@@ -302,7 +302,7 @@ export default function FinancePage() {
         id: loan.id,
         type: 'unearned' as const,
         date: loan.disbursementDate,
-        amount: (loan.registrationFee || 0) + (loan.processingFee || 0) + (loan.carTrackInstallationFee || 0) + (loan.chargingCost || 0),
+        amount: (loan.registrationFee || 0) + (loan.processingFee || 0),
         description: `Fees from Loan #${loan.loanNumber}`
     })).filter(entry => entry.amount > 0);
   }, [loans]);
@@ -437,7 +437,7 @@ export default function FinancePage() {
           <TabsContent value="unearned">
             <FinanceReportTab
               title="Unearned Income"
-              description="Total income from upfront fees (registration, processing, etc.)."
+              description="Total income from upfront fees (registration and processing fees)."
               entries={unearnedIncomeEntries}
               loading={loansLoading}
             />
@@ -724,3 +724,4 @@ export default function FinancePage() {
   );
 
     
+
