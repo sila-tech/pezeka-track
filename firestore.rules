@@ -22,18 +22,15 @@ service cloud.firestore {
 
     /**
      * Role check for 'finance' or 'admin'. These users log in with a @finance.com email.
-     * This function is now structured to safely handle null emails from anonymous users.
+     * This function now safely handles all user types, including anonymous.
      */
     function isFinanceAdmin() {
-      if (!isSignedIn() || request.auth.token.email == null) {
-        return false;
-      }
-      return request.auth.token.email.matches('.*@finance\\.com$');
+      return isSignedIn() && request.auth.token.email != null && request.auth.token.email.matches('.*@finance\\.com$');
     }
     
     /**
      * Role check for 'staff'. A staff member is any authenticated user who is not a finance admin.
-     * This includes anonymous users for the staff portal.
+     * This correctly includes anonymous users.
      */
     function isStaff() {
       return isSignedIn() && !isFinanceAdmin();
