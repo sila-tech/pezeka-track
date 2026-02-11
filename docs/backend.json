@@ -29,16 +29,36 @@
       "description": "Represents a loan disbursed to a customer.",
       "type": "object",
       "properties": {
+        "loanNumber": { "type": "string", "description": "Unique identifier for the loan." },
         "customerId": { "type": "string" },
         "customerName": { "type": "string" },
-        "amountDisbursed": { "type": "number" },
+        "customerPhone": { "type": "string" },
         "disbursementDate": { "type": "string", "format": "date-time" },
-        "dueDate": { "type": "string", "format": "date-time" },
+        "principalAmount": { "type": "number", "description": "The initial amount of the loan."},
+        "registrationFee": { "type": "number", "default": 0 },
+        "processingFee": { "type": "number", "default": 0 },
+        "carTrackInstallationFee": { "type": "number", "default": 0 },
+        "chargingCost": { "type": "number", "default": 0 },
+        "numberOfInstalments": { "type": "number" },
+        "instalmentAmount": { "type": "number" },
+        "totalRepayableAmount": { "type": "number", "description": "Total amount to be paid back."},
+        "totalPaid": { "type": "number", "default": 0 },
         "paymentFrequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
-        "status": { "type": "string", "enum": ["due", "paid", "active"] },
-        "totalPaid": { "type": "number", "default": 0 }
+        "status": { "type": "string", "enum": ["due", "paid", "active"] }
       },
-      "required": ["customerId", "customerName", "amountDisbursed", "disbursementDate", "dueDate", "paymentFrequency", "status"]
+      "required": [
+        "loanNumber",
+        "customerId", 
+        "customerName", 
+        "customerPhone",
+        "disbursementDate", 
+        "principalAmount",
+        "numberOfInstalments",
+        "instalmentAmount",
+        "totalRepayableAmount",
+        "paymentFrequency", 
+        "status"
+      ]
     },
     "FinanceEntry": {
       "title": "Finance Entry",
