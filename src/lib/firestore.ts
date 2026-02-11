@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -10,7 +10,7 @@ type CustomerData = {
   idNumber?: string;
 }
 
-export function addCustomer(db: Firestore, customerData: CustomerData) {
+export async function addCustomer(db: Firestore, customerData: CustomerData): Promise<DocumentReference<DocumentData>> {
   const customerCollection = collection(db, 'customers');
   
   const newCustomer = {
@@ -18,15 +18,18 @@ export function addCustomer(db: Firestore, customerData: CustomerData) {
     createdAt: serverTimestamp(),
   };
 
-  addDoc(customerCollection, newCustomer)
-    .catch((serverError) => {
-      const permissionError = new FirestorePermissionError({
-        path: customerCollection.path,
-        operation: 'create',
-        requestResourceData: newCustomer,
-      });
-      errorEmitter.emit('permission-error', permissionError);
+  try {
+    const docRef = await addDoc(customerCollection, newCustomer);
+    return docRef;
+  } catch (serverError) {
+    const permissionError = new FirestorePermissionError({
+      path: customerCollection.path,
+      operation: 'create',
+      requestResourceData: newCustomer,
     });
+    errorEmitter.emit('permission-error', permissionError);
+    throw serverError;
+  }
 }
 
 type FinanceEntryData = {
@@ -36,22 +39,25 @@ type FinanceEntryData = {
     description?: string;
 }
 
-export function addFinanceEntry(db: Firestore, entryData: FinanceEntryData) {
+export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData): Promise<DocumentReference<DocumentData>> {
   const financeCollection = collection(db, 'financeEntries');
 
   const newEntry = {
     ...entryData,
   };
 
-  addDoc(financeCollection, newEntry)
-    .catch((serverError) => {
+  try {
+    const docRef = await addDoc(financeCollection, newEntry);
+    return docRef;
+  } catch (serverError) {
       const permissionError = new FirestorePermissionError({
         path: financeCollection.path,
         operation: 'create',
         requestResourceData: newEntry,
       });
       errorEmitter.emit('permission-error', permissionError);
-    });
+      throw serverError;
+  }
 }
 
 type LoanData = {
@@ -73,7 +79,7 @@ type LoanData = {
   status: 'due' | 'paid' | 'active';
 }
 
-export function addLoan(db: Firestore, loanData: LoanData) {
+export async function addLoan(db: Firestore, loanData: LoanData): Promise<DocumentReference<DocumentData>> {
   const loanCollection = collection(db, 'loans');
 
   const newLoan = {
@@ -81,13 +87,16 @@ export function addLoan(db: Firestore, loanData: LoanData) {
     createdAt: serverTimestamp(),
   };
 
-  addDoc(loanCollection, newLoan)
-    .catch((serverError) => {
-      const permissionError = new FirestorePermissionError({
-        path: loanCollection.path,
-        operation: 'create',
-        requestResourceData: newLoan,
-      });
-      errorEmitter.emit('permission-error', permissionError);
+  try {
+    const docRef = await addDoc(loanCollection, newLoan);
+    return docRef;
+  } catch (serverError) {
+    const permissionError = new FirestorePermissionError({
+      path: loanCollection.path,
+      operation: 'create',
+      requestResourceData: newLoan,
     });
+    errorEmitter.emit('permission-error', permissionError);
+    throw serverError;
+  }
 }

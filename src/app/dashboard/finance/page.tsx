@@ -87,16 +87,25 @@ export default function FinancePage() {
     }
   });
 
-  function onSubmit(values: z.infer<typeof financeEntrySchema>) {
+  async function onSubmit(values: z.infer<typeof financeEntrySchema>) {
     setIsSubmitting(true);
-    addFinanceEntry(firestore, { ...values, date: new Date(values.date) });
-    toast({
-      title: 'Finance Entry Added',
-      description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
-    });
-    form.reset();
-    setOpen(false);
-    setIsSubmitting(false);
+    try {
+      await addFinanceEntry(firestore, { ...values, date: new Date(values.date) });
+      toast({
+        title: 'Finance Entry Added',
+        description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
+      });
+      form.reset();
+      setOpen(false);
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Could not add finance entry. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const handleExport = () => {

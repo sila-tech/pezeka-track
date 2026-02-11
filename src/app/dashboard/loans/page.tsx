@@ -35,16 +35,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addLoan } from '@/lib/firestore';
+import { addLoan, addCustomer } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const loanSchema = z.object({
   loanNumber: z.string().min(1, 'Loan number is required.'),
-  customerId: z.string().min(1, 'Please select a customer.'),
+  customerId: z.string().optional(),
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
   registrationFee: z.coerce.number().optional(),
@@ -55,7 +56,23 @@ const loanSchema = z.object({
   instalmentAmount: z.coerce.number().min(1, 'Instalment amount is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   status: z.enum(['due', 'paid', 'active']),
+  customerType: z.enum(['existing', 'new']),
+  newCustomerName: z.string().optional(),
+  newCustomerPhone: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.customerType === 'existing' && !data.customerId) {
+    ctx.addIssue({ code: 'custom', message: 'Please select a customer.', path: ['customerId'] });
+  }
+  if (data.customerType === 'new') {
+    if (!data.newCustomerName) {
+      ctx.addIssue({ code: 'custom', message: 'New customer name is required.', path: ['newCustomerName'] });
+    }
+    if (!data.newCustomerPhone) {
+      ctx.addIssue({ code: 'custom', message: 'New customer phone is required.', path: ['newCustomerPhone'] });
+    }
+  }
 });
+
 
 interface Customer {
   id: string;
@@ -99,46 +116,74 @@ export default function LoansPage() {
       instalmentAmount: undefined,
       paymentFrequency: 'monthly',
       status: 'active',
+      customerType: 'existing',
+      newCustomerName: '',
+      newCustomerPhone: '',
     },
   });
 
-  function onSubmit(values: z.infer<typeof loanSchema>) {
+  const customerType = form.watch('customerType');
+
+  async function onSubmit(values: z.infer<typeof loanSchema>) {
     setIsSubmitting(true);
+    try {
+      let customerId = values.customerId;
+      let customerName = '';
+      let customerPhone = '';
 
-    const selectedCustomer = customers?.find(c => c.id === values.customerId);
-    if (!selectedCustomer) {
+      if (values.customerType === 'new') {
+        const newCustomerData = { name: values.newCustomerName!, phone: values.newCustomerPhone! };
+        const newCustomerDocRef = await addCustomer(firestore, newCustomerData);
+        customerId = newCustomerDocRef.id;
+        customerName = newCustomerData.name;
+        customerPhone = newCustomerData.phone;
+        toast({
+            title: 'Customer Added',
+            description: `${customerName} has been added successfully.`,
+        });
+      } else {
+        const selectedCustomer = customers?.find(c => c.id === customerId);
+        if (!selectedCustomer) {
+            throw new Error("Selected customer not found.");
+        }
+        customerName = selectedCustomer.name;
+        customerPhone = selectedCustomer.phone;
+      }
+
+      const totalRepayableAmount = values.numberOfInstalments * values.instalmentAmount;
+
+      const loanData = {
+        ...values,
+        customerId: customerId!,
+        customerName,
+        customerPhone,
+        disbursementDate: new Date(values.disbursementDate),
+        totalRepayableAmount,
+        totalPaid: 0,
+        registrationFee: values.registrationFee || 0,
+        processingFee: values.processingFee || 0,
+        carTrackInstallationFee: values.carTrackInstallationFee || 0,
+        chargingCost: values.chargingCost || 0,
+      };
+      
+      await addLoan(firestore, loanData);
+
       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Selected customer not found.',
+        title: 'Loan Added',
+        description: `Loan #${values.loanNumber} has been added successfully.`,
       });
-      setIsSubmitting(false);
-      return;
+      form.reset();
+      setOpen(false);
+
+    } catch (e: any) {
+        toast({
+            variant: 'destructive',
+            title: 'Error creating loan',
+            description: e.message || 'An unexpected error occurred.',
+        });
+    } finally {
+        setIsSubmitting(false);
     }
-
-    const totalRepayableAmount = values.numberOfInstalments * values.instalmentAmount;
-
-    const loanData = {
-      ...values,
-      customerName: selectedCustomer.name,
-      customerPhone: selectedCustomer.phone,
-      disbursementDate: new Date(values.disbursementDate),
-      totalRepayableAmount,
-      totalPaid: 0,
-      registrationFee: values.registrationFee || 0,
-      processingFee: values.processingFee || 0,
-      carTrackInstallationFee: values.carTrackInstallationFee || 0,
-      chargingCost: values.chargingCost || 0,
-    };
-    
-    addLoan(firestore, loanData);
-    toast({
-      title: 'Loan Added',
-      description: `Loan #${values.loanNumber} has been added successfully.`,
-    });
-    form.reset();
-    setOpen(false);
-    setIsSubmitting(false);
   }
 
   return (
@@ -161,6 +206,92 @@ export default function LoansPage() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+                 <FormField
+                    control={form.control}
+                    name="customerType"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Customer Type</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            className="flex space-x-4"
+                          >
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <RadioGroupItem value="existing" id="existing" />
+                              </FormControl>
+                              <FormLabel htmlFor="existing">Existing Customer</FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <RadioGroupItem value="new" id="new" />
+                              </FormControl>
+                              <FormLabel htmlFor="new">New Customer</FormLabel>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                {customerType === 'existing' ? (
+                  <FormField
+                    control={form.control}
+                    name="customerId"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Customer</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {customers && customers.map(customer => (
+                              <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="newCustomerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>New Customer Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={form.control}
+                      name="newCustomerPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>New Customer Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="0712345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                )}
+
+
                 <FormField
                   control={form.control}
                   name="loanNumber"
@@ -170,28 +301,6 @@ export default function LoansPage() {
                       <FormControl>
                         <Input placeholder="e.g., LN001" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="customerId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Customer</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {customers && customers.map(customer => (
-                            <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

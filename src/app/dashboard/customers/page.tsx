@@ -52,16 +52,25 @@ export default function CustomersPage() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof customerSchema>) {
+  async function onSubmit(values: z.infer<typeof customerSchema>) {
     setIsSubmitting(true);
-    addCustomer(firestore, values);
-    toast({
-      title: 'Customer Added',
-      description: `${values.name} has been added successfully.`,
-    });
-    form.reset();
-    setOpen(false);
-    setIsSubmitting(false);
+    try {
+      await addCustomer(firestore, values);
+      toast({
+        title: 'Customer Added',
+        description: `${values.name} has been added successfully.`,
+      });
+      form.reset();
+      setOpen(false);
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Could not add customer. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
