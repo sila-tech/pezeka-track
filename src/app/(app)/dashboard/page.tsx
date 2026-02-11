@@ -5,7 +5,7 @@ import { customers, loans } from "@/lib/data";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Bell, ArrowRight } from "lucide-react";
+import { Bell, ArrowRight, HandCoins, Users } from "lucide-react";
 
 export default function DashboardPage() {
   const dueLoans = loans
