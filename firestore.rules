@@ -2,7 +2,6 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Only finance users (including Simon) can read or write any document.
     function isFinanceUser() {
       return request.auth != null && (
         request.auth.token.email == 'simon@pezeka.com' ||
@@ -10,7 +9,31 @@ service cloud.firestore {
       );
     }
 
-    match /{document=**} {
+    function isStaffUser() {
+      return request.auth != null && request.auth.token.email.matches('.*@staff\\.pezeka\\.com$');
+    }
+
+    function isOwner(userId) {
+        return request.auth != null && request.auth.uid == userId;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read, write: if isFinanceUser() || isOwner(userId);
+    }
+
+    // Customers
+    match /customers/{customerId} {
+      allow read, write: if isFinanceUser() || isStaffUser();
+    }
+
+    // Loans
+    match /loans/{loanId} {
+      allow read, write: if isFinanceUser() || isStaffUser();
+    }
+
+    // Finance Entries
+    match /financeEntries/{entryId} {
       allow read, write: if isFinanceUser();
     }
   }
