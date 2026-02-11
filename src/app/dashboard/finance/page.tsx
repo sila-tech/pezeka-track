@@ -160,6 +160,7 @@ export default function FinancePage() {
                                             date > new Date() || date < new Date("1900-01-01")
                                         }
                                         initialFocus
+                                        className="bg-card"
                                     />
                                     </PopoverContent>
                                 </Popover>
