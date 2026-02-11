@@ -1,12 +1,68 @@
 'use client';
 
-import { useUser } from '@/firebase';
+import { useMemo } from 'react';
+import { useUser, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell } from 'lucide-react';
+import { Bell, Loader2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
+
+interface DueLoan {
+  id: string;
+  loanNumber: string;
+  customerName: string;
+  status: 'due' | 'paid' | 'active';
+  disbursementDate: { seconds: number; nanoseconds: number };
+  paymentFrequency: 'daily' | 'weekly' | 'monthly';
+  numberOfInstalments: number;
+  totalRepayableAmount: number;
+  totalPaid: number;
+}
 
 export default function Dashboard() {
   const { user } = useUser();
+  const { data: loans, loading: loansLoading } = useCollection<DueLoan>('loans');
+
+  const dueLoans = useMemo(() => {
+    if (!loans) return [];
+
+    const today = startOfToday();
+    
+    return loans
+      .filter(loan => loan.status !== 'paid')
+      .map(loan => {
+        const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
+        let endDate: Date;
+        try {
+            switch (loan.paymentFrequency) {
+                case 'daily':
+                    endDate = addDays(disbursementDate, loan.numberOfInstalments);
+                    break;
+                case 'weekly':
+                    endDate = addWeeks(disbursementDate, loan.numberOfInstalments);
+                    break;
+                case 'monthly':
+                    endDate = addMonths(disbursementDate, loan.numberOfInstalments);
+                    break;
+                default:
+                   endDate = new Date('invalid');
+            }
+        } catch(e) {
+            endDate = new Date('invalid');
+        }
+        return { ...loan, endDate };
+      })
+      .filter(loan => {
+        if (!loan.endDate || loan.endDate.toString() === 'Invalid Date') return false;
+        
+        if (loan.status === 'due') return true;
+        
+        const daysUntilDue = differenceInDays(loan.endDate, today);
+        return daysUntilDue <= 7;
+      });
+  }, [loans]);
 
   return (
     <div>
@@ -47,9 +103,15 @@ export default function Dashboard() {
         <Card>
             <CardHeader>
                 <CardTitle>Due Loans</CardTitle>
-                <CardDescription>Members with payments due soon.</CardDescription>
+                <CardDescription>Members with payments that are overdue or due within 7 days.</CardDescription>
             </CardHeader>
             <CardContent>
+              {loansLoading && (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              )}
+              {!loansLoading && dueLoans.length === 0 && (
                 <Alert>
                     <Bell className="h-4 w-4" />
                     <AlertTitle>No Due Loans</AlertTitle>
@@ -57,7 +119,53 @@ export default function Dashboard() {
                         All customer accounts are up to date.
                     </AlertDescription>
                 </Alert>
-                {/* Placeholder for list of due loans */}
+              )}
+              {!loansLoading && dueLoans.length > 0 && (
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Loan No.</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {dueLoans.map((loan) => {
+                            const balance = loan.totalRepayableAmount - loan.totalPaid;
+                            const daysDue = differenceInDays(loan.endDate, startOfToday());
+                            
+                            let statusLabel = '';
+                            let statusVariant: "destructive" | "secondary" | "default" = 'secondary';
+
+                            if (loan.status === 'due' || daysDue < 0) {
+                                statusLabel = `Overdue by ${Math.abs(daysDue)} day(s)`;
+                                statusVariant = 'destructive';
+                            } else if (daysDue === 0) {
+                                statusLabel = 'Due Today';
+                                statusVariant = 'destructive';
+                            } else {
+                                statusLabel = `Due in ${daysDue} day(s)`;
+                            }
+
+                            return (
+                                <TableRow key={loan.id}>
+                                    <TableCell className="font-medium">{loan.customerName}</TableCell>
+                                    <TableCell>{loan.loanNumber}</TableCell>
+                                    <TableCell>{format(loan.endDate, 'PPP')}</TableCell>
+                                    <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                    <TableCell className="text-center">
+                                      <Badge variant={statusVariant}>
+                                        {statusLabel}
+                                      </Badge>
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
+                    </TableBody>
+                </Table>
+              )}
             </CardContent>
         </Card>
       </div>
