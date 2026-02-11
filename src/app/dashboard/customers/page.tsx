@@ -267,24 +267,28 @@ export default function CustomersPage() {
               </Alert>
           )}
           {!isLoading && customers && customers.length > 0 && (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Phone Number</TableHead>
-                        <TableHead>ID Number</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {customers.map(customer => (
-                        <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
-                            <TableCell className="font-medium">{customer.name}</TableCell>
-                            <TableCell>{customer.phone}</TableCell>
-                            <TableCell>{customer.idNumber || 'N/A'}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+            <div className="relative max-h-[60vh] overflow-y-auto">
+              <Table>
+                  <TableHeader className="sticky top-0 bg-card">
+                      <TableRow>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Phone Number</TableHead>
+                          <TableHead>ID Number</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {customers.map((customer, index) => (
+                          <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
+                              <TableCell>{index + 1}</TableCell>
+                              <TableCell className="font-medium">{customer.name}</TableCell>
+                              <TableCell>{customer.phone}</TableCell>
+                              <TableCell>{customer.idNumber || 'N/A'}</TableCell>
+                          </TableRow>
+                      ))}
+                  </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
