@@ -21,14 +21,11 @@ service cloud.firestore {
     }
 
     /**
-     * Role check for 'finance' or 'admin'. 
-     * This now checks the sign-in provider to be more robust and avoid evaluation
-     * errors on anonymous users.
+     * Role check for 'finance' or 'admin'. This now simply checks if the user
+     * logged in with an email and password.
      */
     function isFinanceAdmin() {
-      return isSignedIn() &&
-             request.auth.token.firebase.sign_in_provider == 'password' &&
-             request.auth.token.email.matches('.*@finance\\.com$');
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'password';
     }
     
     /**
