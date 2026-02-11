@@ -171,7 +171,7 @@ export default function LoansPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/customers/${loan.customerId}`}>
+                        <Link href={`/staff/customers/${loan.customerId}`}>
                             View <ArrowRight className="ml-2 h-4 w-4" />
                         </Link>
                     </Button>

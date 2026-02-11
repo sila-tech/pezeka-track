@@ -30,7 +30,7 @@ export default function AppLayout({
 
   useEffect(() => {
     if (!isUserLoading && !user) {
-      router.push('/login');
+      router.push('/staff/login');
     }
   }, [user, isUserLoading, router]);
 
@@ -41,10 +41,10 @@ export default function AppLayout({
     if (user && !isUserDocLoading && !userDoc && user.email) {
       // User is logged in, but no user document exists. Let's create one.
       let role = 'staff'; // default role
-      if (user.email.endsWith('@admin.com')) {
+      if (user.email.endsWith('@finance.com')) {
         role = 'admin';
-      } else if (user.email.endsWith('@finance.com')) {
-        role = 'finance';
+      } else if (user.email.endsWith('@staff.com')) {
+        role = 'staff';
       }
 
       const newUserDoc = {
@@ -81,13 +81,13 @@ export default function AppLayout({
     <SidebarProvider>
       <Sidebar variant="inset" side="left" collapsible="icon">
         <SidebarHeader>
-          <Logo href="/dashboard" />
+          <Logo href="/staff/dashboard" />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <Link href="/dashboard">
+                <Link href="/staff/dashboard">
                   <LayoutDashboard />
                   Dashboard
                 </Link>
@@ -95,7 +95,7 @@ export default function AppLayout({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <Link href="/customers">
+                <Link href="/staff/customers">
                   <Users />
                   Customers
                 </Link>
@@ -103,7 +103,7 @@ export default function AppLayout({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <Link href="/loans">
+                <Link href="/staff/loans">
                   <HandCoins />
                   Loans
                 </Link>
@@ -113,7 +113,7 @@ export default function AppLayout({
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <PageHeader loginPath="/login" />
+        <PageHeader loginPath="/staff/login" />
         {children}
       </SidebarInset>
     </SidebarProvider>

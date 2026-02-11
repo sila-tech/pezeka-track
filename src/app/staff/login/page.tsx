@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 
-export default function FinanceLoginPage() {
+export default function StaffLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
@@ -19,7 +19,7 @@ export default function FinanceLoginPage() {
 
   useEffect(() => {
     if (!isUserLoading && user) {
-      router.push('/finance');
+      router.push('/staff/dashboard');
     }
   }, [user, isUserLoading, router]);
 
@@ -28,31 +28,31 @@ export default function FinanceLoginPage() {
     const formData = new FormData(event.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
-
+    
     if (!password) {
-      toast({
-        variant: "destructive",
-        title: "Password is required",
-        description: "Please enter your password.",
-      });
-      return;
+        toast({
+            variant: "destructive",
+            title: "Password is required",
+            description: "Please enter your password.",
+        });
+        return;
     }
 
-    if (email.endsWith('@finance.com')) {
+    if (email.endsWith('@staff.com')) {
       toast({
-        title: "Finance/Admin Login Successful",
-        description: "Redirecting to finance dashboard...",
+        title: "Staff Login Successful",
+        description: "Redirecting to dashboard...",
       });
       initiateEmailSignIn(auth, email, password);
     } else {
       toast({
         variant: "destructive",
-        title: "Invalid Credentials",
-        description: "Only finance or admin users can access this portal.",
+        title: "Access Denied",
+        description: "Only staff members can access this portal.",
       });
     }
   };
-  
+
   if (isUserLoading || user) {
     return <div className="flex h-screen items-center justify-center"><p>Loading...</p></div>;
   }
@@ -65,14 +65,14 @@ export default function FinanceLoginPage() {
             <CreditCard className="h-8 w-8" />
             <h1 className="text-2xl font-bold tracking-tight font-headline">PezekaTrack</h1>
           </Link>
-          <CardTitle className="text-2xl">Finance &amp; Admin Login</CardTitle>
-          <CardDescription>Enter your credentials to access the finance portal.</CardDescription>
+          <CardTitle className="text-2xl">Staff Login</CardTitle>
+          <CardDescription>Enter your credentials to access the staff portal.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="you@finance.com" required />
+              <Input id="email" name="email" type="email" placeholder="you@staff.com" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

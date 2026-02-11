@@ -43,7 +43,7 @@ export default function CustomersPage() {
     };
 
     const customersCollection = collection(firestore, 'customers');
-    addDocumentNonBlocking(customersCollection, newCustomer);
+    addDocumentNonBlocking(customersCollection, { ...newCustomer, id: newCustomerId });
     
     setOpen(false);
     toast({
@@ -128,7 +128,7 @@ export default function CustomersPage() {
                   <TableCell>{new Date(customer.joinDate).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/customers/${customer.id}`}>
+                      <Link href={`/staff/customers/${customer.id}`}>
                         View Details <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>

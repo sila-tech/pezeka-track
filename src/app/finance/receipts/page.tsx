@@ -2,7 +2,7 @@
 
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
-import { FinanceDataTable } from "../data-table";
+import { FinanceDataTable } from "./data-table";
 import { FinanceRecord } from "@/lib/types";
 
 export default function ReceiptsPage() {

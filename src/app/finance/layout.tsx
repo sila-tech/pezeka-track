@@ -43,10 +43,10 @@ export default function FinanceLayout({
     if (user && !isUserDocLoading && !userDoc && user.email) {
       // User is logged in, but no user document exists. Let's create one.
       let role = 'staff'; // default role
-      if (user.email.endsWith('@admin.com')) {
+      if (user.email.endsWith('@finance.com')) {
         role = 'admin';
-      } else if (user.email.endsWith('@finance.com')) {
-        role = 'finance';
+      } else if (user.email.endsWith('@staff.com')) {
+        role = 'staff';
       }
 
       const newUserDoc = {
@@ -62,6 +62,12 @@ export default function FinanceLayout({
       setDocumentNonBlocking(userDocToCreateRef, newUserDoc, { merge: false });
     }
   }, [user, userDoc, isUserDocLoading, firestore]);
+  
+  useEffect(() => {
+    if (!isUserLoading && !isUserDocLoading && userDoc && userDoc.role !== 'admin') {
+      router.push('/staff/login');
+    }
+  }, [user, isUserLoading, userDoc, isUserDocLoading, router]);
 
   if (isUserLoading || !user || isUserDocLoading) {
     return (
@@ -71,10 +77,10 @@ export default function FinanceLayout({
     );
   }
 
-  if (!userDoc) {
+  if (!userDoc || userDoc.role !== 'admin') {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p>Creating user profile...</p>
+        <p>Access Denied. Redirecting...</p>
       </div>
     );
   }

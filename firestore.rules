@@ -110,10 +110,10 @@ service cloud.firestore {
      */
     function canCreateUser(userId) {
       let expectedRole = 'staff';
-      if (request.auth.token.email.matches('.*@admin\\.com$')) {
+      if (request.auth.token.email.matches('.*@finance\\.com$')) {
         expectedRole = 'admin';
-      } else if (request.auth.token.email.matches('.*@finance\\.com$')) {
-        expectedRole = 'finance';
+      } else if (request.auth.token.email.matches('.*@staff\\.com$')) {
+        expectedRole = 'staff';
       }
       return request.resource.data.id == userId
           && request.resource.data.role == expectedRole;
