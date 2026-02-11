@@ -9,8 +9,8 @@
  * Data Structure:
  * - /users/{userId}: Stores user profiles, including their role.
  * - /customers/{customerId}: A top-level collection for all customer data.
- * - /customers/{customerId}/loans/{loanId}: Subcollection for loans belonging to a customer.
- * - /customers/{customerId}/loans/{loanId}/payments/{paymentId}: Sub-subcollection for payments on a loan.
+ * - /loans/{loanId}: A top-level collection for all loan data.
+ * - /loans/{loanId}/payments/{paymentId}: Subcollection for payments on a loan.
  * - /financialRecords/{financialRecordId}: A separate top-level collection for financial data,
  *   accessible only to specialized roles.
  *
@@ -203,37 +203,36 @@ service cloud.firestore {
       allow create: if isStaffOrHigher() && hasValidId(customerId);
       allow update: if isStaffOrHigher() && isExisting() && hasImmutableId();
       allow delete: if isAdmin() && isExisting();
+    }
+
+    /**
+     * @description Manages access to loans. Permissions are granted to staff and higher roles.
+     * @path /loans/{loanId}
+     * @allow (create) A 'staff' user adds a loan.
+     * @allow (list) An 'admin' user lists all loans.
+     * @deny (get) An authenticated user with no role cannot view loan data.
+     * @principle "Provides role-based access for managing loan data."
+     */
+    match /loans/{loanId} {
+      allow get, list: if isStaffOrHigher();
+      allow create: if isStaffOrHigher() && hasValidId(loanId);
+      allow update: if isStaffOrHigher() && isExisting() && isImmutableLoanData();
+      allow delete: if isAdmin() && isExisting();
 
       /**
-       * @description Manages access to customer loans. Permissions are inherited from the
-       * parent customer, allowing staff to manage loans.
-       * @path /customers/{customerId}/loans/{loanId}
-       * @allow (create) A 'staff' user adds a loan for an existing customer.
-       * @allow (list) An 'admin' user lists all loans for a specific customer.
-       * @deny (get) An authenticated user with no role cannot view loan data.
-       * @principle "Inherits role-based access from the parent customer, ensuring only authorized staff can manage loans."
+       * @description Manages access to loan payments. Permissions are inherited,
+       * ensuring only authorized staff can log payments.
+       * @path /loans/{loanId}/payments/{paymentId}
+       * @allow (create) A 'staff' user logs a payment for a loan.
+       * @allow (update) A 'finance' user corrects a payment amount.
+       * @deny (create) An authenticated user with no role cannot add a payment.
+       * @principle "Ensures payment records can only be managed by authorized staff within the context of a specific loan."
        */
-      match /loans/{loanId} {
+      match /payments/{paymentId} {
         allow get, list: if isStaffOrHigher();
-        allow create: if isStaffOrHigher() && isValidLoanData(customerId, loanId);
-        allow update: if isStaffOrHigher() && isExisting() && isImmutableLoanData();
+        allow create: if isStaffOrHigher() && isValidPaymentData(loanId, paymentId);
+        allow update: if isStaffOrHigher() && isExisting() && isImmutablePaymentData();
         allow delete: if isAdmin() && isExisting();
-
-        /**
-         * @description Manages access to loan payments. Permissions are inherited,
-         * ensuring only authorized staff can log payments.
-         * @path /customers/{customerId}/loans/{loanId}/payments/{paymentId}
-         * @allow (create) A 'staff' user logs a payment for a loan.
-         * @allow (update) A 'finance' user corrects a payment amount.
-         * @deny (create) An authenticated user with no role cannot add a payment.
-         * @principle "Ensures payment records can only be managed by authorized staff within the context of a specific customer and loan."
-         */
-        match /payments/{paymentId} {
-          allow get, list: if isStaffOrHigher();
-          allow create: if isStaffOrHigher() && isValidPaymentData(loanId, paymentId);
-          allow update: if isStaffOrHigher() && isExisting() && isImmutablePaymentData();
-          allow delete: if isAdmin() && isExisting();
-        }
       }
     }
 
