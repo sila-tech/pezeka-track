@@ -104,7 +104,7 @@ interface Loan {
 
 interface FinanceEntry {
   id: string;
-  type: 'expense' | 'payout' | 'receipt';
+  type: 'expense' | 'payout' | 'receipt' | 'unearned';
   date: { seconds: number; nanoseconds: number };
   amount: number;
   description: string;
@@ -296,6 +296,17 @@ export default function FinancePage() {
   const payouts = useMemo(() => financeEntries?.filter(e => e.type === 'payout') ?? null, [financeEntries]);
   const expenses = useMemo(() => financeEntries?.filter(e => e.type === 'expense') ?? null, [financeEntries]);
 
+  const unearnedIncomeEntries = useMemo(() => {
+    if (!loans) return null;
+    return loans.map(loan => ({
+        id: loan.id,
+        type: 'unearned' as const,
+        date: loan.disbursementDate,
+        amount: (loan.registrationFee || 0) + (loan.processingFee || 0) + (loan.carTrackInstallationFee || 0) + (loan.chargingCost || 0),
+        description: `Fees from Loan #${loan.loanNumber}`
+    })).filter(entry => entry.amount > 0);
+  }, [loans]);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -392,10 +403,11 @@ export default function FinancePage() {
         </Dialog>
       </div>
       <Tabs defaultValue="receipts">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
+              <TabsTrigger value="unearned">Unearned Income</TabsTrigger>
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
           </TabsList>
           <TabsContent value="receipts">
@@ -421,6 +433,14 @@ export default function FinancePage() {
                 entries={expenses}
                 loading={financeEntriesLoading}
               />
+          </TabsContent>
+          <TabsContent value="unearned">
+            <FinanceReportTab
+              title="Unearned Income"
+              description="Total income from upfront fees (registration, processing, etc.)."
+              entries={unearnedIncomeEntries}
+              loading={loansLoading}
+            />
           </TabsContent>
           <TabsContent value="loanbook">
               <Card>

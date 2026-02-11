@@ -15,7 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface FinanceEntry {
   id: string;
-  type: 'expense' | 'payout' | 'receipt';
+  type: 'expense' | 'payout' | 'receipt' | 'unearned';
   date: { seconds: number; nanoseconds: number };
   amount: number;
   description: string;
