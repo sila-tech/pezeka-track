@@ -6,99 +6,26 @@ service cloud.firestore {
     // Helper Functions
     // ------------------------------------------------------------------------
 
-    /**
-     * Authenticated user check.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * Verifies that a document exists for update/delete operations.
+     * Checks if the signed-in user is Simon.
      */
-    function isExisting() {
-      return resource != null;
-    }
-
-    /**
-     * Role check for 'finance' or 'admin'. This now simply checks if the user
-     * logged in with an email and password.
-     */
-    function isFinanceAdmin() {
-      return isSignedIn() && request.auth.token.firebase.sign_in_provider == 'password';
+    function isSimon() {
+      return isSignedIn() && request.auth.token.email == 'simon@pezeka.com';
     }
     
-    /**
-     * Role check for 'staff'. A staff member is any authenticated user who is not a finance admin.
-     * This correctly includes anonymous users.
-     */
-    function isStaff() {
-      return isSignedIn() && !isFinanceAdmin();
-    }
-    
-    /**
-     * On create, ensures the document's internal ID matches the path ID.
-     */
-    function hasValidId(docId) {
-      return request.resource.data.id == docId;
-    }
-    
-    /**
-     * On update, ensures the internal ID is immutable.
-     */
-    function hasImmutableId() {
-      return request.resource.data.id == resource.data.id;
-    }
-
     // ------------------------------------------------------------------------
     // Collection Rules
     // ------------------------------------------------------------------------
 
     /**
-     * @description User documents are no longer used for authorization.
-     * Access is locked down.
+     * All collections are only accessible by Simon.
      */
-    match /users/{userId} {
-      allow read, write: if false;
-    }
-
-    /**
-     * @description Manages access to customer information. Staff and admins can read.
-     * Only admins can create, update, or delete.
-     */
-    match /customers/{customerId} {
-      allow get, list: if isSignedIn();
-      allow create: if isFinanceAdmin() && hasValidId(customerId);
-      allow update: if isFinanceAdmin() && isExisting() && hasImmutableId();
-      allow delete: if isFinanceAdmin() && isExisting();
-    }
-
-    /**
-     * @description Manages access to loans. Staff and admins can read.
-     * Only admins can create, update, or delete.
-     */
-    match /loans/{loanId} {
-      allow get, list: if isSignedIn();
-      allow create: if isFinanceAdmin();
-      allow update: if isFinanceAdmin() && isExisting();
-      allow delete: if isFinanceAdmin() && isExisting();
-
-      /**
-       * @description Manages access to loan payments. Permissions are inherited.
-       */
-      match /payments/{paymentId} {
-        allow get, list: if isSignedIn();
-        allow create: if isFinanceAdmin();
-        allow update: if isFinanceAdmin() && isExisting();
-        allow delete: if isFinanceAdmin() && isExisting();
-      }
-    }
-
-    /**
-     * @description Controls access to sensitive financial records. Only finance admins can access.
-     */
-    match /financialRecords/{financialRecordId} {
-      allow read, write: if isFinanceAdmin();
+    match /{document=**} {
+      allow read, write: if isSimon();
     }
   }
 }

@@ -20,8 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, addDocumentNonBlocking } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
+import { collection, doc, setDoc } from "firebase/firestore";
 
 type DataTableProps = {
   title: string;
@@ -43,8 +43,9 @@ export function FinanceDataTable({ title, records, type }: DataTableProps) {
     const description = formData.get("description") as string;
     const category = formData.get("category") as string;
     
-    const newRecordId = `FIN-${String((records?.length ?? 0) + 1).padStart(3, '0')}`;
-    const newRecord: Omit<FinanceRecord, 'id'> = {
+    const newRecordId = `FIN-${String((records?.length ?? 0) + 1).padStart(3, '0')}-${Math.floor(Math.random() * 1000)}`;
+    const newRecord: FinanceRecord = {
+        id: newRecordId,
         amount,
         date: new Date(date).toISOString(),
         description,
@@ -52,7 +53,8 @@ export function FinanceDataTable({ title, records, type }: DataTableProps) {
         type
     }
     
-    addDocumentNonBlocking(collection(firestore, "financialRecords"), { ...newRecord, id: newRecordId });
+    const recordDocRef = doc(firestore, "financialRecords", newRecordId);
+    setDoc(recordDocRef, newRecord);
 
     setOpen(false);
   };

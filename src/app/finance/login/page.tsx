@@ -9,13 +9,15 @@ import { CreditCard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-export default function FinanceLoginPage() {
+export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
+  const [email, setEmail] = useState("simon@pezeka.com");
+  const [password, setPassword] = useState("symo@4927");
 
   useEffect(() => {
     if (!isUserLoading && user) {
@@ -25,30 +27,18 @@ export default function FinanceLoginPage() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
 
-    if (!password) {
+    if (email === "simon@pezeka.com" && password === "symo@4927") {
       toast({
-        variant: "destructive",
-        title: "Password is required",
-        description: "Please enter your password.",
-      });
-      return;
-    }
-
-    if (email.endsWith('@finance.com')) {
-      toast({
-        title: "Finance/Admin Login Successful",
-        description: "Redirecting to finance dashboard...",
+        title: "Login Successful",
+        description: "Redirecting to dashboard...",
       });
       initiateEmailSignIn(auth, email, password);
     } else {
       toast({
         variant: "destructive",
         title: "Invalid Credentials",
-        description: "Only finance or admin users can access this portal.",
+        description: "Please check your email and password.",
       });
     }
   };
@@ -65,18 +55,18 @@ export default function FinanceLoginPage() {
             <CreditCard className="h-8 w-8" />
             <h1 className="text-2xl font-bold tracking-tight font-headline">PezekaTrack</h1>
           </Link>
-          <CardTitle className="text-2xl">Finance &amp; Admin Login</CardTitle>
-          <CardDescription>Enter your credentials to access the finance portal.</CardDescription>
+          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardDescription>Enter your credentials to access the portal.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="you@finance.com" required />
+              <Input id="email" name="email" type="email" placeholder="simon@pezeka.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required />
+              <Input id="password" name="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
             <Button type="submit" className="w-full">
               Login

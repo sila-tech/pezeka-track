@@ -13,10 +13,7 @@ export default function Home() {
         <p className="max-w-md text-muted-foreground">Your in-house solution for loan and finance management.</p>
         <div className="flex flex-col gap-4 pt-8 sm:flex-row">
             <Button asChild size="lg" className="w-48">
-              <Link href="/staff/dashboard">Staff Portal</Link>
-            </Button>
-            <Button asChild size="lg" variant="secondary" className="w-48">
-              <Link href="/finance">Finance Portal</Link>
+              <Link href="/finance/login">Enter Portal</Link>
             </Button>
         </div>
       </div>

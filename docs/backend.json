@@ -195,53 +195,11 @@
         "description",
         "category"
       ]
-    },
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
-      "type": "object",
-      "description": "Represents a user of the PezekaTrack application.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "username": {
-          "type": "string",
-          "description": "Username for login."
-        },
-        "email": {
-          "type": "string",
-          "description": "Email address of the user.",
-          "format": "email"
-        },
-        "firstName": {
-          "type": "string",
-          "description": "First name of the user."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "Last name of the user."
-        },
-        "role": {
-          "type": "string",
-          "description": "Role of the user (e.g., admin, finance, staff)."
-        }
-      },
-      "required": [
-        "id",
-        "username",
-        "email",
-        "firstName",
-        "lastName",
-        "role"
-      ]
     }
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -253,7 +211,7 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer data. The 'customerId' is used to uniquely identify each customer."
+          "description": "Stores customer data."
         }
       },
       {
@@ -263,7 +221,7 @@
           "schema": {
             "$ref": "#/backend/entities/Loan"
           },
-          "description": "Stores loan data. Includes denormalized 'customerId' for authorization and querying."
+          "description": "Stores loan data."
         }
       },
       {
@@ -273,17 +231,7 @@
           "schema": {
             "$ref": "#/backend/entities/FinancialRecord"
           },
-          "description": "Stores financial records. Access restricted to users with 'finance' role."
-        }
-      },
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user data. Used for authentication and authorization."
+          "description": "Stores financial records."
         }
       }
     ]
