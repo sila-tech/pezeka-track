@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -48,12 +48,12 @@ const loanSchema = z.object({
   customerId: z.string().optional(),
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
+  interestRate: z.coerce.number().min(0, 'Interest rate must be a positive number.'),
   registrationFee: z.coerce.number().optional(),
   processingFee: z.coerce.number().optional(),
   carTrackInstallationFee: z.coerce.number().optional(),
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
-  instalmentAmount: z.coerce.number().min(1, 'Instalment amount is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   status: z.enum(['due', 'paid', 'active']),
   customerType: z.enum(['existing', 'new']),
@@ -108,12 +108,12 @@ export default function LoansPage() {
       loanNumber: '',
       customerId: '',
       principalAmount: undefined,
+      interestRate: undefined,
       registrationFee: 0,
       processingFee: 0,
       carTrackInstallationFee: 0,
       chargingCost: 0,
       numberOfInstalments: undefined,
-      instalmentAmount: undefined,
       paymentFrequency: 'monthly',
       status: 'active',
       customerType: 'existing',
@@ -122,7 +122,52 @@ export default function LoansPage() {
     },
   });
 
-  const customerType = form.watch('customerType');
+  const { watch } = form;
+  const principalAmount = watch('principalAmount');
+  const interestRate = watch('interestRate');
+  const numberOfInstalments = watch('numberOfInstalments');
+  const paymentFrequency = watch('paymentFrequency');
+  const customerType = watch('customerType');
+
+  const calculatedValues = useMemo(() => {
+    const L = Number(principalAmount);
+    const annualRate = Number(interestRate);
+    const n = Number(numberOfInstalments);
+
+    if (L > 0 && n > 0) {
+        if (annualRate > 0) {
+            let r = 0; // periodic interest rate
+            if (paymentFrequency === 'monthly') {
+                r = annualRate / 100 / 12;
+            } else if (paymentFrequency === 'weekly') {
+                r = annualRate / 100 / 52;
+            } else if (paymentFrequency === 'daily') {
+                r = annualRate / 100 / 365;
+            }
+
+            if (r > 0) {
+                const numerator = r * Math.pow(1 + r, n);
+                const denominator = Math.pow(1 + r, n) - 1;
+                const instalmentAmount = L * (numerator / denominator);
+                const totalRepayableAmount = instalmentAmount * n;
+
+                return {
+                    instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                };
+            }
+        } else { // 0 interest rate
+            const instalmentAmount = L / n;
+            const totalRepayableAmount = L;
+            return {
+                instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            };
+        }
+    }
+    return { instalmentAmount: '0.00', totalRepayableAmount: '0.00' };
+  }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
+
 
   async function onSubmit(values: z.infer<typeof loanSchema>) {
     setIsSubmitting(true);
@@ -149,8 +194,31 @@ export default function LoansPage() {
         customerName = selectedCustomer.name;
         customerPhone = selectedCustomer.phone;
       }
+      
+      const L = Number(values.principalAmount);
+      const annualRate = Number(values.interestRate);
+      const n = Number(values.numberOfInstalments);
+      let instalmentAmount = 0;
+      let totalRepayableAmount = 0;
 
-      const totalRepayableAmount = values.numberOfInstalments * values.instalmentAmount;
+      if (L > 0 && n > 0) {
+        if (annualRate > 0) {
+          let r = 0; // periodic interest rate
+          if (values.paymentFrequency === 'monthly') r = annualRate / 100 / 12;
+          else if (values.paymentFrequency === 'weekly') r = annualRate / 100 / 52;
+          else if (values.paymentFrequency === 'daily') r = annualRate / 100 / 365;
+          
+          if (r > 0) {
+            const numerator = r * Math.pow(1 + r, n);
+            const denominator = Math.pow(1 + r, n) - 1;
+            instalmentAmount = L * (numerator / denominator);
+            totalRepayableAmount = instalmentAmount * n;
+          }
+        } else {
+          instalmentAmount = L / n;
+          totalRepayableAmount = L;
+        }
+      }
 
       const loanData = {
         ...values,
@@ -159,6 +227,7 @@ export default function LoansPage() {
         customerPhone,
         disbursementDate: new Date(values.disbursementDate),
         totalRepayableAmount,
+        instalmentAmount,
         totalPaid: 0,
         registrationFee: values.registrationFee || 0,
         processingFee: values.processingFee || 0,
@@ -333,6 +402,20 @@ export default function LoansPage() {
                         )}
                         />
                         <FormField
+                          control={form.control}
+                          name="interestRate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Annual Interest Rate (%)</FormLabel>
+                              <FormControl>
+                                <Input type="number" placeholder="e.g. 15" {...field} value={field.value ?? ''} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
                         control={form.control}
                         name="registrationFee"
                         render={({ field }) => (
@@ -399,19 +482,6 @@ export default function LoansPage() {
                         />
                         <FormField
                         control={form.control}
-                        name="instalmentAmount"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Instalment Amount</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
                         name="paymentFrequency"
                         render={({ field }) => (
                             <FormItem>
@@ -432,11 +502,22 @@ export default function LoansPage() {
                             </FormItem>
                         )}
                         />
+                         <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
+                            <div className="flex justify-between">
+                                <span className="text-sm font-medium">Calculated Instalment Amount</span>
+                                <span className="text-sm font-bold">Ksh {calculatedValues.instalmentAmount}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-sm font-medium">Total Repayable Amount</span>
+                                <span className="text-sm font-bold">Ksh {calculatedValues.totalRepayableAmount}</span>
+                            </div>
+                        </div>
+
                         <FormField
                         control={form.control}
                         name="status"
                         render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="col-span-2">
                             <FormLabel>Status</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>

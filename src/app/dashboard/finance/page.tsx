@@ -65,12 +65,12 @@ const paymentSchema = z.object({
 const editLoanSchema = z.object({
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
+  interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
   registrationFee: z.coerce.number().optional(),
   processingFee: z.coerce.number().optional(),
   carTrackInstallationFee: z.coerce.number().optional(),
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
-  instalmentAmount: z.coerce.number().min(1, 'Instalment amount is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   status: z.enum(['due', 'paid', 'active']),
 });
@@ -88,6 +88,7 @@ interface Loan {
   customerPhone: string;
   disbursementDate: { seconds: number, nanoseconds: number };
   principalAmount: number;
+  interestRate?: number;
   registrationFee: number;
   processingFee: number;
   carTrackInstallationFee: number;
@@ -146,12 +147,49 @@ export default function FinancePage() {
   });
 
   const { watch } = editLoanForm;
-  const watchedInstalments = watch('numberOfInstalments');
-  const watchedInstalmentAmount = watch('instalmentAmount');
+  const principalAmount = watch('principalAmount');
+  const interestRate = watch('interestRate');
+  const numberOfInstalments = watch('numberOfInstalments');
+  const paymentFrequency = watch('paymentFrequency');
 
-  const totalRepayableDisplay = useMemo(() => {
-      return (watchedInstalments || 0) * (watchedInstalmentAmount || 0);
-  }, [watchedInstalments, watchedInstalmentAmount]);
+  const recalculatedValues = useMemo(() => {
+    const L = Number(principalAmount);
+    const annualRate = Number(interestRate);
+    const n = Number(numberOfInstalments);
+
+    if (L > 0 && n > 0) {
+        if (annualRate > 0) {
+            let r = 0; // periodic interest rate
+            if (paymentFrequency === 'monthly') {
+                r = annualRate / 100 / 12;
+            } else if (paymentFrequency === 'weekly') {
+                r = annualRate / 100 / 52;
+            } else if (paymentFrequency === 'daily') {
+                r = annualRate / 100 / 365;
+            }
+
+            if (r > 0) {
+                const numerator = r * Math.pow(1 + r, n);
+                const denominator = Math.pow(1 + r, n) - 1;
+                const instalmentAmount = L * (numerator / denominator);
+                const totalRepayableAmount = instalmentAmount * n;
+
+                return {
+                    instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                };
+            }
+        } else { // 0 interest rate
+             const instalmentAmount = L / n;
+            const totalRepayableAmount = L;
+            return {
+                instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            };
+        }
+    }
+    return { instalmentAmount: '0.00', totalRepayableAmount: '0.00' };
+  }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
 
   async function onSubmit(values: z.infer<typeof financeEntrySchema>) {
     setIsSubmitting(true);
@@ -213,12 +251,12 @@ export default function FinancePage() {
     editLoanForm.reset({
         disbursementDate: format(new Date(loan.disbursementDate.seconds * 1000), 'yyyy-MM-dd'),
         principalAmount: loan.principalAmount,
+        interestRate: loan.interestRate || 0,
         registrationFee: loan.registrationFee || 0,
         processingFee: loan.processingFee || 0,
         carTrackInstallationFee: loan.carTrackInstallationFee || 0,
         chargingCost: loan.chargingCost || 0,
         numberOfInstalments: loan.numberOfInstalments,
-        instalmentAmount: loan.instalmentAmount,
         paymentFrequency: loan.paymentFrequency,
         status: loan.status,
     });
@@ -265,11 +303,35 @@ export default function FinancePage() {
     if (!loanToEdit) return;
     setIsEditingLoan(true);
 
-    const totalRepayableAmount = values.numberOfInstalments * values.instalmentAmount;
+    const L = Number(values.principalAmount);
+    const annualRate = Number(values.interestRate);
+    const n = Number(values.numberOfInstalments);
+    let instalmentAmount = 0;
+    let totalRepayableAmount = 0;
+
+    if (L > 0 && n > 0) {
+      if (annualRate > 0) {
+        let r = 0; // periodic interest rate
+        if (values.paymentFrequency === 'monthly') r = annualRate / 100 / 12;
+        else if (values.paymentFrequency === 'weekly') r = annualRate / 100 / 52;
+        else if (values.paymentFrequency === 'daily') r = annualRate / 100 / 365;
+
+        if (r > 0) {
+          const numerator = r * Math.pow(1 + r, n);
+          const denominator = Math.pow(1 + r, n) - 1;
+          instalmentAmount = L * (numerator / denominator);
+          totalRepayableAmount = instalmentAmount * n;
+        }
+      } else {
+        instalmentAmount = L / n;
+        totalRepayableAmount = L;
+      }
+    }
     
     const updateData = {
         ...values,
         disbursementDate: new Date(values.disbursementDate),
+        instalmentAmount,
         totalRepayableAmount,
     };
 
@@ -657,6 +719,9 @@ export default function FinancePage() {
                                         <FormField control={editLoanForm.control} name="principalAmount" render={({ field }) => (
                                             <FormItem><FormLabel>Principal Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                                         )} />
+                                        <FormField control={editLoanForm.control} name="interestRate" render={({ field }) => (
+                                            <FormItem><FormLabel>Annual Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                                        )} />
                                         <FormField control={editLoanForm.control} name="registrationFee" render={({ field }) => (
                                             <FormItem><FormLabel>Registration Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                                         )} />
@@ -671,9 +736,6 @@ export default function FinancePage() {
                                         )} />
                                         <FormField control={editLoanForm.control} name="numberOfInstalments" render={({ field }) => (
                                             <FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <FormField control={editLoanForm.control} name="instalmentAmount" render={({ field }) => (
-                                            <FormItem><FormLabel>Instalment Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                                         )} />
                                         <FormField control={editLoanForm.control} name="paymentFrequency" render={({ field }) => (
                                             <FormItem><FormLabel>Payment Frequency</FormLabel>
@@ -693,13 +755,13 @@ export default function FinancePage() {
                                     <Card className="mt-4">
                                         <CardHeader><CardTitle className="text-lg">Recalculated Totals</CardTitle></CardHeader>
                                         <CardContent>
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground">New Total Repayable Amount:</span>
-                                                <span className="font-bold text-lg">Ksh {totalRepayableDisplay.toLocaleString()}</span>
+                                             <div className="flex justify-between items-center">
+                                                <span className="text-muted-foreground">New Instalment Amount:</span>
+                                                <span className="font-bold text-lg">Ksh {recalculatedValues.instalmentAmount}</span>
                                             </div>
-                                             <div className="flex justify-between items-center mt-1">
-                                                <span className="text-xs text-muted-foreground">Original:</span>
-                                                <span className="text-xs text-muted-foreground">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</span>
+                                            <div className="flex justify-between items-center mt-2">
+                                                <span className="text-muted-foreground">New Total Repayable:</span>
+                                                <span className="font-bold text-lg">Ksh {recalculatedValues.totalRepayableAmount}</span>
                                             </div>
                                         </CardContent>
                                     </Card>
@@ -724,4 +786,5 @@ export default function FinancePage() {
   );
 
     
+
 

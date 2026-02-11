@@ -73,6 +73,7 @@ interface Loan {
     customerName: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
+    interestRate?: number;
     status: 'due' | 'paid' | 'active';
     totalRepayableAmount: number;
     totalPaid: number;

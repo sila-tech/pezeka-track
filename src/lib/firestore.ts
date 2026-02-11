@@ -67,6 +67,7 @@ type LoanData = {
   customerPhone: string;
   disbursementDate: Date;
   principalAmount: number;
+  interestRate: number;
   registrationFee: number;
   processingFee: number;
   carTrackInstallationFee: number;
