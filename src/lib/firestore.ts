@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -85,6 +85,8 @@ export async function addLoan(db: Firestore, loanData: LoanData): Promise<Docume
   const newLoan = {
     ...loanData,
     createdAt: serverTimestamp(),
+    payments: [],
+    comments: ""
   };
 
   try {
@@ -101,6 +103,22 @@ export async function addLoan(db: Firestore, loanData: LoanData): Promise<Docume
   }
 }
 
+export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {
+    const loanRef = doc(db, 'loans', loanId);
+    try {
+        await updateDoc(loanRef, { ...data, updatedAt: serverTimestamp() });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loanRef.path,
+            operation: 'update',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+
 type CustomerUpdateData = {
   name: string;
   phone: string;
@@ -110,7 +128,7 @@ type CustomerUpdateData = {
 export async function updateCustomer(db: Firestore, customerId: string, data: CustomerUpdateData) {
     const customerRef = doc(db, 'customers', customerId);
     try {
-        await updateDoc(customerRef, data);
+        await updateDoc(customerRef, { ...data, updatedAt: serverTimestamp() });
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: customerRef.path,

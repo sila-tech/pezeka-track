@@ -5,10 +5,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare } from "lucide-react";
+import { arrayUnion } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -38,12 +39,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FinanceReportTab } from './components/finance-report-tab';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const financeEntrySchema = z.object({
@@ -52,6 +55,18 @@ const financeEntrySchema = z.object({
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   description: z.string().optional(),
 });
+
+const paymentSchema = z.object({
+    paymentAmount: z.coerce.number().min(0.01, 'Payment amount must be greater than 0.'),
+    paymentDate: z.string().min(1, 'Payment date is required.'),
+    comments: z.string().optional(),
+});
+
+
+interface Payment {
+  date: { seconds: number; nanoseconds: number } | Date;
+  amount: number;
+}
 
 interface Loan {
   id: string;
@@ -68,6 +83,9 @@ interface Loan {
   instalmentAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
+  payments?: Payment[];
+  comments?: string;
+  status: 'due' | 'paid' | 'active';
 }
 
 interface FinanceEntry {
@@ -82,6 +100,9 @@ interface FinanceEntry {
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const firestore = useFirestore();
   const { toast } = useToast();
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
@@ -95,6 +116,14 @@ export default function FinancePage() {
         amount: undefined,
         date: "",
     }
+  });
+
+  const paymentForm = useForm<z.infer<typeof paymentSchema>>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: {
+        paymentAmount: undefined,
+        comments: '',
+    },
   });
 
   async function onSubmit(values: z.infer<typeof financeEntrySchema>) {
@@ -139,11 +168,59 @@ export default function FinancePage() {
           'Amount to Pay': loan.totalRepayableAmount,
           'Paid Amount': loan.totalPaid,
           'Balance': balance,
+          'Status': loan.status,
+          'Comments': loan.comments,
         };
       });
       exportToCsv(dataForExport, 'loan_book');
     }
   };
+  
+  const handleEditLoanClick = (loan: Loan) => {
+    setLoanToEdit(loan);
+    paymentForm.reset({
+        paymentAmount: undefined,
+        paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        comments: loan.comments || '',
+    });
+  }
+
+  async function onPaymentSubmit(values: z.infer<typeof paymentSchema>) {
+    if (!loanToEdit) return;
+    setIsUpdating(true);
+    try {
+        const currentTotalPaid = loanToEdit.totalPaid || 0;
+        const newTotalPaid = currentTotalPaid + values.paymentAmount;
+        
+        const newPayment = {
+            amount: values.paymentAmount,
+            date: new Date(values.paymentDate),
+        };
+
+        const newStatus = newTotalPaid >= loanToEdit.totalRepayableAmount ? 'paid' : loanToEdit.status;
+
+        await updateLoan(firestore, loanToEdit.id, {
+            totalPaid: newTotalPaid,
+            payments: arrayUnion(newPayment),
+            comments: values.comments,
+            status: newStatus,
+        });
+
+        toast({
+            title: "Payment Recorded",
+            description: `Payment of Ksh ${values.paymentAmount.toLocaleString()} for loan #${loanToEdit.loanNumber} has been recorded.`,
+        });
+        setLoanToEdit(null);
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Update failed",
+            description: "Could not record payment. Please try again.",
+        });
+    } finally {
+        setIsUpdating(false);
+    }
+  }
 
   const receipts = useMemo(() => financeEntries?.filter(e => e.type === 'receipt') ?? null, [financeEntries]);
   const payouts = useMemo(() => financeEntries?.filter(e => e.type === 'payout') ?? null, [financeEntries]);
@@ -318,6 +395,8 @@ export default function FinancePage() {
                                     <TableHead className="text-right">To Pay</TableHead>
                                     <TableHead className="text-right">Paid</TableHead>
                                     <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -341,6 +420,16 @@ export default function FinancePage() {
                                             <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
                                             <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                             <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
+                                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="sm" onClick={() => handleEditLoanClick(loan)}>
+                                                    <PenSquare className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                     )
                                 })}
@@ -351,6 +440,118 @@ export default function FinancePage() {
               </Card>
           </TabsContent>
       </Tabs>
+
+      <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
+        <DialogContent className="sm:max-w-3xl">
+          {loanToEdit && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Record Payment / Edit Loan #{loanToEdit.loanNumber}</DialogTitle>
+                <DialogDescription>
+                  For {loanToEdit.customerName}. Current balance: Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Record a New Payment</CardTitle></CardHeader>
+                        <CardContent>
+                             <Form {...paymentForm}>
+                                <form onSubmit={paymentForm.handleSubmit(onPaymentSubmit)} className="space-y-4" id="payment-form">
+                                    <FormField
+                                        control={paymentForm.control}
+                                        name="paymentAmount"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                            <FormLabel>Payment Amount (Ksh)</FormLabel>
+                                            <FormControl>
+                                                <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
+                                            </FormControl>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={paymentForm.control}
+                                        name="paymentDate"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                            <FormLabel>Payment Date</FormLabel>
+                                            <FormControl>
+                                                <Input type="date" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={paymentForm.control}
+                                        name="comments"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Loan Comments</FormLabel>
+                                                <FormControl>
+                                                    <Textarea placeholder="Add any comments about the loan (e.g., rollover request)..." {...field} rows={4} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                </form>
+                            </Form>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Payment History</CardTitle>
+                      <CardDescription>All payments recorded for this loan.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ScrollArea className="h-72">
+                        {(!loanToEdit.payments || loanToEdit.payments.length === 0) ? (
+                          <Alert>
+                            <AlertTitle>No Payments Yet</AlertTitle>
+                            <AlertDescription>No payments have been recorded for this loan.</AlertDescription>
+                          </Alert>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {loanToEdit.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map((payment, index) => (
+                                <TableRow key={index}>
+                                  <TableCell>{format(new Date(payment.date.seconds * 1000), 'PPP')}</TableCell>
+                                  <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" form="payment-form" disabled={isUpdating}>
+                  {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Payment
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
