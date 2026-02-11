@@ -1,0 +1,257 @@
+/**
+ * Core Philosophy: This ruleset implements a Role-Based Access Control (RBAC) model
+ * for an internal business application. Access to data is not based on user ownership
+ * but on assigned roles ('admin', 'finance', 'staff') stored in each user's profile.
+ * Admins have full access, Finance staff manage financial records, and general Staff
+ * manage customer-related data. The default posture is to deny all access unless
+ * a user is signed in and has an appropriate role.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles, including their role.
+ * - /customers/{customerId}: A top-level collection for all customer data.
+ * - /customers/{customerId}/loans/{loanId}: Subcollection for loans belonging to a customer.
+ * - /customers/{customerId}/loans/{loanId}/payments/{paymentId}: Sub-subcollection for payments on a loan.
+ * - /financialRecords/{financialRecordId}: A separate top-level collection for financial data,
+ *   accessible only to specialized roles.
+ *
+ * Key Security Decisions:
+ * - Role-Based Access: All permissions are checked by retrieving the requesting user's
+ *   role from their document in the `/users` collection. This provides a single
+ *   source of truth for authorization.
+ * - Admin Supremacy: The 'admin' role is granted universal read and write access
+ *   across the entire database for management purposes.
+ * - Segregated Duties: The `finance` role has exclusive access to the `/financialRecords`
+ *   collection, separating sensitive financial data from general customer data.
+ * - Staff Access: The `staff` role is granted permissions to manage the full lifecycle
+ *   of customer data, including their loans and payments.
+ * - No Public Access: No data is readable or writable by unauthenticated users.
+ *
+ * Denormalization for Authorization:
+ * The security model relies on fetching the user's role from `/users/{request.auth.uid}`.
+ * This is a necessary `get()` call to implement RBAC. To ensure data integrity in nested
+ * collections, relational IDs (e.g., `customerId`, `loanId`) are validated on creation
+ * to match the document's path, preventing data from being associated with the wrong parent.
+ *
+ * Structural Segregation:
+ * The use of separate top-level collections for `/customers` and `/financialRecords` is a
+ * key design choice. It allows for the application of fundamentally different security
+ * rules (general staff access vs. restricted finance access) to each data type, which is
+ * more secure and performant for list operations than filtering a single collection.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Authenticated user check.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the requesting user is the owner of a document.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Verifies that a document exists for update/delete operations.
+     */
+    function isExisting() {
+      return resource != null;
+    }
+
+    /**
+     * Retrieves the role from the requesting user's profile document.
+     * This is the core of the RBAC system.
+     */
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    /**
+     * Role check for 'admin'.
+     */
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
+    }
+
+    /**
+     * Role check for 'finance'. Admins are implicitly included.
+     */
+    function isFinanceOrAdmin() {
+      let role = getUserRole();
+      return isSignedIn() && (role == 'finance' || role == 'admin');
+    }
+    
+    /**
+     * Role check for any staff member ('staff', 'finance', 'admin').
+     */
+    function isStaffOrHigher() {
+      let role = getUserRole();
+      return isSignedIn() && (role == 'staff' || role == 'finance' || role == 'admin');
+    }
+
+    // --- Data Validation Helpers (Prototyping Mode) ---
+
+    /**
+     * On create, validates user ID and assigns a default 'staff' role.
+     * Prevents users from assigning themselves an elevated role on signup.
+     */
+    function canCreateUser(userId) {
+      return request.resource.data.id == userId
+          && request.resource.data.role == 'staff';
+    }
+
+    /**
+     * On update, allows a user to modify their own data but not their role.
+     * Admins are exempt from this restriction.
+     */
+    function canUpdateUser(userId) {
+      let isSelfUpdate = isOwner(userId)
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.role == resource.data.role; // Role is immutable for self-update
+      return isSelfUpdate || isAdmin();
+    }
+    
+    /**
+     * On create, ensures the document's internal ID matches the path ID.
+     */
+    function hasValidId(docId) {
+      return request.resource.data.id == docId;
+    }
+    
+    /**
+     * On update, ensures the internal ID is immutable.
+     */
+    function hasImmutableId() {
+      return request.resource.data.id == resource.data.id;
+    }
+    
+    /**
+     * Validates relational integrity for a new Loan document.
+     */
+    function isValidLoanData(customerId, loanId) {
+      return request.resource.data.id == loanId
+        && request.resource.data.customerId == customerId;
+    }
+    
+    /**
+     * Enforces immutability of relational keys for a Loan document.
+     */
+    function isImmutableLoanData() {
+      return request.resource.data.id == resource.data.id
+        && request.resource.data.customerId == resource.data.customerId;
+    }
+    
+    /**
+     * Validates relational integrity for a new Payment document.
+     */
+    function isValidPaymentData(loanId, paymentId) {
+       return request.resource.data.id == paymentId
+        && request.resource.data.loanId == loanId;
+    }
+    
+    /**
+     * Enforces immutability of relational keys for a Payment document.
+     */
+    function isImmutablePaymentData() {
+       return request.resource.data.id == resource.data.id
+        && request.resource.data.loanId == resource.data.loanId;
+    }
+
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Governs access to user profile documents. Users can create and
+     * manage their own profiles, while admins can manage all profiles.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creates their own user document with a default 'staff' role.
+     * @allow (update) An 'admin' user changes another user's role from 'staff' to 'finance'.
+     * @deny (update) A 'staff' user tries to change their own role to 'admin'.
+     * @deny (delete) A 'staff' user tries to delete their own account.
+     * @principle "Enforces user ownership for self-modification and admin privileges for system management."
+     */
+    match /users/{userId} {
+      allow get, list: if isStaffOrHigher();
+      allow create: if isOwner(userId) && canCreateUser(userId);
+      allow update: if (isOwner(userId) || isAdmin()) && canUpdateUser(userId) && isExisting();
+      allow delete: if isAdmin() && isExisting();
+    }
+
+    /**
+     * @description Manages access to customer information. Any user with a staff-level
+     * role or higher can read and write customer data.
+     * @path /customers/{customerId}
+     * @allow (create) A 'staff' user creates a new customer document.
+     * @allow (get) A 'finance' user reads a customer's details.
+     * @deny (create) An authenticated user without a role cannot create a customer.
+     * @deny (delete) A 'staff' user cannot delete a customer record.
+     * @principle "Provides role-based access to company staff for managing customer data."
+     */
+    match /customers/{customerId} {
+      allow get, list: if isStaffOrHigher();
+      allow create: if isStaffOrHigher() && hasValidId(customerId);
+      allow update: if isStaffOrHigher() && isExisting() && hasImmutableId();
+      allow delete: if isAdmin() && isExisting();
+
+      /**
+       * @description Manages access to customer loans. Permissions are inherited from the
+       * parent customer, allowing staff to manage loans.
+       * @path /customers/{customerId}/loans/{loanId}
+       * @allow (create) A 'staff' user adds a loan for an existing customer.
+       * @allow (list) An 'admin' user lists all loans for a specific customer.
+       * @deny (get) An authenticated user with no role cannot view loan data.
+       * @principle "Inherits role-based access from the parent customer, ensuring only authorized staff can manage loans."
+       */
+      match /loans/{loanId} {
+        allow get, list: if isStaffOrHigher();
+        allow create: if isStaffOrHigher() && isValidLoanData(customerId, loanId);
+        allow update: if isStaffOrHigher() && isExisting() && isImmutableLoanData();
+        allow delete: if isAdmin() && isExisting();
+
+        /**
+         * @description Manages access to loan payments. Permissions are inherited,
+         * ensuring only authorized staff can log payments.
+         * @path /customers/{customerId}/loans/{loanId}/payments/{paymentId}
+         * @allow (create) A 'staff' user logs a payment for a loan.
+         * @allow (update) A 'finance' user corrects a payment amount.
+         * @deny (create) An authenticated user with no role cannot add a payment.
+         * @principle "Ensures payment records can only be managed by authorized staff within the context of a specific customer and loan."
+         */
+        match /payments/{paymentId} {
+          allow get, list: if isStaffOrHigher();
+          allow create: if isStaffOrHigher() && isValidPaymentData(loanId, paymentId);
+          allow update: if isStaffOrHigher() && isExisting() && isImmutablePaymentData();
+          allow delete: if isAdmin() && isExisting();
+        }
+      }
+    }
+
+    /**
+     * @description Controls access to sensitive financial records. Only users with the 'finance'
+     * or 'admin' role can read or write this data.
+     * @path /financialRecords/{financialRecordId}
+     * @allow (create) A 'finance' user creates a new daily financial record.
+     * @allow (get) An 'admin' user reviews a financial record.
+     * @deny (list) A 'staff' user attempts to list all financial records.
+     * @deny (update) A 'staff' user attempts to modify an existing financial record.
+     * @principle "Restricts access to specific roles ('finance', 'admin'), protecting sensitive financial data."
+     */
+    match /financialRecords/{financialRecordId} {
+      allow get, list: if isFinanceOrAdmin();
+      allow create: if isFinanceOrAdmin() && hasValidId(financialRecordId);
+      allow update: if isFinanceOrAdmin() && isExisting() && hasImmutableId();
+      allow delete: if isFinanceOrAdmin() && isExisting();
+    }
+  }
+}
