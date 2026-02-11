@@ -34,26 +34,35 @@ export default function AppLayout({
     }
   }, [user, isUserLoading, router]);
 
-  // This logic remains to create a user profile document, which can be useful for storing user-specific data,
-  // but it's no longer used for authorization.
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const { data: userDoc, isLoading: isUserDocLoading } = useDoc(userDocRef);
 
   useEffect(() => {
-    if (user && !isUserDocLoading && !userDoc && user.email) {
+    if (user && !isUserDocLoading && !userDoc) {
       // User is logged in, but no user document exists. Let's create one.
-      let role = 'staff'; // default role
-      if (user.email.endsWith('@finance.com')) {
-        role = 'admin';
+      const isAnonymous = user.isAnonymous;
+      const email = user.email;
+      
+      let role = 'staff';
+      let firstName = 'Anonymous';
+      let lastName = 'User';
+      let username = `anonymous-${user.uid.slice(0, 5)}`;
+
+      if (!isAnonymous && email) {
+        if (email.endsWith('@finance.com')) {
+          role = 'admin';
+        }
+        firstName = email.split('@')[0] || 'New';
+        username = email;
       }
 
       const newUserDoc = {
         id: user.uid,
-        username: user.email,
-        email: user.email,
+        username: username,
+        email: email,
         role: role,
-        firstName: user.email.split('@')[0] || 'New',
-        lastName: 'User',
+        firstName: firstName,
+        lastName: lastName,
       };
       
       const userDocToCreateRef = doc(firestore, "users", user.uid);
@@ -61,8 +70,6 @@ export default function AppLayout({
     }
   }, [user, userDoc, isUserDocLoading, firestore]);
 
-  // Simplified loading state. We no longer need to wait for the user document to load
-  // because authorization is now handled by the auth token in the security rules.
   if (isUserLoading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">

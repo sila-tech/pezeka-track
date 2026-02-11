@@ -29,11 +29,9 @@ service cloud.firestore {
 
     /**
      * Role check for 'admin'. Admins log in with a @finance.com email.
-     * This function now checks the email from the auth token, removing the
-     * need for a database read and fixing the race condition.
      */
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email.matches('.*@finance\\.com$');
+      return isSignedIn() && request.auth.token.email != null && request.auth.token.email.matches('.*@finance\\.com$');
     }
 
     /**
@@ -44,11 +42,10 @@ service cloud.firestore {
     }
     
     /**
-     * Role check for any staff member ('staff' or 'admin').
-     * This now checks the email from the auth token.
+     * Role check for any staff member. Any signed-in user is considered staff for now.
      */
     function isStaffOrHigher() {
-      return isSignedIn() && (request.auth.token.email.matches('.*@staff\\.com$') || isAdmin());
+      return isSignedIn();
     }
 
     // --- Data Validation Helpers (Prototyping Mode) ---
@@ -58,11 +55,12 @@ service cloud.firestore {
      * Prevents users from assigning themselves an elevated role on signup.
      */
     function canCreateUser(userId) {
+      let isAnonymous = request.auth.token.email == null;
       let expectedRole = 'staff';
-      if (request.auth.token.email.matches('.*@finance\\.com$')) {
-        expectedRole = 'admin';
-      } else if (request.auth.token.email.matches('.*@staff\\.com$')) {
-        expectedRole = 'staff';
+      if (!isAnonymous) {
+        if (request.auth.token.email.matches('.*@finance\\.com$')) {
+          expectedRole = 'admin';
+        }
       }
       return request.resource.data.id == userId
           && request.resource.data.role == expectedRole;

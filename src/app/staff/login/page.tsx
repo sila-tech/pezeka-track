@@ -2,18 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useAuth, useUser, initiateEmailSignIn } from "@/firebase";
+import { useAuth, useUser, initiateAnonymousSignIn } from "@/firebase";
 import { CreditCard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
 
 export default function StaffLoginPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
 
@@ -23,34 +19,8 @@ export default function StaffLoginPage() {
     }
   }, [user, isUserLoading, router]);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    
-    if (!password) {
-        toast({
-            variant: "destructive",
-            title: "Password is required",
-            description: "Please enter your password.",
-        });
-        return;
-    }
-
-    if (email.endsWith('@staff.com')) {
-      toast({
-        title: "Staff Login Successful",
-        description: "Redirecting to dashboard...",
-      });
-      initiateEmailSignIn(auth, email, password);
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Access Denied",
-        description: "Only staff members can access this portal.",
-      });
-    }
+  const handleAnonymousLogin = () => {
+    initiateAnonymousSignIn(auth);
   };
 
   if (isUserLoading || user) {
@@ -65,23 +35,13 @@ export default function StaffLoginPage() {
             <CreditCard className="h-8 w-8" />
             <h1 className="text-2xl font-bold tracking-tight font-headline">PezekaTrack</h1>
           </Link>
-          <CardTitle className="text-2xl">Staff Login</CardTitle>
-          <CardDescription>Enter your credentials to access the staff portal.</CardDescription>
+          <CardTitle className="text-2xl">Staff Portal</CardTitle>
+          <CardDescription>Click below to access the dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="you@staff.com" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required />
-            </div>
-            <Button type="submit" className="w-full">
-              Login
-            </Button>
-          </form>
+          <Button onClick={handleAnonymousLogin} className="w-full">
+            Enter Dashboard
+          </Button>
         </CardContent>
       </Card>
     </main>
