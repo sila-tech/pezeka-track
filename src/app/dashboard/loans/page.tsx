@@ -205,265 +205,267 @@ export default function LoansPage() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
-                 <FormField
-                    control={form.control}
-                    name="customerType"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel>Customer Type</FormLabel>
-                        <FormControl>
-                          <RadioGroup
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            className="flex space-x-4"
-                          >
-                            <FormItem className="flex items-center space-x-2">
-                              <FormControl>
-                                <RadioGroupItem value="existing" id="existing" />
-                              </FormControl>
-                              <FormLabel htmlFor="existing">Existing Customer</FormLabel>
+                <div className="max-h-[65vh] overflow-y-auto pr-4">
+                    <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control}
+                            name="customerType"
+                            render={({ field }) => (
+                            <FormItem className="col-span-2">
+                                <FormLabel>Customer Type</FormLabel>
+                                <FormControl>
+                                <RadioGroup
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                    className="flex space-x-4"
+                                >
+                                    <FormItem className="flex items-center space-x-2">
+                                    <FormControl>
+                                        <RadioGroupItem value="existing" id="existing" />
+                                    </FormControl>
+                                    <FormLabel htmlFor="existing">Existing Customer</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2">
+                                    <FormControl>
+                                        <RadioGroupItem value="new" id="new" />
+                                    </FormControl>
+                                    <FormLabel htmlFor="new">New Customer</FormLabel>
+                                    </FormItem>
+                                </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
                             </FormItem>
-                            <FormItem className="flex items-center space-x-2">
-                              <FormControl>
-                                <RadioGroupItem value="new" id="new" />
-                              </FormControl>
-                              <FormLabel htmlFor="new">New Customer</FormLabel>
+                            )}
+                        />
+
+                        {customerType === 'existing' ? (
+                        <FormField
+                            control={form.control}
+                            name="customerId"
+                            render={({ field }) => (
+                            <FormItem className="col-span-2">
+                                <FormLabel>Customer</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                    <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {customers && customers.map(customer => (
+                                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                                </Select>
+                                <FormMessage />
                             </FormItem>
-                          </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                {customerType === 'existing' ? (
-                  <FormField
-                    control={form.control}
-                    name="customerId"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel>Customer</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {customers && customers.map(customer => (
-                              <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ) : (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="newCustomerName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Customer Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={form.control}
-                      name="newCustomerPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>New Customer Phone</FormLabel>
-                          <FormControl>
-                            <Input placeholder="0712345678" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
+                            )}
+                        />
+                        ) : (
+                        <>
+                            <FormField
+                            control={form.control}
+                            name="newCustomerName"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>New Customer Name</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="John Doe" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                            />
+                            <FormField
+                            control={form.control}
+                            name="newCustomerPhone"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>New Customer Phone</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="0712345678" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                            />
+                        </>
+                        )}
 
 
-                <FormField
-                  control={form.control}
-                  name="loanNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Loan Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., LN001" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="disbursementDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Disbursement Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="principalAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Principal Amount</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="e.g. 50000" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="registrationFee"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Registration Fee (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="processingFee"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Processing Fee (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="carTrackInstallationFee"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Car Track Fee (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="chargingCost"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Charging Cost (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="numberOfInstalments"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>No. of Instalments</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="e.g. 12" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="instalmentAmount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Instalment Amount</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="paymentFrequency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Payment Frequency</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select frequency" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="due">Due</SelectItem>
-                          <SelectItem value="paid">Paid</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormField
+                        control={form.control}
+                        name="loanNumber"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Loan Number</FormLabel>
+                            <FormControl>
+                                <Input placeholder="e.g., LN001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="disbursementDate"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Disbursement Date</FormLabel>
+                            <FormControl>
+                                <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="principalAmount"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Principal Amount</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="e.g. 50000" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="registrationFee"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Registration Fee (Optional)</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="processingFee"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Processing Fee (Optional)</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="carTrackInstallationFee"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Car Track Fee (Optional)</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="chargingCost"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Charging Cost (Optional)</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="numberOfInstalments"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>No. of Instalments</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="e.g. 12" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="instalmentAmount"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Instalment Amount</FormLabel>
+                            <FormControl>
+                                <Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="paymentFrequency"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Payment Frequency</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select frequency" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                <SelectItem value="daily">Daily</SelectItem>
+                                <SelectItem value="weekly">Weekly</SelectItem>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                        <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="due">Due</SelectItem>
+                                <SelectItem value="paid">Paid</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    </form>
+                </div>
 
-                <DialogFooter className="col-span-2">
+                <DialogFooter>
                     <DialogClose asChild>
                         <Button type="button" variant="ghost">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button type="submit" form="add-loan-form" disabled={isSubmitting}>
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Add Loan
                     </Button>
                 </DialogFooter>
-              </form>
             </Form>
           </DialogContent>
         </Dialog>
