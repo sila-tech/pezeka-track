@@ -154,7 +154,7 @@ export default function FinancePage() {
   const paymentFrequency = watch('paymentFrequency');
 
   const recalculatedValues = useMemo(() => {
-    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount, interestRate, numberOfInstalments, paymentFrequency);
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount || 0, interestRate || 0, numberOfInstalments || 0, paymentFrequency);
     return {
         instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -738,6 +738,7 @@ export default function FinancePage() {
   );
 
     
+
 
 
 
