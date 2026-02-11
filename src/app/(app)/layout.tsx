@@ -12,7 +12,8 @@ import {
   SidebarMenuButton,
   SidebarInset, 
 } from "@/components/ui/sidebar";
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase";
+import { doc } from "firebase/firestore";
 import { LayoutDashboard, Users, HandCoins } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,7 @@ export default function AppLayout({
 }>) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const firestore = useFirestore();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -32,10 +34,45 @@ export default function AppLayout({
     }
   }, [user, isUserLoading, router]);
 
-  if (isUserLoading || !user) {
+  const userDocRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
+  const { data: userDoc, isLoading: isUserDocLoading } = useDoc(userDocRef);
+
+  useEffect(() => {
+    if (user && !isUserDocLoading && !userDoc && user.email) {
+      // User is logged in, but no user document exists. Let's create one.
+      let role = 'staff'; // default role
+      if (user.email.endsWith('@admin.com')) {
+        role = 'admin';
+      } else if (user.email.endsWith('@finance.com')) {
+        role = 'finance';
+      }
+
+      const newUserDoc = {
+        id: user.uid,
+        username: user.email,
+        email: user.email,
+        role: role,
+        firstName: user.email.split('@')[0] || 'New',
+        lastName: 'User',
+      };
+      
+      const userDocToCreateRef = doc(firestore, "users", user.uid);
+      setDocumentNonBlocking(userDocToCreateRef, newUserDoc, { merge: false });
+    }
+  }, [user, userDoc, isUserDocLoading, firestore]);
+
+  if (isUserLoading || !user || isUserDocLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!userDoc) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Creating user profile...</p>
       </div>
     );
   }

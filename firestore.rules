@@ -101,12 +101,18 @@ service cloud.firestore {
     // --- Data Validation Helpers (Prototyping Mode) ---
 
     /**
-     * On create, validates user ID and assigns a default 'staff' role.
+     * On create, validates user ID and assigns a role based on email.
      * Prevents users from assigning themselves an elevated role on signup.
      */
     function canCreateUser(userId) {
+      let expectedRole = 'staff';
+      if (request.auth.token.email.matches('.*@admin\\.com$')) {
+        expectedRole = 'admin';
+      } else if (request.auth.token.email.matches('.*@finance\\.com$')) {
+        expectedRole = 'finance';
+      }
       return request.resource.data.id == userId
-          && request.resource.data.role == 'staff';
+          && request.resource.data.role == expectedRole;
     }
 
     /**
