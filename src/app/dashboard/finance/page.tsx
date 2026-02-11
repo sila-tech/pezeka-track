@@ -68,7 +68,8 @@ export default function FinancePage() {
   const form = useForm<z.infer<typeof financeEntrySchema>>({
     resolver: zodResolver(financeEntrySchema),
     defaultValues: {
-        description: ""
+        description: "",
+        amount: undefined
     }
   });
 
@@ -77,7 +78,7 @@ export default function FinancePage() {
     addFinanceEntry(firestore, values);
     toast({
       title: 'Finance Entry Added',
-      description: `A new ${values.type} entry of ${values.amount} has been added.`,
+      description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
     });
     form.reset();
     setOpen(false);
@@ -173,7 +174,7 @@ export default function FinancePage() {
                             name="amount"
                             render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Amount</FormLabel>
+                                <FormLabel>Amount (Ksh)</FormLabel>
                                 <FormControl>
                                     <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
                                 </FormControl>

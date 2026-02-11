@@ -19,10 +19,10 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-medium">
                 Total Revenue
                 </CardTitle>
-                <span className="text-muted-foreground">$</span>
+                <span className="text-muted-foreground">Ksh</span>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">$0.00</div>
+                <div className="text-2xl font-bold">Ksh 0.00</div>
                 <p className="text-xs text-muted-foreground">
                 +0% from last month
                 </p>
