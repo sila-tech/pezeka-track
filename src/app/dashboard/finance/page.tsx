@@ -5,10 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, FileDown, Loader2, PlusCircle } from "lucide-react";
+import { FileDown, Loader2, PlusCircle } from "lucide-react";
 
 import { useCollection, useFirestore } from '@/firebase';
-import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,12 +37,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useToast } from '@/hooks/use-toast';
 import { addFinanceEntry } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,9 +47,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const financeEntrySchema = z.object({
   type: z.enum(['expense', 'payout', 'receipt'], { required_error: 'Please select an entry type.' }),
-  date: z.date({
-    required_error: "A date is required.",
-  }),
+  date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   description: z.string().optional(),
 });
@@ -91,13 +82,14 @@ export default function FinancePage() {
     resolver: zodResolver(financeEntrySchema),
     defaultValues: {
         description: "",
-        amount: undefined
+        amount: undefined,
+        date: "",
     }
   });
 
   function onSubmit(values: z.infer<typeof financeEntrySchema>) {
     setIsSubmitting(true);
-    addFinanceEntry(firestore, values);
+    addFinanceEntry(firestore, { ...values, date: new Date(values.date) });
     toast({
       title: 'Finance Entry Added',
       description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
@@ -180,40 +172,11 @@ export default function FinancePage() {
                             control={form.control}
                             name="date"
                             render={({ field }) => (
-                                <FormItem className="flex flex-col">
+                                <FormItem>
                                 <FormLabel>Date</FormLabel>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                    <FormControl>
-                                        <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "w-full pl-3 text-left font-normal",
-                                            !field.value && "text-muted-foreground"
-                                        )}
-                                        >
-                                        {field.value ? (
-                                            format(field.value, "PPP")
-                                        ) : (
-                                            <span>Pick a date</span>
-                                        )}
-                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
-                                    </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) =>
-                                            date > new Date() || date < new Date("1900-01-01")
-                                        }
-                                        initialFocus
-                                        className="bg-card"
-                                    />
-                                    </PopoverContent>
-                                </Popover>
+                                <FormControl>
+                                    <Input type="date" {...field} />
+                                </FormControl>
                                 <FormMessage />
                                 </FormItem>
                             )}

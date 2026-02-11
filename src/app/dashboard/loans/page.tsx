@@ -1,16 +1,363 @@
+'use client';
+
+import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { useFirestore, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { Loader2, PlusCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { addLoan } from '@/lib/firestore';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+
+
+const loanSchema = z.object({
+  loanNumber: z.string().min(1, 'Loan number is required.'),
+  customerId: z.string().min(1, 'Please select a customer.'),
+  disbursementDate: z.string().min(1, 'Disbursement date is required.'),
+  principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
+  registrationFee: z.coerce.number().optional(),
+  processingFee: z.coerce.number().optional(),
+  carTrackInstallationFee: z.coerce.number().optional(),
+  chargingCost: z.coerce.number().optional(),
+  numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
+  instalmentAmount: z.coerce.number().min(1, 'Instalment amount is required.'),
+  paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+  status: z.enum(['due', 'paid', 'active']),
+});
+
+interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+interface Loan {
+    id: string;
+    loanNumber: string;
+    customerName: string;
+    disbursementDate: { seconds: number, nanoseconds: number };
+    principalAmount: number;
+    status: 'due' | 'paid' | 'active';
+    totalRepayableAmount: number;
+    totalPaid: number;
+}
+
 
 export default function LoansPage() {
+  const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
+  const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+
+
+  const form = useForm<z.infer<typeof loanSchema>>({
+    resolver: zodResolver(loanSchema),
+    defaultValues: {
+      loanNumber: '',
+      customerId: '',
+      principalAmount: undefined,
+      registrationFee: 0,
+      processingFee: 0,
+      carTrackInstallationFee: 0,
+      chargingCost: 0,
+      numberOfInstalments: undefined,
+      instalmentAmount: undefined,
+      paymentFrequency: 'monthly',
+      status: 'active',
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof loanSchema>) {
+    setIsSubmitting(true);
+
+    const selectedCustomer = customers?.find(c => c.id === values.customerId);
+    if (!selectedCustomer) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Selected customer not found.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    const totalRepayableAmount = values.numberOfInstalments * values.instalmentAmount;
+
+    const loanData = {
+      ...values,
+      customerName: selectedCustomer.name,
+      customerPhone: selectedCustomer.phone,
+      disbursementDate: new Date(values.disbursementDate),
+      totalRepayableAmount,
+      totalPaid: 0,
+      registrationFee: values.registrationFee || 0,
+      processingFee: values.processingFee || 0,
+      carTrackInstallationFee: values.carTrackInstallationFee || 0,
+      chargingCost: values.chargingCost || 0,
+    };
+    
+    addLoan(firestore, loanData);
+    toast({
+      title: 'Loan Added',
+      description: `Loan #${values.loanNumber} has been added successfully.`,
+    });
+    form.reset();
+    setOpen(false);
+    setIsSubmitting(false);
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Loans</h1>
-        <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Loan
-        </Button>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Loan
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Add a New Loan</DialogTitle>
+              <DialogDescription>
+                Fill in the details below to create a new loan record.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="loanNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Loan Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., LN001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="customerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Customer</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {customers && customers.map(customer => (
+                            <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="disbursementDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Disbursement Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="principalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Principal Amount</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g. 50000" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="registrationFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Registration Fee (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="processingFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Processing Fee (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="carTrackInstallationFee"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Car Track Fee (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="chargingCost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Charging Cost (Optional)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="numberOfInstalments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>No. of Instalments</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g. 12" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="instalmentAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Instalment Amount</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="paymentFrequency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Payment Frequency</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select frequency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="daily">Daily</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="due">Due</SelectItem>
+                          <SelectItem value="paid">Paid</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="col-span-2">
+                    <DialogClose asChild>
+                        <Button type="button" variant="ghost">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Add Loan
+                    </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
       <Card>
         <CardHeader>
@@ -18,7 +365,54 @@ export default function LoansPage() {
           <CardDescription>A list of all loans disbursed.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>Loans table will go here.</p>
+        {loansLoading && (
+            <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        )}
+        {!loansLoading && (!loans || loans.length === 0) && (
+            <Alert>
+                <AlertTitle>No Loans Found</AlertTitle>
+                <AlertDescription>There are no loans in the system yet. Add one to see it here.</AlertDescription>
+            </Alert>
+        )}
+        {!loansLoading && loans && loans.length > 0 && (
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Loan No.</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Principal</TableHead>
+                        <TableHead className="text-right">Amount to Pay</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead className="text-center">Status</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {loans.map((loan) => {
+                        const balance = loan.totalRepayableAmount - loan.totalPaid;
+                        return (
+                            <TableRow key={loan.id}>
+                                <TableCell className="font-medium">{loan.loanNumber}</TableCell>
+                                <TableCell>{loan.customerName}</TableCell>
+                                <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                <TableCell className="text-center">
+                                  <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
+                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                                  </Badge>
+                                </TableCell>
+                            </TableRow>
+                        )
+                    })}
+                </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
