@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -43,6 +43,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { FinanceReportTab } from './components/finance-report-tab';
 
 
 const financeEntrySchema = z.object({
@@ -69,6 +70,14 @@ interface Loan {
   totalPaid: number;
 }
 
+interface FinanceEntry {
+  id: string;
+  type: 'expense' | 'payout' | 'receipt';
+  date: { seconds: number; nanoseconds: number };
+  amount: number;
+  description: string;
+}
+
 
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
@@ -76,6 +85,7 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+  const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>('financeEntries');
 
 
   const form = useForm<z.infer<typeof financeEntrySchema>>({
@@ -134,6 +144,10 @@ export default function FinancePage() {
       exportToCsv(dataForExport, 'loan_book');
     }
   };
+
+  const receipts = useMemo(() => financeEntries?.filter(e => e.type === 'receipt') ?? null, [financeEntries]);
+  const payouts = useMemo(() => financeEntries?.filter(e => e.type === 'payout') ?? null, [financeEntries]);
+  const expenses = useMemo(() => financeEntries?.filter(e => e.type === 'expense') ?? null, [financeEntries]);
 
   return (
     <div>
@@ -232,43 +246,34 @@ export default function FinancePage() {
       </div>
       <Tabs defaultValue="receipts">
           <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="receipts">Daily Receipts</TabsTrigger>
-              <TabsTrigger value="payouts">Daily Payouts</TabsTrigger>
-              <TabsTrigger value="expenses">Daily Expenses</TabsTrigger>
+              <TabsTrigger value="receipts">Receipts</TabsTrigger>
+              <TabsTrigger value="payouts">Payouts</TabsTrigger>
+              <TabsTrigger value="expenses">Expenses</TabsTrigger>
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
           </TabsList>
           <TabsContent value="receipts">
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Daily Receipts</CardTitle>
-                      <CardDescription>Amount received from customers.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <p>Receipts table will go here.</p>
-                  </CardContent>
-              </Card>
+              <FinanceReportTab 
+                title="Receipts"
+                description="Amount received from customers."
+                entries={receipts}
+                loading={financeEntriesLoading}
+              />
           </TabsContent>
           <TabsContent value="payouts">
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Daily Payouts</CardTitle>
-                      <CardDescription>Amount disbursed to customers, including costs.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <p>Payouts table will go here.</p>
-                  </CardContent>
-              </Card>
+              <FinanceReportTab 
+                title="Payouts"
+                description="Amount disbursed to customers, including costs."
+                entries={payouts}
+                loading={financeEntriesLoading}
+              />
           </TabsContent>
           <TabsContent value="expenses">
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Daily Expenses</CardTitle>
-                      <CardDescription>Money spent on facilitation and other costs.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <p>Expenses table will go here.</p>
-                  </CardContent>
-              </Card>
+               <FinanceReportTab 
+                title="Expenses"
+                description="Money spent on facilitation and other costs."
+                entries={expenses}
+                loading={financeEntriesLoading}
+              />
           </TabsContent>
           <TabsContent value="loanbook">
               <Card>
@@ -326,11 +331,11 @@ export default function FinancePage() {
                                             <TableCell>{loan.loanNumber}</TableCell>
                                             <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{loan.registrationFee.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{loan.processingFee.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{(loan.registrationFee || 0).toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{(loan.processingFee || 0).toLocaleString()}</TableCell>
                                             <TableCell className="text-right font-medium">{takeHome.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{loan.carTrackInstallationFee.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{loan.chargingCost.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{(loan.carTrackInstallationFee || 0).toLocaleString()}</TableCell>
+                                            <TableCell className="text-right">{(loan.chargingCost || 0).toLocaleString()}</TableCell>
                                             <TableCell className="text-center">{loan.numberOfInstalments}</TableCell>
                                             <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
                                             <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
