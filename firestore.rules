@@ -2,13 +2,16 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Only Simon can read or write any document in the database.
-    function isSimon() {
-      return request.auth != null && request.auth.token.email == 'simon@pezeka.com';
+    // Only finance users (including Simon) can read or write any document.
+    function isFinanceUser() {
+      return request.auth != null && (
+        request.auth.token.email == 'simon@pezeka.com' ||
+        request.auth.token.email.matches('.*@finance\\.pezeka\\.com$')
+      );
     }
 
     match /{document=**} {
-      allow read, write: if isSimon();
+      allow read, write: if isFinanceUser();
     }
   }
 }

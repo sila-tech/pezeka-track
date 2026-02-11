@@ -15,15 +15,22 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading) return;
+
+    if (!user) {
       router.push('/login');
+      return;
     }
-    if (!loading && user && user.email !== 'simon@pezeka.com') {
+
+    const isAuthorized = user.email === 'simon@pezeka.com' || user.email?.endsWith('@finance.pezeka.com');
+
+    if (!isAuthorized) {
       signOut(auth).then(() => {
         router.push('/login');
       });
     }
   }, [user, loading, router, auth]);
+
 
   if (loading || !user) {
     return (
