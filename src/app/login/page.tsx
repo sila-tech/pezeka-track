@@ -33,7 +33,9 @@ import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.literal('Symo@4927', {
+    errorMap: () => ({ message: 'Incorrect password.' }),
+  }),
 });
 
 export default function LoginPage() {
