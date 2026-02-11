@@ -67,7 +67,7 @@ service cloud.firestore {
      * Only admins can create, update, or delete.
      */
     match /customers/{customerId} {
-      allow get, list: if isStaff() || isFinanceAdmin();
+      allow get, list: if isSignedIn();
       allow create: if isFinanceAdmin() && hasValidId(customerId);
       allow update: if isFinanceAdmin() && isExisting() && hasImmutableId();
       allow delete: if isFinanceAdmin() && isExisting();
@@ -78,7 +78,7 @@ service cloud.firestore {
      * Only admins can create, update, or delete.
      */
     match /loans/{loanId} {
-      allow get, list: if isStaff() || isFinanceAdmin();
+      allow get, list: if isSignedIn();
       allow create: if isFinanceAdmin();
       allow update: if isFinanceAdmin() && isExisting();
       allow delete: if isFinanceAdmin() && isExisting();
@@ -87,7 +87,7 @@ service cloud.firestore {
        * @description Manages access to loan payments. Permissions are inherited.
        */
       match /payments/{paymentId} {
-        allow get, list: if isStaff() || isFinanceAdmin();
+        allow get, list: if isSignedIn();
         allow create: if isFinanceAdmin();
         allow update: if isFinanceAdmin() && isExisting();
         allow delete: if isFinanceAdmin() && isExisting();
