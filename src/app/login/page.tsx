@@ -29,6 +29,15 @@ export default function LoginPage() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     
+    if (!password) {
+        toast({
+            variant: "destructive",
+            title: "Password is required",
+            description: "Please enter your password.",
+        });
+        return;
+    }
+
     if (email.endsWith('@admin.com')) {
       toast({
         title: "Admin Login Successful",
@@ -73,7 +82,7 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required defaultValue="password" />
+              <Input id="password" name="password" type="password" required />
             </div>
             <Button type="submit" className="w-full">
               Login
