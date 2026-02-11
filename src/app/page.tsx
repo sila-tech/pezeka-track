@@ -1,18 +1,27 @@
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+"use client";
 
-export default function Home() {
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@/firebase/auth/use-user';
+import { Loader2 } from 'lucide-react';
+
+export default function HomePage() {
+  const { user, loading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        router.push('/login');
+      }
+    }
+  }, [user, loading, router]);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-3xl font-bold">Welcome!</CardTitle>
-          <CardDescription>This is your new, clean application. What would you like to build today?</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">You can start by telling me what you want to add.</p>
-        </CardContent>
-      </Card>
-    </main>
+    <div className="flex h-screen w-full items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin" />
+    </div>
   );
 }

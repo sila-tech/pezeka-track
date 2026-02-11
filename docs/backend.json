@@ -1,1 +1,77 @@
-{}
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user-specific information and role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["staff", "finance"] },
+        "name": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Represents a customer of Pezeka Credit Ltd.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "idNumber": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone"]
+    },
+    "Loan": {
+      "title": "Loan",
+      "description": "Represents a loan disbursed to a customer.",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "amountDisbursed": { "type": "number" },
+        "disbursementDate": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "paymentFrequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "status": { "type": "string", "enum": ["due", "paid", "active"] },
+        "totalPaid": { "type": "number", "default": 0 }
+      },
+      "required": ["customerId", "customerName", "amountDisbursed", "disbursementDate", "dueDate", "paymentFrequency", "status"]
+    },
+    "FinanceEntry": {
+      "title": "Finance Entry",
+      "description": "Represents a financial transaction.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["expense", "payout", "receipt"] },
+        "date": { "type": "string", "format": "date-time" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["type", "date", "amount"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profiles."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Stores all customer records."
+    },
+    "/loans/{loanId}": {
+      "schema": { "$ref": "#/entities/Loan" },
+      "description": "Stores all loan records."
+    },
+    "/financeEntries/{entryId}": {
+      "schema": { "$ref": "#/entities/FinanceEntry" },
+      "description": "Stores all financial entries."
+    }
+  }
+}
