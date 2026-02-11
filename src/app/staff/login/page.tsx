@@ -23,7 +23,7 @@ export default function StaffLoginPage() {
     initiateAnonymousSignIn(auth);
   };
 
-  if (isUserLoading || user) {
+  if (isUserLoading) {
     return <div className="flex h-screen items-center justify-center"><p>Loading...</p></div>;
   }
 
