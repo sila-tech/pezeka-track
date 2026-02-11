@@ -12,8 +12,7 @@ import {
   SidebarMenuButton,
   SidebarInset, 
 } from "@/components/ui/sidebar";
-import { useUser, useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser } from "@/firebase";
 import { LayoutDashboard, Users, HandCoins } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -26,49 +25,12 @@ export default function AppLayout({
 }>) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const firestore = useFirestore();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
       router.push('/staff/login');
     }
   }, [user, isUserLoading, router]);
-
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
-  const { data: userDoc, isLoading: isUserDocLoading } = useDoc(userDocRef);
-
-  useEffect(() => {
-    if (user && !isUserDocLoading && !userDoc) {
-      // User is logged in, but no user document exists. Let's create one.
-      const isAnonymous = user.isAnonymous;
-      const email = user.email;
-      
-      let role = 'staff';
-      let firstName = 'Anonymous';
-      let lastName = 'User';
-      let username = `anonymous-${user.uid.slice(0, 5)}`;
-
-      if (!isAnonymous && email) {
-        if (email.endsWith('@finance.com')) {
-          role = 'admin';
-        }
-        firstName = email.split('@')[0] || 'New';
-        username = email;
-      }
-
-      const newUserDoc = {
-        id: user.uid,
-        username: username,
-        email: email,
-        role: role,
-        firstName: firstName,
-        lastName: lastName,
-      };
-      
-      const userDocToCreateRef = doc(firestore, "users", user.uid);
-      setDocumentNonBlocking(userDocToCreateRef, newUserDoc, { merge: false });
-    }
-  }, [user, userDoc, isUserDocLoading, firestore]);
 
   if (isUserLoading || !user) {
     return (
