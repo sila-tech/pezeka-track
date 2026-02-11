@@ -7,13 +7,36 @@ import { Label } from "@/components/ui/label";
 import { CreditCard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    router.push('/dashboard');
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    
+    if (email.endsWith('@admin.com')) {
+      toast({
+        title: "Admin Login Successful",
+        description: "Redirecting to dashboard...",
+      });
+      router.push('/dashboard');
+    } else if (email.endsWith('@finance.com')) {
+      toast({
+        variant: "destructive",
+        title: "Access Denied",
+        description: "Finance users must use the Finance Portal.",
+      });
+    } else {
+      toast({
+        title: "Staff Login Successful",
+        description: "Redirecting to dashboard...",
+      });
+      router.push('/dashboard');
+    }
   };
 
   return (
@@ -31,7 +54,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="staff@pezeka.com" required defaultValue="staff@pezeka.com" />
+              <Input id="email" name="email" type="email" placeholder="staff@pezeka.com" required defaultValue="staff@pezeka.com" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

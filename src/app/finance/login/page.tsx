@@ -7,13 +7,30 @@ import { Label } from "@/components/ui/label";
 import { CreditCard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 export default function FinanceLoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    router.push('/finance');
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+
+    if (email.endsWith('@finance.com')) {
+      toast({
+        title: "Finance Login Successful",
+        description: "Redirecting to finance dashboard...",
+      });
+      router.push('/finance');
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Invalid Credentials",
+        description: "Only finance users can access this portal.",
+      });
+    }
   };
 
   return (
@@ -31,7 +48,7 @@ export default function FinanceLoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="finance@pezeka.com" required defaultValue="finance@pezeka.com" />
+              <Input id="email" name="email" type="email" placeholder="finance@pezeka.com" required defaultValue="finance@pezeka.com" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
