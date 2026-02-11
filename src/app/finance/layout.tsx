@@ -14,8 +14,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
-import { useUser, useFirestore, useDoc, setDocumentNonBlocking, useMemoFirebase } from "@/firebase";
-import { doc } from "firebase/firestore";
+import { useUser, useAuth } from "@/firebase";
 import { LayoutDashboard, ArrowDownToDot, ArrowUpFromDot, CircleDollarSign, Users, HandCoins } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,35 +27,22 @@ export default function FinanceLayout({
 }>) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const firestore = useFirestore();
+  const auth = useAuth();
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      router.push('/finance/login');
+    if (!isUserLoading) {
+      if (!user) {
+        router.push('/finance/login');
+      } else if (user.email !== 'simon@pezeka.com') {
+        // If an unexpected user (like anonymous) is logged in,
+        // sign them out and redirect to the login page.
+        auth.signOut();
+        router.push('/finance/login');
+      }
     }
-  }, [user, isUserLoading, router]);
-
-  const userDocRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
-  const { data: userDoc, isLoading: isUserDocLoading } = useDoc(userDocRef);
-
-  useEffect(() => {
-    if (user && !isUserDocLoading && !userDoc && user.email) {
-      // User is logged in, but no user document exists. Let's create one for Simon.
-      const newUserDoc = {
-        id: user.uid,
-        username: user.email,
-        email: user.email,
-        role: 'admin',
-        firstName: 'Simon',
-        lastName: 'Admin',
-      };
-      
-      const userDocToCreateRef = doc(firestore, "users", user.uid);
-      setDocumentNonBlocking(userDocToCreateRef, newUserDoc, { merge: false });
-    }
-  }, [user, userDoc, isUserDocLoading, firestore]);
+  }, [user, isUserLoading, router, auth]);
   
-  if (isUserLoading || !user) {
+  if (isUserLoading || !user || user.email !== 'simon@pezeka.com') {
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Loading...</p>
