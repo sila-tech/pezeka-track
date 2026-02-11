@@ -73,11 +73,10 @@ service cloud.firestore {
      * does not exist to prevent rule evaluation errors.
      */
     function getUserRole() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      if (userDoc == null) {
-        return null;
+      if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
       }
-      return userDoc.data.role;
+      return null;
     }
 
     /**
