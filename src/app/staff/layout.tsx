@@ -12,10 +12,9 @@ import {
   SidebarMenuButton,
   SidebarInset, 
 } from "@/components/ui/sidebar";
-import { useUser } from "@/firebase";
+import { useUser, useAuth, initiateAnonymousSignIn } from "@/firebase";
 import { LayoutDashboard, Users, HandCoins } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function AppLayout({
@@ -24,13 +23,13 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
+  const auth = useAuth();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
-      router.push('/staff/login');
+      initiateAnonymousSignIn(auth);
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, auth]);
 
   if (isUserLoading || !user) {
     return (
@@ -76,7 +75,7 @@ export default function AppLayout({
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <PageHeader loginPath="/staff/login" />
+        <PageHeader loginPath="/" />
         {children}
       </SidebarInset>
     </SidebarProvider>
