@@ -1,3 +1,40 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "user-1",
+      "description": "Avatar for a female user",
+      "imageUrl": "https://images.unsplash.com/photo-1544717304-a2db4a7b16ee?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHx3b21hbiUyMGZhY2V8ZW58MHx8fHwxNzcwNzg2OTYwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman face"
+    },
+    {
+      "id": "user-2",
+      "description": "Avatar for a male user",
+      "imageUrl": "https://images.unsplash.com/photo-1624395213043-fa2e123b2656?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtYW4lMjBmYWNlfGVufDB8fHx8MTc3MDcyMDIyMXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man face"
+    },
+    {
+      "id": "user-3",
+      "description": "Avatar for a user",
+      "imageUrl": "https://images.unsplash.com/flagged/photo-1570612861542-284f4c12e75f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxwZXJzb24lMjBmYWNlfGVufDB8fHx8MTc3MDc3MDIyMXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person face"
+    },
+    {
+      "id": "user-4",
+      "description": "Avatar for a female user with glasses",
+      "imageUrl": "https://images.unsplash.com/photo-1524255684952-d7185b509571?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3b21hbiUyMGdsYXNzZXN8ZW58MHx8fHwxNzcwNjkwMzQxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman glasses"
+    },
+    {
+      "id": "user-5",
+      "description": "Avatar for a male user with a beard",
+      "imageUrl": "https://images.unsplash.com/photo-1653071163695-34ac45a78e28?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtYW4lMjBiZWFyZHxlbnwwfHx8fDE3NzA3MTQ2Nzl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man beard"
+    },
+    {
+      "id": "user-6",
+      "description": "Avatar for a user smiling",
+      "imageUrl": "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwZXJzb24lMjBzbWlsaW5nfGVufDB8fHx8MTc3MDY4MjIzOXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person smiling"
+    }
+  ]
 }
