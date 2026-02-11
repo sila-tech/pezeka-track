@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileDown, PlusCircle } from "lucide-react";
-import type { FinanceRecord } from "@/lib/data";
+import type { FinanceRecord } from "@/lib/types";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -20,6 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useFirestore, addDocumentNonBlocking } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 type DataTableProps = {
   title: string;
@@ -29,10 +31,29 @@ type DataTableProps = {
 
 export function FinanceDataTable({ title, records, type }: DataTableProps) {
   const [open, setOpen] = useState(false);
+  const firestore = useFirestore();
 
-  const handleAddRecord = (e: React.FormEvent) => {
+  const handleAddRecord = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Add logic here
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const amount = Number(formData.get("amount"));
+    const date = formData.get("date") as string;
+    const description = formData.get("description") as string;
+    const category = formData.get("category") as string;
+    
+    const newRecordId = `FIN-${String((records?.length ?? 0) + 1).padStart(3, '0')}`;
+    const newRecord: Omit<FinanceRecord, 'id'> = {
+        amount,
+        date: new Date(date).toISOString(),
+        description,
+        category,
+        type
+    }
+    
+    addDocumentNonBlocking(collection(firestore, "financialRecords"), { ...newRecord, id: newRecordId });
+
     setOpen(false);
   };
 

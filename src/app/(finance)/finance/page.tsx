@@ -1,12 +1,16 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { financeRecords } from "@/lib/data";
-import { format } from "date-fns";
+import { type FinanceRecord } from "@/lib/types";
+import { format, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ArrowDownToDot, ArrowUpFromDot, CircleDollarSign, FileDown } from "lucide-react";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 const chartData = [
   { date: "Mon", receipts: 4000, payouts: 2400, expenses: 400 },
@@ -25,10 +29,17 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export default function FinanceDashboardPage() {
-    const today = new Date();
-    const dailyReceipts = financeRecords.filter(r => r.type === 'receipt' && new Date(r.date).toDateString() === today.toDateString()).reduce((sum, r) => sum + r.amount, 0);
-    const dailyPayouts = financeRecords.filter(r => r.type === 'payout' && new Date(r.date).toDateString() === today.toDateString()).reduce((sum, r) => sum + r.amount, 0);
-    const dailyExpenses = financeRecords.filter(r => r.type === 'expense' && new Date(r.date).toDateString() === today.toDateString()).reduce((sum, r) => sum + r.amount, 0);
+    const firestore = useFirestore();
+    const financeRecordsQuery = useMemoFirebase(() => collection(firestore, "financialRecords"), [firestore]);
+    const { data: financeRecords, isLoading } = useCollection<FinanceRecord>(financeRecordsQuery);
+
+    if (isLoading) {
+        return <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">Loading...</main>;
+    }
+
+    const dailyReceipts = financeRecords?.filter(r => r.type === 'receipt' && isToday(new Date(r.date))).reduce((sum, r) => sum + r.amount, 0) || 0;
+    const dailyPayouts = financeRecords?.filter(r => r.type === 'payout' && isToday(new Date(r.date))).reduce((sum, r) => sum + r.amount, 0) || 0;
+    const dailyExpenses = financeRecords?.filter(r => r.type === 'expense' && isToday(new Date(r.date))).reduce((sum, r) => sum + r.amount, 0) || 0;
 
   return (
     <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -106,7 +117,7 @@ export default function FinanceDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {financeRecords.slice(0, 5).map(record => (
+                {financeRecords?.slice(0, 5).map(record => (
                   <TableRow key={record.id}>
                     <TableCell>
                       <Badge variant={record.type === 'receipt' ? 'secondary' : record.type === 'payout' ? 'outline' : 'destructive' } className="capitalize">

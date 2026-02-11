@@ -10,33 +10,44 @@
           "type": "string",
           "description": "Unique identifier for the customer."
         },
-        "firstName": {
+        "name": {
           "type": "string",
-          "description": "First name of the customer."
+          "description": "Full name of the customer."
         },
-        "lastName": {
-          "type": "string",
-          "description": "Last name of the customer."
-        },
-        "phoneNumber": {
+        "phone": {
           "type": "string",
           "description": "Phone number of the customer."
-        },
-        "address": {
-          "type": "string",
-          "description": "Address of the customer."
         },
         "email": {
           "type": "string",
           "description": "Email address of the customer.",
           "format": "email"
+        },
+        "joinDate": {
+          "type": "string",
+          "description": "Date the customer joined.",
+          "format": "date"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "URL of the customer's avatar image."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the customer's account.",
+          "enum": [
+            "Active Loan",
+            "Paid Off",
+            "Overdue"
+          ]
         }
       },
       "required": [
         "id",
-        "firstName",
-        "lastName",
-        "phoneNumber"
+        "name",
+        "phone",
+        "email",
+        "joinDate"
       ]
     },
     "Loan": {
@@ -51,14 +62,14 @@
         },
         "customerId": {
           "type": "string",
-          "description": "Reference to Customer. (Relationship: Customer 1:N Loan)"
+          "description": "Reference to Customer."
         },
         "disbursementDate": {
           "type": "string",
           "description": "Date the loan was disbursed.",
           "format": "date-time"
         },
-        "amountDisbursed": {
+        "amount": {
           "type": "number",
           "description": "Amount disbursed to the customer."
         },
@@ -72,17 +83,44 @@
         },
         "repaymentSchedule": {
           "type": "string",
-          "description": "Repayment schedule (daily, weekly, monthly)."
+          "description": "Repayment schedule.",
+          "enum": [
+            "daily",
+            "weekly",
+            "monthly"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the loan.",
+          "enum": [
+            "active",
+            "paid",
+            "overdue"
+          ]
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Date the next payment is due.",
+          "format": "date"
+        },
+        "principal": {
+          "type": "number"
+        },
+        "interest": {
+          "type": "number"
         }
       },
       "required": [
         "id",
         "customerId",
         "disbursementDate",
-        "amountDisbursed",
+        "amount",
         "interestRate",
         "loanTerm",
-        "repaymentSchedule"
+        "repaymentSchedule",
+        "status",
+        "dueDate"
       ]
     },
     "Payment": {
@@ -97,7 +135,7 @@
         },
         "loanId": {
           "type": "string",
-          "description": "Reference to Loan. (Relationship: Loan 1:N Payment)"
+          "description": "Reference to Loan."
         },
         "paymentDate": {
           "type": "string",
@@ -126,30 +164,36 @@
           "type": "string",
           "description": "Unique identifier for the financial record."
         },
-        "recordDate": {
+        "date": {
           "type": "string",
           "description": "Date of the financial record.",
           "format": "date-time"
         },
-        "expenses": {
-          "type": "number",
-          "description": "Amount of daily expenses (facilitation)."
+        "amount": {
+          "type": "number"
         },
-        "payouts": {
-          "type": "number",
-          "description": "Amount of daily payouts (customer disbursements with facilitation/transaction costs)."
+        "type": {
+          "type": "string",
+          "enum": [
+            "expense",
+            "payout",
+            "receipt"
+          ]
         },
-        "receipts": {
-          "type": "number",
-          "description": "Amount of daily receipts (customer payments)."
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "recordDate",
-        "expenses",
-        "payouts",
-        "receipts"
+        "date",
+        "amount",
+        "type",
+        "description",
+        "category"
       ]
     },
     "User": {
@@ -203,57 +247,17 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer data. The 'customerId' is used to uniquely identify each customer.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the customer."
-            }
-          ]
+          "description": "Stores customer data. The 'customerId' is used to uniquely identify each customer."
         }
       },
       {
-        "path": "/customers/{customerId}/loans/{loanId}",
+        "path": "/loans/{loanId}",
         "definition": {
           "entityName": "Loan",
           "schema": {
             "$ref": "#/backend/entities/Loan"
           },
-          "description": "Stores loan data for each customer. Includes denormalized 'customerId' for authorization independence.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the customer."
-            },
-            {
-              "name": "loanId",
-              "description": "The unique identifier for the loan."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/customers/{customerId}/loans/{loanId}/payments/{paymentId}",
-        "definition": {
-          "entityName": "Payment",
-          "schema": {
-            "$ref": "#/backend/entities/Payment"
-          },
-          "description": "Stores payment data for each loan. Includes denormalized 'loanId' and 'customerId' for authorization independence.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the customer."
-            },
-            {
-              "name": "loanId",
-              "description": "The unique identifier for the loan."
-            },
-            {
-              "name": "paymentId",
-              "description": "The unique identifier for the payment."
-            }
-          ]
+          "description": "Stores loan data. Includes denormalized 'customerId' for authorization and querying."
         }
       },
       {
@@ -263,13 +267,7 @@
           "schema": {
             "$ref": "#/backend/entities/FinancialRecord"
           },
-          "description": "Stores financial records. Access restricted to users with 'finance' role.",
-          "params": [
-            {
-              "name": "financialRecordId",
-              "description": "The unique identifier for the financial record."
-            }
-          ]
+          "description": "Stores financial records. Access restricted to users with 'finance' role."
         }
       },
       {
@@ -279,16 +277,9 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user data. Used for authentication and authorization.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user."
-            }
-          ]
+          "description": "Stores user data. Used for authentication and authorization."
         }
       }
-    ],
-    "reasoning": "The Firestore data structure is designed to support PezekaTrack's core features, focusing on loan management, financial record keeping, and user authentication. The structure prioritizes authorization independence and facilitates secure list operations.  \n\n**Authorization Independence:**  Each data entry contains all the information needed for access control, avoiding hierarchical `get()` calls.\n\n*   **Customers:** Reside in `/customers/{customerId}`. Access to customer data is governed by the user's role.\n*   **Loans:** Stored in `/customers/{customerId}/loans/{loanId}`. To achieve authorization independence, each loan document includes the `customerId`. This allows security rules to validate loan creation based on the `customerId` in the request and ensures that only users with appropriate permissions can access or modify loans associated with a customer.\n*   **Payments:** Located under `/customers/{customerId}/loans/{loanId}/payments/{paymentId}`. Similarly, payment documents contain the `loanId` and (denormalized) `customerId` for independent authorization. Security rules can enforce that payments are only created, read, updated, or deleted by authorized users associated with the specific loan and customer.\n*   **Financial Records:** Stored in `/financialRecords/{financialRecordId}`. Access to financial records requires a specific role, such as `finance`, which is verified in the security rules.  \n\n**QAPs (Rules are not Filters):**  The design uses structural segregation to enable secure `list` operations.\n\n*   Customers and Financial Records are in separate top-level collections based on authorization requirements. This segregation ensures that listing customers or financial records can be done securely, as different collections have different access control rules.\n*   Loans and Payments are subcollections of Customers. Since a user must have access to a Customer to manage their Loans/Payments, and because of the authorization independence achieved by denormalizing the `customerId`, listing operations at these levels are secure.\n\nThis structure ensures data integrity, scalability, and debuggability while adhering to the core design principles and strategy mandates."
+    ]
   }
 }

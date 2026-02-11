@@ -1,4 +1,6 @@
-import { customers, loans as allLoans } from "@/lib/data";
+"use client";
+
+import { type Loan, type Customer } from "@/lib/types";
 import { notFound } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -8,15 +10,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, FileDown, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { useDoc, useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { doc, collection, query, where } from "firebase/firestore";
 
 export default function CustomerDetailPage({ params }: { params: { id: string } }) {
-  const customer = customers.find(c => c.id === params.id);
+  const firestore = useFirestore();
+
+  const customerRef = useMemoFirebase(() => doc(firestore, "customers", params.id), [firestore, params.id]);
+  const { data: customer, isLoading: customerLoading } = useDoc<Customer>(customerRef);
+
+  const loansQuery = useMemoFirebase(() => query(collection(firestore, "loans"), where("customerId", "==", params.id)), [firestore, params.id]);
+  const { data: customerLoans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
+
+  const isLoading = customerLoading || loansLoading;
+  
+  if (isLoading) {
+    return <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">Loading...</main>
+  }
   
   if (!customer) {
     notFound();
   }
-
-  const customerLoans = allLoans.filter(l => l.customerId === customer.id);
 
   return (
     <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -85,7 +99,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customerLoans.map(loan => (
+                {customerLoans?.map(loan => (
                   <TableRow key={loan.id}>
                     <TableCell className="font-medium">{loan.id}</TableCell>
                     <TableCell>KES {loan.amount.toLocaleString()}</TableCell>
@@ -97,7 +111,7 @@ export default function CustomerDetailPage({ params }: { params: { id: string } 
                     </TableCell>
                   </TableRow>
                 ))}
-                {customerLoans.length === 0 && (
+                {(customerLoans?.length ?? 0) === 0 && (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center h-24">
                       No loans found for this customer.

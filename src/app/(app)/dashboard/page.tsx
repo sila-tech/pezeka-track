@@ -1,20 +1,45 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { customers, loans } from "@/lib/data";
+import { type Customer, type Loan } from "@/lib/types";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Bell, ArrowRight, HandCoins, Users } from "lucide-react";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, where, orderBy } from "firebase/firestore";
 
 export default function DashboardPage() {
-  const dueLoans = loans
-    .filter(loan => loan.status === 'active' || loan.status === 'overdue')
-    .map(loan => ({
+  const firestore = useFirestore();
+  
+  const customersQuery = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
+  const { data: customers, isLoading: customersLoading } = useCollection<Customer>(customersQuery);
+  
+  const loansQuery = useMemoFirebase(() => collection(firestore, 'loans'), [firestore]);
+  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
+
+  const dueLoansQuery = useMemoFirebase(() => {
+    if (!loans) return null;
+    return query(collection(firestore, 'loans'), where('status', 'in', ['active', 'overdue']), orderBy('dueDate'));
+  }, [firestore, loans]);
+  const { data: dueLoansData, isLoading: dueLoansLoading } = useCollection<Loan>(dueLoansQuery);
+  
+  const dueLoans = dueLoansData?.map(loan => ({
       ...loan,
-      customer: customers.find(c => c.id === loan.customerId),
-    }))
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      customer: customers?.find(c => c.id === loan.customerId),
+  })) || [];
+
+  const isLoading = customersLoading || loansLoading || dueLoansLoading;
+
+  if (isLoading) {
+    return <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">Loading...</main>;
+  }
+
+  const activeLoansCount = loans?.filter(l => l.status === 'active').length ?? 0;
+  const overdueLoansCount = loans?.filter(l => l.status === 'overdue').length ?? 0;
+  const totalCustomers = customers?.length ?? 0;
 
   return (
     <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -28,7 +53,7 @@ export default function DashboardPage() {
             <HandCoins className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loans.filter(l => l.status === 'active').length}</div>
+            <div className="text-2xl font-bold">{activeLoansCount}</div>
             <p className="text-xs text-muted-foreground">Total value of active loans</p>
           </CardContent>
         </Card>
@@ -38,7 +63,7 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{customers.length}</div>
+            <div className="text-2xl font-bold">{totalCustomers}</div>
             <p className="text-xs text-muted-foreground">All registered customers</p>
           </CardContent>
         </Card>
@@ -48,7 +73,7 @@ export default function DashboardPage() {
             <Bell className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{loans.filter(l => l.status === 'overdue').length}</div>
+            <div className="text-2xl font-bold text-destructive">{overdueLoansCount}</div>
             <p className="text-xs text-muted-foreground">Require immediate attention</p>
           </CardContent>
         </Card>

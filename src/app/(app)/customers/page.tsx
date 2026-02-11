@@ -2,23 +2,27 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { customers as initialCustomers, type Customer } from "@/lib/data";
-import { PlusCircle, MoreHorizontal, ArrowRight } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { type Customer } from "@/lib/types";
+import { PlusCircle, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
+  
+  const customersQuery = useMemoFirebase(() => collection(firestore, "customers"), [firestore]);
+  const { data: customers, isLoading } = useCollection<Customer>(customersQuery);
 
   const handleAddCustomer = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -28,23 +32,29 @@ export default function CustomersPage() {
     const email = formData.get("email") as string;
     const phone = formData.get("phone") as string;
 
-    const newCustomer: Customer = {
-      id: `CUST-${String(customers.length + 1).padStart(3, '0')}`,
+    const newCustomerId = `CUST-${String((customers?.length ?? 0) + 1).padStart(3, '0')}`;
+    const newCustomer: Omit<Customer, 'id'> = {
       name,
       email,
       phone,
       joinDate: new Date().toISOString().split('T')[0],
-      avatarUrl: `https://picsum.photos/seed/user-${customers.length + 1}/100/100`,
+      avatarUrl: `https://picsum.photos/seed/user-${(customers?.length ?? 0) + 1}/100/100`,
       status: 'Paid Off',
     };
 
-    setCustomers(prev => [newCustomer, ...prev]);
+    const customersCollection = collection(firestore, 'customers');
+    addDocumentNonBlocking(customersCollection, newCustomer);
+    
     setOpen(false);
     toast({
       title: "Customer Added",
       description: `${name} has been successfully added to the system.`,
     });
   };
+
+  if (isLoading) {
+    return <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">Loading...</main>;
+  }
 
   return (
     <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -96,7 +106,7 @@ export default function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer) => (
+              {customers?.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">

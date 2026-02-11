@@ -8,21 +8,59 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { loans as initialLoans, customers, type Loan } from "@/lib/data";
+import { type Loan, type Customer } from "@/lib/types";
 import { PlusCircle, FileDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { useCollection, useFirestore, useMemoFirebase, addDocumentNonBlocking } from "@/firebase";
+import { collection } from "firebase/firestore";
 
 export default function LoansPage() {
-  const [loans, setLoans] = useState<Loan[]>(initialLoans);
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
+
+  const loansQuery = useMemoFirebase(() => collection(firestore, "loans"), [firestore]);
+  const { data: loans, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
+  
+  const customersQuery = useMemoFirebase(() => collection(firestore, "customers"), [firestore]);
+  const { data: customers, isLoading: customersLoading } = useCollection<Customer>(customersQuery);
 
   const handleAddLoan = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // Logic to add a new loan would go here
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    
+    const customerId = formData.get("customer") as string;
+    const amount = Number(formData.get("amount"));
+    const repaymentSchedule = formData.get("schedule") as Loan['repaymentSchedule'];
+
+    if(!customerId || !amount || !repaymentSchedule) {
+        toast({
+            variant: "destructive",
+            title: "Missing fields",
+            description: "Please fill out all fields to disburse a loan."
+        });
+        return;
+    }
+
+    const newLoanId = `LOAN-${String((loans?.length ?? 0) + 1).padStart(3, '0')}`;
+    const newLoan: Omit<Loan, 'id'> = {
+      customerId,
+      amount,
+      repaymentSchedule,
+      disbursementDate: new Date().toISOString(),
+      status: 'active',
+      dueDate: new Date(new Date().setDate(new Date().getDate() + (repaymentSchedule === 'daily' ? 1 : repaymentSchedule === 'weekly' ? 7 : 30))).toISOString(),
+      principal: amount,
+      interest: amount * 0.1, // Assuming 10% interest for now
+    };
+
+    const loansCollection = collection(firestore, 'loans');
+    addDocumentNonBlocking(loansCollection, { ...newLoan, id: newLoanId });
+
     setOpen(false);
     toast({
       title: "Loan Added",
@@ -30,10 +68,16 @@ export default function LoansPage() {
     });
   };
 
-  const allLoansWithCustomer = loans.map(loan => ({
+  const allLoansWithCustomer = loans?.map(loan => ({
     ...loan,
-    customer: customers.find(c => c.id === loan.customerId)
-  }));
+    customer: customers?.find(c => c.id === loan.customerId)
+  })) || [];
+
+  const isLoading = loansLoading || customersLoading;
+
+  if(isLoading) {
+    return <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">Loading...</main>;
+  }
 
   return (
     <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
@@ -66,7 +110,7 @@ export default function LoansPage() {
                         <SelectValue placeholder="Select a customer" />
                       </SelectTrigger>
                       <SelectContent>
-                        {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
