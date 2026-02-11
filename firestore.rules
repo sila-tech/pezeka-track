@@ -14,13 +14,6 @@ service cloud.firestore {
     }
 
     /**
-     * Checks if the requesting user is the owner of a document.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
      * Verifies that a document exists for update/delete operations.
      */
     function isExisting() {
@@ -28,53 +21,18 @@ service cloud.firestore {
     }
 
     /**
-     * Role check for 'admin'. Admins log in with a @finance.com email.
+     * Role check for 'finance' or 'admin'. These users log in with a @finance.com email.
      */
-    function isAdmin() {
+    function isFinanceAdmin() {
       return isSignedIn() && request.auth.token.email != null && request.auth.token.email.matches('.*@finance\\.com$');
-    }
-
-    /**
-     * Role check for 'finance'. In this app, finance users are admins.
-     */
-    function isFinanceOrAdmin() {
-      return isAdmin();
     }
     
     /**
-     * Role check for any staff member. Any signed-in user is considered staff for now.
+     * Role check for 'staff'. A staff member is any authenticated user who is not a finance admin.
+     * This includes anonymous users for the staff portal.
      */
-    function isStaffOrHigher() {
-      return isSignedIn();
-    }
-
-    // --- Data Validation Helpers (Prototyping Mode) ---
-
-    /**
-     * On create, validates user ID and assigns a role based on email.
-     * Prevents users from assigning themselves an elevated role on signup.
-     */
-    function canCreateUser(userId) {
-      let isAnonymous = request.auth.token.email == null;
-      let expectedRole = 'staff';
-      if (!isAnonymous) {
-        if (request.auth.token.email.matches('.*@finance\\.com$')) {
-          expectedRole = 'admin';
-        }
-      }
-      return request.resource.data.id == userId
-          && request.resource.data.role == expectedRole;
-    }
-
-    /**
-     * On update, allows a user to modify their own data but not their role.
-     * Admins are exempt from this restriction.
-     */
-    function canUpdateUser(userId) {
-      let isSelfUpdate = isOwner(userId)
-        && request.resource.data.id == resource.data.id
-        && request.resource.data.role == resource.data.role; // Role is immutable for self-update
-      return isSelfUpdate || isAdmin();
+    function isStaff() {
+      return isSignedIn() && !isFinanceAdmin();
     }
     
     /**
@@ -90,101 +48,56 @@ service cloud.firestore {
     function hasImmutableId() {
       return request.resource.data.id == resource.data.id;
     }
-    
-    /**
-     * Validates relational integrity for a new Loan document.
-     */
-    function isValidLoanData(loanId) {
-      return request.resource.data.id == loanId;
-    }
-    
-    /**
-     * Enforces immutability of relational keys for a Loan document.
-     */
-    function isImmutableLoanData() {
-      return request.resource.data.id == resource.data.id
-        && request.resource.data.customerId == resource.data.customerId;
-    }
-    
-    /**
-     * Validates relational integrity for a new Payment document.
-     */
-    function isValidPaymentData(loanId, paymentId) {
-       return request.resource.data.id == paymentId
-        && request.resource.data.loanId == loanId;
-    }
-    
-    /**
-     * Enforces immutability of relational keys for a Payment document.
-     */
-    function isImmutablePaymentData() {
-       return request.resource.data.id == resource.data.id
-        && request.resource.data.loanId == resource.data.loanId;
-    }
-
 
     // ------------------------------------------------------------------------
     // Collection Rules
     // ------------------------------------------------------------------------
 
     /**
-     * @description Governs access to user profile documents. Users can create and
-     * manage their own profiles, while admins can manage all profiles.
-     * @path /users/{userId}
+     * @description User documents are no longer used for authorization.
+     * Access is locked down.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isStaffOrHigher();
-      allow create: if isOwner(userId) && canCreateUser(userId);
-      allow update: if (isOwner(userId) || isAdmin()) && canUpdateUser(userId) && isExisting();
-      allow delete: if isAdmin() && isExisting();
+      allow read, write: if false;
     }
 
     /**
-     * @description Manages access to customer information. Any user with a staff-level
-     * role or higher can read and write customer data.
-     * @path /customers/{customerId}
+     * @description Manages access to customer information. Staff and admins can read.
+     * Only admins can create, update, or delete.
      */
     match /customers/{customerId} {
-      allow get, list: if isStaffOrHigher();
-      allow create: if isStaffOrHigher() && hasValidId(customerId);
-      allow update: if isStaffOrHigher() && isExisting() && hasImmutableId();
-      allow delete: if isAdmin() && isExisting();
+      allow get, list: if isStaff() || isFinanceAdmin();
+      allow create: if isFinanceAdmin() && hasValidId(customerId);
+      allow update: if isFinanceAdmin() && isExisting() && hasImmutableId();
+      allow delete: if isFinanceAdmin() && isExisting();
     }
 
     /**
-     * @description Manages access to loans. Permissions are granted to staff and higher roles.
-     * @path /loans/{loanId}
+     * @description Manages access to loans. Staff and admins can read.
+     * Only admins can create, update, or delete.
      */
     match /loans/{loanId} {
-      allow get, list: if isStaffOrHigher();
-      allow create: if isStaffOrHigher() && isValidLoanData(loanId);
-      allow update: if isStaffOrHigher() && isExisting() && isImmutableLoanData();
-      allow delete: if isAdmin() && isExisting();
+      allow get, list: if isStaff() || isFinanceAdmin();
+      allow create: if isFinanceAdmin();
+      allow update: if isFinanceAdmin() && isExisting();
+      allow delete: if isFinanceAdmin() && isExisting();
 
       /**
-       * @description Manages access to loan payments. Permissions are inherited,
-       * ensuring only authorized staff can log payments.
-       * @path /loans/{loanId}/payments/{paymentId}
+       * @description Manages access to loan payments. Permissions are inherited.
        */
       match /payments/{paymentId} {
-        allow get, list: if isStaffOrHigher();
-        allow create: if isStaffOrHigher() && isValidPaymentData(loanId, paymentId);
-        allow update: if isStaffOrHigher() && isExisting() && isImmutablePaymentData();
-        allow delete: if isAdmin() && isExisting();
+        allow get, list: if isStaff() || isFinanceAdmin();
+        allow create: if isFinanceAdmin();
+        allow update: if isFinanceAdmin() && isExisting();
+        allow delete: if isFinanceAdmin() && isExisting();
       }
     }
 
     /**
-     * @description Controls access to sensitive financial records. Only users with the 'finance'
-     * or 'admin' role can read or write this data.
-     * @path /financialRecords/{financialRecordId}
+     * @description Controls access to sensitive financial records. Only finance admins can access.
      */
     match /financialRecords/{financialRecordId} {
-      allow get, list: if isFinanceOrAdmin();
-      allow create: if isFinanceOrAdmin() && hasValidId(financialRecordId);
-      allow update: if isFinanceOrAdmin() && isExisting() && hasImmutableId();
-      allow delete: if isFinanceOrAdmin() && isExisting();
+      allow read, write: if isFinanceAdmin();
     }
   }
 }
