@@ -47,6 +47,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FinanceReportTab } from './components/finance-report-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { calculateAmortization } from '@/lib/utils';
 
 
 const financeEntrySchema = z.object({
@@ -153,42 +154,11 @@ export default function FinancePage() {
   const paymentFrequency = watch('paymentFrequency');
 
   const recalculatedValues = useMemo(() => {
-    const L = Number(principalAmount);
-    const annualRate = Number(interestRate);
-    const n = Number(numberOfInstalments);
-
-    if (L > 0 && n > 0) {
-        if (annualRate > 0) {
-            let r = 0; // periodic interest rate
-            if (paymentFrequency === 'monthly') {
-                r = annualRate / 100 / 12;
-            } else if (paymentFrequency === 'weekly') {
-                r = annualRate / 100 / 52;
-            } else if (paymentFrequency === 'daily') {
-                r = annualRate / 100 / 365;
-            }
-
-            if (r > 0) {
-                const numerator = r * Math.pow(1 + r, n);
-                const denominator = Math.pow(1 + r, n) - 1;
-                const instalmentAmount = L * (numerator / denominator);
-                const totalRepayableAmount = instalmentAmount * n;
-
-                return {
-                    instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                    totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                };
-            }
-        } else { // 0 interest rate
-             const instalmentAmount = L / n;
-            const totalRepayableAmount = L;
-            return {
-                instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            };
-        }
-    }
-    return { instalmentAmount: '0.00', totalRepayableAmount: '0.00' };
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount, interestRate, numberOfInstalments, paymentFrequency);
+    return {
+        instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    };
   }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
 
   async function onSubmit(values: z.infer<typeof financeEntrySchema>) {
@@ -303,30 +273,12 @@ export default function FinancePage() {
     if (!loanToEdit) return;
     setIsEditingLoan(true);
 
-    const L = Number(values.principalAmount);
-    const annualRate = Number(values.interestRate);
-    const n = Number(values.numberOfInstalments);
-    let instalmentAmount = 0;
-    let totalRepayableAmount = 0;
-
-    if (L > 0 && n > 0) {
-      if (annualRate > 0) {
-        let r = 0; // periodic interest rate
-        if (values.paymentFrequency === 'monthly') r = annualRate / 100 / 12;
-        else if (values.paymentFrequency === 'weekly') r = annualRate / 100 / 52;
-        else if (values.paymentFrequency === 'daily') r = annualRate / 100 / 365;
-
-        if (r > 0) {
-          const numerator = r * Math.pow(1 + r, n);
-          const denominator = Math.pow(1 + r, n) - 1;
-          instalmentAmount = L * (numerator / denominator);
-          totalRepayableAmount = instalmentAmount * n;
-        }
-      } else {
-        instalmentAmount = L / n;
-        totalRepayableAmount = L;
-      }
-    }
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
+        values.principalAmount,
+        values.interestRate ?? 0,
+        values.numberOfInstalments,
+        values.paymentFrequency
+    );
     
     const updateData = {
         ...values,
@@ -786,5 +738,6 @@ export default function FinancePage() {
   );
 
     
+
 
 

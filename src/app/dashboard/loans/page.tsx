@@ -41,6 +41,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { calculateAmortization } from '@/lib/utils';
 
 
 const loanSchema = z.object({
@@ -130,42 +131,12 @@ export default function LoansPage() {
   const customerType = watch('customerType');
 
   const calculatedValues = useMemo(() => {
-    const L = Number(principalAmount);
-    const annualRate = Number(interestRate);
-    const n = Number(numberOfInstalments);
-
-    if (L > 0 && n > 0) {
-        if (annualRate > 0) {
-            let r = 0; // periodic interest rate
-            if (paymentFrequency === 'monthly') {
-                r = annualRate / 100 / 12;
-            } else if (paymentFrequency === 'weekly') {
-                r = annualRate / 100 / 52;
-            } else if (paymentFrequency === 'daily') {
-                r = annualRate / 100 / 365;
-            }
-
-            if (r > 0) {
-                const numerator = r * Math.pow(1 + r, n);
-                const denominator = Math.pow(1 + r, n) - 1;
-                const instalmentAmount = L * (numerator / denominator);
-                const totalRepayableAmount = instalmentAmount * n;
-
-                return {
-                    instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                    totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                };
-            }
-        } else { // 0 interest rate
-            const instalmentAmount = L / n;
-            const totalRepayableAmount = L;
-            return {
-                instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-                totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            };
-        }
-    }
-    return { instalmentAmount: '0.00', totalRepayableAmount: '0.00' };
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount, interestRate, numberOfInstalments, paymentFrequency);
+    
+    return {
+        instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    };
   }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
 
 
@@ -195,30 +166,12 @@ export default function LoansPage() {
         customerPhone = selectedCustomer.phone;
       }
       
-      const L = Number(values.principalAmount);
-      const annualRate = Number(values.interestRate);
-      const n = Number(values.numberOfInstalments);
-      let instalmentAmount = 0;
-      let totalRepayableAmount = 0;
-
-      if (L > 0 && n > 0) {
-        if (annualRate > 0) {
-          let r = 0; // periodic interest rate
-          if (values.paymentFrequency === 'monthly') r = annualRate / 100 / 12;
-          else if (values.paymentFrequency === 'weekly') r = annualRate / 100 / 52;
-          else if (values.paymentFrequency === 'daily') r = annualRate / 100 / 365;
-          
-          if (r > 0) {
-            const numerator = r * Math.pow(1 + r, n);
-            const denominator = Math.pow(1 + r, n) - 1;
-            instalmentAmount = L * (numerator / denominator);
-            totalRepayableAmount = instalmentAmount * n;
-          }
-        } else {
-          instalmentAmount = L / n;
-          totalRepayableAmount = L;
-        }
-      }
+      const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
+        values.principalAmount,
+        values.interestRate,
+        values.numberOfInstalments,
+        values.paymentFrequency
+      );
 
       const loanData = {
         ...values,
