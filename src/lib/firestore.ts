@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -99,4 +99,39 @@ export async function addLoan(db: Firestore, loanData: LoanData): Promise<Docume
     errorEmitter.emit('permission-error', permissionError);
     throw serverError;
   }
+}
+
+type CustomerUpdateData = {
+  name: string;
+  phone: string;
+  idNumber?: string;
+}
+
+export async function updateCustomer(db: Firestore, customerId: string, data: CustomerUpdateData) {
+    const customerRef = doc(db, 'customers', customerId);
+    try {
+        await updateDoc(customerRef, data);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: customerRef.path,
+            operation: 'update',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function deleteCustomer(db: Firestore, customerId: string) {
+    const customerRef = doc(db, 'customers', customerId);
+    try {
+        await deleteDoc(customerRef);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: customerRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
 }

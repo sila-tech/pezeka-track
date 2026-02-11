@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, FileDown, MessageSquare, Copy } from 'lucide-react';
+import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -28,13 +28,29 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { addCustomer } from '@/lib/firestore';
+import { addCustomer, updateCustomer, deleteCustomer } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { exportToCsv } from '@/lib/excel';
 import { Textarea } from '@/components/ui/textarea';
 import { addDays, addWeeks, addMonths, format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 
 const customerSchema = z.object({
@@ -67,8 +83,12 @@ interface Loan {
 
 export default function CustomersPage() {
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [editCustomerOpen, setEditCustomerOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
 
   const firestore = useFirestore();
@@ -77,7 +97,7 @@ export default function CustomersPage() {
   const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
 
-  const form = useForm<z.infer<typeof customerSchema>>({
+  const addForm = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
     defaultValues: {
       name: '',
@@ -86,7 +106,16 @@ export default function CustomersPage() {
     },
   });
 
-  async function onSubmit(values: z.infer<typeof customerSchema>) {
+  const editForm = useForm<z.infer<typeof customerSchema>>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: '',
+      phone: '',
+      idNumber: '',
+    },
+  });
+
+  async function onAddSubmit(values: z.infer<typeof customerSchema>) {
     setIsSubmitting(true);
     try {
       await addCustomer(firestore, values);
@@ -94,7 +123,7 @@ export default function CustomersPage() {
         title: 'Customer Added',
         description: `${values.name} has been added successfully.`,
       });
-      form.reset();
+      addForm.reset();
       setAddCustomerOpen(false);
     } catch (error) {
        toast({
@@ -104,6 +133,63 @@ export default function CustomersPage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  const handleEditClick = (customer: Customer) => {
+    setCustomerToEdit(customer);
+    editForm.reset({
+      name: customer.name,
+      phone: customer.phone,
+      idNumber: customer.idNumber || '',
+    });
+    setEditCustomerOpen(true);
+  };
+
+  async function onEditSubmit(values: z.infer<typeof customerSchema>) {
+    if (!customerToEdit) return;
+    setIsSubmitting(true);
+    try {
+      await updateCustomer(firestore, customerToEdit.id, values);
+      toast({
+        title: 'Customer Updated',
+        description: `${values.name} has been updated successfully.`,
+      });
+      setEditCustomerOpen(false);
+      setCustomerToEdit(null);
+    } catch (error) {
+       toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Could not update customer. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  const handleDeleteClick = (customer: Customer) => {
+    setCustomerToDelete(customer);
+    setDeleteConfirmOpen(true);
+  };
+
+  async function confirmDelete() {
+    if (!customerToDelete) return;
+    try {
+      await deleteCustomer(firestore, customerToDelete.id);
+      toast({
+        title: 'Customer Deleted',
+        description: `${customerToDelete.name} has been deleted.`,
+      });
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Delete failed",
+            description: "Could not delete customer. Please try again.",
+        });
+    } finally {
+        setDeleteConfirmOpen(false);
+        setCustomerToDelete(null);
     }
   }
 
@@ -194,10 +280,10 @@ export default function CustomersPage() {
                 Fill in the details below to add a new customer.
               </DialogDescription>
             </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <Form {...addForm}>
+              <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
@@ -210,7 +296,7 @@ export default function CustomersPage() {
                   )}
                 />
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
@@ -223,7 +309,7 @@ export default function CustomersPage() {
                   )}
                 />
                 <FormField
-                  control={form.control}
+                  control={addForm.control}
                   name="idNumber"
                   render={({ field }) => (
                     <FormItem>
@@ -275,15 +361,40 @@ export default function CustomersPage() {
                           <TableHead>Name</TableHead>
                           <TableHead>Phone Number</TableHead>
                           <TableHead>ID Number</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
                       {customers.map((customer, index) => (
-                          <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
+                          <TableRow key={customer.id}>
                               <TableCell>{index + 1}</TableCell>
                               <TableCell className="font-medium">{customer.name}</TableCell>
                               <TableCell>{customer.phone}</TableCell>
                               <TableCell>{customer.idNumber || 'N/A'}</TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                            <span className="sr-only">Open menu</span>
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => setSelectedCustomer(customer)}>
+                                            View Breakdown
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleEditClick(customer)}>
+                                            Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => handleDeleteClick(customer)}
+                                            className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                                        >
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
                           </TableRow>
                       ))}
                   </TableBody>
@@ -390,6 +501,89 @@ export default function CustomersPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Customer Dialog */}
+      <Dialog open={editCustomerOpen} onOpenChange={setEditCustomerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Customer</DialogTitle>
+            <DialogDescription>
+              Update the details for {customerToEdit?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 0712345678" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="idNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ID Number (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 12345678" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the customer
+                      "{customerToDelete?.name}" and any associated data.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
