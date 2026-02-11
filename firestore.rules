@@ -188,7 +188,8 @@ service cloud.firestore {
      * @principle "Enforces user ownership for self-modification and admin privileges for system management."
      */
     match /users/{userId} {
-      allow get, list: if isStaffOrHigher();
+      allow get: if isOwner(userId) || isStaffOrHigher();
+      allow list: if isStaffOrHigher();
       allow create: if isOwner(userId) && canCreateUser(userId);
       allow update: if (isOwner(userId) || isAdmin()) && canUpdateUser(userId) && isExisting();
       allow delete: if isAdmin() && isExisting();
