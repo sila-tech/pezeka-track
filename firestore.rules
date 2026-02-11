@@ -22,9 +22,13 @@ service cloud.firestore {
 
     /**
      * Role check for 'finance' or 'admin'. These users log in with a @finance.com email.
+     * This function is now structured to safely handle null emails from anonymous users.
      */
     function isFinanceAdmin() {
-      return isSignedIn() && request.auth.token.email != null && request.auth.token.email.matches('.*@finance\\.com$');
+      if (!isSignedIn() || request.auth.token.email == null) {
+        return false;
+      }
+      return request.auth.token.email.matches('.*@finance\\.com$');
     }
     
     /**
