@@ -34,26 +34,25 @@ export default function FinanceLayout({
     if (!isUserLoading && !user) {
       router.push('/finance/login');
     }
+    // Also redirect if the user is not a finance user
+    if (!isUserLoading && user && !user.email?.endsWith('@finance.com')) {
+      router.push('/staff/login');
+    }
   }, [user, isUserLoading, router]);
 
+  // This logic remains to create a user profile document, which can be useful for storing user-specific data,
+  // but it's no longer used for authorization in this layout.
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const { data: userDoc, isLoading: isUserDocLoading } = useDoc(userDocRef);
 
   useEffect(() => {
     if (user && !isUserDocLoading && !userDoc && user.email) {
       // User is logged in, but no user document exists. Let's create one.
-      let role = 'staff'; // default role
-      if (user.email.endsWith('@finance.com')) {
-        role = 'admin';
-      } else if (user.email.endsWith('@staff.com')) {
-        role = 'staff';
-      }
-
       const newUserDoc = {
         id: user.uid,
         username: user.email,
         email: user.email,
-        role: role,
+        role: 'admin', // All finance users are admins
         firstName: user.email.split('@')[0] || 'New',
         lastName: 'User',
       };
@@ -63,13 +62,8 @@ export default function FinanceLayout({
     }
   }, [user, userDoc, isUserDocLoading, firestore]);
   
-  useEffect(() => {
-    if (!isUserLoading && !isUserDocLoading && userDoc && userDoc.role !== 'admin') {
-      router.push('/staff/login');
-    }
-  }, [user, isUserLoading, userDoc, isUserDocLoading, router]);
-
-  if (isUserLoading || !user || isUserDocLoading) {
+  // The loading screen now only needs to wait for the auth state.
+  if (isUserLoading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Loading...</p>
@@ -77,7 +71,8 @@ export default function FinanceLayout({
     );
   }
 
-  if (!userDoc || userDoc.role !== 'admin') {
+  // Client-side check for a better UX. The real security is in the Firestore rules.
+  if (!user.email?.endsWith('@finance.com')) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Access Denied. Redirecting...</p>

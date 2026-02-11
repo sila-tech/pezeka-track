@@ -34,6 +34,8 @@ export default function AppLayout({
     }
   }, [user, isUserLoading, router]);
 
+  // This logic remains to create a user profile document, which can be useful for storing user-specific data,
+  // but it's no longer used for authorization.
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, "users", user.uid) : null, [firestore, user]);
   const { data: userDoc, isLoading: isUserDocLoading } = useDoc(userDocRef);
 
@@ -43,8 +45,6 @@ export default function AppLayout({
       let role = 'staff'; // default role
       if (user.email.endsWith('@finance.com')) {
         role = 'admin';
-      } else if (user.email.endsWith('@staff.com')) {
-        role = 'staff';
       }
 
       const newUserDoc = {
@@ -61,18 +61,12 @@ export default function AppLayout({
     }
   }, [user, userDoc, isUserDocLoading, firestore]);
 
-  if (isUserLoading || !user || isUserDocLoading) {
+  // Simplified loading state. We no longer need to wait for the user document to load
+  // because authorization is now handled by the auth token in the security rules.
+  if (isUserLoading || !user) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p>Loading...</p>
-      </div>
-    );
-  }
-
-  if (!userDoc) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p>Creating user profile...</p>
       </div>
     );
   }
