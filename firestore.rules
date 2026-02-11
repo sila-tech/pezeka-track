@@ -15,20 +15,21 @@
  *   accessible only to specialized roles.
  *
  * Key Security Decisions:
- * - Role-Based Access: All permissions are checked by retrieving the requesting user's
- *   role from their document in the `/users` collection. This provides a single
- *   source of truth for authorization.
- * - Admin Supremacy: The 'admin' role is granted universal read and write access
- *   across the entire database for management purposes.
- * - Segregated Duties: The `finance` role has exclusive access to the `/financialRecords`
+ * - Role-Based Access: All permissions are checked by inspecting the requesting user's
+ *   email in their auth token. This provides a single source of truth for authorization.
+ * - Admin Supremacy: Users with a `@finance.com` email are considered admins and granted
+ *   universal read and write access for management purposes.
+ * - Segregated Duties: The `admin` role (from `@finance.com` email) has exclusive access to the `/financialRecords`
  *   collection, separating sensitive financial data from general customer data.
- * - Staff Access: The `staff` role is granted permissions to manage the full lifecycle
+ * - Staff Access: Users with a `@staff.com` email are granted permissions to manage the full lifecycle
  *   of customer data, including their loans and payments.
  * - No Public Access: No data is readable or writable by unauthenticated users.
  *
  * Denormalization for Authorization:
- * The security model relies on fetching the user's role from `/users/{request.auth.uid}`.
- * This is a necessary `get()` call to implement RBAC. To ensure data integrity in nested
+ * The security model relies on checking `request.auth.token.email`. This avoids
+ * the need for a `get()` call to implement RBAC, which is more performant and avoids
+ * race conditions during user profile creation.
+ * To ensure data integrity in nested
  * collections, relational IDs (e.g., `customerId`, `loanId`) are validated on creation
  * to match the document's path, preventing data from being associated with the wrong parent.
  *
@@ -68,38 +69,24 @@ service cloud.firestore {
     }
 
     /**
-     * Retrieves the role from the requesting user's profile document.
-     * This is the core of the RBAC system. Returns null if the user document
-     * does not exist to prevent rule evaluation errors.
-     */
-    function getUserRole() {
-      if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      }
-      return null;
-    }
-
-    /**
-     * Role check for 'admin'.
+     * Role check for 'admin'. Admins log in with a @finance.com email.
      */
     function isAdmin() {
-      return isSignedIn() && getUserRole() == 'admin';
+      return isSignedIn() && request.auth.token.email.matches('.*@finance\\.com$');
     }
 
     /**
-     * Role check for 'finance'. Admins are implicitly included.
+     * Role check for 'finance'. In this app, finance users are admins.
      */
     function isFinanceOrAdmin() {
-      let role = getUserRole();
-      return isSignedIn() && (role == 'finance' || role == 'admin');
+      return isAdmin();
     }
     
     /**
-     * Role check for any staff member ('staff', 'finance', 'admin').
+     * Role check for any staff member ('staff' or 'admin').
      */
     function isStaffOrHigher() {
-      let role = getUserRole();
-      return isSignedIn() && (role == 'staff' || role == 'finance' || role == 'admin');
+      return isSignedIn() && (request.auth.token.email.matches('.*@staff\\.com$') || isAdmin());
     }
 
     // --- Data Validation Helpers (Prototyping Mode) ---
