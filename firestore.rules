@@ -69,10 +69,15 @@ service cloud.firestore {
 
     /**
      * Retrieves the role from the requesting user's profile document.
-     * This is the core of the RBAC system.
+     * This is the core of the RBAC system. Returns null if the user document
+     * does not exist to prevent rule evaluation errors.
      */
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      if (userDoc == null) {
+        return null;
+      }
+      return userDoc.data.role;
     }
 
     /**
@@ -188,7 +193,7 @@ service cloud.firestore {
      * @principle "Enforces user ownership for self-modification and admin privileges for system management."
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isStaffOrHigher();
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if isStaffOrHigher();
       allow create: if isOwner(userId) && canCreateUser(userId);
       allow update: if (isOwner(userId) || isAdmin()) && canUpdateUser(userId) && isExisting();
