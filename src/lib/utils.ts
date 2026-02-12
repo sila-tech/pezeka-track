@@ -15,19 +15,19 @@ export function calculateAmortization(principal: number, monthlyRatePercent: num
     if (L > 0 && n > 0) {
         if (monthlyRate > 0) {
             const monthlyRateDecimal = monthlyRate / 100;
-            let periodicRate = 0;
+            
+            let numberOfMonths = 0;
             if (paymentFrequency === 'monthly') {
-                periodicRate = monthlyRateDecimal;
+                numberOfMonths = n;
             } else if (paymentFrequency === 'weekly') {
-                // Convert monthly rate to weekly rate
-                periodicRate = (monthlyRateDecimal * 12) / 52;
+                // Assuming 4 weeks per month for simplicity and alignment with business logic.
+                numberOfMonths = n / 4;
             } else if (paymentFrequency === 'daily') {
-                // Convert monthly rate to daily rate
-                periodicRate = (monthlyRateDecimal * 12) / 365;
+                // Assuming 30 days per month for simplicity.
+                numberOfMonths = n / 30;
             }
             
-            // Simple Interest (Flat Rate): Total Interest = Principal * periodic_rate * number_of_periods
-            const totalInterest = L * periodicRate * n;
+            const totalInterest = L * monthlyRateDecimal * numberOfMonths;
             totalRepayableAmount = L + totalInterest;
             instalmentAmount = totalRepayableAmount / n;
 
