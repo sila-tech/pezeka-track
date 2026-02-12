@@ -402,32 +402,43 @@ export default function FinancePage() {
   const earnedInterestEntries = useMemo(() => {
     if (!loans) return null;
     
-    const allInterestEntries: FinanceEntry[] = [];
-
-    loans.forEach(loan => {
+    return loans.flatMap(loan => {
         if (!loan.payments || loan.payments.length === 0 || !loan.interestRate || loan.interestRate === 0) {
-            return;
+            return [];
         }
 
-        const monthlyRateDecimal = loan.interestRate / 100;
+        // Use the same amortization calculation to get total interest and total repayable amount
+        const { totalRepayableAmount } = calculateAmortization(
+            loan.principalAmount,
+            loan.interestRate,
+            loan.numberOfInstalments,
+            loan.paymentFrequency
+        );
 
-        loan.payments.forEach((payment, index) => {
-            const interestPaid = payment.amount * monthlyRateDecimal;
+        if (totalRepayableAmount <= loan.principalAmount) {
+            return []; // No interest on this loan
+        }
+
+        const totalInterest = totalRepayableAmount - loan.principalAmount;
+        const interestRatio = totalInterest / totalRepayableAmount;
+
+        return loan.payments.map((payment, index) => {
+            const interestPaid = payment.amount * interestRatio;
             
             if (interestPaid > 0) {
-                allInterestEntries.push({
+                return {
                     id: `${loan.id}-${index}`,
-                    type: 'receipt', // it's an income type
+                    type: 'receipt' as const,
                     date: payment.date as { seconds: number; nanoseconds: number },
                     amount: interestPaid,
                     description: `Interest from payment on Loan #${loan.loanNumber}`
-                });
+                };
             }
-        });
+            return null;
+        }).filter((entry): entry is FinanceEntry => entry !== null);
     });
-
-    return allInterestEntries;
   }, [loans]);
+
 
   const earnedIncomeEntries = useMemo(() => {
     if (!unearnedIncomeEntries || !earnedInterestEntries) return null;
