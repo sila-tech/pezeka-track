@@ -46,7 +46,7 @@ import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FinanceReportTab } from './components/finance-report-tab';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
 
 
@@ -597,16 +597,19 @@ export default function FinancePage() {
         </Dialog>
       </div>
       <Tabs defaultValue="receipts">
-          <TabsList className="grid w-full grid-cols-8">
-              <TabsTrigger value="receipts">Receipts</TabsTrigger>
-              <TabsTrigger value="payouts">Payouts</TabsTrigger>
-              <TabsTrigger value="expenses">Expenses</TabsTrigger>
-              <TabsTrigger value="unearned">Unearned Income</TabsTrigger>
-              <TabsTrigger value="earned_interest">Earned Interest</TabsTrigger>
-              <TabsTrigger value="earned_income">Earned Income</TabsTrigger>
-              <TabsTrigger value="payments">All Payments</TabsTrigger>
-              <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
-          </TabsList>
+          <ScrollArea className="w-full whitespace-nowrap pb-4">
+              <TabsList className="inline-flex w-max">
+                  <TabsTrigger value="receipts">Receipts</TabsTrigger>
+                  <TabsTrigger value="payouts">Payouts</TabsTrigger>
+                  <TabsTrigger value="expenses">Expenses</TabsTrigger>
+                  <TabsTrigger value="unearned">Unearned Income</TabsTrigger>
+                  <TabsTrigger value="earned_interest">Earned Interest</TabsTrigger>
+                  <TabsTrigger value="earned_income">Earned Income</TabsTrigger>
+                  <TabsTrigger value="payments">All Payments</TabsTrigger>
+                  <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+          </ScrollArea>
           <TabsContent value="receipts">
               <FinanceReportTab 
                 title="Receipts"
