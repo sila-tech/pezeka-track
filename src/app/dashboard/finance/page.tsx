@@ -404,14 +404,24 @@ export default function FinancePage() {
     const allInterestEntries: FinanceEntry[] = [];
 
     loans.forEach(loan => {
-        if (!loan.payments || loan.payments.length === 0 || !loan.interestRate || loan.interestRate === 0 || loan.totalRepayableAmount <= loan.principalAmount) {
+        if (!loan.payments || loan.payments.length === 0 || !loan.interestRate || loan.interestRate === 0) {
             return;
         }
 
-        const totalInterest = loan.totalRepayableAmount - loan.principalAmount;
-        if (totalInterest <= 0 || loan.totalRepayableAmount <= 0) return;
+        // Recalculate total repayable amount using the flat-rate formula for consistent reporting across all loans.
+        const { totalRepayableAmount: correctTotalRepayable } = calculateAmortization(
+            loan.principalAmount,
+            loan.interestRate,
+            loan.numberOfInstalments,
+            loan.paymentFrequency
+        );
+        
+        const totalInterest = correctTotalRepayable - loan.principalAmount;
+        
+        if (totalInterest <= 0 || correctTotalRepayable <= 0) return;
 
-        const interestProportion = totalInterest / loan.totalRepayableAmount;
+        // For a flat rate loan, the proportion of interest in each payment is constant.
+        const interestProportion = totalInterest / correctTotalRepayable;
 
         loan.payments.forEach((payment, index) => {
             const interestPaid = payment.amount * interestProportion;
