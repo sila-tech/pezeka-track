@@ -5,22 +5,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function calculateAmortization(principal: number, annualRatePercent: number, numberOfInstalments: number, paymentFrequency: 'daily' | 'weekly' | 'monthly') {
-    const L = Number(principal);
-    const annualRate = Number(annualRatePercent);
-    const n = Number(numberOfInstalments);
+export function calculateAmortization(principal: number, monthlyRatePercent: number, numberOfInstalments: number, paymentFrequency: 'daily' | 'weekly' | 'monthly') {
+    const L = Number(principal) || 0;
+    const monthlyRate = Number(monthlyRatePercent) || 0;
+    const n = Number(numberOfInstalments) || 0;
     let instalmentAmount = 0;
     let totalRepayableAmount = 0;
 
     if (L > 0 && n > 0) {
-        if (annualRate > 0) {
+        if (monthlyRate > 0) {
             let r = 0; // periodic interest rate
+            const monthlyRateDecimal = monthlyRate / 100;
             if (paymentFrequency === 'monthly') {
-                r = annualRate / 100 / 12;
+                r = monthlyRateDecimal;
             } else if (paymentFrequency === 'weekly') {
-                r = annualRate / 100 / 52;
+                // Convert monthly rate to weekly rate
+                r = (monthlyRateDecimal * 12) / 52;
             } else if (paymentFrequency === 'daily') {
-                r = annualRate / 100 / 365;
+                // Convert monthly rate to daily rate
+                r = (monthlyRateDecimal * 12) / 365;
             }
 
             if (r > 0) {
