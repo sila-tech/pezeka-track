@@ -45,7 +45,6 @@ import { calculateAmortization } from '@/lib/utils';
 
 
 const loanSchema = z.object({
-  loanNumber: z.string().min(1, 'Loan number is required.'),
   customerId: z.string().optional(),
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
@@ -106,7 +105,6 @@ export default function LoansPage() {
   const form = useForm<z.infer<typeof loanSchema>>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
-      loanNumber: '',
       customerId: '',
       principalAmount: undefined,
       interestRate: undefined,
@@ -173,8 +171,12 @@ export default function LoansPage() {
         values.paymentFrequency
       );
 
+      const loanCount = loans?.length || 0;
+      const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
+
       const loanData = {
         ...values,
+        loanNumber: newLoanNumber,
         customerId: customerId!,
         customerName,
         customerPhone,
@@ -192,7 +194,7 @@ export default function LoansPage() {
 
       toast({
         title: 'Loan Added',
-        description: `Loan #${values.loanNumber} has been added successfully.`,
+        description: `Loan #${newLoanNumber} has been added successfully.`,
       });
       form.reset();
       setOpen(false);
@@ -313,26 +315,11 @@ export default function LoansPage() {
                             />
                         </>
                         )}
-
-
-                        <FormField
-                        control={form.control}
-                        name="loanNumber"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Loan Number</FormLabel>
-                            <FormControl>
-                                <Input placeholder="e.g., LN001" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
                         <FormField
                         control={form.control}
                         name="disbursementDate"
                         render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="col-span-2">
                             <FormLabel>Disbursement Date</FormLabel>
                             <FormControl>
                                 <Input type="date" {...field} />
@@ -495,8 +482,8 @@ export default function LoansPage() {
                     <DialogClose asChild>
                         <Button type="button" variant="ghost">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" form="add-loan-form" disabled={isSubmitting}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" form="add-loan-form" disabled={isSubmitting || loansLoading}>
+                        {(isSubmitting || loansLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Add Loan
                     </Button>
                 </DialogFooter>
