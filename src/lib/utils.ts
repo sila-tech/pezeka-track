@@ -20,11 +20,11 @@ export function calculateAmortization(principal: number, monthlyRatePercent: num
             if (paymentFrequency === 'monthly') {
                 numberOfMonths = n;
             } else if (paymentFrequency === 'weekly') {
-                // Assuming 4 weeks per month for simplicity and alignment with business logic.
+                // Assuming 4 weeks per month as per business logic.
                 numberOfMonths = n / 4;
             } else if (paymentFrequency === 'daily') {
-                // Assuming 30 days per month for simplicity.
-                numberOfMonths = n / 30;
+                // Assuming 4 weeks per month (28 days) for consistency.
+                numberOfMonths = n / 28;
             }
             
             const totalInterest = L * monthlyRateDecimal * numberOfMonths;
