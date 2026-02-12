@@ -343,7 +343,16 @@ export default function FinancePage() {
         let currentBalance = loan.principalAmount;
         let lastEventDate = new Date(loan.disbursementDate.seconds * 1000);
         const monthlyRateDecimal = loan.interestRate / 100;
-        const dailyRate = (monthlyRateDecimal * 12) / 365;
+        
+        let dailyRate = 0;
+        if (loan.paymentFrequency === 'monthly') {
+            dailyRate = (monthlyRateDecimal * 12) / 365;
+        } else if (loan.paymentFrequency === 'weekly') {
+            dailyRate = monthlyRateDecimal / 4.33;
+        } else if (loan.paymentFrequency === 'daily') {
+            dailyRate = monthlyRateDecimal / 30; // Approximation
+        }
+
 
         sortedPayments.forEach((payment, index) => {
             const paymentDate = new Date(payment.date.seconds * 1000);
@@ -354,7 +363,7 @@ export default function FinancePage() {
 
             const daysSinceLastEvent = differenceInDays(paymentDate, lastEventDate);
 
-            if (daysSinceLastEvent > 0 && currentBalance > 0) {
+            if (daysSinceLastEvent > 0 && currentBalance > 0 && dailyRate > 0) {
                 const interestAccrued = currentBalance * dailyRate * daysSinceLastEvent;
                 const paymentAmount = payment.amount;
 
@@ -568,64 +577,66 @@ export default function FinancePage() {
                         </Alert>
                       )}
                       {!loansLoading && loans && loans.length > 0 && (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Client Name</TableHead>
-                                    <TableHead>Phone</TableHead>
-                                    <TableHead>Loan No.</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Principal</TableHead>
-                                    <TableHead className="text-right">Reg. Fee</TableHead>
-                                    <TableHead className="text-right">Proc. Fee</TableHead>
-                                    <TableHead className="text-right">Take Home</TableHead>
-                                    <TableHead className="text-right">Car Track</TableHead>
-                                    <TableHead className="text-right">Charging Cost</TableHead>
-                                    <TableHead className="text-center">Instalments</TableHead>
-                                    <TableHead className="text-right">Instalment Amt</TableHead>
-                                    <TableHead className="text-right">To Pay</TableHead>
-                                    <TableHead className="text-right">Paid</TableHead>
-                                    <TableHead className="text-right">Balance</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loans.map((loan) => {
-                                    const takeHome = loan.principalAmount - (loan.registrationFee || 0) - (loan.processingFee || 0) - (loan.carTrackInstallationFee || 0) - (loan.chargingCost || 0);
-                                    const balance = loan.totalRepayableAmount - loan.totalPaid;
-                                    return (
-                                        <TableRow key={loan.id}>
-                                            <TableCell className="font-medium">{loan.customerName}</TableCell>
-                                            <TableCell>{loan.customerPhone}</TableCell>
-                                            <TableCell>{loan.loanNumber}</TableCell>
-                                            <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{(loan.registrationFee || 0).toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{(loan.processingFee || 0).toLocaleString()}</TableCell>
-                                            <TableCell className="text-right font-medium">{takeHome.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{(loan.carTrackInstallationFee || 0).toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{(loan.chargingCost || 0).toLocaleString()}</TableCell>
-                                            <TableCell className="text-center">{loan.numberOfInstalments}</TableCell>
-                                            <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
-                                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" onClick={() => handleEditLoanClick(loan)}>
-                                                    <PenSquare className="h-4 w-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                })}
-                            </TableBody>
-                        </Table>
+                        <div className="relative max-h-[60vh] overflow-y-auto">
+                          <Table>
+                              <TableHeader className="sticky top-0 bg-card">
+                                  <TableRow>
+                                      <TableHead>Client Name</TableHead>
+                                      <TableHead>Phone</TableHead>
+                                      <TableHead>Loan No.</TableHead>
+                                      <TableHead>Date</TableHead>
+                                      <TableHead className="text-right">Principal</TableHead>
+                                      <TableHead className="text-right">Reg. Fee</TableHead>
+                                      <TableHead className="text-right">Proc. Fee</TableHead>
+                                      <TableHead className="text-right">Take Home</TableHead>
+                                      <TableHead className="text-right">Car Track</TableHead>
+                                      <TableHead className="text-right">Charging Cost</TableHead>
+                                      <TableHead className="text-center">Instalments</TableHead>
+                                      <TableHead className="text-right">Instalment Amt</TableHead>
+                                      <TableHead className="text-right">To Pay</TableHead>
+                                      <TableHead className="text-right">Paid</TableHead>
+                                      <TableHead className="text-right">Balance</TableHead>
+                                      <TableHead>Status</TableHead>
+                                      <TableHead className="text-right">Actions</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {loans.map((loan) => {
+                                      const takeHome = loan.principalAmount - (loan.registrationFee || 0) - (loan.processingFee || 0) - (loan.carTrackInstallationFee || 0) - (loan.chargingCost || 0);
+                                      const balance = loan.totalRepayableAmount - loan.totalPaid;
+                                      return (
+                                          <TableRow key={loan.id}>
+                                              <TableCell className="font-medium">{loan.customerName}</TableCell>
+                                              <TableCell>{loan.customerPhone}</TableCell>
+                                              <TableCell>{loan.loanNumber}</TableCell>
+                                              <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                                              <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{(loan.registrationFee || 0).toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{(loan.processingFee || 0).toLocaleString()}</TableCell>
+                                              <TableCell className="text-right font-medium">{takeHome.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{(loan.carTrackInstallationFee || 0).toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{(loan.chargingCost || 0).toLocaleString()}</TableCell>
+                                              <TableCell className="text-center">{loan.numberOfInstalments}</TableCell>
+                                              <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                              <TableCell>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
+                                                      {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                                                  </Badge>
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                  <Button variant="ghost" size="sm" onClick={() => handleEditLoanClick(loan)}>
+                                                      <PenSquare className="h-4 w-4" />
+                                                  </Button>
+                                              </TableCell>
+                                          </TableRow>
+                                      )
+                                  })}
+                              </TableBody>
+                          </Table>
+                        </div>
                       )}
                   </CardContent>
               </Card>
