@@ -91,6 +91,8 @@ export default function CustomersPage() {
   const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+
 
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -373,22 +375,31 @@ export default function CustomersPage() {
                               <TableCell>{customer.phone}</TableCell>
                               <TableCell>{customer.idNumber || 'N/A'}</TableCell>
                               <TableCell className="text-right">
-                                <DropdownMenu>
+                                <DropdownMenu open={openMenu === customer.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? customer.id : null)}>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="ghost" className="h-8 w-8 p-0">
                                             <span className="sr-only">Open menu</span>
                                             <MoreHorizontal className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => setSelectedCustomer(customer)}>
+                                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                                        <DropdownMenuItem onClick={() => {
+                                            setSelectedCustomer(customer);
+                                            setOpenMenu(null);
+                                        }}>
                                             View Breakdown
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleEditClick(customer)}>
+                                        <DropdownMenuItem onClick={() => {
+                                            handleEditClick(customer);
+                                            setOpenMenu(null);
+                                        }}>
                                             Edit
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                            onClick={() => handleDeleteClick(customer)}
+                                            onClick={() => {
+                                                handleDeleteClick(customer);
+                                                setOpenMenu(null);
+                                            }}
                                             className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
                                         >
                                             Delete
