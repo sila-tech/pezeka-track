@@ -404,62 +404,26 @@ export default function FinancePage() {
     const allInterestEntries: FinanceEntry[] = [];
 
     loans.forEach(loan => {
-        if (!loan.payments || loan.payments.length === 0 || !loan.interestRate || loan.interestRate === 0) {
+        if (!loan.payments || loan.payments.length === 0 || !loan.interestRate || loan.interestRate === 0 || loan.totalRepayableAmount <= loan.principalAmount) {
             return;
         }
 
-        const sortedPayments = [...loan.payments].sort((a, b) => {
-            const dateA = a.date instanceof Date ? a.date.getTime() : a.date.seconds * 1000;
-            const dateB = b.date instanceof Date ? b.date.getTime() : b.date.seconds * 1000;
-            return dateA - dateB;
-        });
-        
-        let currentBalance = loan.principalAmount;
-        let lastEventDate = new Date(loan.disbursementDate.seconds * 1000);
-        const monthlyRateDecimal = loan.interestRate / 100;
-        
-        let dailyRate = 0;
-        if (loan.paymentFrequency === 'monthly') {
-            dailyRate = (monthlyRateDecimal * 12) / 365;
-        } else if (loan.paymentFrequency === 'weekly') {
-            dailyRate = monthlyRateDecimal / 7;
-        } else if (loan.paymentFrequency === 'daily') {
-            dailyRate = monthlyRateDecimal; // Assuming daily rate is given if frequency is daily
-        }
+        const totalInterest = loan.totalRepayableAmount - loan.principalAmount;
+        if (totalInterest <= 0 || loan.totalRepayableAmount <= 0) return;
 
+        const interestProportion = totalInterest / loan.totalRepayableAmount;
 
-        sortedPayments.forEach((payment, index) => {
-            const paymentDate = new Date((payment.date as any).seconds * 1000);
+        loan.payments.forEach((payment, index) => {
+            const interestPaid = payment.amount * interestProportion;
             
-            if (isNaN(paymentDate.getTime()) || isNaN(lastEventDate.getTime())) {
-                return;
-            }
-
-            const daysSinceLastEvent = differenceInDays(paymentDate, lastEventDate);
-
-            if (daysSinceLastEvent > 0 && currentBalance > 0 && dailyRate > 0) {
-                const interestAccrued = currentBalance * dailyRate * daysSinceLastEvent;
-                const paymentAmount = payment.amount;
-
-                const interestPaid = Math.min(paymentAmount, interestAccrued);
-                const principalPaid = paymentAmount - interestPaid;
-                
-                if (interestPaid > 0) {
-                    allInterestEntries.push({
-                        id: `${loan.id}-${index}`,
-                        type: 'receipt',
-                        date: payment.date as { seconds: number; nanoseconds: number },
-                        amount: interestPaid,
-                        description: `Interest from payment on Loan #${loan.loanNumber}`
-                    });
-                }
-
-                currentBalance -= principalPaid;
-                lastEventDate = paymentDate;
-            } else if (currentBalance > 0) {
-                 const principalPaid = payment.amount;
-                 currentBalance -= principalPaid;
-                 lastEventDate = paymentDate;
+            if (interestPaid > 0) {
+                allInterestEntries.push({
+                    id: `${loan.id}-${index}`,
+                    type: 'receipt', // it's an income type
+                    date: payment.date as { seconds: number; nanoseconds: number },
+                    amount: interestPaid,
+                    description: `Interest from payment on Loan #${loan.loanNumber}`
+                });
             }
         });
     });

@@ -14,25 +14,23 @@ export function calculateAmortization(principal: number, monthlyRatePercent: num
 
     if (L > 0 && n > 0) {
         if (monthlyRate > 0) {
-            let r = 0; // periodic interest rate
             const monthlyRateDecimal = monthlyRate / 100;
+            let periodicRate = 0;
             if (paymentFrequency === 'monthly') {
-                r = monthlyRateDecimal;
+                periodicRate = monthlyRateDecimal;
             } else if (paymentFrequency === 'weekly') {
                 // Convert monthly rate to weekly rate
-                r = (monthlyRateDecimal * 12) / 52;
+                periodicRate = (monthlyRateDecimal * 12) / 52;
             } else if (paymentFrequency === 'daily') {
                 // Convert monthly rate to daily rate
-                r = (monthlyRateDecimal * 12) / 365;
+                periodicRate = (monthlyRateDecimal * 12) / 365;
             }
+            
+            // Simple Interest (Flat Rate): Total Interest = Principal * periodic_rate * number_of_periods
+            const totalInterest = L * periodicRate * n;
+            totalRepayableAmount = L + totalInterest;
+            instalmentAmount = totalRepayableAmount / n;
 
-            if (r > 0) {
-                // Amortization formula: P = L * [r(1+r)^n] / [(1+r)^n - 1]
-                const numerator = r * Math.pow(1 + r, n);
-                const denominator = Math.pow(1 + r, n) - 1;
-                instalmentAmount = L * (numerator / denominator);
-                totalRepayableAmount = instalmentAmount * n;
-            }
         } else { // 0 interest rate
             instalmentAmount = L / n;
             totalRepayableAmount = L;
