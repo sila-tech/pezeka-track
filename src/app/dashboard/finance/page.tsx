@@ -736,9 +736,4 @@ export default function FinancePage() {
       </Dialog>
     </div>
   );
-
-    
-
-
-
-
+}
