@@ -343,15 +343,7 @@ export default function FinancePage() {
         let currentBalance = loan.principalAmount;
         let lastEventDate = new Date(loan.disbursementDate.seconds * 1000);
         const monthlyRateDecimal = loan.interestRate / 100;
-        
-        let dailyRate = 0;
-        if (loan.paymentFrequency === 'monthly') {
-            dailyRate = (monthlyRateDecimal * 12) / 365;
-        } else if (loan.paymentFrequency === 'weekly') {
-            dailyRate = monthlyRateDecimal / 4.33;
-        } else if (loan.paymentFrequency === 'daily') {
-            dailyRate = monthlyRateDecimal / 30; // Approximation
-        }
+        const dailyRate = (monthlyRateDecimal * 12) / 365;
 
 
         sortedPayments.forEach((payment, index) => {
