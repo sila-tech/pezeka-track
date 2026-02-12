@@ -54,6 +54,7 @@ const financeEntrySchema = z.object({
   type: z.enum(['expense', 'payout', 'receipt'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
+  transactionCost: z.coerce.number().optional(),
   description: z.string().optional(),
   loanId: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -120,6 +121,7 @@ interface FinanceEntry {
   date: { seconds: number; nanoseconds: number };
   amount: number;
   description: string;
+  transactionCost?: number;
 }
 
 
@@ -142,7 +144,8 @@ export default function FinancePage() {
         description: "",
         amount: undefined,
         date: format(new Date(), 'yyyy-MM-dd'),
-        loanId: ""
+        loanId: "",
+        transactionCost: 0,
     }
   });
 
@@ -220,12 +223,22 @@ export default function FinancePage() {
         });
 
       } else {
-        // Original logic for expense and payout
+        // Payout or Expense
+        let description = values.description;
+        if(values.type === 'payout' && values.loanId && !description) {
+            const loan = loans?.find(l => l.id === values.loanId);
+            if(loan) {
+                description = `Disbursement for Loan #${loan.loanNumber}`;
+            }
+        }
+        
         await addFinanceEntry(firestore, {
           type: values.type,
           date: new Date(values.date),
           amount: values.amount,
-          description: values.description,
+          description: description,
+          loanId: values.loanId,
+          transactionCost: values.transactionCost || 0,
         });
         toast({
           title: 'Finance Entry Added',
@@ -411,7 +424,7 @@ export default function FinancePage() {
         } else if (loan.paymentFrequency === 'weekly') {
             dailyRate = monthlyRateDecimal / 7;
         } else if (loan.paymentFrequency === 'daily') {
-            dailyRate = monthlyRateDecimal / 30;
+            dailyRate = monthlyRateDecimal; // Assuming daily rate is given if frequency is daily
         }
 
 
@@ -515,7 +528,7 @@ export default function FinancePage() {
                                 </FormItem>
                             )}
                         />
-                        {financeEntryType === 'receipt' && (
+                        {(financeEntryType === 'receipt' || financeEntryType === 'payout') && (
                             <FormField
                                 control={form.control}
                                 name="loanId"
@@ -567,6 +580,21 @@ export default function FinancePage() {
                                 </FormItem>
                             )}
                         />
+                         {(financeEntryType === 'payout' || financeEntryType === 'expense') && (
+                            <FormField
+                                control={form.control}
+                                name="transactionCost"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Transaction Cost (Optional)</FormLabel>
+                                        <FormControl>
+                                            <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
                         <FormField
                             control={form.control}
                             name="description"
@@ -944,6 +972,3 @@ export default function FinancePage() {
     </div>
   );
 }
-
-
-    

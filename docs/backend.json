@@ -86,7 +86,9 @@
         "type": { "type": "string", "enum": ["expense", "payout", "receipt"] },
         "date": { "type": "string", "format": "date-time" },
         "amount": { "type": "number" },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "loanId": { "type": "string", "description": "The ID of the associated loan, if applicable." },
+        "transactionCost": { "type": "number", "default": 0, "description": "Any cost associated with the transaction." }
       },
       "required": ["type", "date", "amount"]
     }

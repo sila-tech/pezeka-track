@@ -37,6 +37,8 @@ type FinanceEntryData = {
     date: Date;
     amount: number;
     description?: string;
+    loanId?: string;
+    transactionCost?: number;
 }
 
 export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData): Promise<DocumentReference<DocumentData>> {

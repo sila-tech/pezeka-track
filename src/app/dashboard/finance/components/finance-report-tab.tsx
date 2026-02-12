@@ -19,6 +19,7 @@ interface FinanceEntry {
   date: { seconds: number; nanoseconds: number };
   amount: number;
   description: string;
+  transactionCost?: number;
 }
 
 interface FinanceReportTabProps {
@@ -85,6 +86,7 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const showTransactionCost = useMemo(() => title === 'Payouts' || title === 'Expenses', [title]);
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
@@ -103,14 +105,31 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
     });
   }, [entries, date]);
 
+  const { totalAmount, totalTransactionCost } = useMemo(() => {
+    if (!filteredEntries) return { totalAmount: 0, totalTransactionCost: 0 };
+    return filteredEntries.reduce((acc, entry) => {
+        acc.totalAmount += entry.amount;
+        acc.totalTransactionCost += entry.transactionCost || 0;
+        return acc;
+    }, { totalAmount: 0, totalTransactionCost: 0 });
+  }, [filteredEntries]);
+
+  const grandTotal = totalAmount + totalTransactionCost;
 
   const handleExport = () => {
     if (filteredEntries) {
-      const dataForExport = filteredEntries.map(entry => ({
-        'Date': format(new Date(entry.date.seconds * 1000), 'PPP'),
-        'Description': entry.description,
-        'Amount (Ksh)': entry.amount,
-      }));
+      const dataForExport = filteredEntries.map(entry => {
+        const record: {[key: string]: any} = {
+            'Date': format(new Date(entry.date.seconds * 1000), 'PPP'),
+            'Description': entry.description,
+            'Amount (Ksh)': entry.amount,
+        };
+        if(showTransactionCost) {
+            record['Transaction Cost (Ksh)'] = entry.transactionCost || 0;
+            record['Total (Ksh)'] = entry.amount + (entry.transactionCost || 0);
+        }
+        return record;
+      });
       exportToCsv(dataForExport, `${title.toLowerCase().replace(/ /g, '_')}_report`);
     }
   };
@@ -125,11 +144,6 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
           setDate({ from: startOfMonth(today), to: endOfMonth(today) });
       }
   }
-
-  const totalAmount = useMemo(() => {
-      return filteredEntries.reduce((acc, entry) => acc + entry.amount, 0);
-  }, [filteredEntries]);
-
 
   return (
     <Card>
@@ -172,6 +186,8 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Amount (Ksh)</TableHead>
+                {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
+                {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -180,13 +196,21 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
                   <TableCell>{format(new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="font-medium">{entry.description || '-'}</TableCell>
                   <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                  {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
+                  {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
                 </TableRow>
               ))}
                 <TableRow className="font-bold bg-muted/50">
                     <TableCell colSpan={2} className="text-right">Total</TableCell>
-                    <TableCell className="text-right">
-                        {totalAmount.toLocaleString()}
-                    </TableCell>
+                     {showTransactionCost ? (
+                        <>
+                            <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{totalTransactionCost.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
+                        </>
+                    ) : (
+                         <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
+                    )}
                 </TableRow>
             </TableBody>
           </Table>
