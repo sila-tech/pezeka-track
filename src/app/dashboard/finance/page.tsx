@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { FileDown, Loader2, PlusCircle, PenSquare } from "lucide-react";
 import { arrayUnion } from 'firebase/firestore';
 
@@ -154,7 +154,10 @@ export default function FinancePage() {
   const paymentFrequency = watch('paymentFrequency');
 
   const recalculatedValues = useMemo(() => {
-    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount || 0, interestRate || 0, numberOfInstalments || 0, paymentFrequency);
+    if (!principalAmount || !interestRate || !numberOfInstalments || !paymentFrequency) {
+        return { instalmentAmount: '0.00', totalRepayableAmount: '0.00' };
+    }
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount, interestRate, numberOfInstalments, paymentFrequency);
     return {
         instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -321,6 +324,72 @@ export default function FinancePage() {
     })).filter(entry => entry.amount > 0);
   }, [loans]);
 
+  const earnedInterestEntries = useMemo(() => {
+    if (!loans) return null;
+    
+    const allInterestEntries: FinanceEntry[] = [];
+
+    loans.forEach(loan => {
+        if (!loan.payments || loan.payments.length === 0 || !loan.interestRate || loan.interestRate === 0) {
+            return;
+        }
+
+        const sortedPayments = [...loan.payments].sort((a, b) => {
+            const dateA = a.date instanceof Date ? a.date.getTime() : a.date.seconds * 1000;
+            const dateB = b.date instanceof Date ? b.date.getTime() : b.date.seconds * 1000;
+            return dateA - dateB;
+        });
+        
+        let currentBalance = loan.principalAmount;
+        let lastEventDate = new Date(loan.disbursementDate.seconds * 1000);
+        const monthlyRateDecimal = loan.interestRate / 100;
+        const dailyRate = (monthlyRateDecimal * 12) / 365;
+
+        sortedPayments.forEach((payment, index) => {
+            const paymentDate = new Date(payment.date.seconds * 1000);
+            
+            if (isNaN(paymentDate.getTime()) || isNaN(lastEventDate.getTime())) {
+                return;
+            }
+
+            const daysSinceLastEvent = differenceInDays(paymentDate, lastEventDate);
+
+            if (daysSinceLastEvent > 0 && currentBalance > 0) {
+                const interestAccrued = currentBalance * dailyRate * daysSinceLastEvent;
+                const paymentAmount = payment.amount;
+
+                const interestPaid = Math.min(paymentAmount, interestAccrued);
+                const principalPaid = paymentAmount - interestPaid;
+                
+                if (interestPaid > 0) {
+                    allInterestEntries.push({
+                        id: `${loan.id}-${index}`,
+                        type: 'receipt',
+                        date: payment.date as { seconds: number; nanoseconds: number },
+                        amount: interestPaid,
+                        description: `Interest from payment on Loan #${loan.loanNumber}`
+                    });
+                }
+
+                currentBalance -= principalPaid;
+                lastEventDate = paymentDate;
+            } else if (currentBalance > 0) {
+                 const principalPaid = payment.amount;
+                 currentBalance -= principalPaid;
+                 lastEventDate = paymentDate;
+            }
+        });
+    });
+
+    return allInterestEntries;
+  }, [loans]);
+
+  const earnedIncomeEntries = useMemo(() => {
+    if (!unearnedIncomeEntries || !earnedInterestEntries) return null;
+    return [...unearnedIncomeEntries, ...earnedInterestEntries];
+  }, [unearnedIncomeEntries, earnedInterestEntries]);
+
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -417,11 +486,13 @@ export default function FinancePage() {
         </Dialog>
       </div>
       <Tabs defaultValue="receipts">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
               <TabsTrigger value="unearned">Unearned Income</TabsTrigger>
+              <TabsTrigger value="earned_interest">Earned Interest</TabsTrigger>
+              <TabsTrigger value="earned_income">Earned Income</TabsTrigger>
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
           </TabsList>
           <TabsContent value="receipts">
@@ -453,6 +524,22 @@ export default function FinancePage() {
               title="Unearned Income"
               description="Total income from upfront fees (registration and processing fees)."
               entries={unearnedIncomeEntries}
+              loading={loansLoading}
+            />
+          </TabsContent>
+          <TabsContent value="earned_interest">
+            <FinanceReportTab
+              title="Earned Interest"
+              description="Interest portion of loan payments that have been received."
+              entries={earnedInterestEntries}
+              loading={loansLoading}
+            />
+          </TabsContent>
+          <TabsContent value="earned_income">
+            <FinanceReportTab
+              title="Earned Income"
+              description="Total income from upfront fees and interest payments received."
+              entries={earnedIncomeEntries}
               loading={loansLoading}
             />
           </TabsContent>
@@ -638,7 +725,7 @@ export default function FinancePage() {
                                                     <TableBody>
                                                     {loanToEdit.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map((payment, index) => (
                                                         <TableRow key={index}>
-                                                        <TableCell>{format(new Date(payment.date.seconds * 1000), 'PPP')}</TableCell>
+                                                        <TableCell>{format(new Date((payment.date as any).seconds * 1000), 'PPP')}</TableCell>
                                                         <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
                                                         </TableRow>
                                                     ))}
