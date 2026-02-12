@@ -55,7 +55,17 @@ const financeEntrySchema = z.object({
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   description: z.string().optional(),
+  loanId: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.type === 'receipt' && !data.loanId) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Please select the loan this receipt is for.',
+            path: ['loanId'],
+        });
+    }
 });
+
 
 const paymentSchema = z.object({
     paymentAmount: z.coerce.number().min(0.01, 'Payment amount must be greater than 0.'),
@@ -131,9 +141,14 @@ export default function FinancePage() {
     defaultValues: {
         description: "",
         amount: undefined,
-        date: "",
+        date: format(new Date(), 'yyyy-MM-dd'),
+        loanId: ""
     }
   });
+
+  const { watch: financeEntryWatch } = form;
+  const financeEntryType = financeEntryWatch('type');
+
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
@@ -167,18 +182,64 @@ export default function FinancePage() {
   async function onSubmit(values: z.infer<typeof financeEntrySchema>) {
     setIsSubmitting(true);
     try {
-      await addFinanceEntry(firestore, { ...values, date: new Date(values.date) });
-      toast({
-        title: 'Finance Entry Added',
-        description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
-      });
+       if (values.type === 'receipt' && values.loanId) {
+        const loanToUpdate = loans?.find(l => l.id === values.loanId);
+        if (!loanToUpdate) {
+            throw new Error("Selected loan not found.");
+        }
+
+        // 1. Update the loan with the payment
+        const currentTotalPaid = loanToUpdate.totalPaid || 0;
+        const newTotalPaid = currentTotalPaid + values.amount;
+        
+        const newPayment = {
+            amount: values.amount,
+            date: new Date(values.date),
+        };
+
+        const newStatus = newTotalPaid >= loanToUpdate.totalRepayableAmount ? 'paid' : loanToUpdate.status;
+
+        await updateLoan(firestore, loanToUpdate.id, {
+            totalPaid: newTotalPaid,
+            payments: arrayUnion(newPayment),
+            status: newStatus,
+        });
+
+        toast({
+            title: "Payment Recorded",
+            description: `Payment of Ksh ${values.amount.toLocaleString()} for loan #${loanToUpdate.loanNumber} has been recorded.`,
+        });
+
+        // 2. Add a corresponding receipt to financeEntries
+        const description = values.description || `Payment for Loan #${loanToUpdate.loanNumber} by ${loanToUpdate.customerName}`;
+        await addFinanceEntry(firestore, { 
+            type: 'receipt',
+            date: new Date(values.date),
+            amount: values.amount,
+            description: description,
+        });
+
+      } else {
+        // Original logic for expense and payout
+        await addFinanceEntry(firestore, {
+          type: values.type,
+          date: new Date(values.date),
+          amount: values.amount,
+          description: values.description,
+        });
+        toast({
+          title: 'Finance Entry Added',
+          description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
+        });
+      }
+
       form.reset();
       setOpen(false);
-    } catch (error) {
+    } catch (error: any) {
        toast({
         variant: "destructive",
         title: "Uh oh! Something went wrong.",
-        description: "Could not add finance entry. Please try again.",
+        description: error.message || "Could not add finance entry. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
@@ -348,9 +409,9 @@ export default function FinancePage() {
         if (loan.paymentFrequency === 'monthly') {
             dailyRate = (monthlyRateDecimal * 12) / 365;
         } else if (loan.paymentFrequency === 'weekly') {
-            dailyRate = monthlyRateDecimal / 4.33; // Approximate
+            dailyRate = monthlyRateDecimal / 7;
         } else if (loan.paymentFrequency === 'daily') {
-            dailyRate = monthlyRateDecimal / 30; // Approximate
+            dailyRate = monthlyRateDecimal / 30;
         }
 
 
@@ -454,6 +515,32 @@ export default function FinancePage() {
                                 </FormItem>
                             )}
                         />
+                        {financeEntryType === 'receipt' && (
+                            <FormField
+                                control={form.control}
+                                name="loanId"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>For Loan</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loansLoading}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {loans && loans.filter(l => l.status !== 'paid').map(loan => (
+                                                    <SelectItem key={loan.id} value={loan.id}>
+                                                        {`#${loan.loanNumber} - ${loan.customerName} (Balance: ${(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()})`}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
                         <FormField
                             control={form.control}
                             name="date"
@@ -857,3 +944,6 @@ export default function FinancePage() {
     </div>
   );
 }
+
+
+    
