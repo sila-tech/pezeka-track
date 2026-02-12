@@ -270,6 +270,7 @@ export default function FinancePage() {
           'Loan No.': loan.loanNumber,
           'Date': format(new Date(loan.disbursementDate.seconds * 1000), 'PPP'),
           'Principal Amount': loan.principalAmount,
+          'Interest Rate (%)': loan.interestRate || 0,
           'Registration Fee': loan.registrationFee,
           'Processing Fee': loan.processingFee,
           'Take Home': takeHome,
@@ -700,6 +701,7 @@ export default function FinancePage() {
                                       <TableHead>Loan No.</TableHead>
                                       <TableHead>Date</TableHead>
                                       <TableHead className="text-right">Principal</TableHead>
+                                      <TableHead className="text-right">Interest Rate (%)</TableHead>
                                       <TableHead className="text-right">Reg. Fee</TableHead>
                                       <TableHead className="text-right">Proc. Fee</TableHead>
                                       <TableHead className="text-right">Take Home</TableHead>
@@ -725,6 +727,7 @@ export default function FinancePage() {
                                               <TableCell>{loan.loanNumber}</TableCell>
                                               <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
                                               <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{(loan.interestRate || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.registrationFee || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.processingFee || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-medium">{takeHome.toLocaleString()}</TableCell>
