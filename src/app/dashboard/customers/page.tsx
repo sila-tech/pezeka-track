@@ -406,7 +406,15 @@ export default function CustomersPage() {
       </Card>
       
       {/* Customer Details Dialog */}
-      <Dialog open={!!selectedCustomer} onOpenChange={(isOpen) => !isOpen && setSelectedCustomer(null)}>
+      <Dialog
+        open={!!selectedCustomer}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setSelectedCustomer(null);
+            setMessageLoan(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-3xl">
           {selectedCustomer && (
             <>
