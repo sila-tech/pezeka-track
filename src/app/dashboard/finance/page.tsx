@@ -343,11 +343,19 @@ export default function FinancePage() {
         let currentBalance = loan.principalAmount;
         let lastEventDate = new Date(loan.disbursementDate.seconds * 1000);
         const monthlyRateDecimal = loan.interestRate / 100;
-        const dailyRate = (monthlyRateDecimal * 12) / 365;
+        
+        let dailyRate = 0;
+        if (loan.paymentFrequency === 'monthly') {
+            dailyRate = (monthlyRateDecimal * 12) / 365;
+        } else if (loan.paymentFrequency === 'weekly') {
+            dailyRate = monthlyRateDecimal / 4.33; // Approximate
+        } else if (loan.paymentFrequency === 'daily') {
+            dailyRate = monthlyRateDecimal / 30; // Approximate
+        }
 
 
         sortedPayments.forEach((payment, index) => {
-            const paymentDate = new Date(payment.date.seconds * 1000);
+            const paymentDate = new Date((payment.date as any).seconds * 1000);
             
             if (isNaN(paymentDate.getTime()) || isNaN(lastEventDate.getTime())) {
                 return;
@@ -389,6 +397,19 @@ export default function FinancePage() {
     if (!unearnedIncomeEntries || !earnedInterestEntries) return null;
     return [...unearnedIncomeEntries, ...earnedInterestEntries];
   }, [unearnedIncomeEntries, earnedInterestEntries]);
+
+  const allLoanPayments = useMemo(() => {
+    if (!loans) return null;
+    return loans.flatMap(loan => 
+        (loan.payments || []).map((payment, index) => ({
+            id: `${loan.id}-${index}`,
+            type: 'receipt' as const,
+            date: payment.date as { seconds: number; nanoseconds: number },
+            amount: payment.amount,
+            description: `Payment from ${loan.customerName} (Loan #${loan.loanNumber})`
+        }))
+    );
+  }, [loans]);
 
 
   return (
@@ -487,13 +508,14 @@ export default function FinancePage() {
         </Dialog>
       </div>
       <Tabs defaultValue="receipts">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
               <TabsTrigger value="unearned">Unearned Income</TabsTrigger>
               <TabsTrigger value="earned_interest">Earned Interest</TabsTrigger>
               <TabsTrigger value="earned_income">Earned Income</TabsTrigger>
+              <TabsTrigger value="payments">All Payments</TabsTrigger>
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
           </TabsList>
           <TabsContent value="receipts">
@@ -541,6 +563,14 @@ export default function FinancePage() {
               title="Earned Income"
               description="Total income from upfront fees and interest payments received."
               entries={earnedIncomeEntries}
+              loading={loansLoading}
+            />
+          </TabsContent>
+           <TabsContent value="payments">
+            <FinanceReportTab
+              title="All Loan Payments"
+              description="A consolidated list of all individual payments made against loans."
+              entries={allLoanPayments}
               loading={loansLoading}
             />
           </TabsContent>
