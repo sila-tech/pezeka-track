@@ -409,23 +409,10 @@ export default function FinancePage() {
             return;
         }
 
-        // Recalculate total repayable amount using the flat-rate formula for consistent reporting across all loans.
-        const { totalRepayableAmount: correctTotalRepayable } = calculateAmortization(
-            loan.principalAmount,
-            loan.interestRate,
-            loan.numberOfInstalments,
-            loan.paymentFrequency
-        );
-        
-        const totalInterest = correctTotalRepayable - loan.principalAmount;
-        
-        if (totalInterest <= 0 || correctTotalRepayable <= 0) return;
-
-        // For a flat rate loan, the proportion of interest in each payment is constant.
-        const interestProportion = totalInterest / correctTotalRepayable;
+        const monthlyRateDecimal = loan.interestRate / 100;
 
         loan.payments.forEach((payment, index) => {
-            const interestPaid = payment.amount * interestProportion;
+            const interestPaid = payment.amount * monthlyRateDecimal;
             
             if (interestPaid > 0) {
                 allInterestEntries.push({
