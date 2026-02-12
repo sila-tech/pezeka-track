@@ -420,7 +420,9 @@ export default function FinancePage() {
         }
 
         const totalInterest = totalRepayableAmount - loan.principalAmount;
-        const interestRatio = totalInterest / totalRepayableAmount;
+        
+        // As per user request, the ratio is total interest divided by the principal.
+        const interestRatio = loan.principalAmount > 0 ? totalInterest / loan.principalAmount : 0;
 
         return loan.payments.map((payment, index) => {
             const interestPaid = payment.amount * interestRatio;
