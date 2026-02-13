@@ -154,7 +154,7 @@ const editLoanSchema = z.object({
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['due', 'paid', 'active']),
+  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue']),
 });
 
 
@@ -183,7 +183,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: Payment[];
   comments?: string;
-  status: 'due' | 'paid' | 'active';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
 }
 
 interface FinanceEntry {
@@ -217,6 +217,7 @@ export default function FinancePage() {
   const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
   const [isDeletingEntry, setIsDeletingEntry] = useState(false);
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
+  const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -225,12 +226,15 @@ export default function FinancePage() {
 
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
-    return loans.filter(loan => 
-        loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
-        loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
-        loan.customerPhone.includes(loanBookSearchTerm)
-    );
-  }, [loans, loanBookSearchTerm]);
+    return loans.filter(loan => {
+        const statusMatch = loanBookStatusFilter === 'all' || loan.status === loanBookStatusFilter;
+        const searchMatch = loanBookSearchTerm === '' ||
+            loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
+            loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
+            loan.customerPhone.includes(loanBookSearchTerm);
+        return statusMatch && searchMatch;
+    });
+  }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
   
   const loanBookTotals = useMemo(() => {
       if (!filteredLoans) {
@@ -991,6 +995,19 @@ export default function FinancePage() {
                             <CardDescription>A complete record of all loans.</CardDescription>
                         </div>
                         <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                            <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
+                                <SelectTrigger className="w-full sm:w-[180px]">
+                                    <SelectValue placeholder="Filter by status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Statuses</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="due">Due</SelectItem>
+                                    <SelectItem value="overdue">Overdue</SelectItem>
+                                    <SelectItem value="paid">Paid</SelectItem>
+                                    <SelectItem value="rollover">Rollover</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -1017,8 +1034,8 @@ export default function FinancePage() {
                         <Alert>
                             <AlertTitle>No Loans Found</AlertTitle>
                             <AlertDescription>
-                                {loanBookSearchTerm
-                                    ? "No loans match your search."
+                                {loanBookSearchTerm || loanBookStatusFilter !== 'all'
+                                    ? "No loans match your search criteria."
                                     : "There are no loans in the system yet. Add a loan to see it here."
                                 }
                             </AlertDescription>
@@ -1072,7 +1089,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
                                                       {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                                   </Badge>
                                               </TableCell>
@@ -1252,7 +1269,7 @@ export default function FinancePage() {
                                             <FormField control={editLoanForm.control} name="chargingCost" render={({ field }) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                                             <FormField control={editLoanForm.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                                             <FormField control={editLoanForm.control} name="paymentFrequency" render={({ field }) => (<FormItem><FormLabel>Payment Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                            <FormField control={editLoanForm.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
                                         </div>
                                         <Card className="mt-4">
                                             <CardHeader><CardTitle className="text-lg">Recalculated Totals</CardTitle></CardHeader>

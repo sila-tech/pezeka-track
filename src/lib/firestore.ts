@@ -109,7 +109,7 @@ type LoanData = {
   totalRepayableAmount: number;
   totalPaid: number;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
-  status: 'due' | 'paid' | 'active';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
 }
 
 export async function addLoan(db: Firestore, loanData: LoanData): Promise<DocumentReference<DocumentData>> {

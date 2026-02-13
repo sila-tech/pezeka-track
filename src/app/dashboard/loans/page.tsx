@@ -55,7 +55,7 @@ const loanSchema = z.object({
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['due', 'paid', 'active']),
+  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue']),
   customerType: z.enum(['existing', 'new']),
   newCustomerName: z.string().optional(),
   newCustomerPhone: z.string().optional(),
@@ -87,7 +87,7 @@ interface Loan {
     customerPhone: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
-    status: 'due' | 'paid' | 'active';
+    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
     totalRepayableAmount: number;
     totalPaid: number;
 }
@@ -97,6 +97,7 @@ export default function LoansPage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -105,12 +106,15 @@ export default function LoansPage() {
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
-    return loans.filter(loan => 
-        loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.customerPhone.includes(searchTerm)
-    );
-  }, [loans, searchTerm]);
+    return loans.filter(loan => {
+        const statusMatch = statusFilter === 'all' || loan.status === statusFilter;
+        const searchMatch = searchTerm === '' ||
+            loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            loan.customerPhone.includes(searchTerm);
+        return statusMatch && searchMatch;
+    });
+  }, [loans, searchTerm, statusFilter]);
 
 
   const form = useForm<z.infer<typeof loanSchema>>({
@@ -479,7 +483,9 @@ export default function LoansPage() {
                                 <SelectContent>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="due">Due</SelectItem>
+                                <SelectItem value="overdue">Overdue</SelectItem>
                                 <SelectItem value="paid">Paid</SelectItem>
+                                <SelectItem value="rollover">Rollover</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -509,14 +515,29 @@ export default function LoansPage() {
                     <CardTitle>Loan Records</CardTitle>
                     <CardDescription>A list of all loans disbursed.</CardDescription>
                 </div>
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search loans..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8 w-full sm:w-[300px]"
-                    />
+                <div className="flex items-center gap-2">
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filter by status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="due">Due</SelectItem>
+                            <SelectItem value="overdue">Overdue</SelectItem>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="rollover">Rollover</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search loans..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-8 w-full sm:w-[300px]"
+                        />
+                    </div>
                 </div>
             </div>
         </CardHeader>
@@ -530,8 +551,8 @@ export default function LoansPage() {
             <Alert>
                 <AlertTitle>No Loans Found</AlertTitle>
                 <AlertDescription>
-                    {searchTerm 
-                        ? "No loans match your search."
+                    {searchTerm || statusFilter !== 'all'
+                        ? "No loans match your search criteria."
                         : "There are no loans in the system yet. Add one to see it here."
                     }
                 </AlertDescription>
@@ -564,7 +585,7 @@ export default function LoansPage() {
                                 <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                 <TableCell className="text-center">
-                                  <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
+                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
                                     {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                   </Badge>
                                 </TableCell>

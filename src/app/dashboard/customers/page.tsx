@@ -74,7 +74,7 @@ interface Loan {
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
     interestRate?: number;
-    status: 'due' | 'paid' | 'active';
+    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
     totalRepayableAmount: number;
     totalPaid: number;
     instalmentAmount: number;
@@ -504,7 +504,7 @@ export default function CustomersPage() {
                                                 <TableCell>{loan.principalAmount.toLocaleString()}</TableCell>
                                                 <TableCell className="font-bold">{balance.toLocaleString()}</TableCell>
                                                 <TableCell>
-                                                  <Badge variant={loan.status === 'paid' ? 'default' : loan.status === 'due' ? 'destructive' : 'secondary'}>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
                                                     {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                                   </Badge>
                                                 </TableCell>

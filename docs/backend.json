@@ -46,7 +46,7 @@
         "totalRepayableAmount": { "type": "number", "description": "Total amount to be paid back."},
         "totalPaid": { "type": "number", "default": 0 },
         "paymentFrequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
-        "status": { "type": "string", "enum": ["due", "paid", "active"] },
+        "status": { "type": "string", "enum": ["due", "paid", "active", "rollover", "overdue"] },
         "payments": {
             "type": "array",
             "description": "History of payments made for this loan.",

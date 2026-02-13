@@ -13,7 +13,7 @@ interface DueLoan {
   id: string;
   loanNumber: string;
   customerName: string;
-  status: 'due' | 'paid' | 'active';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
   disbursementDate: { seconds: number; nanoseconds: number };
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
@@ -31,7 +31,7 @@ export default function Dashboard() {
     const today = startOfToday();
     
     return loans
-      .filter(loan => loan.status !== 'paid')
+      .filter(loan => loan.status !== 'paid' && loan.status !== 'rollover')
       .map(loan => {
         const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
         let endDate: Date;
@@ -57,7 +57,7 @@ export default function Dashboard() {
       .filter(loan => {
         if (!loan.endDate || loan.endDate.toString() === 'Invalid Date') return false;
         
-        if (loan.status === 'due') return true;
+        if (loan.status === 'due' || loan.status === 'overdue') return true;
         
         const daysUntilDue = differenceInDays(loan.endDate, today);
         return daysUntilDue <= 7;
@@ -139,7 +139,7 @@ export default function Dashboard() {
                             let statusLabel = '';
                             let statusVariant: "destructive" | "secondary" | "default" = 'secondary';
 
-                            if (loan.status === 'due' || daysDue < 0) {
+                            if (loan.status === 'due' || loan.status === 'overdue' || daysDue < 0) {
                                 statusLabel = `Overdue by ${Math.abs(daysDue)} day(s)`;
                                 statusVariant = 'destructive';
                             } else if (daysDue === 0) {
