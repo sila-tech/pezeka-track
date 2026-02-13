@@ -53,10 +53,11 @@
             "items": {
                 "type": "object",
                 "properties": {
+                    "paymentId": { "type": "string" },
                     "date": { "type": "string", "format": "date-time" },
                     "amount": { "type": "number" }
                 },
-                "required": ["date", "amount"]
+                "required": ["paymentId", "date", "amount"]
             }
         },
         "comments": { "type": "string", "description": "General comments about the loan, such as rollover requests." },

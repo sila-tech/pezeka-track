@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -61,6 +61,36 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
       throw serverError;
   }
 }
+
+export async function updateFinanceEntry(db: Firestore, entryId: string, data: { [key: string]: any }) {
+    const entryRef = doc(db, 'financeEntries', entryId);
+    try {
+        await updateDoc(entryRef, { ...data, updatedAt: serverTimestamp() });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: entryRef.path,
+            operation: 'update',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function deleteFinanceEntry(db: Firestore, entryId: string) {
+    const entryRef = doc(db, 'financeEntries', entryId);
+    try {
+        await deleteDoc(entryRef);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: entryRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
 
 type LoanData = {
   loanNumber: string;

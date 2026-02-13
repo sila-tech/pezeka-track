@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, FileDown, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, Loader2, PenSquare, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -16,10 +16,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 interface FinanceEntry {
   id: string;
   type: 'expense' | 'payout' | 'receipt' | 'unearned';
-  date: { seconds: number; nanoseconds: number };
+  date: { seconds: number; nanoseconds: number } | string;
   amount: number;
   description: string;
   transactionCost?: number;
+  loanId?: string;
 }
 
 interface FinanceReportTabProps {
@@ -27,6 +28,8 @@ interface FinanceReportTabProps {
   description: string;
   entries: FinanceEntry[] | null;
   loading: boolean;
+  onEdit?: (entry: FinanceEntry) => void;
+  onDelete?: (entry: FinanceEntry) => void;
 }
 
 export function DatePickerWithRange({
@@ -81,16 +84,17 @@ export function DatePickerWithRange({
 }
 
 
-export function FinanceReportTab({ title, description, entries, loading }: FinanceReportTabProps) {
+export function EditableFinanceReportTab({ title, description, entries, loading, onEdit, onDelete }: FinanceReportTabProps) {
   const [date, setDate] = useState<DateRange | undefined>();
   const showTransactionCost = useMemo(() => title === 'Payouts' || title === 'Expenses', [title]);
+  const isEditable = !!(onEdit && onDelete);
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     if (!date?.from) return entries;
 
     return entries.filter((entry) => {
-      const entryDate = new Date(entry.date.seconds * 1000);
+      const entryDate = typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000);
       
       const fromDate = new Date(date.from!);
       fromDate.setHours(0,0,0,0);
@@ -117,7 +121,7 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
     if (filteredEntries) {
       const dataForExport = filteredEntries.map(entry => {
         const record: {[key: string]: any} = {
-            'Date': format(new Date(entry.date.seconds * 1000), 'PPP'),
+            'Date': format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'PPP'),
             'Description': entry.description,
             'Amount (Ksh)': entry.amount,
         };
@@ -188,16 +192,27 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
                 <TableHead className="text-right">Amount (Ksh)</TableHead>
                 {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
                 {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
+                {isEditable && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredEntries.map((entry) => (
                 <TableRow key={entry.id}>
-                  <TableCell>{format(new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                  <TableCell>{format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
                   <TableCell className="font-medium">{entry.description || '-'}</TableCell>
                   <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
                   {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
                   {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
+                  {isEditable && onEdit && onDelete && (
+                    <TableCell className="text-right">
+                       <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
+                           <PenSquare className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => onDelete(entry)}>
+                           <Trash2 className="h-4 w-4" />
+                       </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
                 <TableRow className="font-bold bg-muted/50">
@@ -211,6 +226,7 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
                     ) : (
                          <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
                     )}
+                    {isEditable && <TableCell />}
                 </TableRow>
             </TableBody>
           </Table>
