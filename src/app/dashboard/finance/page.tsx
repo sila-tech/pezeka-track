@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan, deleteLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { exportToCsv } from '@/lib/excel';
@@ -222,6 +222,10 @@ export default function FinancePage() {
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
   const [isDeletingEntry, setIsDeletingEntry] = useState(false);
+
+  const [deleteLoanOpen, setDeleteLoanOpen] = useState(false);
+  const [isDeletingLoan, setIsDeletingLoan] = useState(false);
+  
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
@@ -701,6 +705,32 @@ export default function FinancePage() {
         });
     } finally {
         setIsRollingOver(false);
+    }
+  }
+
+  async function handleDeleteLoan() {
+    if (!loanToEdit) return;
+    setIsDeletingLoan(true);
+
+    try {
+        await deleteLoan(firestore, loanToEdit.id);
+
+        toast({
+            title: 'Loan Deleted',
+            description: `Loan #${loanToEdit.loanNumber} has been permanently deleted.`
+        });
+        
+        setLoanToEdit(null); // Close the manage dialog
+        setDeleteLoanOpen(false); // Close the confirmation dialog
+
+    } catch (error: any) {
+         toast({
+            variant: "destructive",
+            title: "Deletion Failed",
+            description: error.message || "Could not delete the loan. Please try again.",
+        });
+    } finally {
+        setIsDeletingLoan(false);
     }
   }
 
@@ -1247,6 +1277,29 @@ export default function FinancePage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete Loan Confirmation */}
+      <AlertDialog open={deleteLoanOpen} onOpenChange={setDeleteLoanOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete loan <strong>#{loanToEdit?.loanNumber}</strong>. Associated financial entries will not be deleted.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleDeleteLoan}
+                    disabled={isDeletingLoan}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                    {isDeletingLoan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Yes, delete loan
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
         <DialogContent className="sm:max-w-4xl">
             {loanToEdit && (
@@ -1259,10 +1312,11 @@ export default function FinancePage() {
                     </DialogHeader>
 
                     <Tabs defaultValue="payment" className="mt-4">
-                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsList className="grid w-full grid-cols-4">
                             <TabsTrigger value="payment">Record Payment & Comments</TabsTrigger>
                             <TabsTrigger value="edit">Edit Loan Details</TabsTrigger>
                             <TabsTrigger value="rollover">Rollover Loan</TabsTrigger>
+                            <TabsTrigger value="delete" className="text-destructive">Delete Loan</TabsTrigger>
                         </TabsList>
                         
                         <TabsContent value="payment">
@@ -1416,6 +1470,33 @@ export default function FinancePage() {
                                 <Button type="submit" form="rollover-form" disabled={isRollingOver || interestForRollover <= 0}>
                                     {isRollingOver && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Confirm Rollover
+                                </Button>
+                            </DialogFooter>
+                        </TabsContent>
+                        <TabsContent value="delete">
+                            <Card className="border-destructive mt-4">
+                                <CardHeader>
+                                    <CardTitle className="text-destructive">Delete Loan #{loanToEdit.loanNumber}</CardTitle>
+                                    <CardDescription>
+                                        Permanently delete this loan from the system. This action cannot be undone.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Alert variant="destructive">
+                                        <AlertTitle>Warning</AlertTitle>
+                                        <AlertDescription>
+                                        Deleting this loan will remove it from the loan book. However, any associated financial entries (receipts or payouts) in the finance section will NOT be deleted. You may need to manually delete them if required.
+                                        </AlertDescription>
+                                    </Alert>
+                                </CardContent>
+                            </Card>
+                            <DialogFooter className="mt-4">
+                                <DialogClose asChild>
+                                    <Button variant="ghost">Cancel</Button>
+                                </DialogClose>
+                                <Button variant="destructive" onClick={() => setDeleteLoanOpen(true)}>
+                                     <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Loan
                                 </Button>
                             </DialogFooter>
                         </TabsContent>

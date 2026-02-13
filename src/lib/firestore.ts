@@ -297,3 +297,18 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         throw serverError;
     }
 }
+
+
+export async function deleteLoan(db: Firestore, loanId: string) {
+    const loanRef = doc(db, 'loans', loanId);
+    try {
+        await deleteDoc(loanRef);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loanRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
