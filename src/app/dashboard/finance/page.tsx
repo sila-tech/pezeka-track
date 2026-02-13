@@ -676,179 +676,181 @@ export default function FinancePage() {
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...addForm}>
-                    <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                        <FormField
-                            control={addForm.control}
-                            name="type"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Entry Type</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select an entry type" />
-                                    </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                    <SelectItem value="receipt">Receipt</SelectItem>
-                                    <SelectItem value="payout">Payout</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        {addFinanceEntryType === 'payout' && (
+                    <div className="max-h-[70vh] overflow-y-auto pr-4">
+                        <form onSubmit={addForm.handleSubmit(onAddSubmit)} id="add-finance-entry-form" className="space-y-4">
                             <FormField
                                 control={addForm.control}
-                                name="payoutReason"
+                                name="type"
                                 render={({ field }) => (
-                                    <FormItem className="space-y-3">
-                                        <FormLabel>Reason for Payout</FormLabel>
+                                    <FormItem>
+                                    <FormLabel>Entry Type</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                                         <FormControl>
-                                            <RadioGroup
-                                                onValueChange={field.onChange}
-                                                defaultValue={field.value}
-                                                className="flex flex-col space-y-1"
-                                            >
-                                                <FormItem className="flex items-center space-x-3 space-y-0">
-                                                    <FormControl>
-                                                        <RadioGroupItem value="loan_disbursement" />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal">
-                                                        New Loan Disbursement
-                                                    </FormLabel>
-                                                </FormItem>
-                                                <FormItem className="flex items-center space-x-3 space-y-0">
-                                                    <FormControl>
-                                                        <RadioGroupItem value="expense" />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal">
-                                                        Expense
-                                                    </FormLabel>
-                                                </FormItem>
-                                            </RadioGroup>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select an entry type" />
+                                        </SelectTrigger>
                                         </FormControl>
-                                        <FormMessage />
+                                        <SelectContent>
+                                        <SelectItem value="receipt">Receipt</SelectItem>
+                                        <SelectItem value="payout">Payout</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
+                            {addFinanceEntryType === 'payout' && (
+                                <FormField
+                                    control={addForm.control}
+                                    name="payoutReason"
+                                    render={({ field }) => (
+                                        <FormItem className="space-y-3">
+                                            <FormLabel>Reason for Payout</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup
+                                                    onValueChange={field.onChange}
+                                                    defaultValue={field.value}
+                                                    className="flex flex-col space-y-1"
+                                                >
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl>
+                                                            <RadioGroupItem value="loan_disbursement" />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">
+                                                            New Loan Disbursement
+                                                        </FormLabel>
+                                                    </FormItem>
+                                                    <FormItem className="flex items-center space-x-3 space-y-0">
+                                                        <FormControl>
+                                                            <RadioGroupItem value="expense" />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">
+                                                            Expense
+                                                        </FormLabel>
+                                                    </FormItem>
+                                                </RadioGroup>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
 
-                        {(addFinanceEntryType === 'receipt' || (addFinanceEntryType === 'payout' && addPayoutReason === 'loan_disbursement')) && (
+                            {(addFinanceEntryType === 'receipt' || (addFinanceEntryType === 'payout' && addPayoutReason === 'loan_disbursement')) && (
+                                <FormField
+                                    control={addForm.control}
+                                    name="loanId"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>For Loan</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loansLoading}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {loans && loans.filter(l => l.status !== 'paid').map(loan => (
+                                                        <SelectItem key={loan.id} value={loan.id}>
+                                                            {`#${loan.loanNumber} - ${loan.customerName} (Balance: ${(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()})`}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                            {addFinanceEntryType === 'payout' && addPayoutReason === 'expense' && (
+                                <FormField
+                                    control={addForm.control}
+                                    name="expenseCategory"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Expense Category</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select a category" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
+                                                    <SelectItem value="office_purchase">Office Purchase</SelectItem>
+                                                    <SelectItem value="other">Other</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
                             <FormField
                                 control={addForm.control}
-                                name="loanId"
+                                name="date"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>For Loan</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loansLoading}>
+                                    <FormLabel>Date</FormLabel>
+                                    <FormControl>
+                                        <Input type="date" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={addForm.control}
+                                name="amount"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Amount (Ksh)</FormLabel>
+                                    <FormControl>
+                                        <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            {addFinanceEntryType === 'payout' && (
+                                <FormField
+                                    control={addForm.control}
+                                    name="transactionCost"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Transaction Cost (Optional)</FormLabel>
                                             <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} />
-                                                </SelectTrigger>
+                                                <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
                                             </FormControl>
-                                            <SelectContent>
-                                                {loans && loans.filter(l => l.status !== 'paid').map(loan => (
-                                                    <SelectItem key={loan.id} value={loan.id}>
-                                                        {`#${loan.loanNumber} - ${loan.customerName} (Balance: ${(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()})`}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-                         {addFinanceEntryType === 'payout' && addPayoutReason === 'expense' && (
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
                             <FormField
                                 control={addForm.control}
-                                name="expenseCategory"
+                                name="description"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Expense Category</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a category" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
-                                                <SelectItem value="office_purchase">Office Purchase</SelectItem>
-                                                <SelectItem value="other">Other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
+                                    <FormLabel>Description {(addFinanceEntryType === 'payout' && addPayoutReason === 'expense' && addExpenseCategory === 'other') ? '' : '(Optional)'}</FormLabel>
+                                    <FormControl>
+                                        <Textarea placeholder="Describe the transaction..." {...field} />
+                                    </FormControl>
+                                    <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
-                        <FormField
-                            control={addForm.control}
-                            name="date"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Date</FormLabel>
-                                <FormControl>
-                                    <Input type="date" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={addForm.control}
-                            name="amount"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Amount (Ksh)</FormLabel>
-                                <FormControl>
-                                    <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         {addFinanceEntryType === 'payout' && (
-                            <FormField
-                                control={addForm.control}
-                                name="transactionCost"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Transaction Cost (Optional)</FormLabel>
-                                        <FormControl>
-                                            <Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-                        <FormField
-                            control={addForm.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Description {(addFinanceEntryType === 'payout' && addPayoutReason === 'expense' && addExpenseCategory === 'other') ? '' : '(Optional)'}</FormLabel>
-                                <FormControl>
-                                    <Textarea placeholder="Describe the transaction..." {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <DialogFooter>
-                            <DialogClose asChild>
-                                <Button type="button" variant="ghost">Cancel</Button>
-                            </DialogClose>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Add Entry
-                            </Button>
-                        </DialogFooter>
-                    </form>
+                        </form>
+                    </div>
+                    <DialogFooter className="pt-4">
+                        <DialogClose asChild>
+                            <Button type="button" variant="ghost">Cancel</Button>
+                        </DialogClose>
+                        <Button type="submit" form="add-finance-entry-form" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Add Entry
+                        </Button>
+                    </DialogFooter>
                 </Form>
             </DialogContent>
         </Dialog>
@@ -1030,9 +1032,10 @@ export default function FinancePage() {
             <DialogDescription>Update the details of this transaction.</DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} className="space-y-4">
+            <div className="max-h-[70vh] overflow-y-auto pr-4">
+              <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} id="edit-finance-entry-form" className="space-y-4">
                   <FormField control={editForm.control} name="type" render={({ field }) => (<FormItem><FormLabel>Entry Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
-                  {(editFinanceEntryType === 'receipt' || editFinanceEntryType === 'payout') && (
+                  {editFinanceEntryType !== 'expense' && (
                       <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={loansLoading || editFinanceEntryType === 'receipt'}><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
                   )}
                   {editFinanceEntryType === 'expense' && (
@@ -1044,11 +1047,12 @@ export default function FinancePage() {
                       <FormField control={editForm.control} name="transactionCost" render={({ field }) => (<FormItem><FormLabel>Transaction Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
                   )}
                   <FormField control={editForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description {editFinanceEntryType === 'expense' && editExpenseCategory === 'other' ? '' : '(Optional)'}</FormLabel><FormControl><Textarea {...field}/></FormControl><FormMessage/></FormItem>)} />
-                  <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                      <Button type="submit" disabled={isUpdatingEntry}>{isUpdatingEntry && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
-                  </DialogFooter>
               </form>
+            </div>
+            <DialogFooter className="pt-4">
+                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                <Button type="submit" form="edit-finance-entry-form" disabled={isUpdatingEntry}>{isUpdatingEntry && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
+            </DialogFooter>
           </Form>
         </DialogContent>
       </Dialog>
@@ -1148,33 +1152,35 @@ export default function FinancePage() {
 
                         <TabsContent value="edit">
                             <Form {...editLoanForm}>
-                                <form onSubmit={editLoanForm.handleSubmit(onLoanEditSubmit)} id="edit-loan-form" className="space-y-4 mt-4 max-h-[60vh] overflow-y-auto p-1">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <FormField control={editLoanForm.control} name="disbursementDate" render={({ field }) => (<FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="registrationFee" render={({ field }) => (<FormItem><FormLabel>Registration Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="processingFee" render={({ field }) => (<FormItem><FormLabel>Processing Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({ field }) => (<FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="chargingCost" render={({ field }) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="paymentFrequency" render={({ field }) => (<FormItem><FormLabel>Payment Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={editLoanForm.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
-                                    </div>
-                                    <Card className="mt-4">
-                                        <CardHeader><CardTitle className="text-lg">Recalculated Totals</CardTitle></CardHeader>
-                                        <CardContent>
-                                             <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground">New Instalment Amount:</span>
-                                                <span className="font-bold text-lg">Ksh {recalculatedValues.instalmentAmount}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2">
-                                                <span className="text-muted-foreground">New Total Repayable:</span>
-                                                <span className="font-bold text-lg">Ksh {recalculatedValues.totalRepayableAmount}</span>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </form>
+                                <div className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
+                                    <form onSubmit={editLoanForm.handleSubmit(onLoanEditSubmit)} id="edit-loan-form" className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <FormField control={editLoanForm.control} name="disbursementDate" render={({ field }) => (<FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="registrationFee" render={({ field }) => (<FormItem><FormLabel>Registration Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="processingFee" render={({ field }) => (<FormItem><FormLabel>Processing Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({ field }) => (<FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="chargingCost" render={({ field }) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="paymentFrequency" render={({ field }) => (<FormItem><FormLabel>Payment Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
+                                        </div>
+                                        <Card className="mt-4">
+                                            <CardHeader><CardTitle className="text-lg">Recalculated Totals</CardTitle></CardHeader>
+                                            <CardContent>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-muted-foreground">New Instalment Amount:</span>
+                                                    <span className="font-bold text-lg">Ksh {recalculatedValues.instalmentAmount}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center mt-2">
+                                                    <span className="text-muted-foreground">New Total Repayable:</span>
+                                                    <span className="font-bold text-lg">Ksh {recalculatedValues.totalRepayableAmount}</span>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </form>
+                                </div>
                             </Form>
                             <DialogFooter className="mt-4">
                                 <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>

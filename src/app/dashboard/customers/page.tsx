@@ -284,56 +284,58 @@ export default function CustomersPage() {
               </DialogDescription>
             </DialogHeader>
             <Form {...addForm}>
-              <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                <FormField
-                  control={addForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={addForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 0712345678" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={addForm.control}
-                  name="idNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ID Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 12345678" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="ghost">Cancel</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Add Customer
-                  </Button>
-                </DialogFooter>
-              </form>
+              <div className="max-h-[70vh] overflow-y-auto pr-4">
+                <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
+                  <FormField
+                    control={addForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={addForm.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 0712345678" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={addForm.control}
+                    name="idNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ID Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 12345678" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </form>
+              </div>
+              <DialogFooter className="mt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="submit" form="add-customer-form" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add Customer
+                </Button>
+              </DialogFooter>
             </Form>
           </DialogContent>
         </Dialog>
@@ -435,7 +437,7 @@ export default function CustomersPage() {
                   Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="mt-4">
+              <div className="mt-4 max-h-[70vh] overflow-y-auto pr-4">
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -532,56 +534,58 @@ export default function CustomersPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <FormField
-                control={editForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="John Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editForm.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. 0712345678" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editForm.control}
-                name="idNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>ID Number (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. 12345678" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">Cancel</Button>
-                </DialogClose>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
-                </Button>
-              </DialogFooter>
-            </form>
+            <div className="max-h-[70vh] overflow-y-auto pr-4">
+              <form id="edit-customer-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 0712345678" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="idNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ID Number (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 12345678" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </form>
+            </div>
+            <DialogFooter className="mt-4">
+              <DialogClose asChild>
+                <Button type="button" variant="ghost">Cancel</Button>
+              </DialogClose>
+              <Button type="submit" form="edit-customer-form" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
           </Form>
         </DialogContent>
       </Dialog>
