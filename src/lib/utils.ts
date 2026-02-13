@@ -38,3 +38,27 @@ export function calculateAmortization(principal: number, monthlyRatePercent: num
     }
     return { instalmentAmount, totalRepayableAmount };
 }
+
+export function calculateInterestForOneInstalment(principal: number, monthlyRatePercent: number, numberOfInstalments: number, paymentFrequency: 'daily' | 'weekly' | 'monthly') {
+    const L = Number(principal) || 0;
+    const monthlyRate = Number(monthlyRatePercent) || 0;
+    const n = Number(numberOfInstalments) || 0;
+    let interestForOneInstalment = 0;
+
+    if (L > 0 && n > 0 && monthlyRate > 0) {
+        const monthlyRateDecimal = monthlyRate / 100;
+        
+        let numberOfMonths = 0;
+        if (paymentFrequency === 'monthly') {
+            numberOfMonths = n;
+        } else if (paymentFrequency === 'weekly') {
+            numberOfMonths = n / 4;
+        } else if (paymentFrequency === 'daily') {
+            numberOfMonths = n / 28;
+        }
+        
+        const totalInterest = L * monthlyRateDecimal * numberOfMonths;
+        interestForOneInstalment = totalInterest / n;
+    }
+    return interestForOneInstalment;
+}

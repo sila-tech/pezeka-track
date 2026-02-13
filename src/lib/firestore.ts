@@ -1,14 +1,39 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { calculateInterestForOneInstalment } from './utils';
 
 type CustomerData = {
   name: string;
   phone: string;
   idNumber?: string;
 }
+
+interface Loan {
+  id: string;
+  loanNumber: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  disbursementDate: { seconds: number; nanoseconds: number };
+  principalAmount: number;
+  interestRate?: number;
+  registrationFee: number;
+  processingFee: number;
+  carTrackInstallationFee: number;
+  chargingCost: number;
+  numberOfInstalments: number;
+  instalmentAmount: number;
+  totalRepayableAmount: number;
+  totalPaid: number;
+  paymentFrequency: 'daily' | 'weekly' | 'monthly';
+  payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
+  comments?: string;
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+}
+
 
 export async function addCustomer(db: Firestore, customerData: CustomerData): Promise<DocumentReference<DocumentData>> {
   const customerCollection = collection(db, 'customers');
@@ -64,13 +89,14 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
 
 export async function updateFinanceEntry(db: Firestore, entryId: string, data: { [key: string]: any }) {
     const entryRef = doc(db, 'financeEntries', entryId);
+    const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
     try {
-        await updateDoc(entryRef, { ...data, updatedAt: serverTimestamp() });
+        await updateDoc(entryRef, { ...updateData, updatedAt: serverTimestamp() });
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: entryRef.path,
             operation: 'update',
-            requestResourceData: data,
+            requestResourceData: updateData,
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
@@ -138,13 +164,15 @@ export async function addLoan(db: Firestore, loanData: LoanData): Promise<Docume
 
 export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {
     const loanRef = doc(db, 'loans', loanId);
+    const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
+
     try {
-        await updateDoc(loanRef, { ...data, updatedAt: serverTimestamp() });
+        await updateDoc(loanRef, { ...updateData, updatedAt: serverTimestamp() });
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: loanRef.path,
             operation: 'update',
-            requestResourceData: data,
+            requestResourceData: updateData,
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
@@ -181,6 +209,84 @@ export async function deleteCustomer(db: Firestore, customerId: string) {
         const permissionError = new FirestorePermissionError({
             path: customerRef.path,
             operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+
+export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDate: Date) {
+    const interestAmount = calculateInterestForOneInstalment(
+        originalLoan.principalAmount,
+        originalLoan.interestRate ?? 0,
+        originalLoan.numberOfInstalments,
+        originalLoan.paymentFrequency
+    );
+
+    if (interestAmount <= 0) {
+        throw new Error("Cannot rollover a loan with zero interest.");
+    }
+
+    const receiptDescription = `Rollover interest payment for Loan #${originalLoan.loanNumber}`;
+    const receiptData = { 
+        type: 'receipt' as const,
+        date: rolloverDate,
+        amount: interestAmount,
+        description: receiptDescription,
+        loanId: originalLoan.id
+    };
+    const receiptDocRef = await addFinanceEntry(db, receiptData);
+
+    const interestPayment = {
+        paymentId: receiptDocRef.id,
+        amount: interestAmount,
+        date: rolloverDate,
+    };
+
+    await updateLoan(db, originalLoan.id, {
+        status: 'rollover',
+        comments: `${originalLoan.comments || ''}\nRolled over on ${rolloverDate.toLocaleDateString()}.`.trim(),
+        payments: arrayUnion(interestPayment),
+        totalPaid: increment(interestAmount)
+    });
+
+    const loansCollection = collection(db, 'loans');
+    const q = query(loansCollection);
+    const querySnapshot = await getDocs(q);
+    const loanCount = querySnapshot.size;
+    const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
+
+    const newLoanData = {
+        loanNumber: newLoanNumber,
+        customerId: originalLoan.customerId,
+        customerName: originalLoan.customerName,
+        customerPhone: originalLoan.customerPhone,
+        disbursementDate: rolloverDate,
+        principalAmount: originalLoan.principalAmount,
+        interestRate: originalLoan.interestRate ?? 0,
+        registrationFee: originalLoan.registrationFee,
+        processingFee: originalLoan.processingFee,
+        carTrackInstallationFee: originalLoan.carTrackInstallationFee,
+        chargingCost: originalLoan.chargingCost,
+        numberOfInstalments: originalLoan.numberOfInstalments,
+        instalmentAmount: originalLoan.instalmentAmount,
+        totalRepayableAmount: originalLoan.totalRepayableAmount,
+        paymentFrequency: originalLoan.paymentFrequency,
+        status: 'active',
+        totalPaid: 0,
+        payments: [],
+        comments: `Rollover from Loan #${originalLoan.loanNumber}`,
+        createdAt: serverTimestamp(),
+    };
+
+    try {
+        await addDoc(loansCollection, newLoanData);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loansCollection.path,
+            operation: 'create',
+            requestResourceData: newLoanData,
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;

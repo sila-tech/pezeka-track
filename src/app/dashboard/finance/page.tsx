@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { exportToCsv } from '@/lib/excel';
@@ -58,7 +58,7 @@ import { FinanceReportTab } from './components/finance-report-tab';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { calculateAmortization } from '@/lib/utils';
+import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
@@ -157,6 +157,10 @@ const editLoanSchema = z.object({
   status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue']),
 });
 
+const rolloverSchema = z.object({
+    rolloverDate: z.string().min(1, 'Rollover date is required.'),
+});
+
 
 interface Payment {
   paymentId: string;
@@ -167,6 +171,7 @@ interface Payment {
 interface Loan {
   id: string;
   loanNumber: string;
+  customerId: string;
   customerName: string;
   customerPhone: string;
   disbursementDate: { seconds: number, nanoseconds: number };
@@ -208,6 +213,7 @@ export default function FinancePage() {
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isEditingLoan, setIsEditingLoan] = useState(false);
+  const [isRollingOver, setIsRollingOver] = useState(false);
 
   const [editEntryOpen, setEditEntryOpen] = useState(false);
   const [entryToEdit, setEntryToEdit] = useState<FinanceEntry | null>(null);
@@ -316,6 +322,13 @@ export default function FinancePage() {
     resolver: zodResolver(editLoanSchema),
   });
 
+  const rolloverForm = useForm<z.infer<typeof rolloverSchema>>({
+    resolver: zodResolver(rolloverSchema),
+    defaultValues: {
+        rolloverDate: format(new Date(), 'yyyy-MM-dd'),
+    },
+  });
+
   const { watch } = editLoanForm;
   const principalAmount = watch('principalAmount');
   const interestRate = watch('interestRate');
@@ -332,6 +345,16 @@ export default function FinancePage() {
         totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     };
   }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
+
+    const interestForRollover = useMemo(() => {
+        if (!loanToEdit) return 0;
+        return calculateInterestForOneInstalment(
+            loanToEdit.principalAmount,
+            loanToEdit.interestRate || 0,
+            loanToEdit.numberOfInstalments,
+            loanToEdit.paymentFrequency
+        );
+    }, [loanToEdit]);
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
@@ -457,6 +480,9 @@ export default function FinancePage() {
         numberOfInstalments: loan.numberOfInstalments,
         paymentFrequency: loan.paymentFrequency,
         status: loan.status,
+    });
+    rolloverForm.reset({
+        rolloverDate: format(new Date(), 'yyyy-MM-dd'),
     });
   }
 
@@ -654,6 +680,27 @@ export default function FinancePage() {
         setDeleteEntryOpen(false);
         setEntryToDelete(null);
         setIsDeletingEntry(false);
+    }
+  }
+
+  async function onRolloverSubmit(values: z.infer<typeof rolloverSchema>) {
+    if (!loanToEdit) return;
+    setIsRollingOver(true);
+    try {
+        await rolloverLoan(firestore, loanToEdit, new Date(values.rolloverDate));
+        toast({
+            title: "Loan Rolled Over",
+            description: `Loan #${loanToEdit.loanNumber} has been rolled over into a new loan.`,
+        });
+        setLoanToEdit(null); // Close dialog
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Rollover Failed",
+            description: error.message || "Could not rollover the loan. Please try again.",
+        });
+    } finally {
+        setIsRollingOver(false);
     }
   }
 
@@ -1160,8 +1207,8 @@ export default function FinancePage() {
             <div className="max-h-[70vh] overflow-y-auto pr-4">
               <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} id="edit-finance-entry-form" className="space-y-4">
                   <FormField control={editForm.control} name="type" render={({ field }) => (<FormItem><FormLabel>Entry Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
-                  {editFinanceEntryType !== 'expense' && (
-                      <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={loansLoading || editFinanceEntryType === 'receipt'}><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
+                  {editFinanceEntryType === 'receipt' && (
+                      <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
                   )}
                   {editFinanceEntryType === 'expense' && (
                       <FormField control={editForm.control} name="expenseCategory" render={({ field }) => (<FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
@@ -1212,9 +1259,10 @@ export default function FinancePage() {
                     </DialogHeader>
 
                     <Tabs defaultValue="payment" className="mt-4">
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className="grid w-full grid-cols-3">
                             <TabsTrigger value="payment">Record Payment & Comments</TabsTrigger>
                             <TabsTrigger value="edit">Edit Loan Details</TabsTrigger>
+                            <TabsTrigger value="rollover">Rollover Loan</TabsTrigger>
                         </TabsList>
                         
                         <TabsContent value="payment">
@@ -1327,6 +1375,49 @@ export default function FinancePage() {
                                     <Button type="submit" form="edit-loan-form" disabled={isEditingLoan}>{isEditingLoan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button>
                                 </DialogFooter>
                             </Form>
+                        </TabsContent>
+                        <TabsContent value="rollover">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Rollover Loan</CardTitle>
+                                    <CardDescription>
+                                        This action will record an interest-only payment, mark this loan as 'Rolled Over', and create a new loan with the same principal amount.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Form {...rolloverForm}>
+                                        <form onSubmit={rolloverForm.handleSubmit(onRolloverSubmit)} id="rollover-form" className="space-y-4">
+                                            <div className="space-y-2 rounded-md bg-muted p-4">
+                                                <div className="flex justify-between">
+                                                    <span className="text-sm font-medium">Interest Payment Required</span>
+                                                    <span className="text-sm font-bold">Ksh {interestForRollover.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">This is the calculated interest for one instalment period.</p>
+                                            </div>
+                                            <FormField
+                                                control={rolloverForm.control}
+                                                name="rolloverDate"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Rollover Date</FormLabel>
+                                                        <FormControl>
+                                                            <Input type="date" {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        </form>
+                                    </Form>
+                                </CardContent>
+                            </Card>
+                            <DialogFooter className="mt-4">
+                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                <Button type="submit" form="rollover-form" disabled={isRollingOver || interestForRollover <= 0}>
+                                    {isRollingOver && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Confirm Rollover
+                                </Button>
+                            </DialogFooter>
                         </TabsContent>
                     </Tabs>
                 </>
