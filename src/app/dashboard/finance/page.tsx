@@ -59,10 +59,12 @@ import { EditableFinanceReportTab } from './components/editable-finance-report-t
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const addFinanceEntrySchema = z.object({
-  type: z.enum(['expense', 'payout', 'receipt'], { required_error: 'Please select an entry type.' }),
+  type: z.enum(['receipt', 'payout'], { required_error: 'Please select an entry type.' }),
+  payoutReason: z.enum(['loan_disbursement', 'expense']).optional(),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   transactionCost: z.coerce.number().optional(),
@@ -77,29 +79,37 @@ const addFinanceEntrySchema = z.object({
             path: ['loanId'],
         });
     }
-    if (data.type === 'payout' && !data.loanId) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Please select the loan being disbursed.',
-            path: ['loanId'],
-        });
-    }
-    if (data.type === 'expense') {
-        if (!data.expenseCategory) {
+    if (data.type === 'payout') {
+        if (!data.payoutReason) {
             ctx.addIssue({
                 code: 'custom',
-                message: 'Please select an expense category.',
-                path: ['expenseCategory'],
+                message: 'Please select a reason for the payout.',
+                path: ['payoutReason'],
             });
-        } else if (data.expenseCategory === 'other' && !data.description) {
+        } else if (data.payoutReason === 'loan_disbursement' && !data.loanId) {
             ctx.addIssue({
                 code: 'custom',
-                message: 'Description is required when category is "Other".',
-                path: ['description'],
+                message: 'Please select the loan being disbursed.',
+                path: ['loanId'],
             });
+        } else if (data.payoutReason === 'expense') {
+            if (!data.expenseCategory) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: 'Please select an expense category.',
+                    path: ['expenseCategory'],
+                });
+            } else if (data.expenseCategory === 'other' && !data.description) {
+                ctx.addIssue({
+                    code: 'custom',
+                    message: 'Description is required when category is "Other".',
+                    path: ['description'],
+                });
+            }
         }
     }
 });
+
 
 const editFinanceEntrySchema = z.object({
   type: z.enum(['expense', 'payout', 'receipt']),
@@ -220,6 +230,7 @@ export default function FinancePage() {
         date: format(new Date(), 'yyyy-MM-dd'),
         loanId: "",
         transactionCost: 0,
+        payoutReason: undefined,
         expenseCategory: undefined,
     }
   });
@@ -228,11 +239,12 @@ export default function FinancePage() {
     resolver: zodResolver(editFinanceEntrySchema)
   });
 
-  const { watch: addFinanceEntryWatch, getValues: getAddFormValues } = addForm;
+  const { watch: addFinanceEntryWatch } = addForm;
   const addFinanceEntryType = addFinanceEntryWatch('type');
+  const addPayoutReason = addFinanceEntryWatch('payoutReason');
   const addExpenseCategory = addFinanceEntryWatch('expenseCategory');
   
-  const { watch: editFinanceEntryWatch, getValues: getEditFormValues } = editForm;
+  const { watch: editFinanceEntryWatch } = editForm;
   const editFinanceEntryType = editFinanceEntryWatch('type');
   const editExpenseCategory = editFinanceEntryWatch('expenseCategory');
 
@@ -269,26 +281,35 @@ export default function FinancePage() {
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
-      const loanForReceipt = values.type === 'receipt' ? loans?.find(l => l.id === values.loanId) : undefined;
-      const loanForPayout = values.type === 'payout' ? loans?.find(l => l.id === values.loanId) : undefined;
-       
-      if (values.type === 'receipt' && !loanForReceipt) throw new Error("Selected loan not found for receipt.");
-      if (values.type === 'payout' && !loanForPayout) throw new Error("Selected loan not found for payout.");
+      const entryType = values.type === 'payout' 
+        ? (values.payoutReason === 'loan_disbursement' ? 'payout' : 'expense') 
+        : 'receipt';
 
-      const description = 
-        values.type === 'receipt' && !values.description
-        ? `Payment for Loan #${loanForReceipt!.loanNumber} by ${loanForReceipt!.customerName}`
-        : values.type === 'payout' && !values.description
-        ? `Disbursement for Loan #${loanForPayout!.loanNumber}`
-        : (values.type === 'expense' && values.expenseCategory && values.expenseCategory !== 'other' && !values.description)
-        ? expenseCategoryLabels[values.expenseCategory]
-        : values.description;
+      const loanForReceipt = values.type === 'receipt' ? loans?.find(l => l.id === values.loanId) : undefined;
+      const loanForPayout = (values.type === 'payout' && values.payoutReason === 'loan_disbursement') ? loans?.find(l => l.id === values.loanId) : undefined;
+       
+      if (entryType === 'receipt' && !loanForReceipt) throw new Error("Selected loan not found for receipt.");
+      if (entryType === 'payout' && !loanForPayout) throw new Error("Selected loan not found for payout.");
+
+      let description = values.description;
+      if (!description) {
+        if (entryType === 'receipt' && loanForReceipt) {
+          description = `Payment for Loan #${loanForReceipt.loanNumber} by ${loanForReceipt.customerName}`;
+        } else if (entryType === 'payout' && loanForPayout) {
+          description = `Disbursement for Loan #${loanForPayout.loanNumber}`;
+        } else if (entryType === 'expense' && values.expenseCategory && values.expenseCategory !== 'other') {
+          description = expenseCategoryLabels[values.expenseCategory];
+        }
+      }
       
       const rawEntryData: { [key: string]: any } = {
           ...values,
+          type: entryType,
           date: new Date(values.date),
           description,
       };
+      delete rawEntryData.payoutReason;
+
 
       const entryData = Object.fromEntries(
         Object.entries(rawEntryData).filter(([_, v]) => v)
@@ -317,7 +338,7 @@ export default function FinancePage() {
       
       toast({
           title: 'Finance Entry Added',
-          description: `A new ${values.type} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
+          description: `A new ${entryType} entry of Ksh ${values.amount.toLocaleString()} has been added.`,
       });
 
       addForm.reset();
@@ -671,14 +692,50 @@ export default function FinancePage() {
                                     <SelectContent>
                                     <SelectItem value="receipt">Receipt</SelectItem>
                                     <SelectItem value="payout">Payout</SelectItem>
-                                    <SelectItem value="expense">Expense</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
                                 </FormItem>
                             )}
                         />
-                        {(addFinanceEntryType === 'receipt' || addFinanceEntryType === 'payout') && (
+                        {addFinanceEntryType === 'payout' && (
+                            <FormField
+                                control={addForm.control}
+                                name="payoutReason"
+                                render={({ field }) => (
+                                    <FormItem className="space-y-3">
+                                        <FormLabel>Reason for Payout</FormLabel>
+                                        <FormControl>
+                                            <RadioGroup
+                                                onValueChange={field.onChange}
+                                                defaultValue={field.value}
+                                                className="flex flex-col space-y-1"
+                                            >
+                                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="loan_disbursement" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal">
+                                                        New Loan Disbursement
+                                                    </FormLabel>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                                    <FormControl>
+                                                        <RadioGroupItem value="expense" />
+                                                    </FormControl>
+                                                    <FormLabel className="font-normal">
+                                                        Expense
+                                                    </FormLabel>
+                                                </FormItem>
+                                            </RadioGroup>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+
+                        {(addFinanceEntryType === 'receipt' || (addFinanceEntryType === 'payout' && addPayoutReason === 'loan_disbursement')) && (
                             <FormField
                                 control={addForm.control}
                                 name="loanId"
@@ -704,7 +761,7 @@ export default function FinancePage() {
                                 )}
                             />
                         )}
-                         {addFinanceEntryType === 'expense' && (
+                         {addFinanceEntryType === 'payout' && addPayoutReason === 'expense' && (
                             <FormField
                                 control={addForm.control}
                                 name="expenseCategory"
@@ -754,7 +811,7 @@ export default function FinancePage() {
                                 </FormItem>
                             )}
                         />
-                         {(addFinanceEntryType === 'payout' || addFinanceEntryType === 'expense') && (
+                         {addFinanceEntryType === 'payout' && (
                             <FormField
                                 control={addForm.control}
                                 name="transactionCost"
@@ -774,7 +831,7 @@ export default function FinancePage() {
                             name="description"
                             render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Description {addFinanceEntryType === 'expense' && addExpenseCategory === 'other' ? '' : '(Optional)'}</FormLabel>
+                                <FormLabel>Description {(addFinanceEntryType === 'payout' && addPayoutReason === 'expense' && addExpenseCategory === 'other') ? '' : '(Optional)'}</FormLabel>
                                 <FormControl>
                                     <Textarea placeholder="Describe the transaction..." {...field} />
                                 </FormControl>
