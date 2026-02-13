@@ -566,6 +566,8 @@ export default function FinancePage() {
             ? expenseCategoryLabels[values.expenseCategory]
             : values.description;
         
+        const originalAmount = entryToEdit.amount;
+        
         const rawUpdateData: {[key: string]: any} = {
             ...values,
             date: new Date(values.date),
@@ -577,6 +579,24 @@ export default function FinancePage() {
         );
 
         await updateFinanceEntry(firestore, entryToEdit.id, updateData);
+
+        if (entryToEdit.type === 'receipt' && entryToEdit.loanId && values.amount !== originalAmount) {
+            const loan = loans?.find(l => l.id === entryToEdit.loanId);
+            if(loan) {
+                const amountDifference = values.amount - originalAmount;
+                const updatedPayments = loan.payments?.map(p => 
+                    p.paymentId === entryToEdit.id ? { ...p, amount: values.amount, date: new Date(values.date) } : p
+                );
+
+                if (updatedPayments) {
+                    await updateLoan(firestore, loan.id, {
+                        totalPaid: increment(amountDifference),
+                        payments: updatedPayments,
+                    });
+                }
+            }
+        }
+
         toast({
             title: 'Entry Updated',
             description: 'The finance entry has been updated successfully.'
@@ -1147,7 +1167,7 @@ export default function FinancePage() {
                       <FormField control={editForm.control} name="expenseCategory" render={({ field }) => (<FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
                   )}
                   <FormField control={editForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl><FormMessage/></FormItem>)} />
-                  <FormField control={editForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={editFinanceEntryType === 'receipt'} /></FormControl><FormMessage/></FormItem>)} />
+                  <FormField control={editForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage/></FormItem>)} />
                   {(editFinanceEntryType === 'payout' || editFinanceEntryType === 'expense') && (
                       <FormField control={editForm.control} name="transactionCost" render={({ field }) => (<FormItem><FormLabel>Transaction Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
                   )}
@@ -1232,15 +1252,31 @@ export default function FinancePage() {
                                                     <TableRow>
                                                         <TableHead>Date</TableHead>
                                                         <TableHead className="text-right">Amount</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
                                                     </TableRow>
                                                     </TableHeader>
                                                     <TableBody>
-                                                    {loanToEdit.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map((payment) => (
-                                                        <TableRow key={payment.paymentId}>
-                                                          <TableCell>{format(new Date((payment.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                          <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
-                                                        </TableRow>
-                                                    ))}
+                                                    {loanToEdit.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map((payment) => {
+                                                        const paymentEntry = financeEntries?.find(fe => fe.id === payment.paymentId);
+                                                        return (
+                                                            <TableRow key={payment.paymentId}>
+                                                                <TableCell>{format(new Date((payment.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                                <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
+                                                                <TableCell className="text-right">
+                                                                    {paymentEntry && (
+                                                                        <>
+                                                                            <Button variant="ghost" size="sm" onClick={() => handleEditEntryClick(paymentEntry)}>
+                                                                                <PenSquare className="h-4 w-4" />
+                                                                            </Button>
+                                                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteEntryClick(paymentEntry)}>
+                                                                                <Trash2 className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        )
+                                                    })}
                                                     </TableBody>
                                                 </Table>
                                                 )}
@@ -1286,11 +1322,11 @@ export default function FinancePage() {
                                         </Card>
                                     </form>
                                 </div>
+                                <DialogFooter className="mt-4">
+                                    <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                    <Button type="submit" form="edit-loan-form" disabled={isEditingLoan}>{isEditingLoan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button>
+                                </DialogFooter>
                             </Form>
-                            <DialogFooter className="mt-4">
-                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                                <Button type="submit" form="edit-loan-form" disabled={isEditingLoan}>{isEditingLoan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button>
-                            </DialogFooter>
                         </TabsContent>
                     </Tabs>
                 </>
