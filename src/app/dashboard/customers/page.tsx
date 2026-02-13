@@ -253,7 +253,7 @@ export default function CustomersPage() {
       const balance = messageLoan.totalRepayableAmount - messageLoan.totalPaid;
       const dueDate = getLoanDueDate(messageLoan);
       
-      return `Dear ${selectedCustomer.name},\n\nThis is a friendly reminder regarding your loan with Pezeka Credit.\n\nLoan Number: ${messageLoan.loanNumber}\nOutstanding Balance: Ksh ${balance.toLocaleString()}\nNext Instalment: Ksh ${messageLoan.instalmentAmount.toLocaleString()}${dueDate ? `\nDue Date: ${format(dueDate, 'PPP')}` : ''}\n\nPlease ensure your payment is made on time to avoid any inconveniences.\n\nThank you,\nPezeka Credit Ltd.`;
+      return `Dear ${selectedCustomer.name},\n\nThis is a friendly reminder regarding your loan with Pezeka Credit.\n\nLoan Number: ${messageLoan.loanNumber}\nOutstanding Balance: Ksh ${balance.toLocaleString()}\nNext Instalment: Ksh ${messageLoan.instalmentAmount.toLocaleString()}${dueDate ? `\nDue Date: ${format(dueDate, 'PPP')}` : ''}\n\nPlease use the following details for your payment:\nPaybill: 522522\nAccount: 1347823360\n\nPlease ensure your payment is made on time to avoid any inconveniences.\n\nThank you,\nPezeka Credit Ltd.`;
   }, [messageLoan, selectedCustomer]);
 
   const copyToClipboard = () => {
