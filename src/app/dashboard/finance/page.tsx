@@ -51,7 +51,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FinanceReportTab } from './components/finance-report-tab';
@@ -231,6 +231,47 @@ export default function FinancePage() {
         loan.customerPhone.includes(loanBookSearchTerm)
     );
   }, [loans, loanBookSearchTerm]);
+  
+  const loanBookTotals = useMemo(() => {
+      if (!filteredLoans) {
+          return {
+              principalAmount: 0,
+              takeHome: 0,
+              carTrackInstallationFee: 0,
+              registrationFee: 0,
+              processingFee: 0,
+              chargingCost: 0,
+              totalRepayableAmount: 0,
+              totalPaid: 0,
+              balance: 0,
+          };
+      }
+      return filteredLoans.reduce((acc, loan) => {
+          const takeHome = loan.principalAmount - (loan.registrationFee || 0) - (loan.processingFee || 0) - (loan.carTrackInstallationFee || 0) - (loan.chargingCost || 0);
+          const balance = loan.totalRepayableAmount - loan.totalPaid;
+
+          acc.principalAmount += loan.principalAmount;
+          acc.takeHome += takeHome;
+          acc.carTrackInstallationFee += (loan.carTrackInstallationFee || 0);
+          acc.registrationFee += (loan.registrationFee || 0);
+          acc.processingFee += (loan.processingFee || 0);
+          acc.chargingCost += (loan.chargingCost || 0);
+          acc.totalRepayableAmount += loan.totalRepayableAmount;
+          acc.totalPaid += loan.totalPaid;
+          acc.balance += balance;
+          return acc;
+      }, {
+          principalAmount: 0,
+          takeHome: 0,
+          carTrackInstallationFee: 0,
+          registrationFee: 0,
+          processingFee: 0,
+          chargingCost: 0,
+          totalRepayableAmount: 0,
+          totalPaid: 0,
+          balance: 0,
+      });
+  }, [filteredLoans]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
@@ -1044,6 +1085,25 @@ export default function FinancePage() {
                                       )
                                   })}
                               </TableBody>
+                              <TableFooter>
+                                <TableRow className="font-bold bg-muted/50 sticky bottom-0">
+                                    <TableCell colSpan={4} className="text-right">Totals</TableCell>
+                                    <TableCell className="text-right">{(loanBookTotals.principalAmount || 0).toLocaleString()}</TableCell>
+                                    <TableCell /> {/* Interest Rate */}
+                                    <TableCell className="text-right">{(loanBookTotals.registrationFee || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{(loanBookTotals.processingFee || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{(loanBookTotals.takeHome || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{(loanBookTotals.carTrackInstallationFee || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right">{(loanBookTotals.chargingCost || 0).toLocaleString()}</TableCell>
+                                    <TableCell /> {/* Instalments */}
+                                    <TableCell /> {/* Instalment Amt */}
+                                    <TableCell className="text-right">{(loanBookTotals.totalRepayableAmount || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right text-green-600">{(loanBookTotals.totalPaid || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right font-bold">{(loanBookTotals.balance || 0).toLocaleString()}</TableCell>
+                                    <TableCell /> {/* Status */}
+                                    <TableCell /> {/* Actions */}
+                                </TableRow>
+                            </TableFooter>
                           </Table>
                         </div>
                       )}
