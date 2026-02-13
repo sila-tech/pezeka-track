@@ -68,6 +68,7 @@ const addFinanceEntrySchema = z.object({
   transactionCost: z.coerce.number().optional(),
   description: z.string().optional(),
   loanId: z.string().optional(),
+  expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
 }).superRefine((data, ctx) => {
     if (data.type === 'receipt' && !data.loanId) {
         ctx.addIssue({
@@ -75,6 +76,28 @@ const addFinanceEntrySchema = z.object({
             message: 'Please select the loan this receipt is for.',
             path: ['loanId'],
         });
+    }
+    if (data.type === 'payout' && !data.loanId) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Please select the loan being disbursed.',
+            path: ['loanId'],
+        });
+    }
+    if (data.type === 'expense') {
+        if (!data.expenseCategory) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Please select an expense category.',
+                path: ['expenseCategory'],
+            });
+        } else if (data.expenseCategory === 'other' && !data.description) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Description is required when category is "Other".',
+                path: ['description'],
+            });
+        }
     }
 });
 
@@ -85,6 +108,23 @@ const editFinanceEntrySchema = z.object({
   transactionCost: z.coerce.number().optional(),
   description: z.string().optional(),
   loanId: z.string().optional(),
+  expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
+}).superRefine((data, ctx) => {
+    if (data.type === 'expense') {
+        if (!data.expenseCategory) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Please select an expense category.',
+                path: ['expenseCategory'],
+            });
+        } else if (data.expenseCategory === 'other' && !data.description) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Description is required when category is "Other".',
+                path: ['description'],
+            });
+        }
+    }
 });
 
 
@@ -144,8 +184,13 @@ interface FinanceEntry {
   description: string;
   transactionCost?: number;
   loanId?: string;
+  expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
 }
 
+const expenseCategoryLabels: Record<string, string> = {
+    facilitation_commission: 'Facilitation Commission',
+    office_purchase: 'Office Purchase',
+};
 
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
@@ -175,6 +220,7 @@ export default function FinancePage() {
         date: format(new Date(), 'yyyy-MM-dd'),
         loanId: "",
         transactionCost: 0,
+        expenseCategory: undefined,
     }
   });
 
@@ -182,11 +228,13 @@ export default function FinancePage() {
     resolver: zodResolver(editFinanceEntrySchema)
   });
 
-  const { watch: addFinanceEntryWatch } = addForm;
+  const { watch: addFinanceEntryWatch, getValues: getAddFormValues } = addForm;
   const addFinanceEntryType = addFinanceEntryWatch('type');
+  const addExpenseCategory = addFinanceEntryWatch('expenseCategory');
   
-  const { watch: editFinanceEntryWatch } = editForm;
+  const { watch: editFinanceEntryWatch, getValues: getEditFormValues } = editForm;
   const editFinanceEntryType = editFinanceEntryWatch('type');
+  const editExpenseCategory = editFinanceEntryWatch('expenseCategory');
 
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
@@ -221,15 +269,19 @@ export default function FinancePage() {
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
-      const isReceipt = values.type === 'receipt' && values.loanId;
-      const loanToUpdate = isReceipt ? loans?.find(l => l.id === values.loanId) : undefined;
+      const loanForReceipt = values.type === 'receipt' ? loans?.find(l => l.id === values.loanId) : undefined;
+      const loanForPayout = values.type === 'payout' ? loans?.find(l => l.id === values.loanId) : undefined;
        
-      if (isReceipt && !loanToUpdate) throw new Error("Selected loan not found.");
+      if (values.type === 'receipt' && !loanForReceipt) throw new Error("Selected loan not found for receipt.");
+      if (values.type === 'payout' && !loanForPayout) throw new Error("Selected loan not found for payout.");
 
-      const description = isReceipt && !values.description
-        ? `Payment for Loan #${loanToUpdate!.loanNumber} by ${loanToUpdate!.customerName}`
-        : values.type === 'payout' && values.loanId && !values.description
-        ? `Disbursement for Loan #${loans?.find(l => l.id === values.loanId)?.loanNumber}`
+      const description = 
+        values.type === 'receipt' && !values.description
+        ? `Payment for Loan #${loanForReceipt!.loanNumber} by ${loanForReceipt!.customerName}`
+        : values.type === 'payout' && !values.description
+        ? `Disbursement for Loan #${loanForPayout!.loanNumber}`
+        : (values.type === 'expense' && values.expenseCategory && values.expenseCategory !== 'other' && !values.description)
+        ? expenseCategoryLabels[values.expenseCategory]
         : values.description;
       
       const rawEntryData: { [key: string]: any } = {
@@ -244,8 +296,8 @@ export default function FinancePage() {
 
       const docRef = await addFinanceEntry(firestore, entryData as any);
 
-      if (isReceipt && loanToUpdate) {
-        const currentTotalPaid = loanToUpdate.totalPaid || 0;
+      if (values.type === 'receipt' && loanForReceipt) {
+        const currentTotalPaid = loanForReceipt.totalPaid || 0;
         const newTotalPaid = currentTotalPaid + values.amount;
         
         const newPayment: Payment = {
@@ -254,9 +306,9 @@ export default function FinancePage() {
             date: new Date(values.date),
         };
 
-        const newStatus = newTotalPaid >= loanToUpdate.totalRepayableAmount ? 'paid' : loanToUpdate.status;
+        const newStatus = newTotalPaid >= loanForReceipt.totalRepayableAmount ? 'paid' : loanForReceipt.status;
 
-        await updateLoan(firestore, loanToUpdate.id, {
+        await updateLoan(firestore, loanForReceipt.id, {
             totalPaid: newTotalPaid,
             payments: arrayUnion(newPayment),
             status: newStatus,
@@ -434,13 +486,18 @@ export default function FinancePage() {
     if (!entryToEdit) return;
     setIsUpdatingEntry(true);
     try {
+        const description = (values.type === 'expense' && values.expenseCategory && values.expenseCategory !== 'other' && !values.description)
+            ? expenseCategoryLabels[values.expenseCategory]
+            : values.description;
+        
         const rawUpdateData: {[key: string]: any} = {
             ...values,
             date: new Date(values.date),
+            description
         };
         
         const updateData = Object.fromEntries(
-            Object.entries(rawUpdateData).filter(([, v]) => v)
+            Object.entries(rawUpdateData).filter(([, v]) => v !== undefined && v !== null && v !== '')
         );
 
         await updateFinanceEntry(firestore, entryToEdit.id, updateData);
@@ -621,7 +678,7 @@ export default function FinancePage() {
                                 </FormItem>
                             )}
                         />
-                        {addFinanceEntryType === 'receipt' && (
+                        {(addFinanceEntryType === 'receipt' || addFinanceEntryType === 'payout') && (
                             <FormField
                                 control={addForm.control}
                                 name="loanId"
@@ -640,6 +697,30 @@ export default function FinancePage() {
                                                         {`#${loan.loanNumber} - ${loan.customerName} (Balance: ${(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()})`}
                                                     </SelectItem>
                                                 ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
+                         {addFinanceEntryType === 'expense' && (
+                            <FormField
+                                control={addForm.control}
+                                name="expenseCategory"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Expense Category</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a category" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
+                                                <SelectItem value="office_purchase">Office Purchase</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -693,7 +774,7 @@ export default function FinancePage() {
                             name="description"
                             render={({ field }) => (
                                 <FormItem>
-                                <FormLabel>Description (Optional)</FormLabel>
+                                <FormLabel>Description {addFinanceEntryType === 'expense' && addExpenseCategory === 'other' ? '' : '(Optional)'}</FormLabel>
                                 <FormControl>
                                     <Textarea placeholder="Describe the transaction..." {...field} />
                                 </FormControl>
@@ -894,15 +975,18 @@ export default function FinancePage() {
           <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} className="space-y-4">
                   <FormField control={editForm.control} name="type" render={({ field }) => (<FormItem><FormLabel>Entry Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
-                  {editFinanceEntryType === 'receipt' && (
+                  {(editFinanceEntryType === 'receipt' || editFinanceEntryType === 'payout') && (
                       <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={loansLoading || editFinanceEntryType === 'receipt'}><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
+                  )}
+                  {editFinanceEntryType === 'expense' && (
+                      <FormField control={editForm.control} name="expenseCategory" render={({ field }) => (<FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
                   )}
                   <FormField control={editForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl><FormMessage/></FormItem>)} />
                   <FormField control={editForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={editFinanceEntryType === 'receipt'} /></FormControl><FormMessage/></FormItem>)} />
                   {(editFinanceEntryType === 'payout' || editFinanceEntryType === 'expense') && (
                       <FormField control={editForm.control} name="transactionCost" render={({ field }) => (<FormItem><FormLabel>Transaction Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
                   )}
-                  <FormField control={editForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl><FormMessage/></FormItem>)} />
+                  <FormField control={editForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description {editFinanceEntryType === 'expense' && editExpenseCategory === 'other' ? '' : '(Optional)'}</FormLabel><FormControl><Textarea {...field}/></FormControl><FormMessage/></FormItem>)} />
                   <DialogFooter>
                       <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
                       <Button type="submit" disabled={isUpdatingEntry}>{isUpdatingEntry && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>

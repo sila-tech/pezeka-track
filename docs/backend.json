@@ -89,7 +89,12 @@
         "amount": { "type": "number" },
         "description": { "type": "string" },
         "loanId": { "type": "string", "description": "The ID of the associated loan, if applicable." },
-        "transactionCost": { "type": "number", "default": 0, "description": "Any cost associated with the transaction." }
+        "transactionCost": { "type": "number", "default": 0, "description": "Any cost associated with the transaction." },
+        "expenseCategory": {
+          "type": "string",
+          "enum": ["facilitation_commission", "office_purchase", "other"],
+          "description": "Category for an expense entry."
+        }
       },
       "required": ["type", "date", "amount"]
     }
