@@ -210,40 +210,42 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
             </Alert>
         )}
         {!loading && filteredEntries && filteredEntries.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount (Ksh)</TableHead>
-                {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
-                {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEntries.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{format(new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell className="font-medium">{entry.description || '-'}</TableCell>
-                  <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
-                  {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
-                  {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
+          <div className="relative max-h-[60vh] overflow-y-auto">
+            <Table>
+                <TableHeader className="sticky top-0 bg-card">
+                <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount (Ksh)</TableHead>
+                    {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
+                    {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
                 </TableRow>
-              ))}
-                <TableRow className="font-bold bg-muted/50">
-                    <TableCell colSpan={2} className="text-right">Total</TableCell>
-                     {showTransactionCost ? (
-                        <>
-                            <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{totalTransactionCost.toLocaleString()}</TableCell>
+                </TableHeader>
+                <TableBody>
+                {filteredEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                    <TableCell>{format(new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="font-medium">{entry.description || '-'}</TableCell>
+                    <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                    {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
+                    {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
+                    </TableRow>
+                ))}
+                    <TableRow className="font-bold bg-muted/50">
+                        <TableCell colSpan={2} className="text-right">Total</TableCell>
+                        {showTransactionCost ? (
+                            <>
+                                <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{totalTransactionCost.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
+                            </>
+                        ) : (
                             <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
-                        </>
-                    ) : (
-                         <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
-                    )}
-                </TableRow>
-            </TableBody>
-          </Table>
+                        )}
+                    </TableRow>
+                </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

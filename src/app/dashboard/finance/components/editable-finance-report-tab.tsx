@@ -213,52 +213,54 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             </Alert>
         )}
         {!loading && filteredEntries && filteredEntries.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount (Ksh)</TableHead>
-                {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
-                {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
-                {isEditable && <TableHead className="text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEntries.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                  <TableCell className="font-medium">{entry.description || '-'}</TableCell>
-                  <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
-                  {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
-                  {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
-                  {isEditable && onEdit && onDelete && (
-                    <TableCell className="text-right">
-                       <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
-                           <PenSquare className="h-4 w-4" />
-                       </Button>
-                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => onDelete(entry)}>
-                           <Trash2 className="h-4 w-4" />
-                       </Button>
-                    </TableCell>
-                  )}
+          <div className="relative max-h-[60vh] overflow-y-auto">
+            <Table>
+                <TableHeader className="sticky top-0 bg-card">
+                <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount (Ksh)</TableHead>
+                    {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
+                    {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
+                    {isEditable && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
-              ))}
-                <TableRow className="font-bold bg-muted/50">
-                    <TableCell colSpan={2} className="text-right">Total</TableCell>
-                     {showTransactionCost ? (
-                        <>
-                            <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{totalTransactionCost.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
-                        </>
-                    ) : (
-                         <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
+                </TableHeader>
+                <TableBody>
+                {filteredEntries.map((entry) => (
+                    <TableRow key={entry.id}>
+                    <TableCell>{format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell className="font-medium">{entry.description || '-'}</TableCell>
+                    <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                    {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
+                    {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
+                    {isEditable && onEdit && onDelete && (
+                        <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
+                            <PenSquare className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => onDelete(entry)}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                        </TableCell>
                     )}
-                    {isEditable && <TableCell />}
-                </TableRow>
-            </TableBody>
-          </Table>
+                    </TableRow>
+                ))}
+                    <TableRow className="font-bold bg-muted/50">
+                        <TableCell colSpan={2} className="text-right">Total</TableCell>
+                        {showTransactionCost ? (
+                            <>
+                                <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{totalTransactionCost.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
+                            </>
+                        ) : (
+                            <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
+                        )}
+                        {isEditable && <TableCell />}
+                    </TableRow>
+                </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

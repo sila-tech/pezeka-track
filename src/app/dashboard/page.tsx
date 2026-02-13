@@ -57,8 +57,6 @@ export default function Dashboard() {
       .filter(loan => {
         if (!loan.endDate || loan.endDate.toString() === 'Invalid Date') return false;
         
-        if (loan.status === 'due' || loan.status === 'overdue') return true;
-        
         const daysUntilDue = differenceInDays(loan.endDate, today);
         return daysUntilDue <= 7;
       });

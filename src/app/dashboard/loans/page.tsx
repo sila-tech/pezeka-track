@@ -205,6 +205,10 @@ export default function LoansPage() {
         chargingCost: values.chargingCost || 0,
       };
       
+      delete (loanData as any).customerType;
+      delete (loanData as any).newCustomerName;
+      delete (loanData as any).newCustomerPhone;
+      
       await addLoan(firestore, loanData);
 
       toast({
@@ -559,41 +563,43 @@ export default function LoansPage() {
             </Alert>
         )}
         {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Loan No.</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead className="text-right">Principal</TableHead>
-                        <TableHead className="text-right">Amount to Pay</TableHead>
-                        <TableHead className="text-right">Paid</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
-                        <TableHead className="text-center">Status</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {filteredLoans.map((loan) => {
-                        const balance = loan.totalRepayableAmount - loan.totalPaid;
-                        return (
-                            <TableRow key={loan.id}>
-                                <TableCell className="font-medium">{loan.loanNumber}</TableCell>
-                                <TableCell>{loan.customerName}</TableCell>
-                                <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                                <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
-                                <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
-                                <TableCell className="text-center">
-                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
-                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                  </Badge>
-                                </TableCell>
-                            </TableRow>
-                        )
-                    })}
-                </TableBody>
-            </Table>
+            <div className="relative max-h-[60vh] overflow-y-auto">
+              <Table>
+                  <TableHeader className="sticky top-0 bg-card">
+                      <TableRow>
+                          <TableHead>Loan No.</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="text-right">Principal</TableHead>
+                          <TableHead className="text-right">Amount to Pay</TableHead>
+                          <TableHead className="text-right">Paid</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                          <TableHead className="text-center">Status</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {filteredLoans.map((loan) => {
+                          const balance = loan.totalRepayableAmount - loan.totalPaid;
+                          return (
+                              <TableRow key={loan.id}>
+                                  <TableCell className="font-medium">{loan.loanNumber}</TableCell>
+                                  <TableCell>{loan.customerName}</TableCell>
+                                  <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                                  <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                      {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                                    </Badge>
+                                  </TableCell>
+                              </TableRow>
+                          )
+                      })}
+                  </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
