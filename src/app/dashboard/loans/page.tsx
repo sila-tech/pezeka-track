@@ -186,12 +186,8 @@ export default function LoansPage() {
         values.paymentFrequency
       );
 
-      const loanCount = loans?.length || 0;
-      const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
-
       const loanData = {
         ...values,
-        loanNumber: newLoanNumber,
         customerId: customerId!,
         customerName,
         customerPhone,
@@ -209,7 +205,7 @@ export default function LoansPage() {
       delete (loanData as any).newCustomerName;
       delete (loanData as any).newCustomerPhone;
       
-      await addLoan(firestore, loanData);
+      const { newLoanNumber } = await addLoan(firestore, loanData);
 
       toast({
         title: 'Loan Added',

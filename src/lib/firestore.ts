@@ -119,7 +119,6 @@ export async function deleteFinanceEntry(db: Firestore, entryId: string) {
 
 
 type LoanData = {
-  loanNumber: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
@@ -138,11 +137,17 @@ type LoanData = {
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
 }
 
-export async function addLoan(db: Firestore, loanData: LoanData): Promise<DocumentReference<DocumentData>> {
+export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: DocumentReference<DocumentData>, newLoanNumber: string}> {
   const loanCollection = collection(db, 'loans');
+  
+  const q = query(loanCollection);
+  const querySnapshot = await getDocs(q);
+  const loanCount = querySnapshot.size;
+  const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
 
   const newLoan = {
     ...loanData,
+    loanNumber: newLoanNumber,
     createdAt: serverTimestamp(),
     payments: [],
     comments: ""
@@ -150,7 +155,7 @@ export async function addLoan(db: Firestore, loanData: LoanData): Promise<Docume
 
   try {
     const docRef = await addDoc(loanCollection, newLoan);
-    return docRef;
+    return { docRef, newLoanNumber };
   } catch (serverError) {
     const permissionError = new FirestorePermissionError({
       path: loanCollection.path,
