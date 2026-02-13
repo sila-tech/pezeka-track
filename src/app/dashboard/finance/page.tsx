@@ -239,7 +239,7 @@ export default function FinancePage() {
       };
 
       const entryData = Object.fromEntries(
-        Object.entries(rawEntryData).filter(([_, v]) => v !== undefined)
+        Object.entries(rawEntryData).filter(([_, v]) => v)
       );
 
       const docRef = await addFinanceEntry(firestore, entryData as any);
@@ -400,7 +400,7 @@ export default function FinancePage() {
     };
 
     const updateData = Object.fromEntries(
-        Object.entries(rawUpdateData).filter(([, v]) => v !== undefined)
+        Object.entries(rawUpdateData).filter(([, v]) => v)
     );
 
     try {
@@ -440,7 +440,7 @@ export default function FinancePage() {
         };
         
         const updateData = Object.fromEntries(
-            Object.entries(rawUpdateData).filter(([, v]) => v !== undefined)
+            Object.entries(rawUpdateData).filter(([, v]) => v)
         );
 
         await updateFinanceEntry(firestore, entryToEdit.id, updateData);
@@ -621,7 +621,7 @@ export default function FinancePage() {
                                 </FormItem>
                             )}
                         />
-                        {(addFinanceEntryType === 'receipt' || addFinanceEntryType === 'payout') && (
+                        {addFinanceEntryType === 'receipt' && (
                             <FormField
                                 control={addForm.control}
                                 name="loanId"
@@ -894,7 +894,7 @@ export default function FinancePage() {
           <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} className="space-y-4">
                   <FormField control={editForm.control} name="type" render={({ field }) => (<FormItem><FormLabel>Entry Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
-                  {(editFinanceEntryType === 'receipt' || editFinanceEntryType === 'payout') && (
+                  {editFinanceEntryType === 'receipt' && (
                       <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={loansLoading || editFinanceEntryType === 'receipt'}><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
                   )}
                   <FormField control={editForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl><FormMessage/></FormItem>)} />
