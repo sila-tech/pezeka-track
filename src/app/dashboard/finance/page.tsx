@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2 } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search } from "lucide-react";
 import { arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
 import { useCollection, useFirestore } from '@/firebase';
@@ -216,11 +216,21 @@ export default function FinancePage() {
   const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
   const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
   const [isDeletingEntry, setIsDeletingEntry] = useState(false);
+  const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
 
   const firestore = useFirestore();
   const { toast } = useToast();
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>('financeEntries');
+
+  const filteredLoans = useMemo(() => {
+    if(!loans) return [];
+    return loans.filter(loan => 
+        loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
+        loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
+        loan.customerPhone.includes(loanBookSearchTerm)
+    );
+  }, [loans, loanBookSearchTerm]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
@@ -518,7 +528,7 @@ export default function FinancePage() {
         };
         
         const updateData = Object.fromEntries(
-            Object.entries(rawUpdateData).filter(([, v]) => v !== undefined && v !== null && v !== '')
+            Object.entries(rawUpdateData).filter(([, v]) => v)
         );
 
         await updateFinanceEntry(firestore, entryToEdit.id, updateData);
@@ -933,29 +943,47 @@ export default function FinancePage() {
           </TabsContent>
           <TabsContent value="loanbook">
               <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle>Loan Book</CardTitle>
-                      <CardDescription>A complete record of all loans.</CardDescription>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <CardTitle>Loan Book</CardTitle>
+                            <CardDescription>A complete record of all loans.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search loan book..."
+                                    value={loanBookSearchTerm}
+                                    onChange={(e) => setLoanBookSearchTerm(e.target.value)}
+                                    className="pl-8 w-full sm:w-[250px]"
+                                />
+                            </div>
+                            <Button variant="outline" onClick={handleExport} disabled={!loans || loans.length === 0}>
+                                <FileDown className="mr-2 h-4 w-4" />
+                                Download CSV
+                            </Button>
+                        </div>
                     </div>
-                    <Button variant="outline" onClick={handleExport} disabled={!loans || loans.length === 0}>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Download CSV
-                    </Button>
-                  </CardHeader>
+                </CardHeader>
                   <CardContent>
                       {loansLoading && (
                         <div className="flex items-center justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                       )}
-                      {!loansLoading && (!loans || loans.length === 0) && (
+                      {!loansLoading && (!filteredLoans || filteredLoans.length === 0) && (
                         <Alert>
                             <AlertTitle>No Loans Found</AlertTitle>
-                            <AlertDescription>There are no loans in the system yet. Add a loan to see it here.</AlertDescription>
+                            <AlertDescription>
+                                {loanBookSearchTerm
+                                    ? "No loans match your search."
+                                    : "There are no loans in the system yet. Add a loan to see it here."
+                                }
+                            </AlertDescription>
                         </Alert>
                       )}
-                      {!loansLoading && loans && loans.length > 0 && (
+                      {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
                         <div className="relative max-h-[60vh] overflow-y-auto">
                           <Table>
                               <TableHeader className="sticky top-0 bg-card">
@@ -981,7 +1009,7 @@ export default function FinancePage() {
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
-                                  {loans.map((loan) => {
+                                  {filteredLoans.map((loan) => {
                                       const takeHome = loan.principalAmount - (loan.registrationFee || 0) - (loan.processingFee || 0) - (loan.carTrackInstallationFee || 0) - (loan.chargingCost || 0);
                                       const balance = loan.totalRepayableAmount - loan.totalPaid;
                                       return (

@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, FileDown, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, Loader2, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 
 interface FinanceEntry {
   id: string;
@@ -46,7 +47,7 @@ export function DatePickerWithRange({
             id="date"
             variant={'outline'}
             className={cn(
-              'w-full sm:w-[300px] justify-start text-left font-normal',
+              'w-full sm:w-[260px] justify-start text-left font-normal',
               !date && 'text-muted-foreground'
             )}
           >
@@ -83,24 +84,37 @@ export function DatePickerWithRange({
 
 export function FinanceReportTab({ title, description, entries, loading }: FinanceReportTabProps) {
   const [date, setDate] = useState<DateRange | undefined>();
+  const [searchTerm, setSearchTerm] = useState('');
   const showTransactionCost = useMemo(() => title === 'Payouts' || title === 'Expenses', [title]);
 
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
-    if (!date?.from) return entries;
+    
+    let filtered = entries;
 
-    return entries.filter((entry) => {
-      const entryDate = new Date(entry.date.seconds * 1000);
-      
-      const fromDate = new Date(date.from!);
-      fromDate.setHours(0,0,0,0);
+    if (date?.from) {
+      filtered = filtered.filter((entry) => {
+        const entryDate = new Date(entry.date.seconds * 1000);
+        
+        const fromDate = new Date(date.from!);
+        fromDate.setHours(0,0,0,0);
 
-      const toDate = date.to ? new Date(date.to) : new Date(date.from!);
-      toDate.setHours(23, 59, 59, 999);
+        const toDate = date.to ? new Date(date.to) : new Date(date.from!);
+        toDate.setHours(23, 59, 59, 999);
 
-      return entryDate >= fromDate && entryDate <= toDate;
-    });
-  }, [entries, date]);
+        return entryDate >= fromDate && entryDate <= toDate;
+      });
+    }
+
+    if (searchTerm) {
+        filtered = filtered.filter(entry =>
+            (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    
+    return filtered;
+
+  }, [entries, date, searchTerm]);
 
   const { totalAmount, totalTransactionCost } = useMemo(() => {
     if (!filteredEntries) return { totalAmount: 0, totalTransactionCost: 0 };
@@ -160,7 +174,18 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
             </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-4">
-            <DatePickerWithRange date={date} setDate={setDate} />
+            <div className="flex flex-wrap items-center gap-2">
+                <DatePickerWithRange date={date} setDate={setDate} />
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search descriptions..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-full sm:w-[250px]"
+                    />
+                </div>
+            </div>
             <Button onClick={handleExport} disabled={!filteredEntries || filteredEntries.length === 0}>
                 <FileDown className="mr-2 h-4 w-4" />
                 Download CSV
@@ -176,7 +201,12 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
         {!loading && (!filteredEntries || filteredEntries.length === 0) && (
             <Alert>
                 <AlertTitle>No Entries Found</AlertTitle>
-                <AlertDescription>There are no {title.toLowerCase()} for the selected period.</AlertDescription>
+                <AlertDescription>
+                    {searchTerm 
+                        ? `No ${title.toLowerCase()} match your search.`
+                        : `There are no ${title.toLowerCase()} for the selected period.`
+                    }
+                </AlertDescription>
             </Alert>
         )}
         {!loading && filteredEntries && filteredEntries.length > 0 && (

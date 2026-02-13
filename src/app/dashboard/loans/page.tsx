@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -84,6 +84,7 @@ interface Loan {
     id: string;
     loanNumber: string;
     customerName: string;
+    customerPhone: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
     status: 'due' | 'paid' | 'active';
@@ -95,11 +96,21 @@ interface Loan {
 export default function LoansPage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+
+  const filteredLoans = useMemo(() => {
+    if (!loans) return [];
+    return loans.filter(loan => 
+        loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loan.customerPhone.includes(searchTerm)
+    );
+  }, [loans, searchTerm]);
 
 
   const form = useForm<z.infer<typeof loanSchema>>({
@@ -493,8 +504,21 @@ export default function LoansPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Loan Records</CardTitle>
-          <CardDescription>A list of all loans disbursed.</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <CardTitle>Loan Records</CardTitle>
+                    <CardDescription>A list of all loans disbursed.</CardDescription>
+                </div>
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search loans..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-full sm:w-[300px]"
+                    />
+                </div>
+            </div>
         </CardHeader>
         <CardContent>
         {loansLoading && (
@@ -502,13 +526,18 @@ export default function LoansPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         )}
-        {!loansLoading && (!loans || loans.length === 0) && (
+        {!loansLoading && (!filteredLoans || filteredLoans.length === 0) && (
             <Alert>
                 <AlertTitle>No Loans Found</AlertTitle>
-                <AlertDescription>There are no loans in the system yet. Add one to see it here.</AlertDescription>
+                <AlertDescription>
+                    {searchTerm 
+                        ? "No loans match your search."
+                        : "There are no loans in the system yet. Add one to see it here."
+                    }
+                </AlertDescription>
             </Alert>
         )}
-        {!loansLoading && loans && loans.length > 0 && (
+        {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -523,7 +552,7 @@ export default function LoansPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {loans.map((loan) => {
+                    {filteredLoans.map((loan) => {
                         const balance = loan.totalRepayableAmount - loan.totalPaid;
                         return (
                             <TableRow key={loan.id}>

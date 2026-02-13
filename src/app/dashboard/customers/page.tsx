@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal } from 'lucide-react';
+import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -92,6 +92,7 @@ export default function CustomersPage() {
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
 
   const firestore = useFirestore();
@@ -99,6 +100,14 @@ export default function CustomersPage() {
   
   const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+
+  const filteredCustomers = useMemo(() => {
+    if (!customers) return [];
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone.includes(searchTerm)
+    );
+  }, [customers, searchTerm]);
 
   const addForm = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
@@ -342,8 +351,21 @@ export default function CustomersPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Customer List</CardTitle>
-          <CardDescription>A list of all customers in the system. Click on a customer to see more details.</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                    <CardTitle>Customer List</CardTitle>
+                    <CardDescription>A list of all customers in the system. Click on a customer to see more details.</CardDescription>
+                </div>
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by name or phone..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 w-full sm:w-[300px]"
+                    />
+                </div>
+            </div>
         </CardHeader>
         <CardContent>
           {isLoading && (
@@ -351,13 +373,18 @@ export default function CustomersPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!isLoading && (!customers || customers.length === 0) && (
+          {!isLoading && (!filteredCustomers || filteredCustomers.length === 0) && (
               <Alert>
                   <AlertTitle>No Customers Found</AlertTitle>
-                  <AlertDescription>There are no customers in the system yet. Add one to see them here.</AlertDescription>
+                  <AlertDescription>
+                    {searchTerm 
+                        ? "No customers match your search." 
+                        : "There are no customers in the system yet. Add one to see them here."
+                    }
+                  </AlertDescription>
               </Alert>
           )}
-          {!isLoading && customers && customers.length > 0 && (
+          {!isLoading && filteredCustomers && filteredCustomers.length > 0 && (
             <div className="relative max-h-[60vh] overflow-y-auto">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
@@ -370,7 +397,7 @@ export default function CustomersPage() {
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {customers.map((customer, index) => (
+                      {filteredCustomers.map((customer, index) => (
                           <TableRow key={customer.id}>
                               <TableCell>{index + 1}</TableCell>
                               <TableCell className="font-medium">{customer.name}</TableCell>
