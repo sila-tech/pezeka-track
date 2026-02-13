@@ -232,13 +232,17 @@ export default function FinancePage() {
         ? `Disbursement for Loan #${loans?.find(l => l.id === values.loanId)?.loanNumber}`
         : values.description;
       
-      const entryData = {
+      const rawEntryData: { [key: string]: any } = {
           ...values,
           date: new Date(values.date),
           description,
       };
 
-      const docRef = await addFinanceEntry(firestore, entryData);
+      const entryData = Object.fromEntries(
+        Object.entries(rawEntryData).filter(([_, v]) => v !== undefined)
+      );
+
+      const docRef = await addFinanceEntry(firestore, entryData as any);
 
       if (isReceipt && loanToUpdate) {
         const currentTotalPaid = loanToUpdate.totalPaid || 0;
@@ -388,12 +392,16 @@ export default function FinancePage() {
         values.paymentFrequency
     );
     
-    const updateData = {
+    const rawUpdateData: { [key: string]: any } = {
         ...values,
         disbursementDate: new Date(values.disbursementDate),
         instalmentAmount,
         totalRepayableAmount,
     };
+
+    const updateData = Object.fromEntries(
+        Object.entries(rawUpdateData).filter(([, v]) => v !== undefined)
+    );
 
     try {
         await updateLoan(firestore, loanToEdit.id, updateData);
@@ -426,10 +434,15 @@ export default function FinancePage() {
     if (!entryToEdit) return;
     setIsUpdatingEntry(true);
     try {
-        const updateData = {
+        const rawUpdateData: {[key: string]: any} = {
             ...values,
             date: new Date(values.date),
         };
+        
+        const updateData = Object.fromEntries(
+            Object.entries(rawUpdateData).filter(([, v]) => v !== undefined)
+        );
+
         await updateFinanceEntry(firestore, entryToEdit.id, updateData);
         toast({
             title: 'Entry Updated',
