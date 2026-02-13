@@ -34,7 +34,19 @@ service cloud.firestore {
 
     // Finance Entries
     match /financeEntries/{entryId} {
-      allow read, write: if isFinanceUser();
+      allow read: if isFinanceUser() || isStaffUser();
+
+      // Create: Finance can create any type. Staff can only create receipts.
+      allow create: if isFinanceUser() || 
+                       (isStaffUser() && request.resource.data.type == 'receipt');
+
+      // Update: Finance can update any type. Staff can only update receipts.
+      // Don't allow changing the 'type' field on update.
+      allow update: if (isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt')) &&
+                        request.resource.data.type == resource.data.type;
+      
+      // Delete: Finance can delete any type. Staff can only delete receipts.
+      allow delete: if isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt');
     }
   }
 }
