@@ -61,7 +61,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
 
 
-const financeEntrySchema = z.object({
+const addFinanceEntrySchema = z.object({
   type: z.enum(['expense', 'payout', 'receipt'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
@@ -76,6 +76,15 @@ const financeEntrySchema = z.object({
             path: ['loanId'],
         });
     }
+});
+
+const editFinanceEntrySchema = z.object({
+  type: z.enum(['expense', 'payout', 'receipt']),
+  date: z.string().min(1, 'A date is required.'),
+  amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
+  transactionCost: z.coerce.number().optional(),
+  description: z.string().optional(),
+  loanId: z.string().optional(),
 });
 
 
@@ -158,8 +167,8 @@ export default function FinancePage() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>('financeEntries');
 
-  const addForm = useForm<z.infer<typeof financeEntrySchema>>({
-    resolver: zodResolver(financeEntrySchema),
+  const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
+    resolver: zodResolver(addFinanceEntrySchema),
     defaultValues: {
         description: "",
         amount: undefined,
@@ -169,8 +178,8 @@ export default function FinancePage() {
     }
   });
 
-  const editForm = useForm<z.infer<typeof financeEntrySchema>>({
-    resolver: zodResolver(financeEntrySchema)
+  const editForm = useForm<z.infer<typeof editFinanceEntrySchema>>({
+    resolver: zodResolver(editFinanceEntrySchema)
   });
 
   const { watch: addFinanceEntryWatch } = addForm;
@@ -209,7 +218,7 @@ export default function FinancePage() {
     };
   }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
 
-  async function onAddSubmit(values: z.infer<typeof financeEntrySchema>) {
+  async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
       const isReceipt = values.type === 'receipt' && values.loanId;
@@ -413,7 +422,7 @@ export default function FinancePage() {
     setEditEntryOpen(true);
   };
 
-  async function onEditEntrySubmit(values: z.infer<typeof financeEntrySchema>) {
+  async function onEditEntrySubmit(values: z.infer<typeof editFinanceEntrySchema>) {
     if (!entryToEdit) return;
     setIsUpdatingEntry(true);
     try {
@@ -873,7 +882,7 @@ export default function FinancePage() {
               <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} className="space-y-4">
                   <FormField control={editForm.control} name="type" render={({ field }) => (<FormItem><FormLabel>Entry Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
                   {(editFinanceEntryType === 'receipt' || editFinanceEntryType === 'payout') && (
-                      <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={loansLoading || editFinanceEntryType === 'receipt'}><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.filter(l => l.status !== 'paid').map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
+                      <FormField control={editForm.control} name="loanId" render={({ field }) => (<FormItem><FormLabel>For Loan</FormLabel><Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={loansLoading || editFinanceEntryType === 'receipt'}><FormControl><SelectTrigger><SelectValue placeholder={loansLoading ? "Loading loans..." : "Select a loan"} /></SelectTrigger></FormControl><SelectContent>{loans?.map(loan => (<SelectItem key={loan.id} value={loan.id}>{`#${loan.loanNumber} - ${loan.customerName}`}</SelectItem>))}</SelectContent></Select><FormMessage/></FormItem>)} />
                   )}
                   <FormField control={editForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl><FormMessage/></FormItem>)} />
                   <FormField control={editForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} disabled={editFinanceEntryType === 'receipt'} /></FormControl><FormMessage/></FormItem>)} />
