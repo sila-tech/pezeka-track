@@ -1,1 +1,14 @@
-{}
+{
+  "landingHero": {
+    "src": "https://picsum.photos/seed/finance-hero/600/600",
+    "width": 600,
+    "height": 600,
+    "hint": "happy people business"
+  },
+  "aboutUs": {
+    "src": "https://picsum.photos/seed/team-working/550/550",
+    "width": 550,
+    "height": 550,
+    "hint": "diverse team collaboration"
+  }
+}

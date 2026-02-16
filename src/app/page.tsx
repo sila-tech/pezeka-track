@@ -1,27 +1,21 @@
-"use client";
+import Header from '@/components/landing/Header';
+import Hero from '@/components/landing/Hero';
+import Products from '@/components/landing/Products';
+import About from '@/components/landing/About';
+import Contact from '@/components/landing/Contact';
+import Footer from '@/components/landing/Footer';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useUser } from '@/firebase/auth/use-user';
-import { Loader2 } from 'lucide-react';
-
-export default function HomePage() {
-  const { user, loading } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.push('/dashboard');
-      } else {
-        router.push('/login');
-      }
-    }
-  }, [user, loading, router]);
-
+export default function LandingPage() {
   return (
-    <div className="flex h-screen w-full items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin" />
+    <div className="flex min-h-dvh flex-col bg-background">
+      <Header />
+      <main className="flex-1">
+        <Hero />
+        <Products />
+        <About />
+        <Contact />
+      </main>
+      <Footer />
     </div>
   );
 }
