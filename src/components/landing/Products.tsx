@@ -1,21 +1,32 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Briefcase, UserCheck } from 'lucide-react';
+import { DollarSign, Briefcase, UserCheck, Banknote } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 const products = [
   {
     icon: <UserCheck className="h-8 w-8 text-primary" />,
-    title: 'Personal Loans',
+    title: 'Individual Loans',
     description: "Access the funds you need for life's important moments. Our personal loans offer competitive rates and flexible terms for everything from home renovations to unexpected expenses.",
+    href: '/application-form'
   },
   {
-    icon: <Briefcase className="h-8 w-8 text-primary" />,
-    title: 'Business Loans',
-    description: 'Power your business ambitions with our tailored SME loan products. Get the working capital you need to scale operations, purchase inventory, or invest in new opportunities.',
+    icon: <Banknote className="h-8 w-8 text-primary" />,
+    title: 'Salary Loans',
+    description: 'Get a quick and convenient loan against your salary. Ideal for emergencies and short-term cash needs with a straightforward repayment plan.',
+    href: '/salary-loan-form'
   },
   {
     icon: <DollarSign className="h-8 w-8 text-primary" />,
     title: 'Logbook Loans',
     description: "Leverage your vehicle's value to get fast and secure financing. Our logbook loans provide immediate cash to address urgent needs without selling your asset.",
+    href: '/logbook-loan-form'
+  },
+  {
+    icon: <Briefcase className="h-8 w-8 text-primary" />,
+    title: 'Business Loans',
+    description: 'Power your business ambitions with our tailored SME loan products. Get the working capital you need to scale operations, purchase inventory, or invest in new opportunities.',
+    href: '#contact'
   },
 ];
 
@@ -32,16 +43,21 @@ export default function Products() {
             </p>
           </div>
         </div>
-        <div className="mx-auto grid max-w-5xl items-start gap-6 py-12 lg:grid-cols-3 lg:gap-12">
+        <div className="mx-auto grid max-w-5xl items-stretch gap-6 py-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
           {products.map((product) => (
-            <Card key={product.title} className="bg-card">
-              <CardHeader className="flex flex-col items-center text-center space-y-4 p-8">
+            <Card key={product.title} className="bg-card flex flex-col">
+              <CardHeader className="flex flex-col items-center text-center space-y-4 p-6">
                 {product.icon}
                 <div className="space-y-2">
                     <CardTitle>{product.title}</CardTitle>
                     <CardDescription>{product.description}</CardDescription>
                 </div>
               </CardHeader>
+              <CardContent className="mt-auto p-6 pt-0">
+                 <Button asChild className="w-full">
+                  <Link href={product.href}>{product.href.startsWith('#') ? 'Contact Us' : 'Apply Now'}</Link>
+                </Button>
+              </CardContent>
             </Card>
           ))}
         </div>
