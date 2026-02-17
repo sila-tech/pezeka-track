@@ -26,7 +26,7 @@ export default function Hero() {
             </div>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
               <Button asChild size="lg">
-                <Link href="/application-form">Apply for a Loan</Link>
+                <Link href="/application-form">Apply for an Individual Loan</Link>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="#products">Our Products</Link>

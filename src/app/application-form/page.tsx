@@ -62,7 +62,7 @@ export default function ApplicationFormPage() {
                     Back to Home
                 </Link>
             </Button>
-            <h1 className="text-xl font-bold text-gray-800">Loan Application & Agreement Form</h1>
+            <h1 className="text-xl font-bold text-gray-800">Individual Short-Term Loan Application</h1>
             <Button onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Print / Save as PDF
@@ -79,7 +79,7 @@ export default function ApplicationFormPage() {
             </div>
             <hr className="border-t-2 border-black my-4" />
 
-            <h2 className="text-lg font-bold text-center mb-2 uppercase">Individual Loan Application Form</h2>
+            <h2 className="text-lg font-bold text-center mb-2 uppercase">Individual Short-Term Loan Application Form</h2>
             <div className="flex justify-between text-sm mb-4">
               <div className="w-2/3"><FormLine label="Official’s Name" /></div>
               <div className="w-1/3 ml-4"><FormLine label="Loan A/C No." /></div>
