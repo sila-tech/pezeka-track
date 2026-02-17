@@ -1257,7 +1257,7 @@ export default function FinancePage() {
             </DialogFooter>
           </Form>
         </DialogContent>
-      </AlertDialog>
+      </Dialog>
 
       {/* Delete Finance Entry Confirmation */}
       <AlertDialog open={deleteEntryOpen} onOpenChange={setDeleteEntryOpen}>
