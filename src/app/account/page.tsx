@@ -205,7 +205,7 @@ export default function AccountPage() {
             <CardHeader>
                 <CardTitle>Apply for a New Loan</CardTitle>
                 <CardDescription>
-                To apply for a new loan, please upload your latest M-Pesa statement (in PDF format) and provide the password to open it.
+                To apply for a new loan, we need to assess your financial history. Please upload your latest M-Pesa statement (in PDF format) and provide the password to open it. This is a required step for loan consideration.
                 </CardDescription>
             </CardHeader>
             <CardContent>
