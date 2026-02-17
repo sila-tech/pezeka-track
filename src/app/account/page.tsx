@@ -19,6 +19,7 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface Payment {
@@ -51,6 +52,7 @@ interface Loan {
 }
 
 const statementSchema = z.object({
+  loanType: z.string({ required_error: 'Please select a loan type.' }),
   loanAmount: z.coerce.number().min(1, 'Please enter a valid loan amount.'),
   statement: z.any().refine((files) => files?.length == 1, 'M-Pesa statement PDF is required.'),
   password: z.string().min(1, 'PDF password is required.'),
@@ -75,6 +77,7 @@ export default function AccountPage() {
   const statementForm = useForm<z.infer<typeof statementSchema>>({
     resolver: zodResolver(statementSchema),
     defaultValues: {
+      loanType: undefined,
       loanAmount: undefined,
       password: '',
       statement: undefined,
@@ -96,7 +99,7 @@ export default function AccountPage() {
 
     toast({
       title: "Application Submitted",
-      description: `Your request for Ksh ${values.loanAmount.toLocaleString()} has been submitted. We will review your M-Pesa statement and contact you via email about the next steps.`,
+      description: `Your application for a ${values.loanType} of Ksh ${values.loanAmount.toLocaleString()} has been submitted. We will review your M-Pesa statement and contact you via email about the next steps.`,
     });
 
     statementForm.reset();
@@ -207,12 +210,35 @@ export default function AccountPage() {
             <CardHeader>
                 <CardTitle>Apply for a New Loan</CardTitle>
                 <CardDescription>
-                To begin your loan application, please enter your desired loan amount and upload your latest M-Pesa statement (in PDF format) with its password. Our team will review your submission and contact you via email about the next steps.
+                To begin your loan application, please select your desired loan type, enter the amount, and upload your latest M-Pesa statement (in PDF format) with its password. Our team will review your submission and contact you via email about the next steps. This is what will determine if we will give you a loan.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...statementForm}>
                 <form onSubmit={statementForm.handleSubmit(onStatementSubmit)} className="space-y-4">
+                    <FormField
+                        control={statementForm.control}
+                        name="loanType"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Loan Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select the type of loan you are applying for" />
+                                </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                <SelectItem value="Individual Short-Term Loan">Individual Short-Term Loan</SelectItem>
+                                <SelectItem value="Salary Advance Loan">Salary Advance Loan</SelectItem>
+                                <SelectItem value="Logbook Loan">Logbook Loan</SelectItem>
+                                <SelectItem value="Business Loan">Business Loan</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
                     <FormField
                       control={statementForm.control}
                       name="loanAmount"
