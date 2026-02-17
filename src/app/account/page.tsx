@@ -5,13 +5,21 @@ import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Landmark, LogOut, Loader2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { Landmark, LogOut, Loader2, FileUp } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { collection, query, where } from 'firebase/firestore';
+
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+
 
 interface Payment {
   paymentId: string;
@@ -42,12 +50,19 @@ interface Loan {
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
 }
 
+const statementSchema = z.object({
+  statement: z.any().refine((files) => files?.length == 1, 'M-Pesa statement PDF is required.'),
+  password: z.string().min(1, 'PDF password is required.'),
+});
+
 
 export default function AccountPage() {
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const customerLoansQuery = useMemo(() => {
     if (!firestore || !user?.phoneNumber) return null;
@@ -56,11 +71,35 @@ export default function AccountPage() {
 
   const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
 
+  const statementForm = useForm<z.infer<typeof statementSchema>>({
+    resolver: zodResolver(statementSchema),
+    defaultValues: {
+      password: '',
+      statement: undefined,
+    },
+  });
 
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/');
   };
+
+  async function onStatementSubmit(values: z.infer<typeof statementSchema>) {
+    setIsSubmitting(true);
+    
+    // In a real app, this is where you would handle the file upload to a service like Firebase Storage.
+    // This is a placeholder to simulate the submission process.
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    toast({
+      title: "Documents Submitted",
+      description: "Your M-Pesa statement has been submitted for review. We will get back to you shortly.",
+    });
+
+    statementForm.reset();
+    setIsSubmitting(false);
+  }
 
   return (
     <>
@@ -157,11 +196,60 @@ export default function AccountPage() {
                 ) : (
                    <div className="text-center py-8">
                         <p className="text-muted-foreground mb-4">You do not have any loans with us yet.</p>
-                        <Button asChild>
-                            <Link href="/#products">Explore Loan Products</Link>
-                        </Button>
                    </div>
                 )}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+                <CardTitle>Apply for a New Loan</CardTitle>
+                <CardDescription>
+                To apply for a new loan, please upload your latest M-Pesa statement (in PDF format) and provide the password to open it.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Form {...statementForm}>
+                <form onSubmit={statementForm.handleSubmit(onStatementSubmit)} className="space-y-4">
+                    <FormField
+                    control={statementForm.control}
+                    name="statement"
+                    render={({ field: { onChange, value, ...rest } }) => (
+                        <FormItem>
+                        <FormLabel>M-Pesa Statement (PDF)</FormLabel>
+                        <FormControl>
+                            <Input 
+                                type="file" 
+                                accept=".pdf"
+                                {...rest}
+                                onChange={(e) => {
+                                    onChange(e.target.files);
+                                }} 
+                            />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={statementForm.control}
+                    name="password"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>PDF Password</FormLabel>
+                        <FormControl>
+                            <Input type="password" placeholder="Enter the password for the PDF" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                        Submit Documents
+                    </Button>
+                </form>
+                </Form>
             </CardContent>
           </Card>
       </main>
