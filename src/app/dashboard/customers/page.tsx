@@ -33,7 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { exportToCsv } from '@/lib/excel';
 import { Textarea } from '@/components/ui/textarea';
-import { addDays, addWeeks, addMonths, format } from 'date-fns';
+import { addDays, addWeeks, addMonths, format, isToday } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -262,7 +262,13 @@ export default function CustomersPage() {
       const balance = messageLoan.totalRepayableAmount - messageLoan.totalPaid;
       const dueDate = getLoanDueDate(messageLoan);
       
-      return `Dear ${selectedCustomer.name},\n\nThis is a friendly reminder regarding your loan with Pezeka Credit.\n\nLoan Number: ${messageLoan.loanNumber}\nOutstanding Balance: Ksh ${balance.toLocaleString()}\nNext Instalment: Ksh ${messageLoan.instalmentAmount.toLocaleString()}${dueDate ? `\nDue Date: ${format(dueDate, 'PPP')}` : ''}\n\nPlease use the following details for your payment:\nPaybill: 522522\nAccount: 1347823360\n\nPlease ensure your payment is made on time to avoid daily penalties.\n\nThank you,\nPezeka Credit Ltd.`;
+      const dueDateText = dueDate
+        ? isToday(dueDate)
+          ? `\nYour loan is due today.`
+          : `\nDue Date: ${format(dueDate, 'PPP')}`
+        : '';
+
+      return `Dear ${selectedCustomer.name},\n\nThis is a friendly reminder regarding your loan with Pezeka Credit.\n\nLoan Number: ${messageLoan.loanNumber}\nOutstanding Balance: Ksh ${balance.toLocaleString()}\nNext Instalment: Ksh ${messageLoan.instalmentAmount.toLocaleString()}${dueDateText}\n\nPlease use the following details for your payment:\nPaybill: 522522\nAccount: 1347823360\n\nPlease ensure your payment is made on time to avoid daily penalties.\n\nThank you,\nPezeka Credit Ltd.`;
   }, [messageLoan, selectedCustomer]);
 
   const copyToClipboard = () => {
