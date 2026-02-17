@@ -18,9 +18,9 @@ export default function Contact() {
           <div className="space-y-4 text-left">
              <h3 className="text-xl font-bold">Contact Information</h3>
               <div className="space-y-2 text-muted-foreground">
-                <p><strong>Address:</strong> 123 Biashara Street, Nairobi, Kenya</p>
-                <p><strong>Phone:</strong> +254 123 456 789</p>
-                <p><strong>Email:</strong> info@pezeka.com</p>
+                <p><strong>Address:</strong> Nairobi, Kenya</p>
+                <p><strong>Phone:</strong> 0757664047</p>
+                <p><strong>Email:</strong> pezekalimited@gmail.com</p>
              </div>
           </div>
           <div className="space-y-4 text-left">
