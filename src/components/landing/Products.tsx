@@ -8,25 +8,25 @@ const products = [
     icon: <UserCheck className="h-8 w-8 text-primary" />,
     title: 'Individual Short-Term Loans',
     description: "Access the funds you need for life's important moments. Our personal loans offer competitive rates and flexible terms for everything from home renovations to unexpected expenses.",
-    href: '#contact'
+    href: '/customer-login'
   },
   {
     icon: <Banknote className="h-8 w-8 text-primary" />,
     title: 'Salary Advance Loans',
     description: 'Get a quick and convenient loan against your salary. Ideal for emergencies and short-term cash needs with a straightforward repayment plan.',
-    href: '#contact'
+    href: '/customer-login'
   },
   {
     icon: <DollarSign className="h-8 w-8 text-primary" />,
     title: 'Logbook Loans',
     description: "Leverage your vehicle's value to get fast and secure financing. Our logbook loans provide immediate cash to address urgent needs without selling your asset.",
-    href: '#contact'
+    href: '/customer-login'
   },
   {
     icon: <Briefcase className="h-8 w-8 text-primary" />,
     title: 'Business Loans',
     description: 'Power your business ambitions with our tailored SME loan products. Get the working capital you need to scale operations, purchase inventory, or invest in new opportunities.',
-    href: '#contact'
+    href: '/customer-login'
   },
 ];
 
@@ -55,7 +55,7 @@ export default function Products() {
               </CardHeader>
               <CardContent className="mt-auto p-6 pt-0">
                  <Button asChild className="w-full">
-                  <Link href={product.href}>{product.href.startsWith('#') ? 'Contact Us' : 'Apply Now'}</Link>
+                  <Link href={product.href}>Apply Now</Link>
                 </Button>
               </CardContent>
             </Card>

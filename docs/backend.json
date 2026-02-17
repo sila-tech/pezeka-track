@@ -100,7 +100,7 @@
     }
   },
   "auth": {
-    "providers": ["password"]
+    "providers": ["password", "phone"]
   },
   "firestore": {
     "/users/{userId}": {
