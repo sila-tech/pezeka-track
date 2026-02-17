@@ -4,7 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Printer, Home } from 'lucide-react';
 import Link from 'next/link';
 
-const FormLine = ({ label, className, lineClassName }: { label: string; className?: string; lineClassName?: string }) => {
+interface FormLineProps {
+  label: string;
+  className?: string;
+  lineClassName?: string;
+}
+
+const FormLine = ({ label, className, lineClassName }: FormLineProps) => {
   return (
     <div className={`flex items-end mt-4 ${className}`}>
       <span className="font-medium whitespace-nowrap text-sm">{label}</span>
