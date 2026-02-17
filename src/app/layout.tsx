@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import WhatsAppButton from '@/components/landing/WhatsAppButton';
 
 export const metadata: Metadata = {
   title: 'Pezeka Credit Ltd',
@@ -23,6 +24,7 @@ export default function RootLayout({
           <FirebaseErrorListener />
         </FirebaseClientProvider>
         <Toaster />
+        <WhatsAppButton />
       </body>
     </html>
   );
