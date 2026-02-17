@@ -393,39 +393,35 @@ export default function CustomersPage() {
                           <TableHead>Name</TableHead>
                           <TableHead>Phone Number</TableHead>
                           <TableHead>ID Number</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableHead className="text-right w-[80px]">Actions</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
                       {filteredCustomers.map((customer, index) => (
-                          <TableRow key={customer.id}>
+                          <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
                               <TableCell>{index + 1}</TableCell>
                               <TableCell className="font-medium">{customer.name}</TableCell>
                               <TableCell>{customer.phone}</TableCell>
                               <TableCell>{customer.idNumber || 'N/A'}</TableCell>
                               <TableCell className="text-right">
                                 <DropdownMenu open={openMenu === customer.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? customer.id : null)}>
-                                    <DropdownMenuTrigger asChild>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                         <Button variant="ghost" className="h-8 w-8 p-0">
                                             <span className="sr-only">Open menu</span>
                                             <MoreHorizontal className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                        <DropdownMenuItem onClick={() => {
-                                            setSelectedCustomer(customer);
-                                            setOpenMenu(null);
-                                        }}>
-                                            View Breakdown
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => {
+                                        <DropdownMenuItem onClick={(e) => {
+                                            e.stopPropagation();
                                             handleEditClick(customer);
                                             setOpenMenu(null);
                                         }}>
                                             Edit
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 handleDeleteClick(customer);
                                                 setOpenMenu(null);
                                             }}
@@ -459,7 +455,7 @@ export default function CustomersPage() {
           {selectedCustomer && (
             <>
               <DialogHeader>
-                <DialogTitle>{selectedCustomer.name}'s Breakdown</DialogTitle>
+                <DialogTitle>{selectedCustomer.name}'s Dashboard</DialogTitle>
                 <DialogDescription>
                   Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
                 </DialogDescription>

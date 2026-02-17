@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search } from 'lucide-react';
+import { Loader2, PlusCircle, Search, FileDown, MessageSquare, Copy } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -38,10 +38,12 @@ import { useToast } from '@/hooks/use-toast';
 import { addLoan, addCustomer } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format } from 'date-fns';
+import { format, addDays, addWeeks, addMonths } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { calculateAmortization } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
+import { exportToCsv } from '@/lib/excel';
 
 
 const loanSchema = z.object({
@@ -78,18 +80,24 @@ interface Customer {
   id: string;
   name: string;
   phone: string;
+  idNumber?: string;
 }
 
 interface Loan {
     id: string;
+    customerId: string;
     loanNumber: string;
     customerName: string;
     customerPhone: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
+    interestRate?: number;
     status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
     totalRepayableAmount: number;
     totalPaid: number;
+    instalmentAmount: number;
+    paymentFrequency: 'daily' | 'weekly' | 'monthly';
+    numberOfInstalments: number;
 }
 
 
@@ -98,6 +106,9 @@ export default function LoansPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
+
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -224,6 +235,88 @@ export default function LoansPage() {
         setIsSubmitting(false);
     }
   }
+
+  const handleRowClick = (loan: Loan) => {
+    const customer = customers?.find(c => c.id === loan.customerId);
+    if (customer) {
+        setSelectedCustomer(customer);
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Customer not found",
+            description: `Could not find the customer details for loan #${loan.loanNumber}`
+        });
+    }
+  };
+
+  const customerLoans = useMemo(() => {
+    if (!selectedCustomer || !loans) return [];
+    return loans.filter(loan => loan.customerId === selectedCustomer.id);
+  }, [selectedCustomer, loans]);
+
+  const handleDownloadReport = () => {
+    if (!selectedCustomer) return;
+
+    const customerData = [{
+      'Customer Name': selectedCustomer.name,
+      'Phone': selectedCustomer.phone,
+      'ID Number': selectedCustomer.idNumber || 'N/A'
+    },
+    {}, // empty row for spacing
+    {
+      'Loan Number': 'Loan Number',
+      'Principal': 'Principal',
+      'Total Repayable': 'Total Repayable',
+      'Total Paid': 'Total Paid',
+      'Balance': 'Balance',
+      'Status': 'Status',
+    },
+    ...customerLoans.map(loan => {
+        const balance = loan.totalRepayableAmount - loan.totalPaid;
+        return {
+            'Loan Number': loan.loanNumber,
+            'Principal': loan.principalAmount,
+            'Total Repayable': loan.totalRepayableAmount,
+            'Total Paid': loan.totalPaid,
+            'Balance': balance,
+            'Status': loan.status,
+        }
+    })
+    ];
+
+    exportToCsv(customerData, `${selectedCustomer.name.replace(/ /g, '_')}_breakdown`);
+  };
+
+  const getLoanDueDate = (loan: Loan) => {
+    const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
+    try {
+        switch (loan.paymentFrequency) {
+            case 'daily': return addDays(disbursementDate, loan.numberOfInstalments);
+            case 'weekly': return addWeeks(disbursementDate, loan.numberOfInstalments);
+            case 'monthly': return addMonths(disbursementDate, loan.numberOfInstalments);
+            default: return null;
+        }
+    } catch(e) {
+        return null;
+    }
+  };
+  
+  const generatedMessage = useMemo(() => {
+      if (!messageLoan || !selectedCustomer) return "";
+      const balance = messageLoan.totalRepayableAmount - messageLoan.totalPaid;
+      const dueDate = getLoanDueDate(messageLoan);
+      
+      return `Dear ${selectedCustomer.name},\n\nThis is a friendly reminder regarding your loan with Pezeka Credit.\n\nLoan Number: ${messageLoan.loanNumber}\nOutstanding Balance: Ksh ${balance.toLocaleString()}\nNext Instalment: Ksh ${messageLoan.instalmentAmount.toLocaleString()}${dueDate ? `\nDue Date: ${format(dueDate, 'PPP')}` : ''}\n\nPlease use the following details for your payment:\nPaybill: 522522\nAccount: 1347823360\n\nPlease ensure your payment is made on time to avoid daily penalties.\n\nThank you,\nPezeka Credit Ltd.`;
+  }, [messageLoan, selectedCustomer]);
+
+  const copyToClipboard = () => {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(generatedMessage);
+        toast({ title: "Message Copied!", description: "The message has been copied to your clipboard." });
+      }
+  };
+  
+  const isLoading = customersLoading || loansLoading;
 
   return (
     <div>
@@ -542,12 +635,12 @@ export default function LoansPage() {
             </div>
         </CardHeader>
         <CardContent>
-        {loansLoading && (
+        {isLoading && (
             <div className="flex items-center justify-center p-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
         )}
-        {!loansLoading && (!filteredLoans || filteredLoans.length === 0) && (
+        {!isLoading && (!filteredLoans || filteredLoans.length === 0) && (
             <Alert>
                 <AlertTitle>No Loans Found</AlertTitle>
                 <AlertDescription>
@@ -558,7 +651,7 @@ export default function LoansPage() {
                 </AlertDescription>
             </Alert>
         )}
-        {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
+        {!isLoading && filteredLoans && filteredLoans.length > 0 && (
             <div className="relative max-h-[60vh] overflow-y-auto">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
@@ -577,7 +670,7 @@ export default function LoansPage() {
                       {filteredLoans.map((loan) => {
                           const balance = loan.totalRepayableAmount - loan.totalPaid;
                           return (
-                              <TableRow key={loan.id}>
+                              <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleRowClick(loan)}>
                                   <TableCell className="font-medium">{loan.loanNumber}</TableCell>
                                   <TableCell>{loan.customerName}</TableCell>
                                   <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
@@ -599,6 +692,112 @@ export default function LoansPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Customer Details Dialog */}
+      <Dialog
+        open={!!selectedCustomer}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setSelectedCustomer(null);
+            setMessageLoan(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl">
+          {selectedCustomer && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedCustomer.name}'s Dashboard</DialogTitle>
+                <DialogDescription>
+                  Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-4 max-h-[70vh] overflow-y-auto pr-4">
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>Loan History</CardTitle>
+                                <CardDescription>All loans associated with this customer.</CardDescription>
+                            </div>
+                             <Button onClick={handleDownloadReport} variant="outline" size="sm">
+                                <FileDown className="mr-2 h-4 w-4" />
+                                Download Report
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {customerLoans.length === 0 ? (
+                             <Alert>
+                                <AlertTitle>No Loans Found</AlertTitle>
+                                <AlertDescription>This customer has no loan history.</AlertDescription>
+                            </Alert>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Loan No.</TableHead>
+                                        <TableHead>Principal</TableHead>
+                                        <TableHead>Balance</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {customerLoans.map(loan => {
+                                        const balance = loan.totalRepayableAmount - loan.totalPaid;
+                                        return (
+                                            <TableRow key={loan.id}>
+                                                <TableCell>{loan.loanNumber}</TableCell>
+                                                <TableCell>{loan.principalAmount.toLocaleString()}</TableCell>
+                                                <TableCell className="font-bold">{balance.toLocaleString()}</TableCell>
+                                                <TableCell>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                                                  </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Button variant="ghost" size="sm" onClick={() => setMessageLoan(loan)}>
+                                                        <MessageSquare className="mr-2 h-4 w-4" />
+                                                        Message
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                </Card>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setSelectedCustomer(null)}>Close</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate Message Dialog */}
+       <Dialog open={!!messageLoan} onOpenChange={(isOpen) => !isOpen && setMessageLoan(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Compose Customer Message</DialogTitle>
+                <DialogDescription>A message has been generated for this loan. You can copy it to your clipboard.</DialogDescription>
+            </DialogHeader>
+            <div className="mt-4">
+                <Textarea value={generatedMessage} rows={10} readOnly className="bg-muted/50" />
+            </div>
+            <DialogFooter>
+                 <Button variant="ghost" onClick={() => setMessageLoan(null)}>Cancel</Button>
+                 <Button onClick={copyToClipboard}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Message
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
