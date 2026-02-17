@@ -51,6 +51,7 @@ export default function CustomerLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCodeForm, setShowCodeForm] = useState(false);
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+  const [isSignUp, setIsSignUp] = useState(false);
 
   const emailForm = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
@@ -86,24 +87,32 @@ export default function CustomerLoginPage() {
 
   async function onEmailSubmit(values: z.infer<typeof emailSchema>) {
     setIsSubmitting(true);
-    try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({ title: 'Login Successful', description: 'Redirecting to your account...' });
-      router.push('/account');
-    } catch (error: any) {
-      if (error.code === 'auth/user-not-found') {
-        try {
-          await createUserWithEmailAndPassword(auth, values.email, values.password);
-          toast({ title: 'Account Created', description: 'Welcome! Redirecting to your account...' });
-          router.push('/account');
-        } catch (creationError: any) {
-          toast({ variant: 'destructive', title: 'Sign Up Failed', description: creationError.message });
-        }
-      } else {
-        toast({ variant: 'destructive', title: 'Login Failed', description: error.message });
+    if (isSignUp) {
+      // Handle Sign Up
+      try {
+        await createUserWithEmailAndPassword(auth, values.email, values.password);
+        toast({ title: 'Account Created', description: 'Welcome! Redirecting to your account...' });
+        router.push('/account');
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Sign Up Failed', description: error.message });
+      } finally {
+        setIsSubmitting(false);
       }
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      // Handle Sign In
+      try {
+        await signInWithEmailAndPassword(auth, values.email, values.password);
+        toast({ title: 'Login Successful', description: 'Redirecting to your account...' });
+        router.push('/account');
+      } catch (error: any) {
+         if (error.code === 'auth/user-not-found') {
+            toast({ variant: 'destructive', title: 'Login Failed', description: 'No account found with this email. Please sign up.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Login Failed', description: error.message });
+        }
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   }
 
@@ -152,7 +161,7 @@ export default function CustomerLoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Customer Portal</CardTitle>
-          <CardDescription>Sign in or create an account to apply for a loan.</CardDescription>
+          <CardDescription>{isSignUp ? 'Create your account to apply for a loan.' : 'Sign in to your account.'}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="phone">
@@ -217,10 +226,39 @@ export default function CustomerLoginPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Sign In / Sign Up
-                  </Button>
+                  <div className="flex flex-col gap-4">
+                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {isSignUp ? 'Create Account' : 'Sign In'}
+                    </Button>
+                    <div className="text-center text-sm">
+                      {isSignUp ? (
+                        <>
+                          Already have an account?{' '}
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="p-0 h-auto"
+                            onClick={() => setIsSignUp(false)}
+                          >
+                            Sign In
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          Don't have an account?{' '}
+                          <Button
+                            type="button"
+                            variant="link"
+                            className="p-0 h-auto"
+                            onClick={() => setIsSignUp(true)}
+                          >
+                            Sign Up
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </form>
               </Form>
             </TabsContent>
