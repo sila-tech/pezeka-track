@@ -18,15 +18,15 @@ export default function Hero() {
           <div className="flex flex-col justify-center space-y-4">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                Fast, Flexible Financing for Your Needs
+                Unlock Your Financial Goals with Pezeka Credit
               </h1>
               <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                Pezeka Credit offers tailored loan solutions to help you achieve your financial goals. Get started today with our simple and transparent application process.
+                We provide fast, transparent, and reliable loan solutions tailored to your unique needs. Whether it's for personal ambitions or business growth, our simple application process is your first step towards success.
               </p>
             </div>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
               <Button asChild size="lg">
-                <Link href="/login">Apply for a Loan</Link>
+                <Link href="#contact">Apply for a Loan</Link>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="#products">Our Products</Link>

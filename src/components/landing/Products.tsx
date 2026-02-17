@@ -5,17 +5,17 @@ const products = [
   {
     icon: <UserCheck className="h-8 w-8 text-primary" />,
     title: 'Personal Loans',
-    description: 'Flexible personal loans for your individual needs, from emergency expenses to personal projects.',
+    description: "Access the funds you need for life's important moments. Our personal loans offer competitive rates and flexible terms for everything from home renovations to unexpected expenses.",
   },
   {
     icon: <Briefcase className="h-8 w-8 text-primary" />,
     title: 'Business Loans',
-    description: 'Fuel your business growth with our SME loans, designed to provide working capital and support expansion.',
+    description: 'Power your business ambitions with our tailored SME loan products. Get the working capital you need to scale operations, purchase inventory, or invest in new opportunities.',
   },
   {
     icon: <DollarSign className="h-8 w-8 text-primary" />,
     title: 'Logbook Loans',
-    description: 'Unlock the value of your vehicle with a logbook loan. Quick access to cash when you need it most.',
+    description: "Leverage your vehicle's value to get fast and secure financing. Our logbook loans provide immediate cash to address urgent needs without selling your asset.",
   },
 ];
 

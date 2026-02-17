@@ -28,7 +28,7 @@ export default function Header() {
           Contact
         </Link>
         <Button asChild>
-            <Link href="/login">Staff Login</Link>
+            <Link href="/login">Portal Login</Link>
         </Button>
       </nav>
       <div className="md:hidden ml-auto">
@@ -54,7 +54,7 @@ export default function Header() {
                 Contact
               </Link>
               <Button asChild>
-                  <Link href="/login" onClick={closeMenu}>Staff Login</Link>
+                  <Link href="/login" onClick={closeMenu}>Portal Login</Link>
               </Button>
             </div>
           </SheetContent>
