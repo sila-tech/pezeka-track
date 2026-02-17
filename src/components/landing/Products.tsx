@@ -6,21 +6,21 @@ import Link from 'next/link';
 const products = [
   {
     icon: <UserCheck className="h-8 w-8 text-primary" />,
-    title: 'Individual Loans',
+    title: 'Individual Short-Term Loans',
     description: "Access the funds you need for life's important moments. Our personal loans offer competitive rates and flexible terms for everything from home renovations to unexpected expenses.",
-    href: '/application-form'
+    href: '#contact'
   },
   {
     icon: <Banknote className="h-8 w-8 text-primary" />,
-    title: 'Salary Loans',
+    title: 'Salary Advance Loans',
     description: 'Get a quick and convenient loan against your salary. Ideal for emergencies and short-term cash needs with a straightforward repayment plan.',
-    href: '/salary-loan-form'
+    href: '#contact'
   },
   {
     icon: <DollarSign className="h-8 w-8 text-primary" />,
     title: 'Logbook Loans',
     description: "Leverage your vehicle's value to get fast and secure financing. Our logbook loans provide immediate cash to address urgent needs without selling your asset.",
-    href: '/logbook-loan-form'
+    href: '#contact'
   },
   {
     icon: <Briefcase className="h-8 w-8 text-primary" />,

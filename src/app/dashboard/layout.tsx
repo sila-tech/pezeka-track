@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
@@ -46,6 +46,14 @@ const NavLinks = ({ isFinance, onLinkClick }: { isFinance: boolean, onLinkClick?
             Finance
         </Link>
     )}
+     <Link
+        href="/dashboard/application-forms"
+        className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+        onClick={onLinkClick}
+    >
+        <FileText className="h-4 w-4" />
+        Application Forms
+    </Link>
     </nav>
 );
 
