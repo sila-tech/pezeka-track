@@ -19,19 +19,23 @@ interface UseCollection<T> {
   error: FirestoreError | null;
 }
 
-export function useCollection<T>(collectionPath: string): UseCollection<T> {
+export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | null): UseCollection<T> {
   const firestore = useFirestore();
   const [data, setData] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
 
   const memoizedQuery = useMemo(() => {
-    if (!firestore || !collectionPath) return null;
-    return query(collection(firestore, collectionPath));
-  }, [firestore, collectionPath]);
+    if (!firestore || !pathOrQuery) return null;
+    if (typeof pathOrQuery === 'string') {
+        return query(collection(firestore, pathOrQuery));
+    }
+    return pathOrQuery;
+  }, [firestore, pathOrQuery]);
 
   useEffect(() => {
     if (!memoizedQuery) {
+      setData(null);
       setLoading(false);
       return;
     }
@@ -49,6 +53,12 @@ export function useCollection<T>(collectionPath: string): UseCollection<T> {
         setError(null);
       },
       (err: FirestoreError) => {
+        let collectionPath = "queried collection";
+        if (typeof pathOrQuery === 'string') {
+            collectionPath = pathOrQuery;
+        } 
+        // Cannot reliably get path from a query object.
+
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: collectionPath,
@@ -60,7 +70,7 @@ export function useCollection<T>(collectionPath: string): UseCollection<T> {
     );
 
     return () => unsubscribe();
-  }, [memoizedQuery, collectionPath]);
+  }, [memoizedQuery, pathOrQuery]);
 
   return { data, loading, error };
 }

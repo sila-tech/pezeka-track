@@ -29,7 +29,9 @@ service cloud.firestore {
 
     // Loans
     match /loans/{loanId} {
-      allow read, write: if isFinanceUser() || isStaffUser();
+      allow write: if isFinanceUser() || isStaffUser();
+      allow get: if isFinanceUser() || isStaffUser() || (request.auth.token.phone_number != null && resource.data.customerPhone == request.auth.token.phone_number);
+      allow list: if isFinanceUser() || isStaffUser() || (request.auth.token.phone_number != null && request.query.where.customerPhone == request.auth.token.phone_number);
     }
 
     // Finance Entries

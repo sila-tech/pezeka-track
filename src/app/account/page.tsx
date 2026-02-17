@@ -1,5 +1,5 @@
 'use client';
-import { useUser, useAuth, useCollection } from '@/firebase';
+import { useUser, useAuth, useCollection, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { collection, query, where } from 'firebase/firestore';
 
 interface Payment {
   paymentId: string;
@@ -46,25 +47,14 @@ export default function AccountPage() {
   const { user } = useUser();
   const auth = useAuth();
   const router = useRouter();
+  const firestore = useFirestore();
 
-  const { data: allLoans, loading: loansLoading } = useCollection<Loan>('loans');
+  const customerLoansQuery = useMemo(() => {
+    if (!firestore || !user?.phoneNumber) return null;
+    return query(collection(firestore, 'loans'), where('customerPhone', '==', user.phoneNumber));
+  }, [firestore, user?.phoneNumber]);
 
-  const customerLoans = useMemo(() => {
-    if (!allLoans || !user) return [];
-    
-    // Match loans based on the user's phone number.
-    // This handles different formats like +254... vs 07... by comparing the last 9 digits.
-    if (!user.phoneNumber) return [];
-    
-    const userPhoneSuffix = user.phoneNumber.replace(/\D/g, '').slice(-9);
-
-    return allLoans.filter(loan => {
-        if (!loan.customerPhone) return false;
-        const loanPhoneSuffix = loan.customerPhone.replace(/\D/g, '').slice(-9);
-        return loanPhoneSuffix === userPhoneSuffix;
-    });
-
-  }, [allLoans, user]);
+  const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
 
 
   const handleLogout = async () => {
@@ -99,7 +89,7 @@ export default function AccountPage() {
                     <div className="flex items-center justify-center p-8">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
-                ) : customerLoans.length > 0 ? (
+                ) : customerLoans && customerLoans.length > 0 ? (
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Your Loans</h3>
                         {customerLoans.map(loan => {
