@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search } from "lucide-react";
 import { arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -229,10 +229,13 @@ export default function FinancePage() {
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
+  const { user, loading: userLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
-  const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>('financeEntries');
+  const { data: loans, loading: loansLoading } = useCollection<Loan>(user ? 'loans' : null);
+  const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(user ? 'financeEntries' : null);
+  
+  const isLoading = userLoading || loansLoading || financeEntriesLoading;
 
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
@@ -1026,7 +1029,7 @@ export default function FinancePage() {
                 title="Receipts"
                 description="Amount received from customers."
                 entries={receipts}
-                loading={financeEntriesLoading}
+                loading={isLoading}
                 onEdit={handleEditEntryClick}
                 onDelete={handleDeleteEntryClick}
               />
@@ -1036,7 +1039,7 @@ export default function FinancePage() {
                 title="Payouts"
                 description="Amount disbursed to customers, including costs."
                 entries={payouts}
-                loading={financeEntriesLoading}
+                loading={isLoading}
                 onEdit={handleEditEntryClick}
                 onDelete={handleDeleteEntryClick}
               />
@@ -1046,7 +1049,7 @@ export default function FinancePage() {
                 title="Expenses"
                 description="Money spent on facilitation and other costs."
                 entries={expenses}
-                loading={financeEntriesLoading}
+                loading={isLoading}
                 onEdit={handleEditEntryClick}
                 onDelete={handleDeleteEntryClick}
               />
@@ -1056,7 +1059,7 @@ export default function FinancePage() {
               title="Unearned Income"
               description="Total income from upfront fees (registration and processing fees)."
               entries={unearnedIncomeEntries}
-              loading={loansLoading}
+              loading={isLoading}
             />
           </TabsContent>
           <TabsContent value="earned_interest">
@@ -1064,7 +1067,7 @@ export default function FinancePage() {
               title="Earned Interest"
               description="Interest portion of loan payments that have been received."
               entries={earnedInterestEntries}
-              loading={loansLoading}
+              loading={isLoading}
             />
           </TabsContent>
           <TabsContent value="earned_income">
@@ -1072,7 +1075,7 @@ export default function FinancePage() {
               title="Earned Income"
               description="Total income from upfront fees and interest payments received."
               entries={earnedIncomeEntries}
-              loading={loansLoading}
+              loading={isLoading}
             />
           </TabsContent>
            <TabsContent value="payments">
@@ -1080,7 +1083,7 @@ export default function FinancePage() {
               title="All Loan Payments"
               description="A consolidated list of all individual payments made against loans."
               entries={allLoanPayments}
-              loading={loansLoading}
+              loading={isLoading}
             />
           </TabsContent>
           <TabsContent value="loanbook">
@@ -1122,12 +1125,12 @@ export default function FinancePage() {
                     </div>
                 </CardHeader>
                   <CardContent>
-                      {loansLoading && (
+                      {isLoading && (
                         <div className="flex items-center justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                       )}
-                      {!loansLoading && (!filteredLoans || filteredLoans.length === 0) && (
+                      {!isLoading && (!filteredLoans || filteredLoans.length === 0) && (
                         <Alert>
                             <AlertTitle>No Loans Found</AlertTitle>
                             <AlertDescription>
@@ -1138,7 +1141,7 @@ export default function FinancePage() {
                             </AlertDescription>
                         </Alert>
                       )}
-                      {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
+                      {!isLoading && filteredLoans && filteredLoans.length > 0 && (
                         <div className="relative max-h-[60vh] overflow-y-auto">
                           <Table>
                               <TableHeader className="sticky top-0 bg-card">

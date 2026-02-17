@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, Search, FileDown, MessageSquare, Copy } from 'lucide-react';
@@ -109,11 +109,12 @@ export default function LoansPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
 
+  const { user, loading: userLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
-  const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+  const { data: customers, loading: customersLoading } = useCollection<Customer>(user ? 'customers' : null);
+  const { data: loans, loading: loansLoading } = useCollection<Loan>(user ? 'loans' : null);
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
@@ -322,7 +323,7 @@ export default function LoansPage() {
       }
   };
   
-  const isLoading = customersLoading || loansLoading;
+  const isLoading = userLoading || customersLoading || loansLoading;
 
   return (
     <div>
@@ -598,8 +599,8 @@ export default function LoansPage() {
                     <DialogClose asChild>
                         <Button type="button" variant="ghost">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" form="add-loan-form" disabled={isSubmitting || loansLoading}>
-                        {(isSubmitting || loansLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button type="submit" form="add-loan-form" disabled={isSubmitting || customersLoading}>
+                        {(isSubmitting || customersLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Add Loan
                     </Button>
                 </DialogFooter>

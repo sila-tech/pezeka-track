@@ -22,8 +22,8 @@ interface DueLoan {
 }
 
 export default function Dashboard() {
-  const { user } = useUser();
-  const { data: loans, loading: loansLoading } = useCollection<DueLoan>('loans');
+  const { user, loading: userLoading } = useUser();
+  const { data: loans, loading: loansLoading } = useCollection<DueLoan>(user ? 'loans' : null);
 
   const dueLoans = useMemo(() => {
     if (!loans) return [];
@@ -61,6 +61,8 @@ export default function Dashboard() {
         return daysUntilDue <= 7;
       });
   }, [loans]);
+  
+  const isLoading = userLoading || loansLoading;
 
   return (
     <div>
@@ -104,12 +106,12 @@ export default function Dashboard() {
                 <CardDescription>Members with payments that are overdue or due within 7 days.</CardDescription>
             </CardHeader>
             <CardContent>
-              {loansLoading && (
+              {isLoading && (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               )}
-              {!loansLoading && dueLoans.length === 0 && (
+              {!isLoading && dueLoans.length === 0 && (
                 <Alert>
                     <Bell className="h-4 w-4" />
                     <AlertTitle>No Due Loans</AlertTitle>
@@ -118,7 +120,7 @@ export default function Dashboard() {
                     </AlertDescription>
                 </Alert>
               )}
-              {!loansLoading && dueLoans.length > 0 && (
+              {!isLoading && dueLoans.length > 0 && (
                  <Table>
                     <TableHeader>
                         <TableRow>

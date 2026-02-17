@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollection, useUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal, Search } from 'lucide-react';
@@ -95,11 +95,12 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
 
+  const { user, loading: userLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
-  const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+  const { data: customers, loading: customersLoading } = useCollection<Customer>(user ? 'customers' : null);
+  const { data: loans, loading: loansLoading } = useCollection<Loan>(user ? 'loans' : null);
 
   const filteredCustomers = useMemo(() => {
     if (!customers) return [];
@@ -278,7 +279,7 @@ export default function CustomersPage() {
       }
   };
   
-  const isLoading = customersLoading || loansLoading;
+  const isLoading = userLoading || customersLoading || loansLoading;
 
   return (
     <div>
