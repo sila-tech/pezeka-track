@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useUser, useAuth } from '@/firebase';
 import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText } from 'lucide-react';
 import Link from 'next/link';
@@ -65,11 +65,14 @@ export default function AdminLayout({
 }) {
     const { user, loading } = useUser();
     const router = useRouter();
+    const pathname = usePathname();
     const auth = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+    const isLoginPage = pathname === '/admin/login';
+
     useEffect(() => {
-        if (loading) return;
+        if (isLoginPage || loading) return;
 
         if (!user) {
             router.push('/admin/login');
@@ -85,16 +88,20 @@ export default function AdminLayout({
                 router.push('/admin/login');
             });
         }
-    }, [user, loading, router, auth]);
+    }, [user, loading, router, auth, pathname, isLoginPage]);
 
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/admin/login');
     }
 
+    if (isLoginPage) {
+        return <>{children}</>;
+    }
+
     if (loading || !user) {
         return (
-            <div className="flex h-screen w-full items-center justify-center">
+            <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         );
