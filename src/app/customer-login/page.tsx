@@ -21,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import Link from 'next/link';
 
 const emailSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
@@ -155,9 +154,8 @@ export default function CustomerLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-50">
+    <>
       <div ref={recaptchaContainerRef}></div>
-      <Link href="/" className="mb-4 text-sm text-primary hover:underline">← Back to Home</Link>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Customer Portal</CardTitle>
@@ -265,6 +263,6 @@ export default function CustomerLoginPage() {
           </Tabs>
         </CardContent>
       </Card>
-    </main>
+    </>
   );
 }
