@@ -69,7 +69,7 @@ export default function AdminLayout({
     const auth = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    const isLoginPage = pathname === '/admin/login';
+    const isLoginPage = pathname === '/admin/login' || pathname === '/staff/login' || pathname === '/finance/login';
 
     useEffect(() => {
         if (isLoginPage || loading) return;
