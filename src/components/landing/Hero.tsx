@@ -28,8 +28,8 @@ export default function Hero() {
               <Button asChild size="lg">
                 <Link href="/application-form">Apply for an Individual Loan</Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="#products">Our Products</Link>
+               <Button asChild size="lg" variant="secondary">
+                <Link href="/salary-loan-form">Apply for a Salary Loan</Link>
               </Button>
             </div>
           </div>
