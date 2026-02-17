@@ -51,6 +51,7 @@ interface Loan {
 }
 
 const statementSchema = z.object({
+  loanAmount: z.coerce.number().min(1, 'Please enter a valid loan amount.'),
   statement: z.any().refine((files) => files?.length == 1, 'M-Pesa statement PDF is required.'),
   password: z.string().min(1, 'PDF password is required.'),
 });
@@ -74,6 +75,7 @@ export default function AccountPage() {
   const statementForm = useForm<z.infer<typeof statementSchema>>({
     resolver: zodResolver(statementSchema),
     defaultValues: {
+      loanAmount: undefined,
       password: '',
       statement: undefined,
     },
@@ -93,8 +95,8 @@ export default function AccountPage() {
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     toast({
-      title: "Documents Submitted",
-      description: "Your M-Pesa statement has been submitted for review. We will get back to you shortly.",
+      title: "Application Submitted",
+      description: `Your request for Ksh ${values.loanAmount.toLocaleString()} has been submitted. We will review your M-Pesa statement and contact you via email about the next steps.`,
     });
 
     statementForm.reset();
@@ -205,12 +207,25 @@ export default function AccountPage() {
             <CardHeader>
                 <CardTitle>Apply for a New Loan</CardTitle>
                 <CardDescription>
-                To apply for a new loan, we need to assess your financial history. Please upload your latest M-Pesa statement (in PDF format) and provide the password to open it. This is a required step for loan consideration.
+                To begin your loan application, please enter your desired loan amount and upload your latest M-Pesa statement (in PDF format) with its password. Our team will review your submission and contact you via email about the next steps.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...statementForm}>
                 <form onSubmit={statementForm.handleSubmit(onStatementSubmit)} className="space-y-4">
+                    <FormField
+                      control={statementForm.control}
+                      name="loanAmount"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Loan Amount Requested (Ksh)</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                    />
                     <FormField
                     control={statementForm.control}
                     name="statement"
@@ -246,7 +261,7 @@ export default function AccountPage() {
                     />
                     <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                        Submit Documents
+                        Submit Application
                     </Button>
                 </form>
                 </Form>
