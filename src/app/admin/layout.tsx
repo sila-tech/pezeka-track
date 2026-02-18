@@ -89,7 +89,7 @@ export default function AdminLayout({
         }
 
         // For all other pages, if not loading and not an authorized user, redirect to login
-        if (!user || !isAuthorized) {
+        if (!isAuthorized) {
             router.push('/admin/login');
         }
 
@@ -102,7 +102,7 @@ export default function AdminLayout({
     }
 
     if (isLoginPage) {
-        if (loading) {
+        if (loading && !user) {
             return (
                 <div className="flex h-screen w-full items-center justify-center bg-background">
                     <Loader2 className="h-8 w-8 animate-spin" />
@@ -112,7 +112,7 @@ export default function AdminLayout({
         return <>{children}</>;
     }
 
-    if (loading || !user || !isAuthorized) {
+    if (loading || !isAuthorized) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin" />

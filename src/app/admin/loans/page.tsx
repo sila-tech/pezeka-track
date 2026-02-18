@@ -113,8 +113,14 @@ export default function LoansPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const { data: customers, loading: customersLoading } = useCollection<Customer>(user ? 'customers' : null);
-  const { data: loans, loading: loansLoading } = useCollection<Loan>(user ? 'loans' : null);
+  const isAuthorized = user ? (
+    user.email === 'simon@pezeka.com' ||
+    user.email?.endsWith('@finance.pezeka.com') ||
+    user.email?.endsWith('@staff.pezeka.com')
+  ) : false;
+
+  const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
+  const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];

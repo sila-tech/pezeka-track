@@ -51,6 +51,7 @@ export default function CustomerLoginPage() {
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [isVerifierReady, setIsVerifierReady] = useState(false);
 
 
   const emailForm = useForm<z.infer<typeof emailSchema>>({
@@ -83,10 +84,13 @@ export default function CustomerLoginPage() {
         }
       });
       window.recaptchaVerifier = verifier;
-      
+      setIsVerifierReady(true);
+
       return () => {
         verifier.clear();
       };
+    } else if (window.recaptchaVerifier) {
+        setIsVerifierReady(true);
     }
   }, [auth]);
 
@@ -184,7 +188,7 @@ export default function CustomerLoginPage() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    <Button type="submit" className="w-full" disabled={isSubmitting || !isVerifierReady}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Send Verification Code
                     </Button>

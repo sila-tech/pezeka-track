@@ -232,8 +232,15 @@ export default function FinancePage() {
   const { user, loading: userLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { data: loans, loading: loansLoading } = useCollection<Loan>(user ? 'loans' : null);
-  const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(user ? 'financeEntries' : null);
+
+  const isAuthorized = user ? (
+    user.email === 'simon@pezeka.com' ||
+    user.email?.endsWith('@finance.pezeka.com') ||
+    user.email?.endsWith('@staff.pezeka.com')
+  ) : false;
+
+  const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
+  const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   
   const isLoading = userLoading || loansLoading || financeEntriesLoading;
 

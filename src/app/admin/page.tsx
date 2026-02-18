@@ -23,7 +23,14 @@ interface DueLoan {
 
 export default function Dashboard() {
   const { user, loading: userLoading } = useUser();
-  const { data: loans, loading: loansLoading } = useCollection<DueLoan>(user ? 'loans' : null);
+  
+  const isAuthorized = user ? (
+    user.email === 'simon@pezeka.com' ||
+    user.email?.endsWith('@finance.pezeka.com') ||
+    user.email?.endsWith('@staff.pezeka.com')
+  ) : false;
+
+  const { data: loans, loading: loansLoading } = useCollection<DueLoan>(isAuthorized ? 'loans' : null);
 
   const dueLoans = useMemo(() => {
     if (!loans) return [];
