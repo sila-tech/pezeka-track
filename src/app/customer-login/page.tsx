@@ -38,7 +38,6 @@ const codeSchema = z.object({
 declare global {
   interface Window {
     recaptchaVerifier: RecaptchaVerifier;
-    confirmationResult: ConfirmationResult;
   }
 }
 
@@ -51,6 +50,8 @@ export default function CustomerLoginPage() {
   const [showCodeForm, setShowCodeForm] = useState(false);
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+
 
   const emailForm = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
@@ -74,13 +75,18 @@ export default function CustomerLoginPage() {
   }, [user, loading, router]);
   
   useEffect(() => {
-    if (recaptchaContainerRef.current && !window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
+    if (auth && recaptchaContainerRef.current && !window.recaptchaVerifier) {
+      const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
         'size': 'invisible',
         'callback': () => {
           // reCAPTCHA solved, allow signInWithPhoneNumber.
         }
       });
+      window.recaptchaVerifier = verifier;
+      
+      return () => {
+        verifier.clear();
+      };
     }
   }, [auth]);
 
@@ -119,8 +125,8 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     const appVerifier = window.recaptchaVerifier;
     try {
-      const confirmationResult = await signInWithPhoneNumber(auth, values.phone, appVerifier);
-      window.confirmationResult = confirmationResult;
+      const result = await signInWithPhoneNumber(auth, values.phone, appVerifier);
+      setConfirmationResult(result);
       setShowCodeForm(true);
       toast({ title: 'Verification Code Sent', description: `A code has been sent to ${values.phone}.` });
     } catch (error: any) {
@@ -132,10 +138,10 @@ export default function CustomerLoginPage() {
   }
 
   async function onCodeSubmit(values: z.infer<typeof codeSchema>) {
-    if (!window.confirmationResult) return;
+    if (!confirmationResult) return;
     setIsSubmitting(true);
     try {
-      await window.confirmationResult.confirm(values.code);
+      await confirmationResult.confirm(values.code);
       toast({ title: 'Login Successful', description: 'Redirecting to your account...' });
       router.push('/account');
     } catch (error: any) {
@@ -199,7 +205,7 @@ export default function CustomerLoginPage() {
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Verify & Sign In
                       </Button>
-                      <Button variant="link" size="sm" onClick={() => { setShowCodeForm(false); codeForm.reset(); }}>
+                      <Button variant="link" size="sm" onClick={() => { setShowCodeForm(false); codeForm.reset(); setConfirmationResult(null); }}>
                         Use a different phone number
                       </Button>
                     </div>

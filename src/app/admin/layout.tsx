@@ -70,25 +70,31 @@ export default function AdminLayout({
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const isLoginPage = pathname === '/admin/login' || pathname === '/staff/login' || pathname === '/finance/login';
+    
+    const isAuthorized = user ? (
+        user.email === 'simon@pezeka.com' || 
+        user.email?.endsWith('@finance.pezeka.com') ||
+        user.email?.endsWith('@staff.pezeka.com')
+    ) : false;
 
     useEffect(() => {
-        if (isLoginPage || loading) return;
+        if (loading) return; // Wait until user status is resolved
 
-        if (!user) {
+        if (isLoginPage) {
+            // If on a login page and already logged in as an authorized user, redirect to admin dashboard
+            if (user && isAuthorized) {
+                router.push('/admin');
+            }
+            return; // Don't do anything else on login pages
+        }
+
+        // For all other pages, if not loading and not an authorized user, redirect to login
+        if (!user || !isAuthorized) {
             router.push('/admin/login');
-            return;
         }
 
-        const isAuthorized = user.email === 'simon@pezeka.com' || 
-                             user.email?.endsWith('@finance.pezeka.com') ||
-                             user.email?.endsWith('@staff.pezeka.com');
+    }, [user, loading, router, pathname, isLoginPage, isAuthorized]);
 
-        if (!isAuthorized) {
-            signOut(auth).then(() => {
-                router.push('/admin/login');
-            });
-        }
-    }, [user, loading, router, auth, pathname, isLoginPage]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -96,10 +102,17 @@ export default function AdminLayout({
     }
 
     if (isLoginPage) {
+        if (loading) {
+            return (
+                <div className="flex h-screen w-full items-center justify-center bg-background">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+            );
+        }
         return <>{children}</>;
     }
 
-    if (loading || !user) {
+    if (loading || !user || !isAuthorized) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin" />
