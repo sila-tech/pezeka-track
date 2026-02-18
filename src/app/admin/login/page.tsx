@@ -134,7 +134,22 @@ export default function AdminLoginPage() {
     );
   }
 
-  if (user && !isAuthorized) {
+  if (user) {
+    const isSimon = user.email === 'simon@pezeka.com';
+    const isStaff = user.email?.endsWith('@staff.pezeka.com');
+    const isFinance = user.email?.endsWith('@finance.pezeka.com');
+    const isPotentiallyAuthorized = isSimon || isStaff || isFinance || isAuthorized;
+    
+    // If the user has an admin-style email or is authorized by role, show a spinner while the layout redirects them.
+    if (isPotentiallyAuthorized) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
+
+    // If the user is logged in but is clearly not an admin (e.g., a customer), show the restricted access message.
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4">
         <Card className="w-full max-w-sm">
@@ -146,22 +161,14 @@ export default function AdminLoginPage() {
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-sm text-muted-foreground mb-4">
-              You are currently logged in as {user.email}. This account does not have admin privileges.
+              You are currently logged in as {user.email}. This account does not have the required privileges.
             </p>
             <Button onClick={() => signOut(auth)} className="w-full">
-              Logout
+              Logout and switch account
             </Button>
           </CardContent>
         </Card>
       </main>
-    );
-  }
-  
-  if (isAuthorized) {
-     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
     );
   }
 
