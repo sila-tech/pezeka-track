@@ -46,18 +46,20 @@ service cloud.firestore {
 
     // Rules for Loans
     match /loans/{loanId} {
-      // Admins have full read and write access to all loans.
-      // This allows staff to see all applications and manage all loans.
-      allow read, write: if isAdmin();
+      // Admins have full write access.
+      allow write: if isAdmin();
+      
+      // Admins have full read access (get and list).
+      allow read: if isAdmin();
       
       // CUSTOMER-specific rules (for non-admins)
-      // Customers can only read (get or list) loans that belong to them.
-      // This rule secures queries by ensuring any query from a customer is
-      // filtered by their customerId.
+      // Customers can GET their own single loan document.
       allow get: if request.auth.uid == resource.data.customerId;
       
-      // Customers can create new loan applications for themselves.
-      // The status must be 'application' on creation.
+      // Customers can LIST loans. The client-side query must be properly filtered.
+      allow list: if request.auth != null;
+      
+      // Customers can CREATE new loan applications for themselves.
       allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     }
     
