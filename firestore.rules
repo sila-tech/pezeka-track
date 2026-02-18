@@ -12,44 +12,36 @@ service cloud.firestore {
     function isStaffUser() {
       return request.auth != null && request.auth.token.email.matches('.*@staff\\.pezeka\\.com$');
     }
+    
+    function isStaffOrFinance() {
+        return isStaffUser() || isFinanceUser();
+    }
 
     function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
     }
 
-    // User profiles
     match /users/{userId} {
-      allow read, write: if isFinanceUser() || isOwner(userId);
+      allow read, write: if isStaffOrFinance() || isOwner(userId);
     }
 
-    // Customers
     match /customers/{customerId} {
-      allow read, write: if isFinanceUser() || isStaffUser();
+      allow read, write: if isStaffOrFinance();
     }
 
-    // Loans
     match /loans/{loanId} {
-      allow get: if isFinanceUser() || isStaffUser() || isOwner(resource.data.customerId);
-      allow list: if isFinanceUser() || isStaffUser() || (request.query.where.customerId != null && request.query.where.customerId == request.auth.uid);
-      allow update, delete: if isFinanceUser() || isStaffUser();
-      allow create: if (isFinanceUser() || isStaffUser()) ||
+      allow get: if isStaffOrFinance() || isOwner(resource.data.customerId);
+      allow list: if isStaffOrFinance() || 
+                     (request.query.where.customerId != null && request.query.where.customerId == request.auth.uid);
+      allow create: if isStaffOrFinance() ||
                        (isOwner(request.resource.data.customerId) && request.resource.data.status == 'application');
+      allow update, delete: if isStaffOrFinance();
     }
 
-    // Finance Entries
     match /financeEntries/{entryId} {
-      allow read: if isFinanceUser() || isStaffUser();
-
-      // Create: Finance can create any type. Staff can only create receipts.
-      allow create: if isFinanceUser() || 
-                       (isStaffUser() && request.resource.data.type == 'receipt');
-
-      // Update: Finance can update any type. Staff can only update receipts.
-      // Don't allow changing the 'type' field on update.
-      allow update: if (isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt')) &&
-                        request.resource.data.type == resource.data.type;
-      
-      // Delete: Finance can delete any type. Staff can only delete receipts.
+      allow get, list: if isStaffOrFinance();
+      allow create: if isFinanceUser() || (isStaffUser() && request.resource.data.type == 'receipt');
+      allow update: if (isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt')) && request.resource.data.type == resource.data.type;
       allow delete: if isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt');
     }
   }
