@@ -2,10 +2,69 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access for any authenticated user to any document.
-    // This simplifies permissions to resolve the access errors.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    // Helper functions to check user roles by looking up their profile
+    function isSuperAdmin() {
+      return request.auth.token.email == 'simon@pezeka.com';
+    }
+
+    function getUserRole() {
+      // A user's role is stored in their profile document in the 'users' collection.
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaff() {
+      return getUserRole() == 'staff';
+    }
+
+    function isFinance() {
+      return getUserRole() == 'finance';
+    }
+
+    function isAdmin() {
+      // An admin is anyone who is a super admin, staff, or finance user.
+      return isSuperAdmin() || isStaff() || isFinance();
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Rules for User Profiles
+    match /users/{userId} {
+      // Admins can read any profile.
+      // Users can read and write their own profile document.
+      // This is necessary for the role-checking functions to work.
+      allow read, write: if isAdmin() || isOwner(userId);
+    }
+
+    // Rules for Customers collection (managed by Admins)
+    match /customers/{customerId} {
+      // Only Admins can read or write to the customers collection.
+      allow read, write: if isAdmin();
+    }
+
+    // Rules for Loans
+    match /loans/{loanId} {
+      // Admins have full read and write access to all loans.
+      // This allows staff to see all applications and manage all loans.
+      allow read, write: if isAdmin();
+      
+      // CUSTOMER-specific rules (for non-admins)
+      // Customers can only read (get or list) loans that belong to them.
+      // This rule secures queries by ensuring any query from a customer is
+      // filtered by their customerId.
+      allow get: if request.auth.uid == resource.data.customerId;
+      
+      // Customers can create new loan applications for themselves.
+      // The status must be 'application' on creation.
+      allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
+    }
+    
+    // Rules for Finance Entries
+    match /financeEntries/{entryId} {
+      // Only Finance users and the Super Admin can read or write finance entries.
+      allow read, write: if isFinance() || isSuperAdmin();
     }
   }
 }
