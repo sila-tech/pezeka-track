@@ -69,7 +69,7 @@ const applicationSchema = z.object({
 
 
 export default function AccountPage() {
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const auth = useAuth();
   const router = useRouter();
   const firestore = useFirestore();
@@ -77,9 +77,9 @@ export default function AccountPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const customerLoansQuery = useMemo(() => {
-    if (!firestore || !user?.uid) return null;
+    if (userLoading || !firestore || !user?.uid) return null;
     return query(collection(firestore, 'loans'), where('customerId', '==', user.uid));
-  }, [firestore, user?.uid]);
+  }, [firestore, user?.uid, userLoading]);
 
   const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
 
