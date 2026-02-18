@@ -9,7 +9,7 @@ import {
   FirestoreError,
   QuerySnapshot,
 } from 'firebase/firestore';
-import { useFirestore } from '../provider';
+import { useFirestore, useAuth } from '../provider';
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
 
@@ -21,6 +21,7 @@ interface UseCollection<T> {
 
 export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | null): UseCollection<T> {
   const firestore = useFirestore();
+  const auth = useAuth();
   const [data, setData] = useState<T[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
@@ -34,7 +35,10 @@ export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | nul
   }, [firestore, pathOrQuery]);
 
   useEffect(() => {
-    if (!memoizedQuery) {
+    // Add an explicit check for auth.currentUser.
+    // This ensures we don't try to set up a listener if there's no authenticated user,
+    // providing a stronger, centralized guard against the race condition.
+    if (!memoizedQuery || !auth.currentUser) {
       setData(null);
       setLoading(false);
       return;
@@ -70,7 +74,7 @@ export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | nul
     );
 
     return () => unsubscribe();
-  }, [memoizedQuery, pathOrQuery]);
+  }, [memoizedQuery, auth.currentUser]); // Add auth.currentUser to ensure effect re-runs on auth state change
 
   return { data, loading, error };
 }
