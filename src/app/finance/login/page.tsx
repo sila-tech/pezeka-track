@@ -135,29 +135,36 @@ export default function FinanceLoginPage() {
   if (user) {
     const isSimon = user.email === 'simon@pezeka.com';
     const isFinance = user.email?.endsWith('@finance.pezeka.com');
-    if (!isSimon && !isFinance) {
-      return (
+
+    if (isSimon || isFinance) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
+
+    return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4">
-          <Card className="w-full max-w-sm">
+            <Card className="w-full max-w-sm">
             <CardHeader>
-              <CardTitle>Pezeka Credit | Finance</CardTitle>
-              <CardDescription>
+                <CardTitle>Pezeka Credit | Finance</CardTitle>
+                <CardDescription>
                 Access to this portal is restricted to finance staff.
-              </CardDescription>
+                </CardDescription>
             </CardHeader>
             <CardContent className="text-center">
-              <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-4">
                 You are currently logged in as {user.email}. Please log out to
                 continue.
-              </p>
-              <Button onClick={() => signOut(auth)} className="w-full">
+                </p>
+                <Button onClick={() => signOut(auth)} className="w-full">
                 Logout
-              </Button>
+                </Button>
             </CardContent>
-          </Card>
+            </Card>
         </main>
-      );
-    }
+    );
   }
 
   return (
