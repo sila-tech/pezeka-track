@@ -44,6 +44,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { calculateAmortization } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { exportToCsv } from '@/lib/excel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 const loanSchema = z.object({
@@ -135,6 +136,20 @@ export default function LoansPage() {
         return statusMatch && searchMatch;
     });
   }, [loans, searchTerm, statusFilter]);
+  
+  const applicationLoans = useMemo(() => {
+    if (!loans) return [];
+    return loans.filter(loan => {
+        const isApplication = loan.status === 'application';
+        if (!isApplication) return false;
+
+        const searchMatch = searchTerm === '' ||
+            loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            loan.customerPhone.includes(searchTerm);
+        return searchMatch;
+    });
+  }, [loans, searchTerm]);
 
 
   const form = useForm<z.infer<typeof loanSchema>>({
@@ -335,380 +350,445 @@ export default function LoansPage() {
 
   return (
     <div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add a New Loan</DialogTitle>
+            <DialogDescription>
+              Fill in the details below to create a new loan record.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+              <div className="max-h-[65vh] overflow-y-auto pr-4">
+                  <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+                      <FormField
+                          control={form.control}
+                          name="customerType"
+                          render={({ field }) => (
+                          <FormItem className="col-span-2">
+                              <FormLabel>Customer Type</FormLabel>
+                              <FormControl>
+                              <RadioGroup
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                  className="flex space-x-4"
+                              >
+                                  <FormItem className="flex items-center space-x-2">
+                                  <FormControl>
+                                      <RadioGroupItem value="existing" id="existing" />
+                                  </FormControl>
+                                  <FormLabel htmlFor="existing">Existing Customer</FormLabel>
+                                  </FormItem>
+                                  <FormItem className="flex items-center space-x-2">
+                                  <FormControl>
+                                      <RadioGroupItem value="new" id="new" />
+                                  </FormControl>
+                                  <FormLabel htmlFor="new">New Customer</FormLabel>
+                                  </FormItem>
+                              </RadioGroup>
+                              </FormControl>
+                              <FormMessage />
+                          </FormItem>
+                          )}
+                      />
+
+                      {customerType === 'existing' ? (
+                      <FormField
+                          control={form.control}
+                          name="customerId"
+                          render={({ field }) => (
+                          <FormItem className="col-span-2">
+                              <FormLabel>Customer</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
+                              <FormControl>
+                                  <SelectTrigger>
+                                  <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
+                                  </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                  {customers && customers.map(customer => (
+                                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                              </Select>
+                              <FormMessage />
+                          </FormItem>
+                          )}
+                      />
+                      ) : (
+                      <>
+                          <FormField
+                          control={form.control}
+                          name="newCustomerName"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>New Customer Name</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="John Doe" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <FormField
+                          control={form.control}
+                          name="newCustomerPhone"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>New Customer Phone</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="0712345678" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                      </>
+                      )}
+                      <FormField
+                      control={form.control}
+                      name="disbursementDate"
+                      render={({ field }) => (
+                          <FormItem className="col-span-2">
+                          <FormLabel>Disbursement Date</FormLabel>
+                          <FormControl>
+                              <Input type="date" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="principalAmount"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Principal Amount</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="e.g. 50000" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="interestRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Monthly Interest Rate (%)</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="e.g. 1.25" {...field} value={field.value ?? ''} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                      control={form.control}
+                      name="registrationFee"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Registration Fee (Optional)</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="processingFee"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Processing Fee (Optional)</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="carTrackInstallationFee"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Car Track Fee (Optional)</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="chargingCost"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Charging Cost (Optional)</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="numberOfInstalments"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>No. of Instalments</FormLabel>
+                          <FormControl>
+                              <Input type="number" placeholder="e.g. 12" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                      <FormField
+                      control={form.control}
+                      name="paymentFrequency"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Payment Frequency</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select frequency" />
+                              </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                       <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
+                          <div className="flex justify-between">
+                              <span className="text-sm font-medium">Calculated Instalment Amount</span>
+                              <span className="text-sm font-bold">Ksh {calculatedValues.instalmentAmount}</span>
+                          </div>
+                          <div className="flex justify-between">
+                              <span className="text-sm font-medium">Total Repayable Amount</span>
+                              <span className="text-sm font-bold">Ksh {calculatedValues.totalRepayableAmount}</span>
+                          </div>
+                      </div>
+
+                      <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                          <FormItem className="col-span-2">
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="due">Due</SelectItem>
+                              <SelectItem value="overdue">Overdue</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="rollover">Rollover</SelectItem>
+                              <SelectItem value="application">Application</SelectItem>
+                              </SelectContent>
+                          </Select>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                      />
+                  </form>
+              </div>
+
+              <DialogFooter>
+                  <DialogClose asChild>
+                      <Button type="button" variant="ghost">Cancel</Button>
+                  </DialogClose>
+                  <Button type="submit" form="add-loan-form" disabled={isSubmitting || customersLoading}>
+                      {(isSubmitting || customersLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Add Loan
+                  </Button>
+              </DialogFooter>
+          </Form>
+        </DialogContent>
+      </Dialog>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Loans</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button>
+         <DialogTrigger asChild>
+            <Button onClick={() => setOpen(true)}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Loan
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Add a New Loan</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to create a new loan record.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-                <div className="max-h-[65vh] overflow-y-auto pr-4">
-                    <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name="customerType"
-                            render={({ field }) => (
-                            <FormItem className="col-span-2">
-                                <FormLabel>Customer Type</FormLabel>
-                                <FormControl>
-                                <RadioGroup
-                                    onValueChange={field.onChange}
-                                    defaultValue={field.value}
-                                    className="flex space-x-4"
-                                >
-                                    <FormItem className="flex items-center space-x-2">
-                                    <FormControl>
-                                        <RadioGroupItem value="existing" id="existing" />
-                                    </FormControl>
-                                    <FormLabel htmlFor="existing">Existing Customer</FormLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2">
-                                    <FormControl>
-                                        <RadioGroupItem value="new" id="new" />
-                                    </FormControl>
-                                    <FormLabel htmlFor="new">New Customer</FormLabel>
-                                    </FormItem>
-                                </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-
-                        {customerType === 'existing' ? (
-                        <FormField
-                            control={form.control}
-                            name="customerId"
-                            render={({ field }) => (
-                            <FormItem className="col-span-2">
-                                <FormLabel>Customer</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                    <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {customers && customers.map(customer => (
-                                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        ) : (
-                        <>
-                            <FormField
-                            control={form.control}
-                            name="newCustomerName"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>New Customer Name</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="John Doe" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                            <FormField
-                            control={form.control}
-                            name="newCustomerPhone"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>New Customer Phone</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="0712345678" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                        </>
-                        )}
-                        <FormField
-                        control={form.control}
-                        name="disbursementDate"
-                        render={({ field }) => (
-                            <FormItem className="col-span-2">
-                            <FormLabel>Disbursement Date</FormLabel>
-                            <FormControl>
-                                <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="principalAmount"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Principal Amount</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="e.g. 50000" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="interestRate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Monthly Interest Rate (%)</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="e.g. 1.25" {...field} value={field.value ?? ''} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                        control={form.control}
-                        name="registrationFee"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Registration Fee (Optional)</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="processingFee"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Processing Fee (Optional)</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="carTrackInstallationFee"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Car Track Fee (Optional)</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="chargingCost"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Charging Cost (Optional)</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="numberOfInstalments"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>No. of Instalments</FormLabel>
-                            <FormControl>
-                                <Input type="number" placeholder="e.g. 12" {...field} value={field.value ?? ''} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                        <FormField
-                        control={form.control}
-                        name="paymentFrequency"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Payment Frequency</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select frequency" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                <SelectItem value="daily">Daily</SelectItem>
-                                <SelectItem value="weekly">Weekly</SelectItem>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                         <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
-                            <div className="flex justify-between">
-                                <span className="text-sm font-medium">Calculated Instalment Amount</span>
-                                <span className="text-sm font-bold">Ksh {calculatedValues.instalmentAmount}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-sm font-medium">Total Repayable Amount</span>
-                                <span className="text-sm font-bold">Ksh {calculatedValues.totalRepayableAmount}</span>
-                            </div>
+      </div>
+      <Tabs defaultValue="all" className="w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+            <TabsList>
+                <TabsTrigger value="all">All Loans</TabsTrigger>
+                <TabsTrigger value="applications" className="relative">
+                    New Applications
+                    {applicationLoans && applicationLoans.length > 0 && (
+                        <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{applicationLoans.length}</Badge>
+                    )}
+                </TabsTrigger>
+            </TabsList>
+            <div className="relative">
+                <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Search loans..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-full sm:w-[300px]"
+                />
+            </div>
+        </div>
+        <TabsContent value="all">
+            <Card>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <CardTitle>Loan Records</CardTitle>
+                            <CardDescription>A list of all loans disbursed.</CardDescription>
                         </div>
-
-                        <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                            <FormItem className="col-span-2">
-                            <FormLabel>Status</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-full sm:w-[180px]">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="due">Due</SelectItem>
                                 <SelectItem value="overdue">Overdue</SelectItem>
                                 <SelectItem value="paid">Paid</SelectItem>
                                 <SelectItem value="rollover">Rollover</SelectItem>
                                 <SelectItem value="application">Application</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    </form>
-                </div>
-
-                <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="ghost">Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit" form="add-loan-form" disabled={isSubmitting || customersLoading}>
-                        {(isSubmitting || customersLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Add Loan
-                    </Button>
-                </DialogFooter>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
-      <Card>
-        <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <CardTitle>Loan Records</CardTitle>
-                    <CardDescription>A list of all loans disbursed.</CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Filter by status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="due">Due</SelectItem>
-                            <SelectItem value="overdue">Overdue</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="rollover">Rollover</SelectItem>
-                            <SelectItem value="application">Application</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search loans..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-8 w-full sm:w-[300px]"
-                        />
+                            </SelectContent>
+                        </Select>
                     </div>
-                </div>
-            </div>
-        </CardHeader>
-        <CardContent>
-        {isLoading && (
-            <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-        )}
-        {!isLoading && (!filteredLoans || filteredLoans.length === 0) && (
-            <Alert>
-                <AlertTitle>No Loans Found</AlertTitle>
-                <AlertDescription>
-                    {searchTerm || statusFilter !== 'all'
-                        ? "No loans match your search criteria."
-                        : "There are no loans in the system yet. Add one to see it here."
-                    }
-                </AlertDescription>
-            </Alert>
-        )}
-        {!isLoading && filteredLoans && filteredLoans.length > 0 && (
-            <div className="relative max-h-[60vh] overflow-y-auto">
-              <Table>
-                  <TableHeader className="sticky top-0 bg-card">
-                      <TableRow>
-                          <TableHead>Loan No.</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead className="text-right">Principal</TableHead>
-                          <TableHead className="text-right">Amount to Pay</TableHead>
-                          <TableHead className="text-right">Paid</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                          <TableHead className="text-center">Status</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {filteredLoans.map((loan) => {
-                          const balance = loan.totalRepayableAmount - loan.totalPaid;
-                          return (
-                              <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleRowClick(loan)}>
-                                  <TableCell className="font-medium">{loan.loanNumber}</TableCell>
-                                  <TableCell>{loan.customerName}</TableCell>
-                                  <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                                  <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
-                                  <TableCell className="text-center">
-                                    <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
-                                      {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                    </Badge>
-                                  </TableCell>
+                </CardHeader>
+                <CardContent>
+                {isLoading && (
+                    <div className="flex items-center justify-center p-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                )}
+                {!isLoading && (!filteredLoans || filteredLoans.length === 0) && (
+                    <Alert>
+                        <AlertTitle>No Loans Found</AlertTitle>
+                        <AlertDescription>
+                            {searchTerm || statusFilter !== 'all'
+                                ? "No loans match your search criteria."
+                                : "There are no loans in the system yet. Add one to see it here."
+                            }
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {!isLoading && filteredLoans && filteredLoans.length > 0 && (
+                    <div className="relative max-h-[60vh] overflow-y-auto">
+                      <Table>
+                          <TableHeader className="sticky top-0 bg-card">
+                              <TableRow>
+                                  <TableHead>Loan No.</TableHead>
+                                  <TableHead>Customer</TableHead>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead className="text-right">Principal</TableHead>
+                                  <TableHead className="text-right">Amount to Pay</TableHead>
+                                  <TableHead className="text-right">Paid</TableHead>
+                                  <TableHead className="text-right">Balance</TableHead>
+                                  <TableHead className="text-center">Status</TableHead>
                               </TableRow>
-                          )
-                      })}
-                  </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                          </TableHeader>
+                          <TableBody>
+                              {filteredLoans.map((loan) => {
+                                  const balance = loan.totalRepayableAmount - loan.totalPaid;
+                                  return (
+                                      <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleRowClick(loan)}>
+                                          <TableCell className="font-medium">{loan.loanNumber}</TableCell>
+                                          <TableCell>{loan.customerName}</TableCell>
+                                          <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                                          <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
+                                          <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                          <TableCell className="text-center">
+                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>
+                                              {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
+                                            </Badge>
+                                          </TableCell>
+                                      </TableRow>
+                                  )
+                              })}
+                          </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="applications">
+            <Card>
+                <CardHeader>
+                    <CardTitle>New Loan Applications</CardTitle>
+                    <CardDescription>Review and process new loan applications from customers.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {isLoading && (
+                        <div className="flex items-center justify-center p-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                    )}
+                    {!isLoading && (!applicationLoans || applicationLoans.length === 0) && (
+                        <Alert>
+                            <AlertTitle>No New Applications</AlertTitle>
+                            <AlertDescription>
+                                {searchTerm
+                                    ? "No applications match your search."
+                                    : "There are no new loan applications to review."
+                                }
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    {!isLoading && applicationLoans && applicationLoans.length > 0 && (
+                        <div className="relative max-h-[60vh] overflow-y-auto">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-card">
+                                    <TableRow>
+                                        <TableHead>Customer Name</TableHead>
+                                        <TableHead>Phone</TableHead>
+                                        <TableHead>Loan Type</TableHead>
+                                        <TableHead>Application Date</TableHead>
+                                        <TableHead className="text-right">Amount Requested</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {applicationLoans.map((loan) => (
+                                        <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleRowClick(loan)}>
+                                            <TableCell className="font-medium">{loan.customerName}</TableCell>
+                                            <TableCell>{loan.customerPhone}</TableCell>
+                                            <TableCell>{loan.loanType || 'N/A'}</TableCell>
+                                            <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell className="text-right font-bold">{loan.principalAmount.toLocaleString()}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Customer Details Dialog */}
       <Dialog
@@ -769,7 +849,7 @@ export default function LoansPage() {
                                                 <TableCell>{loan.principalAmount.toLocaleString()}</TableCell>
                                                 <TableCell className="font-bold">{balance.toLocaleString()}</TableCell>
                                                 <TableCell>
-                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>
                                                     {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                                   </Badge>
                                                 </TableCell>

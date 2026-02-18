@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
 
-interface DueLoan {
+interface DashboardLoan {
   id: string;
   loanNumber: string;
   customerName: string;
@@ -19,6 +19,8 @@ interface DueLoan {
   numberOfInstalments: number;
   totalRepayableAmount: number;
   totalPaid: number;
+  principalAmount: number;
+  loanType?: string;
 }
 
 export default function Dashboard() {
@@ -30,7 +32,7 @@ export default function Dashboard() {
     user.email?.endsWith('@staff.pezeka.com')
   ) : false;
 
-  const { data: loans, loading: loansLoading } = useCollection<DueLoan>(isAuthorized ? 'loans' : null);
+  const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
   const dueLoans = useMemo(() => {
     if (!loans) return [];
@@ -67,6 +69,11 @@ export default function Dashboard() {
         const daysUntilDue = differenceInDays(loan.endDate, today);
         return daysUntilDue <= 7;
       });
+  }, [loans]);
+
+  const newApplications = useMemo(() => {
+    if (!loans) return [];
+    return loans.filter(loan => loan.status === 'application').sort((a, b) => b.disbursementDate.seconds - a.disbursementDate.seconds);
   }, [loans]);
   
   const isLoading = userLoading || loansLoading;
@@ -106,7 +113,7 @@ export default function Dashboard() {
             </CardContent>
         </Card>
       </div>
-      <div className="mt-6">
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
         <Card>
             <CardHeader>
                 <CardTitle>Due Loans</CardTitle>
@@ -173,6 +180,52 @@ export default function Dashboard() {
                     </TableBody>
                 </Table>
               )}
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+                <CardTitle>New Loan Applications</CardTitle>
+                <CardDescription>Customers who have recently applied for a loan.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isLoading && (
+                    <div className="flex items-center justify-center p-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                )}
+                {!isLoading && newApplications.length === 0 && (
+                    <Alert>
+                        <Bell className="h-4 w-4" />
+                        <AlertTitle>No New Applications</AlertTitle>
+                        <AlertDescription>
+                            There are currently no new loan applications to review.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {!isLoading && newApplications.length > 0 && (
+                    <div className="max-h-[300px] overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Loan Type</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {newApplications.map((loan) => (
+                                    <TableRow key={loan.id}>
+                                        <TableCell className="font-medium">{loan.customerName}</TableCell>
+                                        <TableCell>{loan.loanType || 'N/A'}</TableCell>
+                                        <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}</TableCell>
+                                        <TableCell className="text-right font-bold">{loan.principalAmount.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
             </CardContent>
         </Card>
       </div>
