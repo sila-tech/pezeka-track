@@ -34,6 +34,8 @@
         "customerId": { "type": "string" },
         "customerName": { "type": "string" },
         "customerPhone": { "type": "string" },
+        "idNumber": { "type": "string", "description": "Customer's national ID number, from application." },
+        "loanType": { "type": "string", "description": "The type of loan applied for." },
         "disbursementDate": { "type": "string", "format": "date-time" },
         "principalAmount": { "type": "number", "description": "The initial amount of the loan."},
         "interestRate": { "type": "number", "description": "The monthly interest rate for the loan in percentage." },
@@ -46,7 +48,7 @@
         "totalRepayableAmount": { "type": "number", "description": "Total amount to be paid back."},
         "totalPaid": { "type": "number", "default": 0 },
         "paymentFrequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
-        "status": { "type": "string", "enum": ["due", "paid", "active", "rollover", "overdue"] },
+        "status": { "type": "string", "enum": ["due", "paid", "active", "rollover", "overdue", "application"] },
         "payments": {
             "type": "array",
             "description": "History of payments made for this loan.",

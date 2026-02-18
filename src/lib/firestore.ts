@@ -17,6 +17,8 @@ interface Loan {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  idNumber?: string;
+  loanType?: string;
   disbursementDate: { seconds: number; nanoseconds: number };
   principalAmount: number;
   interestRate?: number;
@@ -31,7 +33,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
 }
 
 
@@ -122,6 +124,8 @@ type LoanData = {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  idNumber?: string;
+  loanType?: string;
   disbursementDate: Date;
   principalAmount: number;
   interestRate: number;
@@ -134,7 +138,8 @@ type LoanData = {
   totalRepayableAmount: number;
   totalPaid: number;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
+  comments?: string;
 }
 
 export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: DocumentReference<DocumentData>, newLoanNumber: string}> {
@@ -150,7 +155,7 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     loanNumber: newLoanNumber,
     createdAt: serverTimestamp(),
     payments: [],
-    comments: ""
+    comments: loanData.comments || ""
   };
 
   try {

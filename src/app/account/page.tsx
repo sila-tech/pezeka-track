@@ -16,10 +16,13 @@ import { collection, query, where } from 'firebase/firestore';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { addLoan } from '@/lib/firestore';
+import { calculateAmortization } from '@/lib/utils';
 
 
 interface Payment {
@@ -34,6 +37,8 @@ interface Loan {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  idNumber?: string;
+  loanType?: string;
   disbursementDate: { seconds: number, nanoseconds: number };
   principalAmount: number;
   interestRate?: number;
@@ -48,14 +53,18 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: Payment[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
 }
 
-const statementSchema = z.object({
+const applicationSchema = z.object({
   loanType: z.string({ required_error: 'Please select a loan type.' }),
   loanAmount: z.coerce.number().min(1, 'Please enter a valid loan amount.'),
-  statement: z.any().refine((files) => files?.length == 1, 'M-Pesa statement PDF is required.'),
-  password: z.string().min(1, 'PDF password is required.'),
+  idNumber: z.string().min(5, 'Please enter a valid ID number.'),
+  phone: z.string().min(10, 'Please enter a valid phone number.'),
+  statement: z.any().optional(),
+  agreeToTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the terms and conditions.' }),
+  }),
 });
 
 
@@ -68,19 +77,21 @@ export default function AccountPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const customerLoansQuery = useMemo(() => {
-    if (!firestore || !user?.phoneNumber) return null;
-    return query(collection(firestore, 'loans'), where('customerPhone', '==', user.phoneNumber));
-  }, [firestore, user?.phoneNumber]);
+    if (!firestore || !user?.uid) return null;
+    return query(collection(firestore, 'loans'), where('customerId', '==', user.uid));
+  }, [firestore, user?.uid]);
 
   const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
 
-  const statementForm = useForm<z.infer<typeof statementSchema>>({
-    resolver: zodResolver(statementSchema),
+  const applicationForm = useForm<z.infer<typeof applicationSchema>>({
+    resolver: zodResolver(applicationSchema),
     defaultValues: {
       loanType: undefined,
       loanAmount: undefined,
-      password: '',
+      idNumber: '',
+      phone: user?.phoneNumber || '',
       statement: undefined,
+      agreeToTerms: false,
     },
   });
 
@@ -89,21 +100,60 @@ export default function AccountPage() {
     router.push('/');
   };
 
-  async function onStatementSubmit(values: z.infer<typeof statementSchema>) {
+  async function onApplicationSubmit(values: z.infer<typeof applicationSchema>) {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Not logged in",
+        description: "You must be logged in to apply for a loan.",
+      });
+      return;
+    }
     setIsSubmitting(true);
     
-    // In a real app, this is where you would handle the file upload to a service like Firebase Storage.
-    // This is a placeholder to simulate the submission process.
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // In a real scenario, you'd upload the optional statement to Firebase Storage here.
+      // For now, we'll proceed with creating the loan application record.
 
-    toast({
-      title: "Application Submitted",
-      description: `Your application for a ${values.loanType} of Ksh ${values.loanAmount.toLocaleString()} has been submitted. We will review your M-Pesa statement and contact you via email about the next steps.`,
-    });
+      const loanApplicationData = {
+        customerId: user.uid,
+        customerName: user.displayName || user.email,
+        customerPhone: values.phone,
+        idNumber: values.idNumber,
+        disbursementDate: new Date(),
+        principalAmount: values.loanAmount,
+        interestRate: 0, // To be determined by staff
+        registrationFee: 0,
+        processingFee: 0,
+        carTrackInstallationFee: 0,
+        chargingCost: 0,
+        numberOfInstalments: 1, // To be determined by staff
+        paymentFrequency: 'monthly' as const, // Default
+        status: 'application' as const,
+        loanType: values.loanType,
+        instalmentAmount: values.loanAmount, // Placeholder
+        totalRepayableAmount: values.loanAmount, // Placeholder
+        totalPaid: 0,
+        comments: `Application for ${values.loanType}.`,
+      };
+      
+      await addLoan(firestore, loanApplicationData);
 
-    statementForm.reset();
-    setIsSubmitting(false);
+      toast({
+        title: "Application Submitted",
+        description: "Your loan application has been submitted successfully. Our team will review it and contact you.",
+      });
+
+      applicationForm.reset();
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Application failed',
+        description: e.message || 'Could not submit your application. Please try again.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -145,7 +195,10 @@ export default function AccountPage() {
                                             <div>
                                                 <CardTitle>Loan #{loan.loanNumber}</CardTitle>
                                                 <CardDescription>
-                                                    Disbursed on: {format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}
+                                                    {loan.status === 'application' 
+                                                      ? `Applied for ${loan.loanType || 'Loan'} on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`
+                                                      : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`
+                                                    }
                                                 </CardDescription>
                                             </div>
                                             <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
@@ -156,7 +209,7 @@ export default function AccountPage() {
                                     <CardContent>
                                         <div className="grid gap-4 sm:grid-cols-3">
                                             <div>
-                                                <div className="text-sm text-muted-foreground">Principal</div>
+                                                <div className="text-sm text-muted-foreground">{loan.status === 'application' ? 'Amount Requested' : 'Principal'}</div>
                                                 <div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div>
                                             </div>
                                              <div>
@@ -200,7 +253,7 @@ export default function AccountPage() {
                     </div>
                 ) : (
                    <div className="text-center py-8">
-                        <p className="text-muted-foreground mb-4">You do not have any loans with us yet.</p>
+                        <p className="text-muted-foreground mb-4">You do not have any loans or applications with us yet.</p>
                    </div>
                 )}
             </CardContent>
@@ -210,14 +263,14 @@ export default function AccountPage() {
             <CardHeader>
                 <CardTitle>Apply for a New Loan</CardTitle>
                 <CardDescription>
-                To begin your loan application, please select your desired loan type, enter the amount, and upload your latest M-Pesa statement (in PDF format) with its password. Our team will review your submission and contact you via email about the next steps. This is what will determine if we will give you a loan.
+                To begin your loan application, please fill out the form below. Our team will review your submission and contact you.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <Form {...statementForm}>
-                <form onSubmit={statementForm.handleSubmit(onStatementSubmit)} className="space-y-4">
+                <Form {...applicationForm}>
+                <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-4">
                     <FormField
-                        control={statementForm.control}
+                        control={applicationForm.control}
                         name="loanType"
                         render={({ field }) => (
                             <FormItem>
@@ -240,7 +293,7 @@ export default function AccountPage() {
                         )}
                         />
                     <FormField
-                      control={statementForm.control}
+                      control={applicationForm.control}
                       name="loanAmount"
                       render={({ field }) => (
                           <FormItem>
@@ -252,12 +305,38 @@ export default function AccountPage() {
                           </FormItem>
                       )}
                     />
+                     <FormField
+                      control={applicationForm.control}
+                      name="idNumber"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>National ID Number</FormLabel>
+                          <FormControl>
+                              <Input placeholder="Your ID Number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={applicationForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                              <Input placeholder="e.g. 0712345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                    />
                     <FormField
-                    control={statementForm.control}
+                    control={applicationForm.control}
                     name="statement"
                     render={({ field: { onChange, value, ...rest } }) => (
                         <FormItem>
-                        <FormLabel>M-Pesa Statement (PDF)</FormLabel>
+                        <FormLabel>M-Pesa Statement (PDF) - Optional</FormLabel>
                         <FormControl>
                             <Input 
                                 type="file" 
@@ -273,17 +352,27 @@ export default function AccountPage() {
                     )}
                     />
                     <FormField
-                    control={statementForm.control}
-                    name="password"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>PDF Password</FormLabel>
-                        <FormControl>
-                            <Input type="password" placeholder="Enter the password for the PDF" {...field} />
-                        </FormControl>
-                        <FormMessage />
+                      control={applicationForm.control}
+                      name="agreeToTerms"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Agree to terms and conditions
+                            </FormLabel>
+                            <FormDescription>
+                              You agree to our Data Privacy Terms and Conditions.
+                            </FormDescription>
+                             <FormMessage />
+                          </div>
                         </FormItem>
-                    )}
+                      )}
                     />
                     <Button type="submit" disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}

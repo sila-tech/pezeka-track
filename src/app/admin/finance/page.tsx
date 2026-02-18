@@ -154,7 +154,7 @@ const editLoanSchema = z.object({
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue']),
+  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application']),
 });
 
 const rolloverSchema = z.object({
@@ -174,6 +174,8 @@ interface Loan {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  idNumber?: string;
+  loanType?: string;
   disbursementDate: { seconds: number, nanoseconds: number };
   principalAmount: number;
   interestRate?: number;
@@ -188,7 +190,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: Payment[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
 }
 
 interface FinanceEntry {
@@ -1113,6 +1115,7 @@ export default function FinancePage() {
                                     <SelectItem value="overdue">Overdue</SelectItem>
                                     <SelectItem value="paid">Paid</SelectItem>
                                     <SelectItem value="rollover">Rollover</SelectItem>
+                                    <SelectItem value="application">Application</SelectItem>
                                 </SelectContent>
                             </Select>
                             <div className="relative">
@@ -1196,7 +1199,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>
                                                       {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                                   </Badge>
                                               </TableCell>
@@ -1417,7 +1420,7 @@ export default function FinancePage() {
                                             <FormField control={editLoanForm.control} name="chargingCost" render={({ field }) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                                             <FormField control={editLoanForm.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                                             <FormField control={editLoanForm.control} name="paymentFrequency" render={({ field }) => (<FormItem><FormLabel>Payment Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                            <FormField control={editLoanForm.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
+                                            <FormField control={editLoanForm.control} name="status" render={({ field }) => (<FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem><SelectItem value="application">Application</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
                                         </div>
                                         <Card className="mt-4">
                                             <CardHeader><CardTitle className="text-lg">Recalculated Totals</CardTitle></CardHeader>

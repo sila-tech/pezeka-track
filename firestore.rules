@@ -29,9 +29,11 @@ service cloud.firestore {
 
     // Loans
     match /loans/{loanId} {
-      allow write: if isFinanceUser() || isStaffUser();
-      allow get: if isFinanceUser() || isStaffUser() || (request.auth.token.phone_number != null && resource.data.customerPhone == request.auth.token.phone_number);
-      allow list: if isFinanceUser() || isStaffUser() || (request.auth.token.phone_number != null && request.query.where.customerPhone == request.auth.token.phone_number);
+      allow get: if isFinanceUser() || isStaffUser() || isOwner(resource.data.customerId);
+      allow list: if isFinanceUser() || isStaffUser() || (request.query.where.customerId != null && request.query.where.customerId == request.auth.uid);
+      allow update, delete: if isFinanceUser() || isStaffUser();
+      allow create: if (isFinanceUser() || isStaffUser()) ||
+                       (isOwner(request.resource.data.customerId) && request.resource.data.status == 'application');
     }
 
     // Finance Entries

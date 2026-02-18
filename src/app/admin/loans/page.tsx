@@ -57,7 +57,7 @@ const loanSchema = z.object({
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue']),
+  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application']),
   customerType: z.enum(['existing', 'new']),
   newCustomerName: z.string().optional(),
   newCustomerPhone: z.string().optional(),
@@ -89,10 +89,12 @@ interface Loan {
     loanNumber: string;
     customerName: string;
     customerPhone: string;
+    idNumber?: string;
+    loanType?: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
     interestRate?: number;
-    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
     totalRepayableAmount: number;
     totalPaid: number;
     instalmentAmount: number;
@@ -592,6 +594,7 @@ export default function LoansPage() {
                                 <SelectItem value="overdue">Overdue</SelectItem>
                                 <SelectItem value="paid">Paid</SelectItem>
                                 <SelectItem value="rollover">Rollover</SelectItem>
+                                <SelectItem value="application">Application</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -633,6 +636,7 @@ export default function LoansPage() {
                             <SelectItem value="overdue">Overdue</SelectItem>
                             <SelectItem value="paid">Paid</SelectItem>
                             <SelectItem value="rollover">Rollover</SelectItem>
+                            <SelectItem value="application">Application</SelectItem>
                         </SelectContent>
                     </Select>
                     <div className="relative">

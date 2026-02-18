@@ -13,7 +13,7 @@ interface DueLoan {
   id: string;
   loanNumber: string;
   customerName: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
   disbursementDate: { seconds: number; nanoseconds: number };
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
@@ -38,7 +38,7 @@ export default function Dashboard() {
     const today = startOfToday();
     
     return loans
-      .filter(loan => loan.status !== 'paid' && loan.status !== 'rollover')
+      .filter(loan => loan.status !== 'paid' && loan.status !== 'rollover' && loan.status !== 'application')
       .map(loan => {
         const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
         let endDate: Date;
