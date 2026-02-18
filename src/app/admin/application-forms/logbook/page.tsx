@@ -4,14 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Printer, Home } from 'lucide-react';
 import Link from 'next/link';
 
-const FormLine = ({ label, className, lineClassName }: { label: string; className?: string; lineClassName?: string; }) => {
+function FormLine({ label, className, lineClassName }: { label: string; className?: string; lineClassName?: string; }) {
   return (
     <div className={`flex items-end mt-4 ${className || ''}`}>
       <span className="font-medium whitespace-nowrap text-sm">{label}</span>
       <span className={`w-full border-b border-black ml-2 ${lineClassName || ''}`}></span>
     </div>
   );
-};
+}
 
 
 export default function LogbookLoanFormPage() {
