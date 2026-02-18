@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useFirestore, useCollection, useUser } from '@/firebase';
+import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal, Search } from 'lucide-react';
@@ -95,15 +95,11 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
 
-  const { user, loading: userLoading } = useUser();
+  const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const isAuthorized = user ? (
-    user.email === 'simon@pezeka.com' ||
-    user.email?.endsWith('@finance.pezeka.com') ||
-    user.email?.endsWith('@staff.pezeka.com')
-  ) : false;
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);

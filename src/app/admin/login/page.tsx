@@ -27,7 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useAppUser, useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserProfile } from '@/lib/firestore';
@@ -38,7 +38,7 @@ const formSchema = z.object({
 });
 
 export default function AdminLoginPage() {
-  const { user, loading } = useUser();
+  const { user, loading } = useAppUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();

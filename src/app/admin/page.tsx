@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useUser, useCollection } from '@/firebase';
+import { useAppUser, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Bell, Loader2 } from 'lucide-react';
@@ -24,13 +24,9 @@ interface DashboardLoan {
 }
 
 export default function Dashboard() {
-  const { user, loading: userLoading } = useUser();
+  const { user, loading: userLoading } = useAppUser();
   
-  const isAuthorized = user ? (
-    user.email === 'simon@pezeka.com' ||
-    user.email?.endsWith('@finance.pezeka.com') ||
-    user.email?.endsWith('@staff.pezeka.com')
-  ) : false;
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
@@ -81,7 +77,7 @@ export default function Dashboard() {
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight mb-4">
-        Welcome, {user?.email?.split('@')[0] || 'Simon'}!
+        Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!
       </h1>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
          <Card>

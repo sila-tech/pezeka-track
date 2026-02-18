@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search } from "lucide-react";
 import { arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
-import { useCollection, useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -231,15 +231,11 @@ export default function FinancePage() {
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
-  const { user, loading: userLoading } = useUser();
+  const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isAuthorized = user ? (
-    user.email === 'simon@pezeka.com' ||
-    user.email?.endsWith('@finance.pezeka.com') ||
-    user.email?.endsWith('@staff.pezeka.com')
-  ) : false;
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);

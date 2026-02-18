@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useUser, useAuth } from '@/firebase';
+import { useAppUser, useAuth } from '@/firebase';
 import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -63,7 +63,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-    const { user, loading } = useUser();
+    const { user, loading } = useAppUser();
     const router = useRouter();
     const pathname = usePathname();
     const auth = useAuth();
@@ -71,12 +71,7 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login' || pathname === '/staff/login' || pathname === '/finance/login';
     
-    // Derived state is simpler and less prone to race conditions
-    const isAuthorized = !loading && user && (
-        user.email === 'simon@pezeka.com' || 
-        user.email?.endsWith('@finance.pezeka.com') ||
-        user.email?.endsWith('@staff.pezeka.com')
-    );
+    const isAuthorized = !loading && user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
 
     useEffect(() => {
         if (loading) return; // Wait until user status is resolved
@@ -114,7 +109,7 @@ export default function AdminLayout({
         return <>{children}</>;
     }
     
-    const isFinance = user?.email === 'simon@pezeka.com' || user?.email?.endsWith('@finance.pezeka.com');
+    const isFinance = user?.email === 'simon@pezeka.com' || user?.role === 'finance';
 
     return (
         <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
