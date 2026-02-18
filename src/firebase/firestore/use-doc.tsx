@@ -31,15 +31,18 @@ export function useDoc<T>(docPath: string | null): UseDoc<T> {
   }, [firestore, docPath]);
 
   useEffect(() => {
-    if (userLoading) {
-        setLoading(true);
-        return;
-    }
-
-    if (!user || !memoizedDocRef) {
+    // Don't do anything until the doc path is ready and we know the auth state.
+    if (!memoizedDocRef || userLoading) {
+      setLoading(true);
       setData(null);
-      setLoading(false);
       return;
+    }
+    
+    // If auth is resolved but there's no user, we can't make a protected query.
+    if (!user) {
+        setData(null);
+        setLoading(false);
+        return;
     }
 
     setLoading(true);

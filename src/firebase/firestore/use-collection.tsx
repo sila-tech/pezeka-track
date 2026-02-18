@@ -36,19 +36,21 @@ export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | nul
   }, [firestore, pathOrQuery]);
 
   useEffect(() => {
-    if (userLoading) {
+    // Don't do anything until the query is ready and we know the auth state.
+    if (!memoizedQuery || userLoading) {
       setLoading(true);
+      setData(null);
       return;
     }
 
-    if (!user || !memoizedQuery) {
-      setData(null);
+    // If auth is resolved but there's no user, we can't make a protected query.
+    if (!user) {
       setLoading(false);
+      setData(null);
       return;
     }
 
     setLoading(true);
-
     const unsubscribe = onSnapshot(
       memoizedQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
