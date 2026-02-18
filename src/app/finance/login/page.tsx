@@ -6,6 +6,7 @@ import * as z from 'zod';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signOut,
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -53,7 +54,11 @@ export default function FinanceLoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.push('/admin');
+      const isSimon = user.email === 'simon@pezeka.com';
+      const isFinance = user.email?.endsWith('@finance.pezeka.com');
+      if (isSimon || isFinance) {
+        router.push('/admin');
+      }
     }
   }, [user, loading, router]);
 
@@ -108,12 +113,40 @@ export default function FinanceLoginPage() {
     }
   }
   
-  if (loading || user) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
+  }
+
+  if (user) {
+    const isSimon = user.email === 'simon@pezeka.com';
+    const isFinance = user.email?.endsWith('@finance.pezeka.com');
+    if (!isSimon && !isFinance) {
+      return (
+        <main className="flex min-h-screen flex-col items-center justify-center p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle>Pezeka Credit | Finance</CardTitle>
+              <CardDescription>
+                Access to this portal is restricted to finance staff.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <p className="text-sm text-muted-foreground mb-4">
+                You are currently logged in as {user.email}. Please log out to
+                continue.
+              </p>
+              <Button onClick={() => signOut(auth)} className="w-full">
+                Logout
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      );
+    }
   }
 
   return (
