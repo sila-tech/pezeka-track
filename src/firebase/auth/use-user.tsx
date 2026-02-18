@@ -10,7 +10,7 @@ interface UseUser {
 
 export const useUser = (): UseUser => {
   const auth = useAuth();
-  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
