@@ -6,6 +6,7 @@ import * as z from 'zod';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signOut,
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -52,12 +53,14 @@ export default function AdminLoginPage() {
       password: '',
     },
   });
+  
+  const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && isAuthorized) {
       router.push('/admin');
     }
-  }, [user, loading, router]);
+  }, [user, loading, isAuthorized, router]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const isSimon = values.email === 'simon@pezeka.com';
@@ -123,8 +126,39 @@ export default function AdminLoginPage() {
     }
   }
   
-  if (loading || user) {
+  if (loading) {
     return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (user && !isAuthorized) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>Pezeka Credit | Admin</CardTitle>
+            <CardDescription>
+              Access to this portal is restricted.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              You are currently logged in as {user.email}. This account does not have admin privileges.
+            </p>
+            <Button onClick={() => signOut(auth)} className="w-full">
+              Logout
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+  
+  if (isAuthorized) {
+     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
