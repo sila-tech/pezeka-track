@@ -71,29 +71,28 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login' || pathname === '/staff/login' || pathname === '/finance/login';
     
-    const isAuthorized = user ? (
+    // Derived state is simpler and less prone to race conditions
+    const isAuthorized = !loading && user && (
         user.email === 'simon@pezeka.com' || 
         user.email?.endsWith('@finance.pezeka.com') ||
         user.email?.endsWith('@staff.pezeka.com')
-    ) : false;
+    );
 
     useEffect(() => {
         if (loading) return; // Wait until user status is resolved
 
         if (isLoginPage) {
             // If on a login page and already logged in as an authorized user, redirect to admin dashboard
-            if (user && isAuthorized) {
+            if (isAuthorized) {
                 router.push('/admin');
             }
-            return; // Don't do anything else on login pages
+        } else {
+            // For all other pages, if not an authorized user, redirect to login
+            if (!isAuthorized) {
+                router.push('/admin/login');
+            }
         }
-
-        // For all other pages, if not loading and not an authorized user, redirect to login
-        if (!isAuthorized) {
-            router.push('/admin/login');
-        }
-
-    }, [user, loading, router, pathname, isLoginPage, isAuthorized]);
+    }, [user, loading, isAuthorized, router, isLoginPage]);
 
 
     const handleLogout = async () => {
@@ -101,18 +100,8 @@ export default function AdminLayout({
         router.push('/admin/login');
     }
 
-    if (isLoginPage) {
-        if (loading && !user) {
-            return (
-                <div className="flex h-screen w-full items-center justify-center bg-background">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-            );
-        }
-        return <>{children}</>;
-    }
-
-    if (loading || !isAuthorized) {
+    // On non-login pages, show a spinner while loading or if not authorized
+    if (!isLoginPage && (loading || !isAuthorized)) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -120,7 +109,12 @@ export default function AdminLayout({
         );
     }
     
-    const isFinance = user.email === 'simon@pezeka.com' || user.email?.endsWith('@finance.pezeka.com');
+    // On login pages, we can render the content immediately
+    if (isLoginPage) {
+        return <>{children}</>;
+    }
+    
+    const isFinance = user?.email === 'simon@pezeka.com' || user?.email?.endsWith('@finance.pezeka.com');
 
     return (
         <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
