@@ -27,9 +27,10 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { createUserProfile } from '@/lib/firestore';
 
 const formSchema = z.object({
   email: z.string().email(),
@@ -39,6 +40,7 @@ const formSchema = z.object({
 export default function StaffLoginPage() {
   const { user, loading } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,7 +78,14 @@ export default function StaffLoginPage() {
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         try {
-          await createUserWithEmailAndPassword(auth, values.email, values.password);
+          const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+          const newUser = userCredential.user;
+
+          await createUserProfile(firestore, newUser.uid, {
+            email: newUser.email!,
+            role: 'staff',
+          });
+
           router.push('/admin');
         } catch (creationError: any) {
           toast({

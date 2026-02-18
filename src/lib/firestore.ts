@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { calculateInterestForOneInstalment } from './utils';
@@ -312,6 +312,28 @@ export async function deleteLoan(db: Firestore, loanId: string) {
         const permissionError = new FirestorePermissionError({
             path: loanRef.path,
             operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+
+export async function createUserProfile(db: Firestore, userId: string, data: { email: string, role: string, name?: string }) {
+    const userRef = doc(db, 'users', userId);
+    const profileData = {
+        uid: userId,
+        email: data.email,
+        role: data.role,
+        name: data.name || data.email.split('@')[0],
+    };
+    try {
+        await setDoc(userRef, profileData, { merge: true });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'create',
+            requestResourceData: profileData,
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
