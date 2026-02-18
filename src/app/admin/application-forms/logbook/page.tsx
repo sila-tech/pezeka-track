@@ -12,9 +12,9 @@ interface FormLineProps {
 
 const FormLine = ({ label, className, lineClassName }: FormLineProps) => {
   return (
-    <div className={`flex items-end mt-4 ${className}`}>
+    <div className={`flex items-end mt-4 ${className || ''}`}>
       <span className="font-medium whitespace-nowrap text-sm">{label}</span>
-      <span className={`w-full border-b border-black ml-2 ${lineClassName}`}></span>
+      <span className={`w-full border-b border-black ml-2 ${lineClassName || ''}`}></span>
     </div>
   );
 };
