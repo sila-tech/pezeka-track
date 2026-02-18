@@ -8,6 +8,7 @@ import {
   FirestoreError,
 } from 'firebase/firestore';
 import { useFirestore } from '../provider';
+import { useUser } from '../auth/use-user';
 import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
 
@@ -17,8 +18,9 @@ interface UseDoc<T> {
   error: FirestoreError | null;
 }
 
-export function useDoc<T>(docPath: string): UseDoc<T> {
+export function useDoc<T>(docPath: string | null): UseDoc<T> {
   const firestore = useFirestore();
+  const { user, loading: userLoading } = useUser();
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<FirestoreError | null>(null);
@@ -29,7 +31,13 @@ export function useDoc<T>(docPath: string): UseDoc<T> {
   }, [firestore, docPath]);
 
   useEffect(() => {
-    if (!memoizedDocRef) {
+    if (userLoading) {
+        setLoading(true);
+        return;
+    }
+
+    if (!user || !memoizedDocRef) {
+      setData(null);
       setLoading(false);
       return;
     }
@@ -58,7 +66,7 @@ export function useDoc<T>(docPath: string): UseDoc<T> {
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef]);
+  }, [memoizedDocRef, user, userLoading]);
 
   return { data, loading, error };
 }
