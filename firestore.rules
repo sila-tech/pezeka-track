@@ -2,6 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // --- Functions ---
     function isFinanceUser() {
       return request.auth != null && (
         request.auth.token.email == 'simon@pezeka.com' ||
@@ -14,35 +15,53 @@ service cloud.firestore {
     }
     
     function isStaffOrFinance() {
-        return isStaffUser() || isFinanceUser();
+      return isStaffUser() || isFinanceUser();
     }
 
     function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
+    // --- Rules ---
+
+    // USERS collection
     match /users/{userId} {
+      // Admins can manage any user profile
+      // Users can manage their own profile
       allow read, write: if isStaffOrFinance() || isOwner(userId);
     }
 
+    // CUSTOMERS collection
     match /customers/{customerId} {
+      // Only admins can read or write customer data directly
       allow read, write: if isStaffOrFinance();
     }
 
+    // LOANS collection
     match /loans/{loanId} {
-      allow get: if isStaffOrFinance() || isOwner(resource.data.customerId);
-      allow list: if isStaffOrFinance() || 
-                     (request.query.where.customerId != null && request.query.where.customerId == request.auth.uid);
-      allow create: if isStaffOrFinance() ||
-                       (isOwner(request.resource.data.customerId) && request.resource.data.status == 'application');
-      allow update, delete: if isStaffOrFinance();
+      // Admins can perform any action on any loan
+      allow read, write: if isStaffOrFinance();
+
+      // Customers can get their own loan document
+      allow get: if request.auth != null && resource.data.customerId == request.auth.uid;
+      
+      // Customers can create new loan "applications"
+      allow create: if request.auth != null && request.resource.data.customerId == request.auth.uid && request.resource.data.status == 'application';
+      
+      // Customers can query for their own loans
+      // This rule requires a client-side query like: where("customerId", "==", user.uid)
+      allow list: if request.auth != null && request.query.where.customerId == request.auth.uid;
     }
 
+    // FINANCE ENTRIES collection
     match /financeEntries/{entryId} {
+      // Admins can read any finance entry
       allow get, list: if isStaffOrFinance();
-      allow create: if isFinanceUser() || (isStaffUser() && request.resource.data.type == 'receipt');
-      allow update: if (isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt')) && request.resource.data.type == resource.data.type;
-      allow delete: if isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt');
+
+      // Finance can create, update, delete any entry
+      // Staff can only create/update/delete "receipt" entries
+      allow create, delete: if isFinanceUser() || (isStaffUser() && request.resource.data.type == 'receipt');
+      allow update: if isFinanceUser() || (isStaffUser() && resource.data.type == 'receipt' && request.resource.data.type == resource.data.type);
     }
   }
 }
