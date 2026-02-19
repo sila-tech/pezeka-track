@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -89,43 +90,42 @@ export default function AdminLoginPage() {
 
     setIsSubmitting(true);
     try {
-      // Try to sign in the user.
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/admin');
-    } catch (error: any) {
-      // If the user does not exist, create a new account for them.
-      if (error.code === 'auth/user-not-found') {
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-          const newUser = userCredential.user;
-          
-          let role = 'staff'; // Default role
-          if (isFinance) {
-            role = 'finance';
-          }
-          
-          // Create a corresponding user profile in Firestore with the correct role.
-          await createUserProfile(firestore, newUser.uid, {
-            email: newUser.email!,
-            role: role,
-          });
-
-          router.push('/admin');
-        } catch (creationError: any) {
-          toast({
-            variant: 'destructive',
-            title: 'Signup Failed',
-            description: creationError.message,
-          });
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+          userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        } else {
+          // Re-throw other errors (like wrong password) to be caught by the outer catch
+          throw error;
         }
-      } else {
-        // Handle other login errors (e.g., wrong password).
-        toast({
-          variant: 'destructive',
-          title: 'Login Failed',
-          description: error.message,
+      }
+      
+      const loggedInUser = userCredential.user;
+      
+      // Check if a Firestore profile exists. If not, create one.
+      // This is crucial for ensuring the user.role is available for authorization checks.
+      const userDocRef = doc(firestore, 'users', loggedInUser.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        const role = isFinance ? 'finance' : 'staff';
+        await createUserProfile(firestore, loggedInUser.uid, {
+          email: loggedInUser.email!,
+          role: role,
         });
       }
+      
+      // Now that the user is authenticated and we've ensured their profile exists, redirect.
+      router.push('/admin');
+
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: error.message || 'An unexpected error occurred.',
+      });
     } finally {
       setIsSubmitting(false);
     }
