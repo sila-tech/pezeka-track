@@ -28,7 +28,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useAppUser, useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { createUserProfile } from '@/lib/firestore';
@@ -39,7 +39,7 @@ const formSchema = z.object({
 });
 
 export default function FinanceLoginPage() {
-  const { user, loading } = useUser();
+  const { user, loading } = useAppUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
@@ -57,7 +57,7 @@ export default function FinanceLoginPage() {
   useEffect(() => {
     if (!loading && user) {
       const isSimon = user.email === 'simon@pezeka.com';
-      const isFinance = user.email?.endsWith('@finance.pezeka.com');
+      const isFinance = user.role === 'finance';
       if (isSimon || isFinance) {
         router.push('/admin');
       }
@@ -97,11 +97,9 @@ export default function FinanceLoginPage() {
           const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
           const newUser = userCredential.user;
           
-          const role = isFinance ? 'finance' : 'staff'; 
-
           await createUserProfile(firestore, newUser.uid, {
             email: newUser.email!,
-            role: role,
+            role: 'finance',
           });
 
           router.push('/admin');
@@ -134,7 +132,7 @@ export default function FinanceLoginPage() {
 
   if (user) {
     const isSimon = user.email === 'simon@pezeka.com';
-    const isFinance = user.email?.endsWith('@finance.pezeka.com');
+    const isFinance = user.role === 'finance';
 
     if (isSimon || isFinance) {
         return (
