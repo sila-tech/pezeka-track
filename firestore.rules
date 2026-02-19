@@ -20,11 +20,6 @@ service cloud.firestore {
     function isFinance() {
       return getUserRole() == 'finance';
     }
-
-    function isAdmin() {
-      // An admin is anyone who is a super admin, staff, or finance user.
-      return isSuperAdmin() || isStaff() || isFinance();
-    }
     
     function isOwner(userId) {
       return request.auth.uid == userId;
@@ -32,25 +27,24 @@ service cloud.firestore {
 
     // Rules for User Profiles
     match /users/{userId} {
-      // Admins can read any profile.
+      // Staff, Finance, or SuperAdmins can read/write any profile.
       // Users can read and write their own profile document.
-      // This is necessary for the role-checking functions to work.
-      allow read, write: if isAdmin() || isOwner(userId);
+      allow read, write: if isStaff() || isFinance() || isSuperAdmin() || isOwner(userId);
     }
 
-    // Rules for Customers collection (managed by Admins)
+    // Rules for Customers collection
     match /customers/{customerId} {
-      // Only Admins can read or write to the customers collection.
-      allow read, write: if isAdmin();
+      // Only Staff, Finance, or SuperAdmins can read or write to the customers collection.
+      allow read, write: if isStaff() || isFinance() || isSuperAdmin();
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      // Admins have full write access.
-      allow write: if isAdmin();
+      // Staff, Finance, or SuperAdmins have full write access.
+      allow write: if isStaff() || isFinance() || isSuperAdmin();
       
-      // Admins have full read access (get and list).
-      allow read: if isAdmin();
+      // Staff, Finance, or SuperAdmins have full read access (get and list).
+      allow read: if isStaff() || isFinance() || isSuperAdmin();
       
       // CUSTOMER-specific rules (for non-admins)
       // Customers can GET their own single loan document.
