@@ -71,27 +71,25 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login';
     
+    const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
+
+    useEffect(() => {
+        if (loading || isLoginPage) {
+            return;
+        }
+
+        if (!isAuthorized) {
+            router.push('/admin/login');
+        }
+    }, [loading, isAuthorized, isLoginPage, router]);
+    
     if (isLoginPage) {
         return <>{children}</>;
     }
     
-    if (loading) {
+    if (loading || !isAuthorized) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
-    
-    const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
-
-    if (!isAuthorized) {
-        useEffect(() => {
-            router.push('/admin/login');
-        }, [router]);
-        
-        return (
-             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         );
