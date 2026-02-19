@@ -67,6 +67,16 @@ export default function AdminLoginPage() {
     const isStaff = values.email.endsWith('@staff.pezeka.com');
     const isFinance = values.email.endsWith('@finance.pezeka.com');
 
+    // Special case for super admin
+    if (isSimon && values.password !== 'Symo@4927') {
+         toast({
+            variant: 'destructive',
+            title: 'Login Failed',
+            description: 'Invalid password for the super admin account.',
+        });
+        return;
+    }
+
     // Check if the email domain is permitted for admin/staff/finance access.
     if (!isSimon && !isStaff && !isFinance) {
       toast({
