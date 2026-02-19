@@ -190,7 +190,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: Payment[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
 }
 
 interface FinanceEntry {
@@ -1112,6 +1112,7 @@ export default function FinancePage() {
                                     <SelectItem value="paid">Paid</SelectItem>
                                     <SelectItem value="rollover">Rollover</SelectItem>
                                     <SelectItem value="application">Application</SelectItem>
+                                    <SelectItem value="rejected">Rejected</SelectItem>
                                 </SelectContent>
                             </Select>
                             <div className="relative">
@@ -1195,7 +1196,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>
+                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application' || loan.status === 'rejected') ? 'destructive' : 'secondary'}>
                                                       {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                                   </Badge>
                                               </TableCell>

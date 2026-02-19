@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addLoan, addCustomer } from '@/lib/firestore';
+import { addLoan, addCustomer, updateLoan } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format, addDays, addWeeks, addMonths, isToday } from 'date-fns';
@@ -95,7 +95,7 @@ interface Loan {
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
     interestRate?: number;
-    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
+    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
     totalRepayableAmount: number;
     totalPaid: number;
     instalmentAmount: number;
@@ -111,6 +111,8 @@ export default function LoansPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
+  const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -341,6 +343,26 @@ export default function LoansPage() {
         toast({ title: "Message Copied!", description: "The message has been copied to your clipboard." });
       }
   };
+
+  const handleUpdateStatus = async (loan: Loan, newStatus: 'active' | 'rejected') => {
+    setIsUpdatingStatus(true);
+    try {
+        await updateLoan(firestore, loan.id, { status: newStatus });
+        toast({
+            title: `Application ${newStatus === 'active' ? 'Approved' : 'Rejected'}`,
+            description: `Loan application #${loan.loanNumber} has been updated.`,
+        });
+        setApplicationToManage(null);
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: error.message || "Could not update the loan status.",
+        });
+    } finally {
+        setIsUpdatingStatus(false);
+    }
+  }
   
   const isLoading = userLoading || customersLoading || loansLoading;
 
@@ -669,6 +691,7 @@ export default function LoansPage() {
                                 <SelectItem value="paid">Paid</SelectItem>
                                 <SelectItem value="rollover">Rollover</SelectItem>
                                 <SelectItem value="application">Application</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -718,7 +741,7 @@ export default function LoansPage() {
                                           <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                           <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                           <TableCell className="text-center">
-                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>
+                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application' || loan.status === 'rejected') ? 'destructive' : 'secondary'}>
                                               {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                             </Badge>
                                           </TableCell>
@@ -769,7 +792,7 @@ export default function LoansPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {applicationLoans.map((loan) => (
-                                        <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleRowClick(loan)}>
+                                        <TableRow key={loan.id} className="cursor-pointer" onClick={() => setApplicationToManage(loan)}>
                                             <TableCell className="font-medium">{loan.customerName}</TableCell>
                                             <TableCell>{loan.customerPhone}</TableCell>
                                             <TableCell>{loan.loanType || 'N/A'}</TableCell>
@@ -871,6 +894,46 @@ export default function LoansPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Manage Application Dialog */}
+      <Dialog open={!!applicationToManage} onOpenChange={(isOpen) => !isOpen && setApplicationToManage(null)}>
+        <DialogContent className="sm:max-w-2xl">
+            {applicationToManage && (
+                <>
+                    <DialogHeader>
+                        <DialogTitle>Manage Application #{applicationToManage.loanNumber}</DialogTitle>
+                        <DialogDescription>
+                            Review and approve or reject this loan application from {applicationToManage.customerName}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-4 grid gap-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><div className="text-sm text-muted-foreground">Applicant Name</div><div className="font-semibold">{applicationToManage.customerName}</div></div>
+                            <div><div className="text-sm text-muted-foreground">Applicant Phone</div><div className="font-semibold">{applicationToManage.customerPhone}</div></div>
+                            <div><div className="text-sm text-muted-foreground">National ID</div><div className="font-semibold">{applicationToManage.idNumber || 'N/A'}</div></div>
+                            <div><div className="text-sm text-muted-foreground">Application Date</div><div className="font-semibold">{format(new Date(applicationToManage.disbursementDate.seconds * 1000), 'PPP')}</div></div>
+                            <div><div className="text-sm text-muted-foreground">Loan Type</div><div className="font-semibold">{applicationToManage.loanType || 'N/A'}</div></div>
+                            <div><div className="text-sm text-muted-foreground">Amount Requested</div><div className="font-bold text-lg">Ksh {applicationToManage.principalAmount.toLocaleString()}</div></div>
+                        </div>
+                    </div>
+                    {(user?.role === 'finance' || user?.email === 'simon@pezeka.com') && (
+                        <DialogFooter className="mt-6">
+                            <Button variant="outline" onClick={() => setApplicationToManage(null)} disabled={isUpdatingStatus}>Cancel</Button>
+                            <Button variant="destructive" onClick={() => handleUpdateStatus(applicationToManage, 'rejected')} disabled={isUpdatingStatus}>
+                                {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Reject
+                            </Button>
+                            <Button onClick={() => handleUpdateStatus(applicationToManage, 'active')} disabled={isUpdatingStatus}>
+                                {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Approve
+                            </Button>
+                        </DialogFooter>
+                    )}
+                </>
+            )}
+        </DialogContent>
+      </Dialog>
+
 
       {/* Generate Message Dialog */}
        <Dialog open={!!messageLoan} onOpenChange={(isOpen) => !isOpen && setMessageLoan(null)}>

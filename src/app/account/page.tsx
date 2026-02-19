@@ -53,7 +53,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: Payment[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
 }
 
 const applicationSchema = z.object({
@@ -201,7 +201,7 @@ export default function AccountPage() {
                                                     }
                                                 </CardDescription>
                                             </div>
-                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'rejected') ? 'destructive' : 'secondary'}>
                                                 {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
                                             </Badge>
                                         </div>
