@@ -53,14 +53,14 @@ export default function AdminLoginPage() {
     },
   });
   
-  const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
+  const isAuthorizedAdmin = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
 
   useEffect(() => {
     // If the user is loaded and authorized, redirect them to the admin dashboard.
-    if (!loading && isAuthorized) {
+    if (!loading && isAuthorizedAdmin) {
       router.push('/admin');
     }
-  }, [user, loading, isAuthorized, router]);
+  }, [user, loading, isAuthorizedAdmin, router]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const isSimon = values.email === 'simon@pezeka.com';
@@ -77,16 +77,6 @@ export default function AdminLoginPage() {
       return;
     }
     
-    // Specific password check for the super admin.
-    if (isSimon && values.password !== 'Symo@4927') {
-        toast({
-            variant: "destructive",
-            title: "Login Failed",
-            description: "Incorrect password for super admin.",
-        });
-        return;
-    }
-
     setIsSubmitting(true);
     try {
       // 1. Attempt to sign in. Do not create an account.
@@ -100,7 +90,7 @@ export default function AdminLoginPage() {
       // 3. If no profile exists, this is an invalid login.
       if (!userDocSnap.exists()) {
         await signOut(auth); // Sign out the authenticated but unauthorized user.
-        throw new Error("User profile not found. Please contact an administrator to set up your account.");
+        throw new Error("User profile not found in the database. Please contact an administrator to have your account properly configured.");
       }
       
       // 4. If profile exists, redirect to the dashboard.
@@ -108,10 +98,8 @@ export default function AdminLoginPage() {
 
     } catch (error: any) {
       let errorMessage = error.message;
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No user found with this email. Please contact an administrator.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password. Please try again.';
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password. Please check your credentials or contact an administrator if you believe this is an error.';
       }
 
       toast({
@@ -126,12 +114,33 @@ export default function AdminLoginPage() {
   
   // While loading user data or if the user is already authorized, show a spinner.
   // The useEffect will handle the redirect.
-  if (loading || (!loading && isAuthorized)) {
+  if (loading || (!loading && isAuthorizedAdmin)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
+  }
+  
+  // If a non-admin user is logged in, show an access restricted message.
+  if (!loading && user && !isAuthorizedAdmin) {
+     return (
+        <main className="flex min-h-screen flex-col items-center justify-center p-4">
+            <Card className="w-full max-w-sm">
+                 <CardHeader>
+                    <CardTitle>Access Restricted</CardTitle>
+                    <CardDescription>
+                        Your account does not have the necessary privileges to access this page.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button onClick={() => signOut(auth).then(() => router.push('/admin/login'))} className="w-full">
+                        Logout
+                    </Button>
+                </CardContent>
+            </Card>
+        </main>
+     )
   }
 
   // If the user is not loading and not authorized, show the login form.
