@@ -19,7 +19,7 @@ export default function Contact() {
              <h3 className="text-xl font-bold">Contact Information</h3>
               <div className="space-y-2 text-muted-foreground">
                 <p><strong>Address:</strong> Nairobi, Kenya</p>
-                <p><strong>Phone:</strong> 0757664047</p>
+                <p><strong>Phone:</strong> +254 757 664047</p>
                 <p><strong>Email:</strong> pezekalimited@gmail.com</p>
              </div>
           </div>

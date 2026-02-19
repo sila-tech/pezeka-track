@@ -75,7 +75,7 @@ export default function SalaryLoanApplicationFormPage() {
             <div className="text-center mb-4">
               <h1 className="text-lg font-bold uppercase">PEZEKA LTD</h1>
               <p className="font-semibold">AFFORDABLE CREDIT, REAL OPPORTUNITIES</p>
-              <p className="text-sm">Location: Juja, Kenya | Email: pezekalimited@gmail.com | Phone: 0757 664 047</p>
+              <p className="text-sm">Location: Juja, Kenya | Email: pezekalimited@gmail.com | Phone: +254 757 664047</p>
             </div>
             <hr className="border-t-2 border-black my-4" />
 

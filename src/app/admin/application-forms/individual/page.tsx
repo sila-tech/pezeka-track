@@ -75,7 +75,7 @@ export default function ApplicationFormPage() {
             <div className="text-center mb-4">
               <h1 className="text-xl font-bold uppercase">Pezeka Limited</h1>
               <p className="font-semibold">Affordable Credit, Real Opportunities</p>
-              <p className="text-sm">Email: pezekalimited@gmail.com | Phone: 0757 664 047</p>
+              <p className="text-sm">Email: pezekalimited@gmail.com | Phone: +254 757 664047</p>
             </div>
             <hr className="border-t-2 border-black my-4" />
 
@@ -275,7 +275,7 @@ export default function ApplicationFormPage() {
                 <p className="font-bold mt-2">Kenya Commercial Bank Account: [ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ]</p>
                 <p className="font-bold mt-2">M-Pesa PayBill Number: ( &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ) (Account no: Borrower ID)</p>
                 <p className="font-bold text-red-600 mt-4">UNDER NO CIRCUMSTANCES SHOULD A CLIENT MAKE ANY PAYMENT DIRECTLY TO A LOAN OFFICER, AGENT OR ANY STAFF MEMBER.</p>
-                <p className="font-bold mt-2">Call 0757 664 047 FOR ANY ENQUIRIES.</p>
+                <p className="font-bold mt-2">Call +254 757 664047 FOR ANY ENQUIRIES.</p>
             </section>
 
             <section className="mt-8 space-y-8">
