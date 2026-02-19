@@ -92,8 +92,15 @@ export default function AdminLoginPage() {
       // 1. Attempt to sign in. Do not create an account.
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const loggedInUser = userCredential.user;
+
+      // Special handling for the super admin
+      if (isSimon) {
+        // Super admin's role is implicit and doesn't require a Firestore profile.
+        router.push('/admin');
+        return; // Bypass the profile check
+      }
       
-      // 2. Verify that a user profile exists in Firestore.
+      // 2. Verify that a user profile exists in Firestore for all other users.
       const userDocRef = doc(firestore, 'users', loggedInUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
