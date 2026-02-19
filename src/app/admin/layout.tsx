@@ -69,34 +69,13 @@ export default function AdminLayout({
     const auth = useAuth();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-    const isLoginPage = pathname === '/admin/login' || pathname === '/staff/login' || pathname === '/finance/login';
+    const isLoginPage = pathname === '/admin/login';
     
-    const isAuthorized = !loading && user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
-
-    useEffect(() => {
-        if (loading) return; // Wait until user status is resolved
-
-        if (isLoginPage) {
-            // If on a login page and already logged in as an authorized user, redirect to admin dashboard
-            if (isAuthorized) {
-                router.push('/admin');
-            }
-        } else {
-            // For all other pages, if not an authorized user, redirect to login
-            if (!isAuthorized) {
-                router.push('/admin/login');
-            }
-        }
-    }, [user, loading, isAuthorized, router, isLoginPage]);
-
-
-    const handleLogout = async () => {
-        await signOut(auth);
-        router.push('/admin/login');
+    if (isLoginPage) {
+        return <>{children}</>;
     }
-
-    // On non-login pages, show a spinner while loading or if not authorized
-    if (!isLoginPage && (loading || !isAuthorized)) {
+    
+    if (loading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
                 <Loader2 className="h-8 w-8 animate-spin" />
@@ -104,9 +83,24 @@ export default function AdminLayout({
         );
     }
     
-    // On login pages, we can render the content immediately
-    if (isLoginPage) {
-        return <>{children}</>;
+    const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
+
+    if (!isAuthorized) {
+        useEffect(() => {
+            router.push('/admin/login');
+        }, [router]);
+        
+        return (
+             <div className="flex h-screen w-full items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
+
+
+    const handleLogout = async () => {
+        await signOut(auth);
+        router.push('/admin/login');
     }
     
     const isFinance = user?.email === 'simon@pezeka.com' || user?.role === 'finance';

@@ -6,7 +6,6 @@ import * as z from 'zod';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut,
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -57,6 +56,7 @@ export default function AdminLoginPage() {
   const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
 
   useEffect(() => {
+    // If the user is loaded and authorized, redirect them to the admin dashboard.
     if (!loading && isAuthorized) {
       router.push('/admin');
     }
@@ -67,6 +67,7 @@ export default function AdminLoginPage() {
     const isStaff = values.email.endsWith('@staff.pezeka.com');
     const isFinance = values.email.endsWith('@finance.pezeka.com');
 
+    // Check if the email domain is permitted for admin/staff/finance access.
     if (!isSimon && !isStaff && !isFinance) {
       toast({
         variant: 'destructive',
@@ -76,21 +77,23 @@ export default function AdminLoginPage() {
       return;
     }
     
+    // Specific password check for the super admin.
     if (isSimon && values.password !== 'Symo@4927') {
         toast({
             variant: "destructive",
             title: "Login Failed",
-            description: "Incorrect password.",
+            description: "Incorrect password for super admin.",
         });
-        setIsSubmitting(false);
         return;
     }
 
     setIsSubmitting(true);
     try {
+      // Try to sign in the user.
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push('/admin');
     } catch (error: any) {
+      // If the user does not exist, create a new account for them.
       if (error.code === 'auth/user-not-found') {
         try {
           const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
@@ -101,6 +104,7 @@ export default function AdminLoginPage() {
             role = 'finance';
           }
           
+          // Create a corresponding user profile in Firestore with the correct role.
           await createUserProfile(firestore, newUser.uid, {
             email: newUser.email!,
             role: role,
@@ -115,6 +119,7 @@ export default function AdminLoginPage() {
           });
         }
       } else {
+        // Handle other login errors (e.g., wrong password).
         toast({
           variant: 'destructive',
           title: 'Login Failed',
@@ -126,7 +131,9 @@ export default function AdminLoginPage() {
     }
   }
   
-  if (loading) {
+  // While loading user data or if the user is already authorized, show a spinner.
+  // The useEffect will handle the redirect.
+  if (loading || (!loading && isAuthorized)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -134,44 +141,7 @@ export default function AdminLoginPage() {
     );
   }
 
-  if (user) {
-    const isSimon = user.email === 'simon@pezeka.com';
-    const isStaff = user.email?.endsWith('@staff.pezeka.com');
-    const isFinance = user.email?.endsWith('@finance.pezeka.com');
-    const isPotentiallyAuthorized = isSimon || isStaff || isFinance || isAuthorized;
-    
-    // If the user has an admin-style email or is authorized by role, show a spinner while the layout redirects them.
-    if (isPotentiallyAuthorized) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-        );
-    }
-
-    // If the user is logged in but is clearly not an admin (e.g., a customer), show the restricted access message.
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle>Pezeka Credit | Admin</CardTitle>
-            <CardDescription>
-              Access to this portal is restricted.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              You are currently logged in as {user.email}. This account does not have the required privileges.
-            </p>
-            <Button onClick={() => signOut(auth)} className="w-full">
-              Logout and switch account
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
-
+  // If the user is not loading and not authorized, show the login form.
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
       <Card className="w-full max-w-sm">
