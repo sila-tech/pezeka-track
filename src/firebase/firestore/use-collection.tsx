@@ -36,10 +36,17 @@ export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | nul
   }, [firestore, pathOrQuery]);
 
   useEffect(() => {
-    // Don't do anything until the query is ready and we know the auth state.
-    if (!memoizedQuery || userLoading) {
-      setLoading(true);
+    // If no query to run, stop loading and clear data.
+    if (!memoizedQuery) {
       setData(null);
+      setLoading(false);
+      return;
+    }
+    
+    // If we have a query but are waiting for auth, we are loading.
+    if (userLoading) {
+      setData(null);
+      setLoading(true);
       return;
     }
 
@@ -79,7 +86,7 @@ export function useCollection<T>(pathOrQuery: string | Query<DocumentData> | nul
     );
 
     return () => unsubscribe();
-  }, [memoizedQuery, user, userLoading]);
+  }, [memoizedQuery, user, userLoading, pathOrQuery]);
 
   return { data, loading, error };
 }

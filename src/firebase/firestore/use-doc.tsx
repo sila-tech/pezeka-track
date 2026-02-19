@@ -31,10 +31,17 @@ export function useDoc<T>(docPath: string | null): UseDoc<T> {
   }, [firestore, docPath]);
 
   useEffect(() => {
-    // Don't do anything until the doc path is ready and we know the auth state.
-    if (!memoizedDocRef || userLoading) {
-      setLoading(true);
+    // If no document to fetch, stop loading and clear data.
+    if (!memoizedDocRef) {
       setData(null);
+      setLoading(false);
+      return;
+    }
+    
+    // If we have a doc ref but are waiting for auth, we are loading.
+    if (userLoading) {
+      setData(null);
+      setLoading(true);
       return;
     }
     
