@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 
-const NavLinks = ({ isFinance, onLinkClick }: { isFinance: boolean, onLinkClick?: () => void }) => (
+const NavLinks = ({ isFinance, isSuperAdmin, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, onLinkClick?: () => void }) => (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
     <Link
         href="/admin"
@@ -54,6 +54,16 @@ const NavLinks = ({ isFinance, onLinkClick }: { isFinance: boolean, onLinkClick?
         <FileText className="h-4 w-4" />
         Application Forms
     </Link>
+    {isSuperAdmin && (
+        <Link
+            href="/admin/users"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+            onClick={onLinkClick}
+        >
+            <ShieldCheck className="h-4 w-4" />
+            User Management
+        </Link>
+    )}
     </nav>
 );
 
@@ -74,14 +84,10 @@ export default function AdminLayout({
     const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
 
     useEffect(() => {
-        if (loading || isLoginPage) {
-            return;
-        }
-
-        if (!isAuthorized) {
+        if (!loading && !isAuthorized && !isLoginPage) {
             router.push('/admin/login');
         }
-    }, [loading, isAuthorized, isLoginPage, router]);
+    }, [user, loading, isAuthorized, isLoginPage, router]);
     
     if (isLoginPage) {
         return <>{children}</>;
@@ -102,6 +108,7 @@ export default function AdminLayout({
     }
     
     const isFinance = user?.email === 'simon@pezeka.com' || user?.role === 'finance';
+    const isSuperAdmin = user?.email === 'simon@pezeka.com';
 
     return (
         <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -114,7 +121,7 @@ export default function AdminLayout({
                 </Link>
             </div>
             <div className="flex-1">
-                <NavLinks isFinance={isFinance} />
+                <NavLinks isFinance={isFinance} isSuperAdmin={isSuperAdmin} />
             </div>
             <div className="mt-auto p-4">
                 <Button onClick={handleLogout} variant="ghost" className="w-full justify-start">
@@ -141,7 +148,7 @@ export default function AdminLayout({
                   </Link>
                 </div>
                 <div className="flex-1 overflow-y-auto py-2">
-                    <NavLinks isFinance={isFinance} onLinkClick={() => setMobileMenuOpen(false)} />
+                    <NavLinks isFinance={isFinance} isSuperAdmin={isSuperAdmin} onLinkClick={() => setMobileMenuOpen(false)} />
                 </div>
                  <div className="mt-auto p-4 border-t">
                   <Button onClick={() => {
