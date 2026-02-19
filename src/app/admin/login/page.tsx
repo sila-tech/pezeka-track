@@ -4,8 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import {
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signOut,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -31,7 +31,6 @@ import {
 import { useAuth, useAppUser, useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { createUserProfile } from '@/lib/firestore';
 
 const formSchema = z.object({
   email: z.string().email(),
@@ -90,41 +89,35 @@ export default function AdminLoginPage() {
 
     setIsSubmitting(true);
     try {
-      let userCredential;
-      try {
-        userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      } catch (error: any) {
-        if (error.code === 'auth/user-not-found') {
-          userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-        } else {
-          // Re-throw other errors (like wrong password) to be caught by the outer catch
-          throw error;
-        }
-      }
-      
+      // 1. Attempt to sign in. Do not create an account.
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const loggedInUser = userCredential.user;
       
-      // Check if a Firestore profile exists. If not, create one.
-      // This is crucial for ensuring the user.role is available for authorization checks.
+      // 2. Verify that a user profile exists in Firestore.
       const userDocRef = doc(firestore, 'users', loggedInUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
+      // 3. If no profile exists, this is an invalid login.
       if (!userDocSnap.exists()) {
-        const role = isFinance ? 'finance' : 'staff';
-        await createUserProfile(firestore, loggedInUser.uid, {
-          email: loggedInUser.email!,
-          role: role,
-        });
+        await signOut(auth); // Sign out the authenticated but unauthorized user.
+        throw new Error("User profile not found. Please contact an administrator to set up your account.");
       }
       
-      // Now that the user is authenticated and we've ensured their profile exists, redirect.
+      // 4. If profile exists, redirect to the dashboard.
       router.push('/admin');
 
     } catch (error: any) {
+      let errorMessage = error.message;
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No user found with this email. Please contact an administrator.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = 'Incorrect password. Please try again.';
+      }
+
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: error.message || 'An unexpected error occurred.',
+        description: errorMessage,
       });
     } finally {
       setIsSubmitting(false);
