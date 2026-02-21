@@ -916,19 +916,17 @@ export default function LoansPage() {
                             <div><div className="text-sm text-muted-foreground">Amount Requested</div><div className="font-bold text-lg">Ksh {applicationToManage.principalAmount.toLocaleString()}</div></div>
                         </div>
                     </div>
-                    {(user?.role === 'finance' || user?.email === 'simon@pezeka.com') && (
-                        <DialogFooter className="mt-6">
-                            <Button variant="outline" onClick={() => setApplicationToManage(null)} disabled={isUpdatingStatus}>Cancel</Button>
-                            <Button variant="destructive" onClick={() => handleUpdateStatus(applicationToManage, 'rejected')} disabled={isUpdatingStatus}>
-                                {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Reject
-                            </Button>
-                            <Button onClick={() => handleUpdateStatus(applicationToManage, 'active')} disabled={isUpdatingStatus}>
-                                {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Approve
-                            </Button>
-                        </DialogFooter>
-                    )}
+                    <DialogFooter className="mt-6">
+                        <Button variant="outline" onClick={() => setApplicationToManage(null)} disabled={isUpdatingStatus}>Cancel</Button>
+                        <Button variant="destructive" onClick={() => handleUpdateStatus(applicationToManage, 'rejected')} disabled={isUpdatingStatus}>
+                            {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Reject
+                        </Button>
+                        <Button onClick={() => handleUpdateStatus(applicationToManage, 'active')} disabled={isUpdatingStatus}>
+                            {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Approve
+                        </Button>
+                    </DialogFooter>
                 </>
             )}
         </DialogContent>
