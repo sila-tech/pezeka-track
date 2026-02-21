@@ -27,9 +27,10 @@ service cloud.firestore {
 
     // Rules for User Profiles
     match /users/{userId} {
-      // Staff, Finance, or SuperAdmins can read/write any profile.
-      // Users can read and write their own profile document.
-      allow read, write: if isStaff() || isFinance() || isSuperAdmin() || isOwner(userId);
+      // Admins can list all users and write to any user profile.
+      allow list, write: if isStaff() || isFinance() || isSuperAdmin();
+      // Any user can read their own profile (for role checking), and admins can read any profile.
+      allow get: if isOwner(userId) || isStaff() || isFinance() || isSuperAdmin();
     }
 
     // Rules for Customers collection
