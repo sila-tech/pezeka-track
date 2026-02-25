@@ -74,14 +74,18 @@ service cloud.firestore {
 
     // Rules for Investors
     match /investors/{investorId} {
-      // Admin Access: Any authenticated user on the admin domain can list/get.
-      // UI must control who sees the page. Create/Update/Delete is more specific.
-      allow list, get: if request.auth != null; 
-      // Specific investor can get their own document.
-      allow get: if isInvestorOwner(investorId);
+      // Allow any authenticated user to read. The UI controls which roles can access the investors page.
+      // This is necessary because Firestore rules for queries ('list') cannot perform document lookups.
+      allow read: if request.auth != null;
 
+      // Allow only the superAdmin to create new investor profiles.
       allow create: if isSuperAdmin();
-      allow update: if isSuperAdmin() || isFinance();
+
+      // Allow superAdmin and finance to update. These are separated to avoid evaluation errors.
+      allow update: if isSuperAdmin();
+      allow update: if isFinance();
+      
+      // Allow only superAdmin to delete.
       allow delete: if isSuperAdmin();
     }
 
