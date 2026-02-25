@@ -424,3 +424,33 @@ export async function createInvestorProfile(db: Firestore, userId: string, data:
         throw serverError;
     }
 }
+
+export async function updateInvestorProfile(db: Firestore, investorId: string, data: { name: string, email: string }) {
+    const investorRef = doc(db, 'investors', investorId);
+    const updateData = { ...data, updatedAt: serverTimestamp() };
+    try {
+        await updateDoc(investorRef, updateData);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: investorRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function deleteInvestorProfile(db: Firestore, investorId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+    try {
+        await deleteDoc(investorRef);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: investorRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}

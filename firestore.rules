@@ -10,6 +10,7 @@ service cloud.firestore {
 
     function getUserRole() {
       // A user's role is stored in their profile document in the 'users' collection.
+      // This now safely returns an empty string if the document doesn't exist.
       if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
       }
@@ -69,12 +70,10 @@ service cloud.firestore {
 
     // Rules for Investors
     match /investors/{investorId} {
-      // Admins have full access.
+      // Admins have full access to create, read, and write.
       allow read, write: if isStaff() || isFinance() || isSuperAdmin();
       // Investor can read their own profile.
       allow get: if isOwner(investorId);
-      // An investor can create their own profile during signup.
-      allow create: if request.auth.uid == request.resource.data.uid;
     }
     
     // Rules for Investments
