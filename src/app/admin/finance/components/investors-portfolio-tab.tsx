@@ -50,7 +50,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 // Schemas
 const addInvestorSchema = z.object({
-  name: z.string().min(1, 'Investor name is required.'),
+  name: z.string().min(1, 'Portfolio holder name is required.'),
   initialInvestment: z.coerce.number().min(1, 'Initial investment must be greater than 0.'),
 });
 
@@ -114,11 +114,11 @@ export function InvestorsPortfolioTab() {
     setIsSubmitting(true);
     try {
         await addInvestor(firestore, values);
-        toast({ title: 'Investor Added', description: `${values.name} has been added to the portfolio.` });
+        toast({ title: 'Portfolio Created', description: `A new portfolio for ${values.name} has been created.` });
         addInvestorForm.reset();
         setAddInvestorOpen(false);
     } catch(error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add investor.' });
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not create portfolio.' });
     } finally {
         setIsSubmitting(false);
     }
@@ -159,11 +159,11 @@ export function InvestorsPortfolioTab() {
     setIsSubmitting(true);
     try {
         await deleteInvestor(firestore, investorToDelete.id);
-        toast({ title: 'Investor Deleted', description: `${investorToDelete.name} has been removed from the portfolio.` });
+        toast({ title: 'Portfolio Deleted', description: `The portfolio for ${investorToDelete.name} has been removed.` });
         setDeleteInvestorOpen(false);
         setInvestorToDelete(null);
     } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not delete investor.' });
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not delete the portfolio.' });
     } finally {
         setIsSubmitting(false);
     }
@@ -189,29 +189,29 @@ export function InvestorsPortfolioTab() {
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <CardTitle>Investors Portfolio</CardTitle>
-            <CardDescription>Manage investors and their portfolio growth.</CardDescription>
+            <CardTitle>Investment Portfolios</CardTitle>
+            <CardDescription>Track investment portfolios and their accumulated interest.</CardDescription>
           </div>
           <Dialog open={addInvestorOpen} onOpenChange={setAddInvestorOpen}>
             <DialogTrigger asChild>
                 <Button>
-                    <PlusCircle className="mr-2" /> Add Investor
+                    <PlusCircle className="mr-2" /> Add New Portfolio
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Add New Investor</DialogTitle>
-                    <DialogDescription>Enter the details for the new investor and their initial investment.</DialogDescription>
+                    <DialogTitle>Create New Investment Portfolio</DialogTitle>
+                    <DialogDescription>Enter the details for the new portfolio and its initial investment.</DialogDescription>
                 </DialogHeader>
                 <Form {...addInvestorForm}>
                     <form id="add-investor-form" onSubmit={addInvestorForm.handleSubmit(onAddInvestorSubmit)} className="space-y-4">
-                        <FormField control={addInvestorForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Investor Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={addInvestorForm.control} name="initialInvestment" render={({ field }) => (<FormItem><FormLabel>Initial Investment (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={addInvestorForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Portfolio Holder Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={addInvestorForm.control} name="initialInvestment" render={({ field }) => (<FormItem><FormLabel>Initial Investment Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     </form>
                 </Form>
                 <DialogFooter className="mt-4">
                     <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                    <Button type="submit" form="add-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Add Investor</Button>
+                    <Button type="submit" form="add-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Create Portfolio</Button>
                 </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -222,8 +222,8 @@ export function InvestorsPortfolioTab() {
           )}
           {!isLoading && (!sortedInvestors || sortedInvestors.length === 0) && (
               <Alert>
-                  <AlertTitle>No Investors Found</AlertTitle>
-                  <AlertDescription>Click "Add Investor" to get started.</AlertDescription>
+                  <AlertTitle>No Portfolios Found</AlertTitle>
+                  <AlertDescription>Click "Add New Portfolio" to get started.</AlertDescription>
               </Alert>
           )}
           {!isLoading && sortedInvestors && sortedInvestors.length > 0 && (
@@ -231,7 +231,7 @@ export function InvestorsPortfolioTab() {
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
                       <TableRow>
-                          <TableHead>Investor Name</TableHead>
+                          <TableHead>Portfolio Holder</TableHead>
                           <TableHead className="text-right">Initial Investment (Ksh)</TableHead>
                           <TableHead className="text-right">Current Balance (Ksh)</TableHead>
                           <TableHead className="text-right">Total Interest (Ksh)</TableHead>
@@ -278,8 +278,8 @@ export function InvestorsPortfolioTab() {
               {selectedInvestor && (
                   <>
                     <DialogHeader>
-                        <DialogTitle>Manage Portfolio: {selectedInvestor.name}</DialogTitle>
-                        <DialogDescription>Add manual interest entries and view portfolio history.</DialogDescription>
+                        <DialogTitle>Manage Portfolio for: {selectedInvestor.name}</DialogTitle>
+                        <DialogDescription>Add manual interest entries and view the history for this portfolio.</DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 max-h-[60vh] overflow-y-auto pr-4">
                         <div className="space-y-4">
@@ -338,7 +338,7 @@ export function InvestorsPortfolioTab() {
           <AlertDialogContent>
               <AlertDialogHeader>
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>This will permanently delete the portfolio for <strong>{investorToDelete?.name}</strong>. This action cannot be undone.</AlertDialogDescription>
+                  <AlertDialogDescription>This will permanently delete the investment portfolio for <strong>{investorToDelete?.name}</strong>. This action cannot be undone.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel>
