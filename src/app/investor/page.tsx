@@ -5,7 +5,7 @@ import { useUser, useDoc, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, FileText, Bell, Download, Wallet, TrendingUp } from 'lucide-react';
-import { format, differenceInMonths, addMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -87,27 +87,6 @@ export default function InvestorPage() {
   const monthlyReturn = useMemo(() => {
     if (!portfolio || !portfolio.interestRate) return 0;
     return (portfolio.currentBalance || 0) * (portfolio.interestRate / 100);
-  }, [portfolio]);
-
- const monthlyROI = useMemo(() => {
-    if (!portfolio || !portfolio.totalInvestment || portfolio.totalInvestment === 0 || !portfolio.createdAt) {
-      return 0;
-    }
-    const investmentDate = new Date(portfolio.createdAt.seconds * 1000);
-    const now = new Date();
-    const monthsInvested = differenceInMonths(now, investmentDate);
-
-    if (monthsInvested <= 0) {
-      // If invested for less than a month, calculate ROI based on current growth
-      const totalReturn = portfolio.currentBalance - portfolio.totalInvestment;
-      if (totalReturn <= 0) return 0;
-      return (totalReturn / portfolio.totalInvestment) * 100;
-    }
-
-    const totalReturn = portfolio.currentBalance - portfolio.totalInvestment;
-    if (totalReturn <= 0) return 0;
-    const averageMonthlyReturn = totalReturn / monthsInvested;
-    return (averageMonthlyReturn / portfolio.totalInvestment) * 100;
   }, [portfolio]);
 
   async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
@@ -253,7 +232,7 @@ export default function InvestorPage() {
 
       {!isLoading && portfolio && (
         <>
-            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Invested Amount</CardTitle>
@@ -274,12 +253,23 @@ export default function InvestorPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Avg. Monthly ROI</CardTitle>
+                        <CardTitle className="text-sm font-medium">Monthly Interest Rate</CardTitle>
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">
-                           {monthlyROI.toFixed(2)}%
+                           {(portfolio.interestRate || 0).toFixed(2)}%
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Est. Monthly Return</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-green-600">
+                           Ksh {monthlyReturn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
                     </CardContent>
                 </Card>
