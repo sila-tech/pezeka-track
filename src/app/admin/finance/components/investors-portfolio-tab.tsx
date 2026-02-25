@@ -80,8 +80,10 @@ interface Deposit {
 
 interface Investor {
   id: string;
+  uid: string;
   name: string;
-  initialInvestment: number;
+  email: string;
+  totalInvestment: number;
   currentBalance: number;
   interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
@@ -230,7 +232,7 @@ export function InvestorsPortfolioTab() {
   const portfolioTotals = useMemo(() => {
     if (!sortedInvestors) return { initial: 0, balance: 0 };
     return sortedInvestors.reduce((acc, investor) => {
-        acc.initial += (investor.initialInvestment || 0);
+        acc.initial += (investor.totalInvestment || 0);
         acc.balance += (investor.currentBalance || 0);
         return acc;
     }, { initial: 0, balance: 0 });
@@ -255,6 +257,65 @@ export function InvestorsPortfolioTab() {
         return entryDate >= startOfCurrentMonth && entryDate <= endOfCurrentMonth;
     });
   }, [selectedInvestor?.interestEntries]);
+
+  const statementEntries = useMemo(() => {
+    if (!selectedInvestor) return [];
+
+    const allTransactions: any[] = [];
+    
+    // Handle legacy portfolios created before 'deposits' field existed.
+    // If no approved deposits, use totalInvestment as the initial investment.
+    if ((selectedInvestor.deposits || []).filter(d => d.status === 'approved').length === 0 && (selectedInvestor.totalInvestment || 0) > 0 && selectedInvestor.createdAt) {
+        allTransactions.push({
+            date: new Date((selectedInvestor.createdAt as any).seconds * 1000),
+            description: 'Initial Investment',
+            amount: selectedInvestor.totalInvestment,
+            type: 'credit'
+        });
+    }
+
+    // Deposits (which are investments)
+    (selectedInvestor.deposits || []).filter(d => d.status === 'approved').forEach(d => {
+        allTransactions.push({
+            date: new Date((d.date as any).seconds * 1000),
+            description: 'Deposit',
+            amount: d.amount,
+            type: 'credit'
+        });
+    });
+
+    // Interest Entries
+    (selectedInvestor.interestEntries || []).forEach(i => {
+        allTransactions.push({
+            date: new Date((i.date as any).seconds * 1000),
+            description: i.description || 'Monthly Interest',
+            amount: i.amount,
+            type: 'credit'
+        });
+    });
+
+    // Withdrawals
+    (selectedInvestor.withdrawals || []).filter(w => w.status === 'processed').forEach(w => {
+        allTransactions.push({
+            date: new Date((w.date as any).seconds * 1000),
+            description: 'Withdrawal',
+            amount: w.amount,
+            type: 'debit'
+        });
+    });
+
+    allTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    let balance = 0;
+    return allTransactions.map(t => {
+        if (t.type === 'credit') {
+            balance += t.amount;
+        } else {
+            balance -= t.amount;
+        }
+        return { ...t, balance };
+    }).reverse();
+  }, [selectedInvestor]);
 
 
   return (
@@ -290,11 +351,11 @@ export function InvestorsPortfolioTab() {
                   </TableHeader>
                   <TableBody>
                       {sortedInvestors.map(investor => {
-                          const totalInterest = (investor.currentBalance || 0) - (investor.initialInvestment || 0);
+                          const totalInterest = (investor.currentBalance || 0) - (investor.totalInvestment || 0);
                           return (
                               <TableRow key={investor.id}>
                                   <TableCell className="font-medium">{investor.name}</TableCell>
-                                  <TableCell className="text-right">{(investor.initialInvestment || 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right text-green-600">{totalInterest.toLocaleString()}</TableCell>
                                   <TableCell className="text-center">
@@ -331,12 +392,40 @@ export function InvestorsPortfolioTab() {
                   <>
                     <DialogHeader>
                         <DialogTitle>Manage Portfolio for: {selectedInvestor.name}</DialogTitle>
-                        <DialogDescription>Apply interest, process withdrawals, and view history.</DialogDescription>
+                        <DialogDescription>Review portfolio statement, apply interest, and manage requests.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] pr-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                          <div className="space-y-4">
-                              <Card>
+                      <div className="space-y-6 mt-4">
+
+                        <Card>
+                            <CardHeader><CardTitle>Portfolio Summary</CardTitle></CardHeader>
+                            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <div className="text-muted-foreground">Total Investment</div>
+                                    <div className="font-semibold">Ksh {(selectedInvestor.totalInvestment || 0).toLocaleString()}</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">Investment Date</div>
+                                    <div className="font-semibold">{selectedInvestor.createdAt ? format(new Date(selectedInvestor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">Current Balance</div>
+                                    <div className="font-semibold">Ksh {(selectedInvestor.currentBalance || 0).toLocaleString()}</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">Monthly Interest Rate</div>
+                                    <div className="font-semibold">{selectedInvestor.interestRate || 0}%</div>
+                                </div>
+                                <div>
+                                    <div className="text-muted-foreground">Est. Monthly Return</div>
+                                    <div className="font-semibold">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-6">
+                                <Card>
                                   <CardHeader><CardTitle>Apply Monthly Interest</CardTitle></CardHeader>
                                   <CardContent className="space-y-4">
                                       <div className="space-y-2 rounded-md bg-muted p-4">
@@ -362,31 +451,9 @@ export function InvestorsPortfolioTab() {
                                           </Button>
                                       )}
                                   </CardContent>
-                              </Card>
-                              <Card>
-                                  <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
-                                  <CardContent>
-                                      <ScrollArea className="h-60">
-                                          {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
-                                              <Alert><AlertTitle>No Interest Added</AlertTitle><AlertDescription>No interest has been applied yet.</AlertDescription></Alert>
-                                          ) : (
-                                              <Table>
-                                                  <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                                                  <TableBody>
-                                                      {[...selectedInvestor.interestEntries].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
-                                                          <TableRow key={entry.entryId}>
-                                                              <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                              <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
-                                                          </TableRow>
-                                                      ))}
-                                                  </TableBody>
-                                              </Table>
-                                          )}
-                                      </ScrollArea>
-                                  </CardContent>
-                              </Card>
-                          </div>
-                          <div className="space-y-4">
+                                </Card>
+                            </div>
+                            <div className="space-y-6">
                               <Card>
                                 <CardHeader><CardTitle>Deposit Requests</CardTitle></CardHeader>
                                 <CardContent>
@@ -449,7 +516,50 @@ export function InvestorsPortfolioTab() {
                                       </ScrollArea>
                                   </CardContent>
                               </Card>
-                          </div>
+                            </div>
+                        </div>
+
+                        <Card>
+                            <CardHeader><CardTitle>Portfolio Statement</CardTitle></CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-72">
+                                    {statementEntries.length === 0 ? (
+                                        <Alert>
+                                            <AlertTitle>No Transactions</AlertTitle>
+                                            <AlertDescription>No transactions have been recorded for this portfolio yet.</AlertDescription>
+                                        </Alert>
+                                    ) : (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Description</TableHead>
+                                                    <TableHead className="text-right">Debit</TableHead>
+                                                    <TableHead className="text-right">Credit</TableHead>
+                                                    <TableHead className="text-right">Balance</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {statementEntries.map((item, index) => (
+                                                    <TableRow key={index}>
+                                                        <TableCell>{format(item.date, 'PPP')}</TableCell>
+                                                        <TableCell>{item.description}</TableCell>
+                                                        <TableCell className="text-right text-destructive">
+                                                            {item.type === 'debit' ? item.amount.toLocaleString() : '-'}
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-green-600">
+                                                            {item.type === 'credit' ? item.amount.toLocaleString() : '-'}
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-semibold">{item.balance.toLocaleString()}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    )}
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+
                       </div>
                     </ScrollArea>
                     <DialogFooter className="mt-4">
@@ -476,5 +586,3 @@ export function InvestorsPortfolioTab() {
     </>
   );
 }
-
-    
