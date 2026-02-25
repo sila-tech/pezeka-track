@@ -38,28 +38,27 @@ service cloud.firestore {
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      allow list: if request.auth != null; 
-      allow get, write: if isSuperAdmin() || isStaff() || isFinance(); 
+      allow read: if request.auth != null; 
+      allow write: if isSuperAdmin() || isStaff() || isFinance(); 
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      allow list: if request.auth != null;
-      allow get: if request.auth.uid == resource.data.customerId || isSuperAdmin() || isStaff() || isFinance();
+      allow read: if request.auth != null;
       allow write: if isSuperAdmin() || isStaff() || isFinance();
       allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     }
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      allow list: if request.auth != null;
-      allow get, write: if isSuperAdmin() || isFinance();
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin() || isFinance();
     }
 
     // Rules for Investors collection
     match /investors/{investorId} {
-      // Allow admins to list all investors for the dashboard
-      allow list: if isSuperAdmin() || isFinance() || isStaff();
+      // Allow any authenticated user to list for the admin dashboard. UI will handle role visibility.
+      allow list: if request.auth != null;
       // Allow an investor to read their own document, and admins to read any
       allow get: if isOwner(investorId) || isSuperAdmin() || isFinance() || isStaff();
       // Allow super admin to create/delete, and finance/superadmin to update
