@@ -99,8 +99,8 @@ service cloud.firestore {
       // We check that only the 'withdrawals' or 'deposits' array is being modified.
       allow update: if isOwner(investorId) && 
                     (
-                      request.resource.data.keys().hasOnly(['withdrawals', 'updatedAt']) ||
-                      request.resource.data.keys().hasOnly(['deposits', 'updatedAt'])
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['withdrawals', 'updatedAt']) ||
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deposits', 'updatedAt'])
                     );
 
       // Only Finance and Super Admin can update portfolios for other reasons (e.g. applying interest).
