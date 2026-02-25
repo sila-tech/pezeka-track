@@ -84,20 +84,5 @@ service cloud.firestore {
       // Only Finance and Super Admin can get single entries or write.
       allow get, write: if isFinance() || isSuperAdmin();
     }
-    
-    // Rules for Investors collection
-    match /investors/{investorId} {
-      // Any authenticated user can list investors. The UI controls visibility.
-      allow list: if request.auth != null;
-      
-      // An investor can read their own document, and admins can read any.
-      allow get: if isOwner(investorId) || isSuperAdmin() || isFinance() || isStaff();
-      
-      // Super admin can create/delete investor profiles.
-      allow create, delete: if isSuperAdmin();
-      
-      // Finance and Super Admin can update investor portfolios.
-      allow update: if isFinance() || isSuperAdmin();
-    }
   }
 }
