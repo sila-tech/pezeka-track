@@ -33,8 +33,9 @@ service cloud.firestore {
     match /users/{userId} {
       // Admins can list all users and write to any user profile.
       allow list, write: if isStaff() || isFinance() || isSuperAdmin();
-      // Any user can read their own profile (for role checking), and admins can read any profile.
-      allow get: if isOwner(userId) || isStaff() || isFinance() || isSuperAdmin();
+      // A user can read their own profile, or the super admin can read any profile.
+      // This avoids a recursive loop in the rules.
+      allow get: if isOwner(userId) || isSuperAdmin();
     }
 
     // Rules for Customers collection
