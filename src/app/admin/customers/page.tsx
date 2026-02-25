@@ -100,6 +100,10 @@ export default function CustomersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
+  const isSuperAdmin = user?.email === 'simon@pezeka.com';
+  const isFinance = user?.role === 'finance';
+  const canPerformActions = isSuperAdmin || isFinance;
+  
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
@@ -288,76 +292,78 @@ export default function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-        <Dialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Customer
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add a New Customer</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new customer.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...addForm}>
-              <ScrollArea className="max-h-[70vh]">
-                <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 pr-6">
-                  <FormField
-                    control={addForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. 0712345678" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="idNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ID Number (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. 12345678" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </form>
-              </ScrollArea>
-              <DialogFooter className="mt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">Cancel</Button>
-                </DialogClose>
-                <Button type="submit" form="add-customer-form" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add Customer
-                </Button>
-              </DialogFooter>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        {canPerformActions && (
+          <Dialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Customer
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add a New Customer</DialogTitle>
+                <DialogDescription>
+                  Fill in the details below to add a new customer.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...addForm}>
+                <ScrollArea className="max-h-[70vh]">
+                  <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 pr-6">
+                    <FormField
+                      control={addForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={addForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 0712345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={addForm.control}
+                      name="idNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>ID Number (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 12345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </form>
+                </ScrollArea>
+                <DialogFooter className="mt-4">
+                  <DialogClose asChild>
+                    <Button type="button" variant="ghost">Cancel</Button>
+                  </DialogClose>
+                  <Button type="submit" form="add-customer-form" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Add Customer
+                  </Button>
+                </DialogFooter>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
       <Card>
         <CardHeader>
@@ -403,7 +409,7 @@ export default function CustomersPage() {
                           <TableHead>Name</TableHead>
                           <TableHead>Phone Number</TableHead>
                           <TableHead>ID Number</TableHead>
-                          <TableHead className="text-right w-[80px]">Actions</TableHead>
+                          {canPerformActions && <TableHead className="text-right w-[80px]">Actions</TableHead>}
                       </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -413,35 +419,37 @@ export default function CustomersPage() {
                               <TableCell className="font-medium">{customer.name}</TableCell>
                               <TableCell>{customer.phone}</TableCell>
                               <TableCell>{customer.idNumber || 'N/A'}</TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu open={openMenu === customer.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? customer.id : null)}>
-                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                            <span className="sr-only">Open menu</span>
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                        <DropdownMenuItem onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleEditClick(customer);
-                                            setOpenMenu(null);
-                                        }}>
-                                            Edit
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteClick(customer);
-                                                setOpenMenu(null);
-                                            }}
-                                            className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
-                                        >
-                                            Delete
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
+                              {canPerformActions && (
+                                <TableCell className="text-right">
+                                  <DropdownMenu open={openMenu === customer.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? customer.id : null)}>
+                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                          <Button variant="ghost" className="h-8 w-8 p-0">
+                                              <span className="sr-only">Open menu</span>
+                                              <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                                          <DropdownMenuItem onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleEditClick(customer);
+                                              setOpenMenu(null);
+                                          }}>
+                                              Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                              onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDeleteClick(customer);
+                                                  setOpenMenu(null);
+                                              }}
+                                              className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                                          >
+                                              Delete
+                                          </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              )}
                           </TableRow>
                       ))}
                   </TableBody>
