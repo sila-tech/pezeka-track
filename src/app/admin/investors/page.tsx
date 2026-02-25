@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
-import { createUserProfile, updateUserProfile, deleteUserProfile } from '@/lib/firestore';
+import { addInvestor, updateInvestor, deleteInvestor } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, MoreHorizontal } from 'lucide-react';
