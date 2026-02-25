@@ -38,30 +38,41 @@ service cloud.firestore {
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      allow read, write: if isSuperAdmin() || isStaff() || isFinance();
+      // Broad rule for LIST queries to avoid lookups
+      allow list: if request.auth != null; 
+      // Granular rules for specific documents
+      allow get, write: if isSuperAdmin() || isStaff() || isFinance(); 
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      allow read: if isSuperAdmin() || isStaff() || isFinance();
-      allow write: if isSuperAdmin() || isStaff() || isFinance();
-      
-      // CUSTOMER-specific rules
+      // Broad rule for LIST queries to avoid lookups
+      allow list: if request.auth != null;
+      // Granular rule for admin/staff to get/write
+      allow get, write: if isSuperAdmin() || isStaff() || isFinance();
+      // Granular rule for a customer to view their own loan or create an application
       allow get: if request.auth.uid == resource.data.customerId;
       allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     }
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      allow read, write: if isSuperAdmin() || isFinance();
+      // Broad rule for LIST queries to avoid lookups
+      allow list: if request.auth != null;
+      // Granular rules for specific documents
+      allow get, write: if isSuperAdmin() || isFinance();
     }
 
     // Rules for Investors
     match /investors/{investorId} {
-      // Broad read rule to allow LIST operations without document lookups
-      allow list, get: if request.auth != null;
+      // Broad read rule for LIST queries to avoid invalid lookups.
+      allow list: if request.auth != null; 
+      
+      // Granular rules for staff/admin/owner to GET a specific document.
+      allow get: if isSuperAdmin() || isFinance() || isStaff();
+      allow get: if resource.data.uid != null && request.auth.uid == resource.data.uid;
 
-      // Strict write rules that CAN use document lookups
+      // Granular rules for WRITES which can use lookups.
       allow create, delete: if isSuperAdmin();
       allow update: if isSuperAdmin() || isFinance();
     }
