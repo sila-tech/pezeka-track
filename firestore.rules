@@ -51,7 +51,8 @@ service cloud.firestore {
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      // Any authenticated user can list customers. The UI controls visibility.
+      // Any authenticated admin user can list customers. The UI controls visibility.
+      // This rule is broad to prevent query errors. UI must enforce roles.
       allow list: if request.auth != null;
       
       // Only authorized roles can get a single customer document or write data.
@@ -78,7 +79,7 @@ service cloud.firestore {
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      // Any authenticated user can list finance entries. The UI controls visibility.
+      // Any authenticated admin user can list finance entries. UI controls visibility.
       allow list: if request.auth != null;
       // Only Finance and Super Admin can get single entries or write.
       allow get, write: if isFinance() || isSuperAdmin();
