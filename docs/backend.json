@@ -114,6 +114,45 @@
         }
       },
       "required": ["type", "date", "amount"]
+    },
+    "Investor": {
+      "title": "Investor",
+      "description": "Stores investor-specific information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["investor"] }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Investment": {
+      "title": "Investment",
+      "description": "Represents an investment made by an investor.",
+      "type": "object",
+      "properties": {
+        "investorId": { "type": "string" },
+        "principalAmount": { "type": "number", "description": "The initial amount invested." },
+        "interestRate": { "type": "number", "description": "The monthly interest rate in percentage." },
+        "startDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "monthlyAccruals": {
+            "type": "array",
+            "description": "History of monthly interest accruals.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "accrualId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "amount": { "type": "number" }
+                },
+                "required": ["accrualId", "date", "amount"]
+            }
+        }
+      },
+      "required": ["investorId", "principalAmount", "interestRate", "startDate"]
     }
   },
   "auth": {
@@ -135,6 +174,14 @@
     "/financeEntries/{entryId}": {
       "schema": { "$ref": "#/entities/FinanceEntry" },
       "description": "Stores all financial entries."
+    },
+    "/investors/{investorId}": {
+      "schema": { "$ref": "#/entities/Investor" },
+      "description": "Stores investor profiles."
+    },
+    "/investments/{investmentId}": {
+      "schema": { "$ref": "#/entities/Investment" },
+      "description": "Stores all investment records."
     }
   }
 }
