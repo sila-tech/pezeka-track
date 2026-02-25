@@ -114,6 +114,32 @@
         }
       },
       "required": ["type", "date", "amount"]
+    },
+    "Investor": {
+      "title": "Investor",
+      "description": "Represents an investor and their portfolio.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "initialInvestment": { "type": "number", "description": "The initial amount invested by the investor." },
+        "currentBalance": { "type": "number", "description": "The current value of the investment including interest." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "interestEntries": {
+            "type": "array",
+            "description": "History of interest payments manually added to the portfolio.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "entryId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "amount": { "type": "number" },
+                    "description": { "type": "string" }
+                },
+                "required": ["entryId", "date", "amount"]
+            }
+        }
+      },
+      "required": ["name", "initialInvestment", "currentBalance", "createdAt"]
     }
   },
   "auth": {
@@ -135,6 +161,10 @@
     "/financeEntries/{entryId}": {
       "schema": { "$ref": "#/entities/FinanceEntry" },
       "description": "Stores all financial entries."
+    },
+    "/investors/{investorId}": {
+      "schema": { "$ref": "#/entities/Investor" },
+      "description": "Stores investor portfolios."
     }
   }
 }

@@ -30,14 +30,14 @@ service cloud.firestore {
     }
 
     // Rules for User Profiles
-    // A user can read their own profile, or the super admin can read any profile.
-    allow get: if isOwner(userId) || isSuperAdmin();
-    
-    // Admins can list all users and write to any user profile.
+    allow get: if isSuperAdmin();
+    allow get: if isOwner(userId);
     allow list, write: if isSuperAdmin();
 
     // Rules for Customers collection
-    allow read, write: if isSuperAdmin() || isStaff() || isFinance();
+    allow read, write: if isSuperAdmin();
+    allow read, write: if isStaff();
+    allow read, write: if isFinance();
 
     // Rules for Loans
     // Write access
@@ -51,17 +51,20 @@ service cloud.firestore {
     allow read: if isFinance();
     
     // CUSTOMER-specific rules (for non-admins)
-    // Customers can GET their own single loan document.
     allow get: if request.auth.uid == resource.data.customerId;
-    
-    // Customers can LIST loans. The client-side query must be properly filtered.
     allow list: if request.auth != null;
-    
-    // Customers can CREATE new loan applications for themselves.
     allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     
     // Rules for Finance Entries
     allow read, write: if isSuperAdmin();
     allow read, write: if isFinance();
+
+    // Rules for Investors
+    match /investors/{investorId} {
+      allow read: if isSuperAdmin();
+      allow read: if isFinance();
+      allow write: if isSuperAdmin();
+      allow write: if isFinance();
+    }
   }
 }
