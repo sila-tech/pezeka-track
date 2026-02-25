@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, PiggyBank } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search } from "lucide-react";
 import { arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -56,7 +56,6 @@ import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FinanceReportTab } from './components/finance-report-tab';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
-import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
@@ -1094,7 +1093,6 @@ export default function FinancePage() {
                   <TabsTrigger value="earned_income">Earned Income</TabsTrigger>
                   <TabsTrigger value="payments">All Payments</TabsTrigger>
                   <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
-                  <TabsTrigger value="investors">Investors Portfolio</TabsTrigger>
               </TabsList>
               <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -1305,9 +1303,6 @@ export default function FinancePage() {
                       )}
                   </CardContent>
               </Card>
-          </TabsContent>
-          <TabsContent value="investors">
-              <InvestorsPortfolioTab />
           </TabsContent>
       </Tabs>
 

@@ -60,14 +60,5 @@ service cloud.firestore {
     allow read, write: if isSuperAdmin();
     allow read, write: if isFinance();
 
-    // Rules for Investors
-    match /investors/{investorId} {
-      // isSuperAdmin has full access.
-      allow read, write: if isSuperAdmin();
-      
-      // isFinance can get, create, update, but NOT list.
-      // Listing is a query, and rules for queries cannot use get() or exists(), which isFinance() does.
-      allow get, write: if isFinance();
-    }
   }
 }
