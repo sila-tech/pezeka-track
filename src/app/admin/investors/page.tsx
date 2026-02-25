@@ -6,8 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
-import { addInvestor, updateInvestor, deleteInvestor } from '@/lib/firestore';
-
+import { createUserProfile, updateUserProfile, deleteUserProfile } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, MoreHorizontal } from 'lucide-react';
@@ -41,6 +40,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -50,8 +56,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, differenceInMonths } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface UserProfile {
+  id: string;
+  uid: string;
+  name: string;
+  email: string;
+  role: 'staff' | 'finance';
+}
 
 interface Investor {
   id: string;
@@ -64,6 +78,13 @@ interface Investor {
   createdAt: { seconds: number; nanoseconds: number };
 }
 
+const userProfileSchema = z.object({
+  uid: z.string().min(1, 'Firebase UID is required.'),
+  name: z.string().min(1, 'Name is required.'),
+  email: z.string().email('A valid email is required.'),
+  role: z.enum(['staff', 'finance'], { required_error: 'Please select a role.' }),
+});
+
 const investorSchema = z.object({
   uid: z.string().min(1, 'Firebase UID is required.'),
   name: z.string().min(1, 'Name is required.'),
@@ -75,9 +96,9 @@ const investorSchema = z.object({
 
 export default function InvestorsPage() {
     const { user: currentUser, loading: userLoading } = useAppUser();
+    const router = useRouter();
     const firestore = useFirestore();
     const { toast } = useToast();
-    const router = useRouter();
 
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -268,13 +289,23 @@ export default function InvestorsPage() {
                         <TableHead>Interest Rate</TableHead>
                         <TableHead className="text-right">Total Investment (Ksh)</TableHead>
                         <TableHead className="text-right">Current Balance (Ksh)</TableHead>
-                        <TableHead className="text-right">ROI</TableHead>
+                        <TableHead className="text-right">Monthly ROI (%)</TableHead>
                         {(isSuperAdmin || isFinance) && <TableHead className="text-right w-[80px]">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                       {investors.map((investor) => {
-                          const roi = (investor.totalInvestment || 0) > 0 ? (((investor.currentBalance || 0) - (investor.totalInvestment || 0)) / (investor.totalInvestment || 0)) * 100 : 0;
+                          const totalRoiPercentage = (investor.totalInvestment || 0) > 0 ? (((investor.currentBalance || 0) - (investor.totalInvestment || 0)) / (investor.totalInvestment || 0)) * 100 : 0;
+                          
+                          let monthlyRoi = 0;
+                          if(investor.createdAt && isFinite(totalRoiPercentage)) {
+                            const investmentDate = new Date(investor.createdAt.seconds * 1000);
+                            const now = new Date();
+                            const monthsElapsed = differenceInMonths(now, investmentDate);
+                            const durationInMonths = Math.max(1, monthsElapsed);
+                            monthlyRoi = totalRoiPercentage / durationInMonths;
+                          }
+                          
                           return (
                             <TableRow key={investor.id}>
                                 <TableCell className="font-medium">{investor.name}</TableCell>
@@ -283,7 +314,7 @@ export default function InvestorsPage() {
                                 <TableCell>{investor.interestRate || 0}%</TableCell>
                                 <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
-                                <TableCell className={`text-right font-medium ${roi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{roi.toFixed(2)}%</TableCell>
+                                <TableCell className={`text-right font-medium ${monthlyRoi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{monthlyRoi.toFixed(2)}%</TableCell>
                                 
                                 {(isSuperAdmin || isFinance) && (
                                     <TableCell className="text-right">

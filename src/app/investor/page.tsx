@@ -5,7 +5,7 @@ import { useUser, useDoc, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, FileText, Bell, Download } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInMonths } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -84,10 +84,22 @@ export default function InvestorPage() {
     defaultValues: { amount: undefined },
   });
 
-  const roi = useMemo(() => {
-    if (!portfolio || !portfolio.totalInvestment) return 0;
-    return ((portfolio.currentBalance - portfolio.totalInvestment) / portfolio.totalInvestment) * 100;
+  const monthlyRoi = useMemo(() => {
+    if (!portfolio || !portfolio.totalInvestment || !portfolio.createdAt || portfolio.totalInvestment === 0) return 0;
+
+    const investmentDate = new Date(portfolio.createdAt.seconds * 1000);
+    const now = new Date();
+    // Calculate months elapsed, ensuring it's at least 1 to avoid division by zero.
+    const monthsElapsed = differenceInMonths(now, investmentDate);
+    const durationInMonths = Math.max(1, monthsElapsed);
+
+    const totalRoiPercentage = ((portfolio.currentBalance - portfolio.totalInvestment) / portfolio.totalInvestment) * 100;
+    
+    if (!isFinite(totalRoiPercentage)) return 0;
+
+    return totalRoiPercentage / durationInMonths;
   }, [portfolio]);
+
 
   async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
     if (!user) return;
@@ -232,7 +244,7 @@ export default function InvestorPage() {
                         <span className="text-muted-foreground">Ksh</span>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{portfolio.totalInvestment.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">{(portfolio.totalInvestment || 0).toLocaleString()}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -241,16 +253,16 @@ export default function InvestorPage() {
                          <span className="text-muted-foreground">Ksh</span>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{portfolio.currentBalance.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">{(portfolio.currentBalance || 0).toLocaleString()}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Return on Investment (ROI)</CardTitle>
+                        <CardTitle className="text-sm font-medium">Average Monthly ROI</CardTitle>
                         <span className="text-muted-foreground">%</span>
                     </CardHeader>
                     <CardContent>
-                        <div className={`text-2xl font-bold ${roi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{roi.toFixed(2)}%</div>
+                        <div className={`text-2xl font-bold ${monthlyRoi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{monthlyRoi.toFixed(2)}%</div>
                     </CardContent>
                 </Card>
             </div>
