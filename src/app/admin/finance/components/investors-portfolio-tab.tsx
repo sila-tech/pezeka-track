@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
-import { addInvestor, applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor } from '@/lib/firestore';
+import { addInvestor, applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor, approveDeposit, rejectDeposit } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -71,6 +71,13 @@ interface Withdrawal {
   status: 'pending' | 'processed' | 'rejected';
 }
 
+interface Deposit {
+  depositId: string;
+  date: { seconds: number; nanoseconds: number } | Date;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
 interface Investor {
   id: string;
   name: string;
@@ -80,6 +87,7 @@ interface Investor {
   createdAt: { seconds: number; nanoseconds: number };
   interestEntries?: InterestEntry[];
   withdrawals?: Withdrawal[];
+  deposits?: Deposit[];
 }
 
 
@@ -168,6 +176,33 @@ export function InvestorsPortfolioTab() {
     }
   }
 
+  const handleApproveDeposit = async (depositId: string) => {
+    if (!selectedInvestor) return;
+    setIsSubmitting(true);
+    try {
+        await approveDeposit(firestore, selectedInvestor.id, depositId);
+        toast({ title: 'Deposit Approved', description: "The deposit has been approved and the investor's balance updated." });
+    } catch(e: any) {
+        toast({ variant: 'destructive', title: 'Approval Failed', description: e.message || 'Could not approve deposit.' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectDeposit = async (depositId: string) => {
+    if (!selectedInvestor) return;
+    setIsSubmitting(true);
+    try {
+        await rejectDeposit(firestore, selectedInvestor.id, depositId);
+        toast({ title: 'Deposit Rejected', description: "The deposit notification has been rejected." });
+    } catch(e: any) {
+        toast({ variant: 'destructive', title: 'Action Failed', description: e.message || 'Could not reject deposit.' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+
   const handleDeleteClick = (investor: Investor) => {
     setInvestorToDelete(investor);
     setDeleteInvestorOpen(true);
@@ -189,14 +224,14 @@ export function InvestorsPortfolioTab() {
   }
   
   const sortedInvestors = useMemo(() => {
-      return investors ? [...investors].sort((a, b) => b.createdAt.seconds - a.createdAt.seconds) : [];
+      return investors ? [...investors].sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)) : [];
   }, [investors]);
   
   const portfolioTotals = useMemo(() => {
     if (!sortedInvestors) return { initial: 0, balance: 0 };
     return sortedInvestors.reduce((acc, investor) => {
-        acc.initial += investor.initialInvestment;
-        acc.balance += investor.currentBalance;
+        acc.initial += (investor.initialInvestment || 0);
+        acc.balance += (investor.currentBalance || 0);
         return acc;
     }, { initial: 0, balance: 0 });
   }, [sortedInvestors]);
@@ -207,7 +242,7 @@ export function InvestorsPortfolioTab() {
     // we'll apply monthly interest on the current balance.
     // A more complex implementation could track the exact investment date.
     const rate = selectedInvestor.interestRate / 100;
-    return selectedInvestor.currentBalance * rate;
+    return (selectedInvestor.currentBalance || 0) * rate;
   }, [selectedInvestor]);
 
   const hasInterestBeenAppliedThisMonth = useMemo(() => {
@@ -255,12 +290,12 @@ export function InvestorsPortfolioTab() {
                   </TableHeader>
                   <TableBody>
                       {sortedInvestors.map(investor => {
-                          const totalInterest = investor.currentBalance - investor.initialInvestment;
+                          const totalInterest = (investor.currentBalance || 0) - (investor.initialInvestment || 0);
                           return (
                               <TableRow key={investor.id}>
                                   <TableCell className="font-medium">{investor.name}</TableCell>
-                                  <TableCell className="text-right">{investor.initialInvestment.toLocaleString()}</TableCell>
-                                  <TableCell className="text-right font-bold">{investor.currentBalance.toLocaleString()}</TableCell>
+                                  <TableCell className="text-right">{(investor.initialInvestment || 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right text-green-600">{totalInterest.toLocaleString()}</TableCell>
                                   <TableCell className="text-center">
                                       <Button variant="ghost" size="sm" onClick={() => handleManageClick(investor)}>
@@ -298,96 +333,125 @@ export function InvestorsPortfolioTab() {
                         <DialogTitle>Manage Portfolio for: {selectedInvestor.name}</DialogTitle>
                         <DialogDescription>Apply interest, process withdrawals, and view history.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                        <div className="space-y-4">
-                            <Card>
-                                <CardHeader><CardTitle>Apply Monthly Interest</CardTitle></CardHeader>
-                                <CardContent className="space-y-4">
-                                     <div className="space-y-2 rounded-md bg-muted p-4">
-                                        <div className="flex justify-between">
-                                            <span className="text-sm font-medium">Monthly Interest Rate</span>
-                                            <span className="text-sm font-bold">{selectedInvestor.interestRate || 0}%</span>
-                                        </div>
-                                         <div className="flex justify-between">
-                                            <span className="text-sm font-medium">Calculated Interest</span>
-                                            <span className="text-sm font-bold">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                                        </div>
-                                    </div>
-                                    {hasInterestBeenAppliedThisMonth ? (
-                                        <Alert variant="default">
-                                            <Check className="h-4 w-4" />
-                                            <AlertTitle>Interest Already Applied</AlertTitle>
-                                            <AlertDescription>Monthly interest has already been applied for this portfolio this month.</AlertDescription>
-                                        </Alert>
-                                    ) : (
-                                        <Button onClick={handleApplyInterest} disabled={isSubmitting || monthlyInterest <= 0} className="w-full">
-                                            {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
-                                            Apply Interest for {format(new Date(), 'MMMM')}
-                                        </Button>
-                                    )}
-                                </CardContent>
-                            </Card>
-                            <Card>
-                                <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
+                    <ScrollArea className="max-h-[70vh] pr-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                          <div className="space-y-4">
+                              <Card>
+                                  <CardHeader><CardTitle>Apply Monthly Interest</CardTitle></CardHeader>
+                                  <CardContent className="space-y-4">
+                                      <div className="space-y-2 rounded-md bg-muted p-4">
+                                          <div className="flex justify-between">
+                                              <span className="text-sm font-medium">Monthly Interest Rate</span>
+                                              <span className="text-sm font-bold">{selectedInvestor.interestRate || 0}%</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                              <span className="text-sm font-medium">Calculated Interest</span>
+                                              <span className="text-sm font-bold">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                                          </div>
+                                      </div>
+                                      {hasInterestBeenAppliedThisMonth ? (
+                                          <Alert variant="default">
+                                              <Check className="h-4 w-4" />
+                                              <AlertTitle>Interest Already Applied</AlertTitle>
+                                              <AlertDescription>Monthly interest has already been applied for this portfolio this month.</AlertDescription>
+                                          </Alert>
+                                      ) : (
+                                          <Button onClick={handleApplyInterest} disabled={isSubmitting || monthlyInterest <= 0} className="w-full">
+                                              {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
+                                              Apply Interest for {format(new Date(), 'MMMM')}
+                                          </Button>
+                                      )}
+                                  </CardContent>
+                              </Card>
+                              <Card>
+                                  <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
+                                  <CardContent>
+                                      <ScrollArea className="h-60">
+                                          {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
+                                              <Alert><AlertTitle>No Interest Added</AlertTitle><AlertDescription>No interest has been applied yet.</AlertDescription></Alert>
+                                          ) : (
+                                              <Table>
+                                                  <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                                  <TableBody>
+                                                      {[...selectedInvestor.interestEntries].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
+                                                          <TableRow key={entry.entryId}>
+                                                              <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                              <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                                                          </TableRow>
+                                                      ))}
+                                                  </TableBody>
+                                              </Table>
+                                          )}
+                                      </ScrollArea>
+                                  </CardContent>
+                              </Card>
+                          </div>
+                          <div className="space-y-4">
+                              <Card>
+                                <CardHeader><CardTitle>Deposit Requests</CardTitle></CardHeader>
                                 <CardContent>
-                                    <ScrollArea className="h-60">
-                                        {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
-                                            <Alert><AlertTitle>No Interest Added</AlertTitle><AlertDescription>No interest has been applied yet.</AlertDescription></Alert>
-                                        ) : (
-                                            <Table>
-                                                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                                                <TableBody>
-                                                    {[...selectedInvestor.interestEntries].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
-                                                        <TableRow key={entry.entryId}>
-                                                            <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                            <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        )}
+                                    <ScrollArea className="h-[200px]">
+                                      {(!selectedInvestor.deposits || selectedInvestor.deposits.length === 0) ? (
+                                          <Alert><AlertTitle>No Deposits</AlertTitle><AlertDescription>No deposit notifications found.</AlertDescription></Alert>
+                                      ) : (
+                                          <Table>
+                                              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                              <TableBody>
+                                                  {[...selectedInvestor.deposits].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(d => (
+                                                      <TableRow key={d.depositId}>
+                                                          <TableCell>{format(new Date((d.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                                          <TableCell>{d.amount.toLocaleString()}</TableCell>
+                                                          <TableCell><Badge variant={d.status === 'pending' ? 'secondary' : d.status === 'approved' ? 'default' : 'destructive'}>{d.status}</Badge></TableCell>
+                                                          <TableCell className="text-right">
+                                                              {d.status === 'pending' && (
+                                                                  <>
+                                                                      <Button variant="ghost" size="icon" onClick={() => handleApproveDeposit(d.depositId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600" /></Button>
+                                                                      <Button variant="ghost" size="icon" onClick={() => handleRejectDeposit(d.depositId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive" /></Button>
+                                                                  </>
+                                                              )}
+                                                          </TableCell>
+                                                      </TableRow>
+                                                  ))}
+                                              </TableBody>
+                                          </Table>
+                                      )}
                                     </ScrollArea>
                                 </CardContent>
-                            </Card>
-                        </div>
-                        <div>
-                             <Card>
-                                <CardHeader><CardTitle>Withdrawal Requests</CardTitle></CardHeader>
-                                <CardContent>
-                                     <ScrollArea className="h-[33.5rem]">
-                                        {(!selectedInvestor.withdrawals || selectedInvestor.withdrawals.length === 0) ? (
-                                            <Alert><AlertTitle>No Withdrawals</AlertTitle><AlertDescription>This investor has not made any withdrawal requests.</AlertDescription></Alert>
-                                        ) : (
-                                            <Table>
-                                                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                                                <TableBody>
-                                                    {[...selectedInvestor.withdrawals].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(w => (
-                                                        <TableRow key={w.withdrawalId}>
-                                                            <TableCell>{format(new Date((w.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
-                                                            <TableCell>{w.amount.toLocaleString()}</TableCell>
-                                                            <TableCell>
-                                                                <Badge variant={w.status === 'pending' ? 'secondary' : w.status === 'processed' ? 'default' : 'destructive'}>
-                                                                    {w.status}
-                                                                </Badge>
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                {w.status === 'pending' && (
-                                                                    <>
-                                                                        <Button variant="ghost" size="sm" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600" /></Button>
-                                                                        <Button variant="ghost" size="sm" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive" /></Button>
-                                                                    </>
-                                                                )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        )}
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
+                              </Card>
+                              <Card>
+                                  <CardHeader><CardTitle>Withdrawal Requests</CardTitle></CardHeader>
+                                  <CardContent>
+                                      <ScrollArea className="h-[200px]">
+                                          {(!selectedInvestor.withdrawals || selectedInvestor.withdrawals.length === 0) ? (
+                                              <Alert><AlertTitle>No Withdrawals</AlertTitle><AlertDescription>This investor has not made any withdrawal requests.</AlertDescription></Alert>
+                                          ) : (
+                                              <Table>
+                                                  <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                                  <TableBody>
+                                                      {[...selectedInvestor.withdrawals].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(w => (
+                                                          <TableRow key={w.withdrawalId}>
+                                                              <TableCell>{format(new Date((w.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                                              <TableCell>{w.amount.toLocaleString()}</TableCell>
+                                                              <TableCell><Badge variant={w.status === 'pending' ? 'secondary' : w.status === 'processed' ? 'default' : 'destructive'}>{w.status}</Badge></TableCell>
+                                                              <TableCell className="text-right">
+                                                                  {w.status === 'pending' && (
+                                                                      <>
+                                                                          <Button variant="ghost" size="icon" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600" /></Button>
+                                                                          <Button variant="ghost" size="icon" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive" /></Button>
+                                                                      </>
+                                                                  )}
+                                                              </TableCell>
+                                                          </TableRow>
+                                                      ))}
+                                                  </TableBody>
+                                              </Table>
+                                          )}
+                                      </ScrollArea>
+                                  </CardContent>
+                              </Card>
+                          </div>
+                      </div>
+                    </ScrollArea>
                     <DialogFooter className="mt-4">
                         <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
                     </DialogFooter>
@@ -412,3 +476,5 @@ export function InvestorsPortfolioTab() {
     </>
   );
 }
+
+    
