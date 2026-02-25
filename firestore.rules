@@ -74,8 +74,8 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
       // Finance and Super Admins need to list investors to manage investments.
       allow list: if isFinance() || isSuperAdmin();
-      // All admins and the investor themselves can view a profile.
-      allow get: if isOwner(investorId) || isStaff() || isFinance() || isSuperAdmin();
+      // Finance, Super Admins, and the investor themselves can view a profile.
+      allow get: if isOwner(investorId) || isFinance() || isSuperAdmin();
     }
     
     // Rules for Investments
@@ -83,8 +83,8 @@ service cloud.firestore {
       // Only Finance and Super Admins can manage investments.
       allow write: if isFinance() || isSuperAdmin();
       
-      // Admins have full read access to all investments.
-      allow read: if isStaff() || isFinance() || isSuperAdmin();
+      // Finance and Super Admins have full read access to all investments.
+      allow read: if isFinance() || isSuperAdmin();
       
       // An investor can read their own specific investment record.
       allow get: if request.auth.uid == resource.data.investorId;
