@@ -403,3 +403,54 @@ export async function deleteUserProfile(db: Firestore, userId: string) {
         throw serverError;
     }
 }
+
+
+// Investor Functions
+export async function addInvestor(db: Firestore, investorData: { uid: string; name: string; email: string; totalInvestment: number; currentBalance: number; }) {
+    const investorRef = doc(db, 'investors', investorData.uid);
+    const data = {
+        ...investorData,
+        createdAt: serverTimestamp()
+    };
+    try {
+        await setDoc(investorRef, data);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: investorRef.path,
+            operation: 'create',
+            requestResourceData: data,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function updateInvestor(db: Firestore, investorId: string, data: { [key: string]: any }) {
+    const investorRef = doc(db, 'investors', investorId);
+     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
+    try {
+        await updateDoc(investorRef, { ...updateData, updatedAt: serverTimestamp() });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: investorRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function deleteInvestor(db: Firestore, investorId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+    try {
+        await deleteDoc(investorRef);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: investorRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}

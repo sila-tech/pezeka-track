@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "User Profile",
-      "description": "Stores user-specific information and role.",
+      "description": "Stores user-specific information and role for staff and finance users.",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
@@ -114,6 +114,21 @@
         }
       },
       "required": ["type", "date", "amount"]
+    },
+    "Investor": {
+      "title": "Investor",
+      "description": "Represents an investor's portfolio.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "totalInvestment": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "totalInvestment", "currentBalance"]
     }
   },
   "auth": {
@@ -135,6 +150,10 @@
     "/financeEntries/{entryId}": {
       "schema": { "$ref": "#/entities/FinanceEntry" },
       "description": "Stores all financial entries."
+    },
+    "/investors/{investorId}": {
+      "schema": { "$ref": "#/entities/Investor" },
+      "description": "Stores investor portfolio data. The document ID must be the user's UID."
     }
   }
 }

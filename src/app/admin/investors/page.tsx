@@ -1,6 +1,8 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -83,8 +85,9 @@ export default function InvestorsPage() {
     
     const isSuperAdmin = currentUser?.email === 'simon@pezeka.com';
     const isFinance = currentUser?.role === 'finance';
+    const canViewPage = isSuperAdmin || isFinance || currentUser?.role === 'staff';
 
-    const { data: investors, loading: investorsLoading } = useCollection<Investor>('investors');
+    const { data: investors, loading: investorsLoading } = useCollection<Investor>(canViewPage ? 'investors' : null);
 
     const addForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
@@ -99,7 +102,10 @@ export default function InvestorsPage() {
         setIsSubmitting(true);
         try {
             await addInvestor(firestore, {
-                ...values,
+                uid: values.uid,
+                name: values.name,
+                email: values.email,
+                totalInvestment: values.totalInvestment,
                 currentBalance: values.totalInvestment, // Initially balance equals investment
             });
             toast({ title: 'Investor Created', description: `Profile for ${values.name} has been added.` });
@@ -150,7 +156,7 @@ export default function InvestorsPage() {
             await deleteInvestor(firestore, investorToDelete.id);
             toast({ title: 'Investor Deleted', description: `Profile for ${investorToDelete.name} has been deleted.` });
             setDeleteDialogOpen(false);
-            setUserToDelete(null);
+            setInvestorToDelete(null);
         } catch (error: any) {
              toast({ variant: "destructive", title: "Delete Failed", description: error.message });
         } finally {
@@ -191,7 +197,7 @@ export default function InvestorsPage() {
                     <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@example.com" {...field} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
-                    <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                 </form>
                 </Form>
@@ -225,8 +231,8 @@ export default function InvestorsPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Date Joined</TableHead>
-                        <TableHead className="text-right">Total Investment</TableHead>
-                        <TableHead className="text-right">Current Balance</TableHead>
+                        <TableHead className="text-right">Total Investment (Ksh)</TableHead>
+                        <TableHead className="text-right">Current Balance (Ksh)</TableHead>
                         <TableHead className="text-right">ROI</TableHead>
                         {(isSuperAdmin || isFinance) && <TableHead className="text-right w-[80px]">Actions</TableHead>}
                     </TableRow>
@@ -285,7 +291,7 @@ export default function InvestorsPage() {
                   <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
                 )}/>
                  <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
-                  <FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                 )}/>
               </form>
             </Form>

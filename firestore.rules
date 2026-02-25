@@ -38,35 +38,33 @@ service cloud.firestore {
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      // Broad rule for LIST queries to avoid lookups
       allow list: if request.auth != null; 
-      // Granular rules for specific documents
       allow get, write: if isSuperAdmin() || isStaff() || isFinance(); 
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      // Broad rule for LIST queries to avoid lookups
       allow list: if request.auth != null;
-      // Granular rule for admin/staff to get/write
-      allow get, write: if isSuperAdmin() || isStaff() || isFinance();
-      // Granular rule for a customer to view their own loan or create an application
-      allow get: if request.auth.uid == resource.data.customerId;
+      allow get: if request.auth.uid == resource.data.customerId || isSuperAdmin() || isStaff() || isFinance();
+      allow write: if isSuperAdmin() || isStaff() || isFinance();
       allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     }
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      // Broad rule for LIST queries to avoid lookups
       allow list: if request.auth != null;
-      // Granular rules for specific documents
       allow get, write: if isSuperAdmin() || isFinance();
     }
 
     // Rules for Investors collection
     match /investors/{investorId} {
-      // Explicit rule for super admin to bypass helper function issues.
-      allow read, write: if request.auth.token.email == 'simon@pezeka.com';
+      // Allow admins to list all investors for the dashboard
+      allow list: if isSuperAdmin() || isFinance() || isStaff();
+      // Allow an investor to read their own document, and admins to read any
+      allow get: if isOwner(investorId) || isSuperAdmin() || isFinance() || isStaff();
+      // Allow super admin to create/delete, and finance/superadmin to update
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isFinance();
     }
   }
 }
