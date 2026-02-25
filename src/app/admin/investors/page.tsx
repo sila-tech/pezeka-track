@@ -172,7 +172,6 @@ export default function InvestorsPage() {
             name: values.name,
             email: values.email,
             totalInvestment: values.totalInvestment,
-            interestRate: values.interestRate,
         };
 
         if (values.createdAt) {
@@ -345,9 +344,6 @@ export default function InvestorsPage() {
                     )}/>
                     <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
                     <FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={editForm.control} name="interestRate" render={({ field }) => (
-                    <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={editForm.control} name="createdAt" render={({ field }) => (
                     <FormItem><FormLabel>Investment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
