@@ -27,9 +27,6 @@ export default function Header() {
         <Link href="#contact" className="text-sm font-medium hover:underline underline-offset-4">
           Contact
         </Link>
-        <Button asChild variant="outline">
-            <Link href="/investor-login">Investor Portal</Link>
-        </Button>
         <Button asChild>
             <Link href="/customer-login">Customer Portal</Link>
         </Button>
@@ -56,9 +53,6 @@ export default function Header() {
               <Link href="#contact" className="text-lg font-medium" onClick={closeMenu}>
                 Contact
               </Link>
-               <Button asChild className="w-full">
-                  <Link href="/investor-login" onClick={closeMenu}>Investor Portal</Link>
-              </Button>
               <Button asChild className="w-full">
                   <Link href="/customer-login" onClick={closeMenu}>Customer Portal</Link>
               </Button>
