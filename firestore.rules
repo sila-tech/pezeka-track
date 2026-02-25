@@ -39,17 +39,23 @@ service cloud.firestore {
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      // Only Staff, Finance, or SuperAdmins can read or write to the customers collection.
-      allow read, write: if isStaff() || isFinance() || isSuperAdmin();
+      // Separated rules for clarity and to avoid OR evaluation issues.
+      allow read, write: if isSuperAdmin();
+      allow read, write: if isStaff();
+      allow read, write: if isFinance();
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      // Staff, Finance, or SuperAdmins have full write access.
-      allow write: if isStaff() || isFinance() || isSuperAdmin();
+      // Separated write access for each role
+      allow write: if isSuperAdmin();
+      allow write: if isStaff();
+      allow write: if isFinance();
       
-      // Staff, Finance, or SuperAdmins have full read access (get and list).
-      allow read: if isStaff() || isFinance() || isSuperAdmin();
+      // Separated read access for each role
+      allow read: if isSuperAdmin();
+      allow read: if isStaff();
+      allow read: if isFinance();
       
       // CUSTOMER-specific rules (for non-admins)
       // Customers can GET their own single loan document.
@@ -64,8 +70,9 @@ service cloud.firestore {
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      // Only Finance users and the Super Admin can read or write finance entries.
-      allow read, write: if isFinance() || isSuperAdmin();
+      // Separated access for each role
+      allow read, write: if isSuperAdmin();
+      allow read, write: if isFinance();
     }
 
     // Rules for Investors & Investments
@@ -81,17 +88,12 @@ service cloud.firestore {
     }
     
     match /investments/{investmentId} {
-      // Finance and Super Admin can manage investments.
-      allow write: if isFinance() || isSuperAdmin();
-      
+      // Separated access for each role
+      allow write, get, list: if isSuperAdmin();
+      allow write, get, list: if isFinance();
+
       // An investor can view their own investment documents.
       allow get: if request.auth.uid == resource.data.investorId;
-
-      // Finance and Super Admin can list all investments.
-      allow list: if isFinance() || isSuperAdmin();
-
-      // Finance and Super Admin can get any investment document.
-      allow get: if isFinance() || isSuperAdmin();
     }
   }
 }
