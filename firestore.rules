@@ -32,7 +32,7 @@ service cloud.firestore {
     // Rules for User Profiles
     match /users/{userId} {
       // Admins can list all users and write to any user profile.
-      allow list, write: if isStaff() || isFinance() || isSuperAdmin();
+      allow list, write: if isSuperAdmin();
       // A user can read their own profile, or the super admin can read any profile.
       // This avoids a recursive loop in the rules.
       allow get: if isOwner(userId) || isSuperAdmin();
@@ -72,11 +72,9 @@ service cloud.firestore {
     // Rules for Investors
     match /investors/{investorId} {
       // Only the Super Admin can manage investor profiles.
-      allow write: if isSuperAdmin();
-      // Only the Super Admin can list all investors for the management page.
-      allow list: if isSuperAdmin();
-      // Finance, Super Admins, and the investor themselves can view a profile.
-      allow get: if isOwner(investorId) || isSuperAdmin() || isFinance();
+      allow list, write: if isSuperAdmin();
+      // An investor can view their own profile, or the super admin can.
+      allow get: if isOwner(investorId) || isSuperAdmin();
     }
     
     // Rules for Investments
