@@ -412,6 +412,7 @@ export async function addInvestor(db: Firestore, investorData: { uid: string; na
         ...investorData,
         interestRate: investorData.interestRate || 0,
         withdrawals: [],
+        deposits: [],
         interestEntries: [],
         createdAt: serverTimestamp()
     };

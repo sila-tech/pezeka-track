@@ -289,49 +289,34 @@ export default function InvestorsPage() {
                         <TableHead>Interest Rate</TableHead>
                         <TableHead className="text-right">Total Investment (Ksh)</TableHead>
                         <TableHead className="text-right">Current Balance (Ksh)</TableHead>
-                        <TableHead className="text-right">Monthly ROI (%)</TableHead>
                         {(isSuperAdmin || isFinance) && <TableHead className="text-right w-[80px]">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {investors.map((investor) => {
-                          const totalRoiPercentage = (investor.totalInvestment || 0) > 0 ? (((investor.currentBalance || 0) - (investor.totalInvestment || 0)) / (investor.totalInvestment || 0)) * 100 : 0;
-                          
-                          let monthlyRoi = 0;
-                          if(investor.createdAt && isFinite(totalRoiPercentage)) {
-                            const investmentDate = new Date(investor.createdAt.seconds * 1000);
-                            const now = new Date();
-                            const monthsElapsed = differenceInMonths(now, investmentDate);
-                            const durationInMonths = Math.max(1, monthsElapsed);
-                            monthlyRoi = totalRoiPercentage / durationInMonths;
-                          }
-                          
-                          return (
-                            <TableRow key={investor.id}>
-                                <TableCell className="font-medium">{investor.name}</TableCell>
-                                <TableCell>{investor.email}</TableCell>
-                                <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
-                                <TableCell>{investor.interestRate || 0}%</TableCell>
-                                <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
-                                <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
-                                <TableCell className={`text-right font-medium ${monthlyRoi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{monthlyRoi.toFixed(2)}%</TableCell>
-                                
-                                {(isSuperAdmin || isFinance) && (
-                                    <TableCell className="text-right">
-                                    <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                            {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>}
-                                            {isSuperAdmin && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                      {investors.map((investor) => (
+                          <TableRow key={investor.id}>
+                              <TableCell className="font-medium">{investor.name}</TableCell>
+                              <TableCell>{investor.email}</TableCell>
+                              <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
+                              <TableCell>{investor.interestRate || 0}%</TableCell>
+                              <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
+                              {(isSuperAdmin || isFinance) && (
+                                  <TableCell className="text-right">
+                                  <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                                          {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>}
+                                          {isSuperAdmin && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </TableCell>
-                                )}
-                            </TableRow>
-                          )
-                      })}
+                              )}
+                          </TableRow>
+                        )
+                      )}
                   </TableBody>
               </Table>
             </ScrollArea>

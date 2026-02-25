@@ -374,9 +374,9 @@ export function InvestorsPortfolioTab() {
                   </TableBody>
                    <TableRow className="font-bold bg-muted/50 sticky bottom-0">
                         <TableCell>Totals</TableCell>
-                        <TableCell className="text-right">{portfolioTotals.initial.toLocaleString()}</TableCell>
-                        <TableCell className="text-right">{portfolioTotals.balance.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-green-600">{(portfolioTotals.balance - portfolioTotals.initial).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{(portfolioTotals.initial || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{(portfolioTotals.balance || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-green-600">{((portfolioTotals.balance - portfolioTotals.initial) || 0).toLocaleString()}</TableCell>
                         <TableCell />
                     </TableRow>
               </Table>

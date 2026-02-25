@@ -5,7 +5,7 @@ import { useUser, useDoc, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, FileText, Bell, Download } from 'lucide-react';
-import { format, differenceInMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -84,20 +84,9 @@ export default function InvestorPage() {
     defaultValues: { amount: undefined },
   });
 
-  const monthlyRoi = useMemo(() => {
-    if (!portfolio || !portfolio.totalInvestment || !portfolio.createdAt || portfolio.totalInvestment === 0) return 0;
-
-    const investmentDate = new Date(portfolio.createdAt.seconds * 1000);
-    const now = new Date();
-    // Calculate months elapsed, ensuring it's at least 1 to avoid division by zero.
-    const monthsElapsed = differenceInMonths(now, investmentDate);
-    const durationInMonths = Math.max(1, monthsElapsed);
-
-    const totalRoiPercentage = ((portfolio.currentBalance - portfolio.totalInvestment) / portfolio.totalInvestment) * 100;
-    
-    if (!isFinite(totalRoiPercentage)) return 0;
-
-    return totalRoiPercentage / durationInMonths;
+  const monthlyReturn = useMemo(() => {
+    if (!portfolio || !portfolio.interestRate) return 0;
+    return (portfolio.currentBalance || 0) * (portfolio.interestRate / 100);
   }, [portfolio]);
 
 
@@ -258,11 +247,16 @@ export default function InvestorPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Average Monthly ROI</CardTitle>
-                        <span className="text-muted-foreground">%</span>
+                        <CardTitle className="text-sm font-medium">Monthly Interest</CardTitle>
+                        <span className="text-muted-foreground">{portfolio.interestRate || 0}%</span>
                     </CardHeader>
                     <CardContent>
-                        <div className={`text-2xl font-bold ${monthlyRoi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{monthlyRoi.toFixed(2)}%</div>
+                        <div className="text-2xl font-bold text-green-600">
+                            Ksh {monthlyReturn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Estimated return for this month
+                        </p>
                     </CardContent>
                 </Card>
             </div>
