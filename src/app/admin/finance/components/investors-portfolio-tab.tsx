@@ -227,7 +227,7 @@ export function InvestorsPortfolioTab() {
               </Alert>
           )}
           {!isLoading && sortedInvestors && sortedInvestors.length > 0 && (
-            <div className="relative max-h-[60vh] overflow-y-auto">
+            <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
                       <TableRow>
@@ -267,7 +267,7 @@ export function InvestorsPortfolioTab() {
                         <TableCell />
                     </TableRow>
               </Table>
-            </div>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
@@ -281,50 +281,52 @@ export function InvestorsPortfolioTab() {
                         <DialogTitle>Manage Portfolio for: {selectedInvestor.name}</DialogTitle>
                         <DialogDescription>Add manual interest entries and view the history for this portfolio.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 max-h-[60vh] overflow-y-auto pr-4">
-                        <div className="space-y-4">
-                            <Card>
-                                <CardHeader><CardTitle>Add Interest Entry</CardTitle></CardHeader>
-                                <CardContent>
-                                    <Form {...addInterestForm}>
-                                        <form onSubmit={addInterestForm.handleSubmit(onAddInterestSubmit)} id="add-interest-form" className="space-y-4">
-                                            <FormField control={addInterestForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Interest Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                            <FormField control={addInterestForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                            <FormField control={addInterestForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Monthly interest for January" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                             <Button type="submit" disabled={isSubmitting} className="w-full">{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Add Interest</Button>
-                                        </form>
-                                    </Form>
-                                </CardContent>
-                            </Card>
+                    <ScrollArea className="max-h-[60vh] pr-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <div className="space-y-4">
+                                <Card>
+                                    <CardHeader><CardTitle>Add Interest Entry</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <Form {...addInterestForm}>
+                                            <form onSubmit={addInterestForm.handleSubmit(onAddInterestSubmit)} id="add-interest-form" className="space-y-4">
+                                                <FormField control={addInterestForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Interest Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                                <FormField control={addInterestForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                                <FormField control={addInterestForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Monthly interest for January" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                                <Button type="submit" disabled={isSubmitting} className="w-full">{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Add Interest</Button>
+                                            </form>
+                                        </Form>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            <div>
+                                <Card>
+                                    <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <ScrollArea className="h-72">
+                                            {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
+                                                <Alert>
+                                                    <AlertTitle>No Interest Added</AlertTitle>
+                                                    <AlertDescription>No interest has been manually added yet.</AlertDescription>
+                                                </Alert>
+                                            ) : (
+                                                <Table>
+                                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                                    <TableBody>
+                                                        {selectedInvestor.interestEntries.sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
+                                                            <TableRow key={entry.entryId}>
+                                                                <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                                <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            )}
+                                        </ScrollArea>
+                                    </CardContent>
+                                </Card>
+                            </div>
                         </div>
-                         <div>
-                            <Card>
-                                <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
-                                <CardContent>
-                                    <ScrollArea className="h-72">
-                                        {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
-                                            <Alert>
-                                                <AlertTitle>No Interest Added</AlertTitle>
-                                                <AlertDescription>No interest has been manually added yet.</AlertDescription>
-                                            </Alert>
-                                        ) : (
-                                            <Table>
-                                                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                                                <TableBody>
-                                                    {selectedInvestor.interestEntries.sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
-                                                        <TableRow key={entry.entryId}>
-                                                            <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                            <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        )}
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
-                         </div>
-                    </div>
+                    </ScrollArea>
                     <DialogFooter className="mt-4">
                         <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
                     </DialogFooter>

@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { addLoan } from '@/lib/firestore';
 import { calculateAmortization } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface Payment {
@@ -226,22 +227,24 @@ export default function AccountPage() {
                                                 <AccordionItem value="item-1">
                                                     <AccordionTrigger>View Payment History</AccordionTrigger>
                                                     <AccordionContent>
-                                                        <Table>
-                                                            <TableHeader>
-                                                                <TableRow>
-                                                                    <TableHead>Date</TableHead>
-                                                                    <TableHead className="text-right">Amount (Ksh)</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody>
-                                                                {loan.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(payment => (
-                                                                    <TableRow key={payment.paymentId}>
-                                                                        <TableCell>{format(new Date((payment.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                                        <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
+                                                        <ScrollArea className="h-72">
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead>Date</TableHead>
+                                                                        <TableHead className="text-right">Amount (Ksh)</TableHead>
                                                                     </TableRow>
-                                                                ))}
-                                                            </TableBody>
-                                                        </Table>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {loan.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(payment => (
+                                                                        <TableRow key={payment.paymentId}>
+                                                                            <TableCell>{format(new Date((payment.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                                            <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
+                                                                        </TableRow>
+                                                                    ))}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </ScrollArea>
                                                     </AccordionContent>
                                                 </AccordionItem>
                                             </Accordion>

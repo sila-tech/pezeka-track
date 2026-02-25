@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface FinanceEntry {
   id: string;
@@ -213,7 +214,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             </Alert>
         )}
         {!loading && filteredEntries && filteredEntries.length > 0 && (
-          <div className="relative max-h-[60vh] overflow-y-auto">
+          <ScrollArea className="h-[60vh]">
             <Table>
                 <TableHeader className="sticky top-0 bg-card">
                 <TableRow>
@@ -260,7 +261,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                     </TableRow>
                 </TableBody>
             </Table>
-          </div>
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

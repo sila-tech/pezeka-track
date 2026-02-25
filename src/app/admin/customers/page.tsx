@@ -51,6 +51,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const customerSchema = z.object({
@@ -302,8 +303,8 @@ export default function CustomersPage() {
               </DialogDescription>
             </DialogHeader>
             <Form {...addForm}>
-              <div className="max-h-[70vh] overflow-y-auto pr-4">
-                <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
+              <ScrollArea className="max-h-[70vh]">
+                <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 pr-6">
                   <FormField
                     control={addForm.control}
                     name="name"
@@ -344,7 +345,7 @@ export default function CustomersPage() {
                     )}
                   />
                 </form>
-              </div>
+              </ScrollArea>
               <DialogFooter className="mt-4">
                 <DialogClose asChild>
                   <Button type="button" variant="ghost">Cancel</Button>
@@ -394,7 +395,7 @@ export default function CustomersPage() {
               </Alert>
           )}
           {!isLoading && filteredCustomers && filteredCustomers.length > 0 && (
-            <div className="relative max-h-[60vh] overflow-y-auto">
+            <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
                       <TableRow>
@@ -445,7 +446,7 @@ export default function CustomersPage() {
                       ))}
                   </TableBody>
               </Table>
-            </div>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
@@ -469,7 +470,7 @@ export default function CustomersPage() {
                   Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="mt-4 max-h-[70vh] overflow-y-auto pr-4">
+              <ScrollArea className="mt-4 max-h-[70vh]">
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -527,7 +528,7 @@ export default function CustomersPage() {
                         )}
                     </CardContent>
                 </Card>
-              </div>
+              </ScrollArea>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSelectedCustomer(null)}>Close</Button>
               </DialogFooter>
@@ -566,8 +567,8 @@ export default function CustomersPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <div className="max-h-[70vh] overflow-y-auto pr-4">
-              <form id="edit-customer-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+            <ScrollArea className="max-h-[70vh]">
+              <form id="edit-customer-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 pr-6">
                 <FormField
                   control={editForm.control}
                   name="name"
@@ -608,7 +609,7 @@ export default function CustomersPage() {
                   )}
                 />
               </form>
-            </div>
+            </ScrollArea>
             <DialogFooter className="mt-4">
               <DialogClose asChild>
                 <Button type="button" variant="ghost">Cancel</Button>

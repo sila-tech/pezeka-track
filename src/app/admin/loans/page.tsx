@@ -45,6 +45,7 @@ import { calculateAmortization } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { exportToCsv } from '@/lib/excel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const loanSchema = z.object({
@@ -385,7 +386,7 @@ export default function LoansPage() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <div className="max-h-[65vh] overflow-y-auto pr-4">
+              <ScrollArea className="max-h-[65vh] pr-4">
                 <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -635,7 +636,7 @@ export default function LoansPage() {
                     )}
                   />
                 </form>
-              </div>
+              </ScrollArea>
 
               <DialogFooter>
                 <DialogClose asChild>
@@ -714,7 +715,7 @@ export default function LoansPage() {
                     </Alert>
                 )}
                 {!isLoading && filteredLoans && filteredLoans.length > 0 && (
-                    <div className="relative max-h-[60vh] overflow-y-auto">
+                    <ScrollArea className="h-[60vh]">
                       <Table>
                           <TableHeader className="sticky top-0 bg-card">
                               <TableRow>
@@ -750,7 +751,7 @@ export default function LoansPage() {
                               })}
                           </TableBody>
                       </Table>
-                    </div>
+                    </ScrollArea>
                   )}
                 </CardContent>
             </Card>
@@ -779,7 +780,7 @@ export default function LoansPage() {
                         </Alert>
                     )}
                     {!isLoading && applicationLoans && applicationLoans.length > 0 && (
-                        <div className="relative max-h-[60vh] overflow-y-auto">
+                        <ScrollArea className="h-[60vh]">
                             <Table>
                                 <TableHeader className="sticky top-0 bg-card">
                                     <TableRow>
@@ -802,7 +803,7 @@ export default function LoansPage() {
                                     ))}
                                 </TableBody>
                             </Table>
-                        </div>
+                        </ScrollArea>
                     )}
                 </CardContent>
             </Card>
@@ -828,7 +829,7 @@ export default function LoansPage() {
                   Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="mt-4 max-h-[70vh] overflow-y-auto pr-4">
+              <ScrollArea className="mt-4 max-h-[70vh] pr-4">
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -886,7 +887,7 @@ export default function LoansPage() {
                         )}
                     </CardContent>
                 </Card>
-              </div>
+              </ScrollArea>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setSelectedCustomer(null)}>Close</Button>
               </DialogFooter>

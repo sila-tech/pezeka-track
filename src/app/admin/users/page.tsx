@@ -57,6 +57,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UserProfile {
   id: string;
@@ -198,23 +199,25 @@ export default function UserManagementPage() {
               </DialogDescription>
             </DialogHeader>
             <Form {...addForm}>
-              <form id="add-user-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                <FormField control={addForm.control} name="uid" render={({ field }) => (
-                  <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={addForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={addForm.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={addForm.control} name="role" render={({ field }) => (
-                  <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
-                      <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
-                  </Select><FormMessage /></FormItem>
-                )}/>
-              </form>
+              <ScrollArea className="max-h-[70vh]">
+                <form id="add-user-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
+                    <FormField control={addForm.control} name="uid" render={({ field }) => (
+                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="role" render={({ field }) => (
+                    <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
+                        <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
+                    </Select><FormMessage /></FormItem>
+                    )}/>
+                </form>
+              </ScrollArea>
             </Form>
              <DialogFooter className="mt-4">
                 <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
@@ -238,7 +241,7 @@ export default function UserManagementPage() {
               <Alert><AlertTitle>No User Profiles Found</AlertTitle><AlertDescription>There are no user profiles in the database. Add one to get started.</AlertDescription></Alert>
           )}
           {!usersLoading && users && users.length > 0 && (
-            <div className="relative max-h-[60vh] overflow-y-auto">
+            <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
                     <TableRow>
@@ -269,7 +272,7 @@ export default function UserManagementPage() {
                       ))}
                   </TableBody>
               </Table>
-            </div>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
@@ -282,23 +285,25 @@ export default function UserManagementPage() {
                 <DialogDescription>Update the profile for {userToEdit?.name}.</DialogDescription>
             </DialogHeader>
             <Form {...editForm}>
-              <form id="edit-user-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                <FormField control={editForm.control} name="uid" render={({ field }) => (
-                  <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={editForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={editForm.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={editForm.control} name="role" render={({ field }) => (
-                  <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
-                  </Select><FormMessage /></FormItem>
-                )}/>
-              </form>
+                <ScrollArea className="max-h-[70vh]">
+                    <form id="edit-user-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 p-1">
+                        <FormField control={editForm.control} name="uid" render={({ field }) => (
+                        <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={editForm.control} name="name" render={({ field }) => (
+                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={editForm.control} name="email" render={({ field }) => (
+                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={editForm.control} name="role" render={({ field }) => (
+                        <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                            <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
+                        </Select><FormMessage /></FormItem>
+                        )}/>
+                    </form>
+                </ScrollArea>
             </Form>
              <DialogFooter className="mt-4">
                 <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>

@@ -52,6 +52,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Investor {
   id: string;
@@ -198,20 +199,22 @@ export default function InvestorsPage() {
                 </DialogDescription>
                 </DialogHeader>
                 <Form {...addForm}>
-                <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                    <FormField control={addForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@example.com" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
-                    <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                </form>
+                <ScrollArea className="max-h-[70vh]">
+                    <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
+                        <FormField control={addForm.control} name="uid" render={({ field }) => (
+                        <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="name" render={({ field }) => (
+                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="email" render={({ field }) => (
+                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
+                        <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                    </form>
+                </ScrollArea>
                 </Form>
                 <DialogFooter className="mt-4">
                     <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
@@ -236,7 +239,7 @@ export default function InvestorsPage() {
               <Alert><AlertTitle>No Investors Found</AlertTitle><AlertDescription>There are no investors in the database. Add one to get started.</AlertDescription></Alert>
           )}
           {!isLoading && investors && investors.length > 0 && (
-            <div className="relative max-h-[60vh] overflow-y-auto">
+            <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
                     <TableRow>
@@ -279,7 +282,7 @@ export default function InvestorsPage() {
                       })}
                   </TableBody>
               </Table>
-            </div>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
@@ -292,20 +295,22 @@ export default function InvestorsPage() {
                 <DialogDescription>Update the profile for {investorToEdit?.name}.</DialogDescription>
             </DialogHeader>
             <Form {...editForm}>
-              <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                <FormField control={editForm.control} name="uid" render={({ field }) => (
-                  <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={editForm.control} name="name" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={editForm.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                 <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
-                  <FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                )}/>
-              </form>
+              <ScrollArea className="max-h-[70vh]">
+                <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 p-1">
+                    <FormField control={editForm.control} name="uid" render={({ field }) => (
+                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={editForm.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={editForm.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
+                    <FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                </form>
+              </ScrollArea>
             </Form>
              <DialogFooter className="mt-4">
                 <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>

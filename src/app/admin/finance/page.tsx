@@ -903,7 +903,7 @@ export default function FinancePage() {
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...addForm}>
-                    <div className="max-h-[70vh] overflow-y-auto pr-4">
+                    <ScrollArea className="max-h-[70vh] pr-4">
                         <form onSubmit={addForm.handleSubmit(onAddSubmit)} id="add-finance-entry-form" className="space-y-4">
                             <FormField
                                 control={addForm.control}
@@ -1068,7 +1068,7 @@ export default function FinancePage() {
                                 )}
                             />
                         </form>
-                    </div>
+                    </ScrollArea>
                     <DialogFooter className="pt-4">
                         <DialogClose asChild>
                             <Button type="button" variant="ghost">Cancel</Button>
@@ -1216,7 +1216,7 @@ export default function FinancePage() {
                         </Alert>
                       )}
                       {!isLoading && filteredLoans && filteredLoans.length > 0 && (
-                        <div className="relative max-h-[60vh] overflow-y-auto">
+                        <ScrollArea className="h-[60vh]">
                           <Table>
                               <TableHeader className="sticky top-0 bg-card">
                                   <TableRow>
@@ -1299,7 +1299,7 @@ export default function FinancePage() {
                                 </TableRow>
                             </TableFooter>
                           </Table>
-                        </div>
+                        </ScrollArea>
                       )}
                   </CardContent>
               </Card>
@@ -1314,7 +1314,7 @@ export default function FinancePage() {
             <DialogDescription>Update the details of this transaction.</DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <div className="max-h-[70vh] overflow-y-auto pr-4">
+            <ScrollArea className="max-h-[70vh] pr-4">
               <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} id="edit-finance-entry-form" className="space-y-4">
                   <FormField control={editForm.control} name="type" render={({ field }) => (<FormItem><FormLabel>Entry Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select><FormMessage/></FormItem>)} />
                   {editFinanceEntryType === 'receipt' && (
@@ -1330,7 +1330,7 @@ export default function FinancePage() {
                   )}
                   <FormField control={editForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description {editFinanceEntryType === 'expense' && editExpenseCategory === 'other' ? '' : '(Optional)'}</FormLabel><FormControl><Textarea {...field}/></FormControl><FormMessage/></FormItem>)} />
               </form>
-            </div>
+            </ScrollArea>
             <DialogFooter className="pt-4">
                 <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
                 <Button type="submit" form="edit-finance-entry-form" disabled={isUpdatingEntry}>{isUpdatingEntry && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
@@ -1536,7 +1536,7 @@ export default function FinancePage() {
 
                         <TabsContent value="edit">
                             <Form {...editLoanForm}>
-                                <div className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
+                                <ScrollArea className="max-h-[60vh] pr-4 mt-4">
                                     <form onSubmit={editLoanForm.handleSubmit(onLoanEditSubmit)} id="edit-loan-form" className="space-y-4">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <FormField control={editLoanForm.control} name="disbursementDate" render={({ field }) => (<FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -1564,7 +1564,7 @@ export default function FinancePage() {
                                             </CardContent>
                                         </Card>
                                     </form>
-                                </div>
+                                </ScrollArea>
                                 <DialogFooter className="mt-4">
                                     <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
                                     <Button type="submit" form="edit-loan-form" disabled={isEditingLoan}>{isEditingLoan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button>
