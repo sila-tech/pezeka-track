@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText, ShieldCheck, PiggyBank } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText, ShieldCheck, PiggyBank, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
@@ -54,6 +54,16 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
         <FileText className="h-4 w-4" />
         Application Forms
     </Link>
+    {(isSuperAdmin || isFinance || isStaff) && (
+        <Link
+            href="/admin/investors"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+            onClick={onLinkClick}
+        >
+            <Briefcase className="h-4 w-4" />
+            Investors
+        </Link>
+    )}
     {isSuperAdmin && (
         <Link
             href="/admin/users"

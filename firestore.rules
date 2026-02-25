@@ -32,40 +32,38 @@ service cloud.firestore {
 
     // Rules for User Profiles
     match /users/{userId} {
-      allow get: if isSuperAdmin();
-      allow get: if isOwner(userId);
+      allow get: if isSuperAdmin() || isOwner(userId);
       allow list, write: if isSuperAdmin();
     }
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      allow read, write: if isSuperAdmin();
-      allow read, write: if isStaff();
-      allow read, write: if isFinance();
+      allow read, write: if isSuperAdmin() || isStaff() || isFinance();
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      // Write access
-      allow write: if isSuperAdmin();
-      allow write: if isStaff();
-      allow write: if isFinance();
+      allow read: if isSuperAdmin() || isStaff() || isFinance();
+      allow write: if isSuperAdmin() || isStaff() || isFinance();
       
-      // Read access
-      allow read: if isSuperAdmin();
-      allow read: if isStaff();
-      allow read: if isFinance();
-      
-      // CUSTOMER-specific rules (for non-admins)
+      // CUSTOMER-specific rules
       allow get: if request.auth.uid == resource.data.customerId;
-      allow list: if request.auth.uid == request.resource.data.customerId;
       allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     }
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      allow read, write: if isSuperAdmin();
-      allow read, write: if isFinance();
+      allow read, write: if isSuperAdmin() || isFinance();
+    }
+
+    // Rules for Investors
+    match /investors/{investorId} {
+      // Broad read rule to allow LIST operations without document lookups
+      allow list, get: if request.auth != null;
+
+      // Strict write rules that CAN use document lookups
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isFinance();
     }
 
   }
