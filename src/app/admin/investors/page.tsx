@@ -244,7 +244,7 @@ export default function InvestorsPage() {
                             <TableRow key={investor.id}>
                                 <TableCell className="font-medium">{investor.name}</TableCell>
                                 <TableCell>{investor.email}</TableCell>
-                                <TableCell>{format(new Date(investor.createdAt.seconds * 1000), 'PPP')}</TableCell>
+                                <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
                                 <TableCell className="text-right">{investor.totalInvestment.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold">{investor.currentBalance.toLocaleString()}</TableCell>
                                 <TableCell className={`text-right font-medium ${roi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{roi.toFixed(2)}%</TableCell>
