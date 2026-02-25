@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { useUser, useDoc, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, FileText, Bell, Download } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, FileText, Bell, Download, Wallet, TrendingUp } from 'lucide-react';
+import { format, differenceInMonths, addMonths } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -89,6 +89,26 @@ export default function InvestorPage() {
     return (portfolio.currentBalance || 0) * (portfolio.interestRate / 100);
   }, [portfolio]);
 
+ const monthlyROI = useMemo(() => {
+    if (!portfolio || !portfolio.totalInvestment || portfolio.totalInvestment === 0 || !portfolio.createdAt) {
+      return 0;
+    }
+    const investmentDate = new Date(portfolio.createdAt.seconds * 1000);
+    const now = new Date();
+    const monthsInvested = differenceInMonths(now, investmentDate);
+
+    if (monthsInvested <= 0) {
+      // If invested for less than a month, calculate ROI based on current growth
+      const totalReturn = portfolio.currentBalance - portfolio.totalInvestment;
+      if (totalReturn <= 0) return 0;
+      return (totalReturn / portfolio.totalInvestment) * 100;
+    }
+
+    const totalReturn = portfolio.currentBalance - portfolio.totalInvestment;
+    if (totalReturn <= 0) return 0;
+    const averageMonthlyReturn = totalReturn / monthsInvested;
+    return (averageMonthlyReturn / portfolio.totalInvestment) * 100;
+  }, [portfolio]);
 
   async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
     if (!user) return;
@@ -107,6 +127,13 @@ export default function InvestorPage() {
         title: "Withdrawal Request Submitted",
         description: "Your request has been sent for processing.",
       });
+
+      const phoneNumber = "254757664047";
+      const message = `Hello! I would like to request a withdrawal of Ksh ${values.amount.toLocaleString()} from my Pezeka Credit portfolio. My investor account is associated with the email ${user.email}. Please process this request.`;
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+      
+      window.open(whatsappUrl, '_blank');
+
       withdrawalForm.reset();
     } catch (error: any) {
       toast({
@@ -230,33 +257,30 @@ export default function InvestorPage() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Invested Amount</CardTitle>
-                        <span className="text-muted-foreground">Ksh</span>
+                        <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{(portfolio.totalInvestment || 0).toLocaleString()}</div>
+                        <div className="text-2xl font-bold">Ksh {(portfolio.totalInvestment || 0).toLocaleString()}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Current Portfolio Value</CardTitle>
-                         <span className="text-muted-foreground">Ksh</span>
+                         <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{(portfolio.currentBalance || 0).toLocaleString()}</div>
+                        <div className="text-2xl font-bold">Ksh {(portfolio.currentBalance || 0).toLocaleString()}</div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Monthly Interest</CardTitle>
-                        <span className="text-muted-foreground">{portfolio.interestRate || 0}%</span>
+                        <CardTitle className="text-sm font-medium">Avg. Monthly ROI</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">
-                            Ksh {monthlyReturn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                           {monthlyROI.toFixed(2)}%
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Estimated return for this month
-                        </p>
                     </CardContent>
                 </Card>
             </div>
