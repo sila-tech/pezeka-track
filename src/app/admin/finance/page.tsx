@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, PiggyBank } from "lucide-react";
 import { arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan, deleteLoan } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { exportToCsv } from '@/lib/excel';
@@ -144,6 +144,13 @@ const paymentSchema = z.object({
     comments: z.string().optional(),
 });
 
+const penaltySchema = z.object({
+    penaltyAmount: z.coerce.number().min(0.01, 'Penalty amount must be greater than 0.'),
+    penaltyDate: z.string().min(1, 'Penalty date is required.'),
+    penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
+});
+
+
 const editLoanSchema = z.object({
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
@@ -168,6 +175,13 @@ interface Payment {
   amount: number;
 }
 
+interface Penalty {
+  penaltyId: string;
+  date: { seconds: number; nanoseconds: number } | Date;
+  amount: number;
+  description: string;
+}
+
 interface Loan {
   id: string;
   loanNumber: string;
@@ -187,8 +201,10 @@ interface Loan {
   instalmentAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
+  totalPenalties?: number;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: Payment[];
+  penalties?: Penalty[];
   comments?: string;
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
 }
@@ -214,6 +230,7 @@ export default function FinancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isAddingPenalty, setIsAddingPenalty] = useState(false);
   const [isEditingLoan, setIsEditingLoan] = useState(false);
   const [isRollingOver, setIsRollingOver] = useState(false);
 
@@ -265,6 +282,7 @@ export default function FinancePage() {
               chargingCost: 0,
               totalRepayableAmount: 0,
               totalPaid: 0,
+              totalPenalties: 0,
               balance: 0,
           };
       }
@@ -280,6 +298,7 @@ export default function FinancePage() {
           acc.chargingCost += (loan.chargingCost || 0);
           acc.totalRepayableAmount += loan.totalRepayableAmount;
           acc.totalPaid += loan.totalPaid;
+          acc.totalPenalties += (loan.totalPenalties || 0);
           acc.balance += balance;
           return acc;
       }, {
@@ -291,6 +310,7 @@ export default function FinancePage() {
           chargingCost: 0,
           totalRepayableAmount: 0,
           totalPaid: 0,
+          totalPenalties: 0,
           balance: 0,
       });
   }, [filteredLoans]);
@@ -327,6 +347,15 @@ export default function FinancePage() {
     defaultValues: {
         paymentAmount: undefined,
         comments: '',
+    },
+  });
+  
+  const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
+    resolver: zodResolver(penaltySchema),
+    defaultValues: {
+        penaltyAmount: undefined,
+        penaltyDate: format(new Date(), 'yyyy-MM-dd'),
+        penaltyDescription: '',
     },
   });
 
@@ -481,6 +510,11 @@ export default function FinancePage() {
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
         comments: loan.comments || '',
     });
+     penaltyForm.reset({
+        penaltyAmount: undefined,
+        penaltyDate: format(new Date(), 'yyyy-MM-dd'),
+        penaltyDescription: '',
+    });
     editLoanForm.reset({
         disbursementDate: format(new Date(loan.disbursementDate.seconds * 1000), 'yyyy-MM-dd'),
         principalAmount: loan.principalAmount,
@@ -547,6 +581,34 @@ export default function FinancePage() {
     }
   }
 
+  async function onPenaltySubmit(values: z.infer<typeof penaltySchema>) {
+    if (!loanToEdit) return;
+    setIsAddingPenalty(true);
+    try {
+        const penaltyData = {
+            amount: values.penaltyAmount,
+            date: new Date(values.penaltyDate),
+            description: values.penaltyDescription,
+        };
+
+        await addPenaltyToLoan(firestore, loanToEdit.id, penaltyData);
+
+        toast({
+            title: "Penalty Added",
+            description: `A penalty of Ksh ${values.penaltyAmount.toLocaleString()} has been added to loan #${loanToEdit.loanNumber}.`,
+        });
+        setLoanToEdit(null); // This will close the dialog and refresh the data
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Failed to Add Penalty",
+            description: "Could not add penalty. Please try again.",
+        });
+    } finally {
+        setIsAddingPenalty(false);
+    }
+  }
+
   async function onLoanEditSubmit(values: z.infer<typeof editLoanSchema>) {
     if (!loanToEdit) return;
     setIsEditingLoan(true);
@@ -558,11 +620,16 @@ export default function FinancePage() {
         values.paymentFrequency
     );
     
+    // Recalculate total repayable including existing penalties
+    const currentPenalties = loanToEdit.totalPenalties || 0;
+    const finalTotalRepayable = totalRepayableAmount + currentPenalties;
+
+
     const rawUpdateData: { [key: string]: any } = {
         ...values,
         disbursementDate: new Date(values.disbursementDate),
         instalmentAmount,
-        totalRepayableAmount,
+        totalRepayableAmount: finalTotalRepayable,
     };
 
     const updateData = Object.fromEntries(
@@ -1168,6 +1235,7 @@ export default function FinancePage() {
                                       <TableHead className="text-right">Instalment Amt</TableHead>
                                       <TableHead className="text-right">To Pay</TableHead>
                                       <TableHead className="text-right">Paid</TableHead>
+                                      <TableHead className="text-right">Penalties</TableHead>
                                       <TableHead className="text-right">Balance</TableHead>
                                       <TableHead>Status</TableHead>
                                       <TableHead className="text-right">Actions</TableHead>
@@ -1194,6 +1262,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
                                               <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right text-destructive">{(loan.totalPenalties || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                               <TableCell>
                                                   <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application' || loan.status === 'rejected') ? 'destructive' : 'secondary'}>
@@ -1223,6 +1292,7 @@ export default function FinancePage() {
                                     <TableCell /> {/* Instalment Amt */}
                                     <TableCell className="text-right">{(loanBookTotals.totalRepayableAmount || 0).toLocaleString()}</TableCell>
                                     <TableCell className="text-right text-green-600">{(loanBookTotals.totalPaid || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="text-right text-destructive">{(loanBookTotals.totalPenalties || 0).toLocaleString()}</TableCell>
                                     <TableCell className="text-right font-bold">{(loanBookTotals.balance || 0).toLocaleString()}</TableCell>
                                     <TableCell /> {/* Status */}
                                     <TableCell /> {/* Actions */}
@@ -1322,8 +1392,9 @@ export default function FinancePage() {
                     </DialogHeader>
 
                     <Tabs defaultValue="payment" className="mt-4">
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-5">
                             <TabsTrigger value="payment">Record Payment & Comments</TabsTrigger>
+                            <TabsTrigger value="penalty">Add Penalty</TabsTrigger>
                             <TabsTrigger value="edit">Edit Loan Details</TabsTrigger>
                             <TabsTrigger value="rollover">Rollover Loan</TabsTrigger>
                             <TabsTrigger value="delete" className="text-destructive">Delete Loan</TabsTrigger>
@@ -1402,6 +1473,66 @@ export default function FinancePage() {
                                 <Button type="submit" form="payment-form" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Payment</Button>
                             </DialogFooter>
                         </TabsContent>
+                        
+                        <TabsContent value="penalty">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                                <div className="space-y-4">
+                                    <Card>
+                                        <CardHeader><CardTitle>Add a New Penalty</CardTitle></CardHeader>
+                                        <CardContent>
+                                            <Form {...penaltyForm}>
+                                                <form onSubmit={penaltyForm.handleSubmit(onPenaltySubmit)} className="space-y-4" id="penalty-form">
+                                                    <FormField control={penaltyForm.control} name="penaltyAmount" render={({ field }) => (<FormItem><FormLabel>Penalty Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                                    <FormField control={penaltyForm.control} name="penaltyDate" render={({ field }) => (<FormItem><FormLabel>Penalty Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                                    <FormField control={penaltyForm.control} name="penaltyDescription" render={({ field }) => (<FormItem><FormLabel>Penalty Reason</FormLabel><FormControl><Textarea placeholder="e.g., Late payment fee for January" {...field} rows={4} /></FormControl><FormMessage /></FormItem>)} />
+                                                </form>
+                                            </Form>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                                <div>
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle>Penalty History</CardTitle>
+                                            <CardDescription>All penalties applied to this loan.</CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <ScrollArea className="h-72">
+                                                {(!loanToEdit.penalties || loanToEdit.penalties.length === 0) ? (
+                                                <Alert>
+                                                    <AlertTitle>No Penalties Yet</AlertTitle>
+                                                    <AlertDescription>No penalties have been applied to this loan.</AlertDescription>
+                                                </Alert>
+                                                ) : (
+                                                <Table>
+                                                    <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Date</TableHead>
+                                                        <TableHead>Description</TableHead>
+                                                        <TableHead className="text-right">Amount</TableHead>
+                                                    </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                    {loanToEdit.penalties.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map((penalty) => (
+                                                        <TableRow key={penalty.penaltyId}>
+                                                            <TableCell>{format(new Date((penalty.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                            <TableCell>{penalty.description}</TableCell>
+                                                            <TableCell className="text-right">{penalty.amount.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    </TableBody>
+                                                </Table>
+                                                )}
+                                            </ScrollArea>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </div>
+                             <DialogFooter className="mt-4">
+                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                <Button type="submit" form="penalty-form" disabled={isAddingPenalty}>{isAddingPenalty && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Penalty</Button>
+                            </DialogFooter>
+                        </TabsContent>
 
                         <TabsContent value="edit">
                             <Form {...editLoanForm}>
@@ -1427,7 +1558,7 @@ export default function FinancePage() {
                                                     <span className="font-bold text-lg">Ksh {recalculatedValues.instalmentAmount}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center mt-2">
-                                                    <span className="text-muted-foreground">New Total Repayable:</span>
+                                                    <span className="text-muted-foreground">New Total Repayable (excl. penalties):</span>
                                                     <span className="font-bold text-lg">Ksh {recalculatedValues.totalRepayableAmount}</span>
                                                 </div>
                                             </CardContent>

@@ -47,6 +47,7 @@
         "instalmentAmount": { "type": "number" },
         "totalRepayableAmount": { "type": "number", "description": "Total amount to be paid back."},
         "totalPaid": { "type": "number", "default": 0 },
+        "totalPenalties": { "type": "number", "default": 0, "description": "Total amount of penalties applied to the loan." },
         "paymentFrequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
         "status": { "type": "string", "enum": ["due", "paid", "active", "rollover", "overdue", "application", "rejected"] },
         "payments": {
@@ -60,6 +61,20 @@
                     "amount": { "type": "number" }
                 },
                 "required": ["paymentId", "date", "amount"]
+            }
+        },
+        "penalties": {
+            "type": "array",
+            "description": "History of penalties applied to this loan.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "penaltyId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "amount": { "type": "number" },
+                    "description": { "type": "string" }
+                },
+                "required": ["penaltyId", "date", "amount", "description"]
             }
         },
         "comments": { "type": "string", "description": "General comments about the loan, such as rollover requests." },

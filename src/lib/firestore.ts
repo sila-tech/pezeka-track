@@ -30,8 +30,10 @@ interface Loan {
   instalmentAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
+  totalPenalties?: number;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
+  penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; }[];
   comments?: string;
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
 }
@@ -303,7 +305,6 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
     }
 }
 
-
 export async function deleteLoan(db: Firestore, loanId: string) {
     const loanRef = doc(db, 'loans', loanId);
     try {
@@ -312,6 +313,38 @@ export async function deleteLoan(db: Firestore, loanId: string) {
         const permissionError = new FirestorePermissionError({
             path: loanRef.path,
             operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: { amount: number; date: Date; description: string }) {
+    const loanRef = doc(db, 'loans', loanId);
+    
+    // Firestore can generate IDs client-side without a round trip
+    const penaltyId = doc(collection(db, 'temp')).id;
+
+    const penaltyWithId = {
+        ...penalty,
+        penaltyId: penaltyId,
+    };
+
+    try {
+        await updateDoc(loanRef, {
+            penalties: arrayUnion(penaltyWithId),
+            totalPenalties: increment(penalty.amount),
+            totalRepayableAmount: increment(penalty.amount)
+        });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loanRef.path,
+            operation: 'update',
+            requestResourceData: {
+                penalties: 'ADD_PENALTY_DATA', // Placeholder to avoid sending large objects
+                totalPenalties: `increment by ${penalty.amount}`,
+                totalRepayableAmount: `increment by ${penalty.amount}`
+            },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
