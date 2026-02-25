@@ -70,21 +70,27 @@ service cloud.firestore {
 
     // Rules for Investors
     match /investors/{investorId} {
-      // Only the Super Admin can create, update, or delete investor profiles.
+      // Only the Super Admin can manage investor profiles.
       allow write: if isSuperAdmin();
-      // Only the Super Admin can list all investors.
-      allow list: if isSuperAdmin();
-      // An investor can read their own profile, and the Super Admin can read any profile.
-      allow get: if isOwner(investorId) || isSuperAdmin();
+      // Finance and Super Admins need to list investors to manage investments.
+      allow list: if isFinance() || isSuperAdmin();
+      // All admins and the investor themselves can view a profile.
+      allow get: if isOwner(investorId) || isStaff() || isFinance() || isSuperAdmin();
     }
     
     // Rules for Investments
     match /investments/{investmentId} {
-      // Admins have full access.
-      allow read, write: if isStaff() || isFinance() || isSuperAdmin();
-      // An investor can read their own investments.
+      // Only Finance and Super Admins can manage investments.
+      allow write: if isFinance() || isSuperAdmin();
+      
+      // Admins have full read access to all investments.
+      allow read: if isStaff() || isFinance() || isSuperAdmin();
+      
+      // An investor can read their own specific investment record.
       allow get: if request.auth.uid == resource.data.investorId;
-      allow list: if request.auth != null; // Client query must filter by investorId
+
+      // An investor can list investments, but the client query must filter by their UID.
+      allow list: if request.auth != null;
     }
   }
 }
