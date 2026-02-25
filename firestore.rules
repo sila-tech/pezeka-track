@@ -74,9 +74,9 @@ service cloud.firestore {
       // Only the Super Admin can manage investor profiles.
       allow write: if isSuperAdmin();
       // Finance and Super Admins need to list investors to manage investments.
-      allow list: if isFinance() || isSuperAdmin();
+      allow list: if isSuperAdmin() || isFinance();
       // Finance, Super Admins, and the investor themselves can view a profile.
-      allow get: if isOwner(investorId) || isFinance() || isSuperAdmin();
+      allow get: if isOwner(investorId) || isSuperAdmin() || isFinance();
     }
     
     // Rules for Investments
