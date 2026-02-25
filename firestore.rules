@@ -15,7 +15,7 @@ service cloud.firestore {
     // WARNING: The following functions use `get()` and CANNOT be used in `list` rules.
     // They are safe for single document access (`get`, `create`, `update`, `delete`).
     function getUserRole() {
-      if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
+      if (request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
       }
       return ''; // Return empty string if profile doesn't exist, preventing errors.
@@ -30,7 +30,7 @@ service cloud.firestore {
     }
     
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
     // =====================================================================
@@ -68,13 +68,13 @@ service cloud.firestore {
       allow get: if isStaff() || isFinance() || isSuperAdmin();
       
       // A customer can get their own loan document.
-      allow get: if request.auth.uid == resource.data.customerId;
+      allow get: if request.auth != null && resource.data.customerId == request.auth.uid;
       
       // Admins have full write access.
       allow write: if isStaff() || isFinance() || isSuperAdmin();
       
       // Customers can create new loan applications for themselves.
-      allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
+      allow create: if request.auth != null && request.resource.data.customerId == request.auth.uid && request.resource.data.status == 'application';
     }
     
     // Rules for Finance Entries
@@ -83,6 +83,24 @@ service cloud.firestore {
       allow list: if request.auth != null;
       // Only Finance and Super Admin can get single entries or write.
       allow get, write: if isFinance() || isSuperAdmin();
+    }
+
+    // Rules for the Investors collection
+    match /investors/{investorId} {
+      // Any authenticated user can list investors. The UI controls visibility.
+      allow list: if request.auth != null;
+      
+      // An investor can read their own portfolio data
+      allow get: if isOwner(investorId);
+
+      // Staff, Finance, or SuperAdmins have read access to individual documents.
+      allow get: if isStaff() || isFinance() || isSuperAdmin();
+      
+      // Only Finance and Super Admin can update portfolios.
+      allow update: if isFinance() || isSuperAdmin();
+
+      // Only Super Admin can create or delete portfolios.
+      allow create, delete: if isSuperAdmin();
     }
   }
 }
