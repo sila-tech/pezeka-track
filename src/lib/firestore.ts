@@ -406,10 +406,13 @@ export async function deleteUserProfile(db: Firestore, userId: string) {
 
 
 // Investor Functions
-export async function addInvestor(db: Firestore, investorData: { uid: string; name: string; email: string; totalInvestment: number; currentBalance: number; }) {
+export async function addInvestor(db: Firestore, investorData: { uid: string; name: string; email: string; totalInvestment: number; currentBalance: number; interestRate?: number; }) {
     const investorRef = doc(db, 'investors', investorData.uid);
     const data = {
         ...investorData,
+        interestRate: investorData.interestRate || 0,
+        withdrawals: [],
+        interestEntries: [],
         createdAt: serverTimestamp()
     };
     try {
@@ -452,5 +455,114 @@ export async function deleteInvestor(db: Firestore, investorId: string) {
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
+    }
+}
+
+export async function applyInterestToPortfolio(db: Firestore, investorId: string, interestAmount: number, description: string) {
+    const investorRef = doc(db, 'investors', investorId);
+    const entryId = doc(collection(db, 'temp')).id;
+    const interestEntry = {
+        entryId,
+        amount: interestAmount,
+        date: new Date(),
+        description,
+    };
+
+    try {
+        await updateDoc(investorRef, {
+            currentBalance: increment(interestAmount),
+            interestEntries: arrayUnion(interestEntry),
+            updatedAt: serverTimestamp(),
+        });
+    } catch(e) {
+        const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { currentBalance: `increment by ${interestAmount}` }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
+    }
+}
+
+export async function requestWithdrawal(db: Firestore, investorId: string, amount: number) {
+    const investorRef = doc(db, 'investors', investorId);
+    const withdrawalId = doc(collection(db, 'temp')).id;
+    const withdrawalRequest = {
+        withdrawalId,
+        amount,
+        date: new Date(),
+        status: 'pending'
+    };
+
+    try {
+        await updateDoc(investorRef, {
+            withdrawals: arrayUnion(withdrawalRequest),
+            updatedAt: serverTimestamp(),
+        });
+    } catch(e) {
+        const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { withdrawals: 'ADD_WITHDRAWAL_REQUEST' }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
+    }
+}
+
+export async function processWithdrawal(db: Firestore, investorId: string, withdrawalId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+    
+    // This part is not transactional and can be improved with a transaction or cloud function in a real app.
+    // 1. Find the withdrawal and update its status
+    const investorDoc = await getDoc(investorRef);
+    if (!investorDoc.exists()) throw new Error("Investor not found");
+
+    const investorData = investorDoc.data();
+    const withdrawal = investorData.withdrawals?.find((w: any) => w.withdrawalId === withdrawalId);
+
+    if (!withdrawal || withdrawal.status !== 'pending') {
+        throw new Error("Withdrawal request not found or already processed.");
+    }
+
+    const updatedWithdrawals = investorData.withdrawals.map((w: any) => 
+        w.withdrawalId === withdrawalId ? { ...w, status: 'processed' } : w
+    );
+    
+    // 2. Create a finance entry for the payout
+    await addFinanceEntry(db, {
+        type: 'payout',
+        date: new Date(),
+        amount: withdrawal.amount,
+        description: `Investor withdrawal for ${investorData.name}`,
+    });
+
+    // 3. Update the investor's balance and withdrawals array
+    try {
+         await updateDoc(investorRef, {
+            withdrawals: updatedWithdrawals,
+            currentBalance: increment(-withdrawal.amount),
+            updatedAt: serverTimestamp()
+        });
+    } catch (e) {
+         const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { currentBalance: `decrement by ${withdrawal.amount}` }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
+    }
+}
+
+export async function rejectWithdrawal(db: Firestore, investorId: string, withdrawalId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+
+    const investorDoc = await getDoc(investorRef);
+    if (!investorDoc.exists()) throw new Error("Investor not found");
+
+    const withdrawals = investorDoc.data().withdrawals || [];
+    const updatedWithdrawals = withdrawals.map((w: any) => 
+        w.withdrawalId === withdrawalId ? { ...w, status: 'rejected' } : w
+    );
+
+    try {
+        await updateDoc(investorRef, {
+            withdrawals: updatedWithdrawals,
+            updatedAt: serverTimestamp()
+        });
+    } catch(e) {
+        const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { withdrawals: 'REJECT_WITHDRAWAL' }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
     }
 }

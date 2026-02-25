@@ -61,6 +61,7 @@ interface Investor {
   email: string;
   totalInvestment: number;
   currentBalance: number;
+  interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
 }
 
@@ -69,6 +70,7 @@ const investorSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
   email: z.string().email('A valid email is required.'),
   totalInvestment: z.coerce.number().min(0, 'Total investment cannot be negative.'),
+  interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.').optional(),
 });
 
 export default function InvestorsPage() {
@@ -100,7 +102,7 @@ export default function InvestorsPage() {
 
     const addForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
-        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0 },
+        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0, interestRate: 0 },
     });
 
     const editForm = useForm<z.infer<typeof investorSchema>>({
@@ -116,6 +118,7 @@ export default function InvestorsPage() {
                 email: values.email,
                 totalInvestment: values.totalInvestment,
                 currentBalance: values.totalInvestment, // Initially balance equals investment
+                interestRate: values.interestRate || 0,
             });
             toast({ title: 'Investor Created', description: `Profile for ${values.name} has been added.` });
             setAddDialogOpen(false);
@@ -134,6 +137,7 @@ export default function InvestorsPage() {
             name: investor.name,
             email: investor.email,
             totalInvestment: investor.totalInvestment,
+            interestRate: investor.interestRate || 0,
         });
         setEditDialogOpen(true);
     };
@@ -208,10 +212,13 @@ export default function InvestorsPage() {
                         <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={addForm.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
                         <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="interestRate" render={({ field }) => (
+                        <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
                     </form>
                 </ScrollArea>
@@ -246,6 +253,7 @@ export default function InvestorsPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Date Joined</TableHead>
+                        <TableHead>Interest Rate</TableHead>
                         <TableHead className="text-right">Total Investment (Ksh)</TableHead>
                         <TableHead className="text-right">Current Balance (Ksh)</TableHead>
                         <TableHead className="text-right">ROI</TableHead>
@@ -260,6 +268,7 @@ export default function InvestorsPage() {
                                 <TableCell className="font-medium">{investor.name}</TableCell>
                                 <TableCell>{investor.email}</TableCell>
                                 <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
+                                <TableCell>{investor.interestRate || 0}%</TableCell>
                                 <TableCell className="text-right">{investor.totalInvestment.toLocaleString()}</TableCell>
                                 <TableCell className="text-right font-bold">{investor.currentBalance.toLocaleString()}</TableCell>
                                 <TableCell className={`text-right font-medium ${roi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{roi.toFixed(2)}%</TableCell>
@@ -308,6 +317,9 @@ export default function InvestorsPage() {
                     )}/>
                     <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
                     <FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={editForm.control} name="interestRate" render={({ field }) => (
+                    <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                 </form>
               </ScrollArea>

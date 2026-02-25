@@ -125,8 +125,37 @@
         "email": { "type": "string", "format": "email" },
         "totalInvestment": { "type": "number" },
         "currentBalance": { "type": "number" },
+        "interestRate": { "type": "number", "description": "The monthly interest rate as a percentage (e.g., 5 for 5%)." },
         "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "interestEntries": {
+            "type": "array",
+            "description": "History of interest payments added to this portfolio.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "entryId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "amount": { "type": "number" },
+                    "description": { "type": "string" }
+                },
+                "required": ["entryId", "date", "amount"]
+            }
+        },
+        "withdrawals": {
+            "type": "array",
+            "description": "History of withdrawal requests.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "withdrawalId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "amount": { "type": "number" },
+                    "status": { "type": "string", "enum": ["pending", "processed", "rejected"] }
+                },
+                "required": ["withdrawalId", "date", "amount", "status"]
+            }
+        }
       },
       "required": ["uid", "name", "email", "totalInvestment", "currentBalance"]
     }

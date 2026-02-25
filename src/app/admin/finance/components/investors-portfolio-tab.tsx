@@ -4,10 +4,10 @@ import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
-import { addInvestor, addInterestToInvestorPortfolio, deleteInvestor } from '@/lib/firestore';
+import { addInvestor, applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,21 +43,16 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, PlusCircle, PenSquare, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, PenSquare, Trash2, Check, X, CircleSlash } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 
 // Schemas
 const addInvestorSchema = z.object({
   name: z.string().min(1, 'Portfolio holder name is required.'),
   initialInvestment: z.coerce.number().min(1, 'Initial investment must be greater than 0.'),
-});
-
-const addInterestSchema = z.object({
-    amount: z.coerce.number().min(0.01, 'Interest amount must be greater than 0.'),
-    date: z.string().min(1, 'Interest date is required.'),
-    description: z.string().optional(),
 });
 
 
@@ -69,13 +64,22 @@ interface InterestEntry {
   description?: string;
 }
 
+interface Withdrawal {
+  withdrawalId: string;
+  date: { seconds: number; nanoseconds: number } | Date;
+  amount: number;
+  status: 'pending' | 'processed' | 'rejected';
+}
+
 interface Investor {
   id: string;
   name: string;
   initialInvestment: number;
   currentBalance: number;
+  interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
   interestEntries?: InterestEntry[];
+  withdrawals?: Withdrawal[];
 }
 
 
@@ -97,15 +101,9 @@ export function InvestorsPortfolioTab() {
 
   const isLoading = userLoading || investorsLoading;
 
-  // Forms
   const addInvestorForm = useForm<z.infer<typeof addInvestorSchema>>({
     resolver: zodResolver(addInvestorSchema),
     defaultValues: { name: '', initialInvestment: undefined },
-  });
-
-  const addInterestForm = useForm<z.infer<typeof addInterestSchema>>({
-    resolver: zodResolver(addInterestSchema),
-    defaultValues: { amount: undefined, date: format(new Date(), 'yyyy-MM-dd'), description: '' },
   });
 
 
@@ -126,27 +124,48 @@ export function InvestorsPortfolioTab() {
 
   const handleManageClick = (investor: Investor) => {
     setSelectedInvestor(investor);
-    addInterestForm.reset({ amount: undefined, date: format(new Date(), 'yyyy-MM-dd'), description: '' });
     setManageInvestorOpen(true);
   };
   
-  async function onAddInterestSubmit(values: z.infer<typeof addInterestSchema>) {
-      if (!selectedInvestor) return;
-      setIsSubmitting(true);
-      try {
-          await addInterestToInvestorPortfolio(firestore, selectedInvestor.id, {
-              ...values,
-              date: new Date(values.date),
-          });
-          toast({ title: 'Interest Added', description: `Interest has been added to ${selectedInvestor.name}'s portfolio.` });
-          addInterestForm.reset();
-          // We don't close the dialog, just clear the form for another entry.
-          // The data will refresh in the background.
-      } catch (error: any) {
-          toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not add interest.' });
-      } finally {
-          setIsSubmitting(false);
-      }
+  const handleApplyInterest = async () => {
+    if (!selectedInvestor || !monthlyInterest) return;
+    setIsSubmitting(true);
+    try {
+        const description = `Monthly interest for ${format(new Date(), 'MMMM yyyy')}`;
+        await applyInterestToPortfolio(firestore, selectedInvestor.id, monthlyInterest, description);
+        toast({ title: 'Interest Applied', description: `Ksh ${monthlyInterest.toLocaleString()} applied to ${selectedInvestor.name}'s portfolio.`});
+        // Data will refresh from Firestore listener
+    } catch(error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not apply interest.' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+
+  const handleProcessWithdrawal = async (withdrawalId: string) => {
+    if (!selectedInvestor) return;
+    setIsSubmitting(true);
+    try {
+      await processWithdrawal(firestore, selectedInvestor.id, withdrawalId);
+      toast({ title: 'Withdrawal Processed', description: "The withdrawal has been marked as processed and the balance updated."});
+    } catch(e: any) {
+      toast({ variant: 'destructive', title: 'Processing Failed', description: e.message || 'Could not process withdrawal.'});
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+  
+  const handleRejectWithdrawal = async (withdrawalId: string) => {
+     if (!selectedInvestor) return;
+    setIsSubmitting(true);
+    try {
+      await rejectWithdrawal(firestore, selectedInvestor.id, withdrawalId);
+      toast({ title: 'Withdrawal Rejected', description: "The withdrawal request has been rejected."});
+    } catch(e: any) {
+      toast({ variant: 'destructive', title: 'Action Failed', description: e.message || 'Could not reject withdrawal.'});
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const handleDeleteClick = (investor: Investor) => {
@@ -173,7 +192,6 @@ export function InvestorsPortfolioTab() {
       return investors ? [...investors].sort((a, b) => b.createdAt.seconds - a.createdAt.seconds) : [];
   }, [investors]);
   
-  // Totals for the footer
   const portfolioTotals = useMemo(() => {
     if (!sortedInvestors) return { initial: 0, balance: 0 };
     return sortedInvestors.reduce((acc, investor) => {
@@ -182,6 +200,26 @@ export function InvestorsPortfolioTab() {
         return acc;
     }, { initial: 0, balance: 0 });
   }, [sortedInvestors]);
+
+  const monthlyInterest = useMemo(() => {
+    if (!selectedInvestor || !selectedInvestor.interestRate) return 0;
+    // As per user, month starts on investment date. But for simplicity and regular cadence,
+    // we'll apply monthly interest on the current balance.
+    // A more complex implementation could track the exact investment date.
+    const rate = selectedInvestor.interestRate / 100;
+    return selectedInvestor.currentBalance * rate;
+  }, [selectedInvestor]);
+
+  const hasInterestBeenAppliedThisMonth = useMemo(() => {
+    if (!selectedInvestor?.interestEntries || selectedInvestor.interestEntries.length === 0) return false;
+    const now = new Date();
+    const startOfCurrentMonth = startOfMonth(now);
+    const endOfCurrentMonth = endOfMonth(now);
+    return selectedInvestor.interestEntries.some(entry => {
+        const entryDate = new Date((entry.date as any).seconds * 1000);
+        return entryDate >= startOfCurrentMonth && entryDate <= endOfCurrentMonth;
+    });
+  }, [selectedInvestor?.interestEntries]);
 
 
   return (
@@ -192,29 +230,6 @@ export function InvestorsPortfolioTab() {
             <CardTitle>Investment Portfolios</CardTitle>
             <CardDescription>Track investment portfolios and their accumulated interest.</CardDescription>
           </div>
-          <Dialog open={addInvestorOpen} onOpenChange={setAddInvestorOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                    <PlusCircle className="mr-2" /> Add New Portfolio
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Create New Investment Portfolio</DialogTitle>
-                    <DialogDescription>Enter the details for the new portfolio and its initial investment.</DialogDescription>
-                </DialogHeader>
-                <Form {...addInvestorForm}>
-                    <form id="add-investor-form" onSubmit={addInvestorForm.handleSubmit(onAddInvestorSubmit)} className="space-y-4">
-                        <FormField control={addInvestorForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Portfolio Holder Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={addInvestorForm.control} name="initialInvestment" render={({ field }) => (<FormItem><FormLabel>Initial Investment Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g., 500000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                    </form>
-                </Form>
-                <DialogFooter className="mt-4">
-                    <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                    <Button type="submit" form="add-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Create Portfolio</Button>
-                </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </CardHeader>
         <CardContent>
           {isLoading && (
@@ -223,7 +238,7 @@ export function InvestorsPortfolioTab() {
           {!isLoading && (!sortedInvestors || sortedInvestors.length === 0) && (
               <Alert>
                   <AlertTitle>No Portfolios Found</AlertTitle>
-                  <AlertDescription>Click "Add New Portfolio" to get started.</AlertDescription>
+                  <AlertDescription>Go to the Investors page to add a new portfolio.</AlertDescription>
               </Alert>
           )}
           {!isLoading && sortedInvestors && sortedInvestors.length > 0 && (
@@ -251,9 +266,11 @@ export function InvestorsPortfolioTab() {
                                       <Button variant="ghost" size="sm" onClick={() => handleManageClick(investor)}>
                                           <PenSquare className="mr-2 h-4 w-4" /> Manage
                                       </Button>
-                                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(investor)}>
-                                          <Trash2 className="h-4 w-4" />
-                                      </Button>
+                                      {user?.email === 'simon@pezeka.com' && (
+                                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(investor)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                   </TableCell>
                               </TableRow>
                           )
@@ -274,59 +291,103 @@ export function InvestorsPortfolioTab() {
       
       {/* Manage Investor Dialog */}
       <Dialog open={manageInvestorOpen} onOpenChange={setManageInvestorOpen}>
-          <DialogContent className="sm:max-w-3xl">
+          <DialogContent className="sm:max-w-4xl">
               {selectedInvestor && (
                   <>
                     <DialogHeader>
                         <DialogTitle>Manage Portfolio for: {selectedInvestor.name}</DialogTitle>
-                        <DialogDescription>Add manual interest entries and view the history for this portfolio.</DialogDescription>
+                        <DialogDescription>Apply interest, process withdrawals, and view history.</DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[60vh] pr-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                            <div className="space-y-4">
-                                <Card>
-                                    <CardHeader><CardTitle>Add Interest Entry</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <Form {...addInterestForm}>
-                                            <form onSubmit={addInterestForm.handleSubmit(onAddInterestSubmit)} id="add-interest-form" className="space-y-4">
-                                                <FormField control={addInterestForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Interest Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="0.00" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                                                <FormField control={addInterestForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                                <FormField control={addInterestForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Monthly interest for January" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                                <Button type="submit" disabled={isSubmitting} className="w-full">{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Add Interest</Button>
-                                            </form>
-                                        </Form>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                            <div>
-                                <Card>
-                                    <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
-                                    <CardContent>
-                                        <ScrollArea className="h-72">
-                                            {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
-                                                <Alert>
-                                                    <AlertTitle>No Interest Added</AlertTitle>
-                                                    <AlertDescription>No interest has been manually added yet.</AlertDescription>
-                                                </Alert>
-                                            ) : (
-                                                <Table>
-                                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                                                    <TableBody>
-                                                        {selectedInvestor.interestEntries.sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
-                                                            <TableRow key={entry.entryId}>
-                                                                <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                                <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                            )}
-                                        </ScrollArea>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                        <div className="space-y-4">
+                            <Card>
+                                <CardHeader><CardTitle>Apply Monthly Interest</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                     <div className="space-y-2 rounded-md bg-muted p-4">
+                                        <div className="flex justify-between">
+                                            <span className="text-sm font-medium">Monthly Interest Rate</span>
+                                            <span className="text-sm font-bold">{selectedInvestor.interestRate || 0}%</span>
+                                        </div>
+                                         <div className="flex justify-between">
+                                            <span className="text-sm font-medium">Calculated Interest</span>
+                                            <span className="text-sm font-bold">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    </div>
+                                    {hasInterestBeenAppliedThisMonth ? (
+                                        <Alert variant="default">
+                                            <Check className="h-4 w-4" />
+                                            <AlertTitle>Interest Already Applied</AlertTitle>
+                                            <AlertDescription>Monthly interest has already been applied for this portfolio this month.</AlertDescription>
+                                        </Alert>
+                                    ) : (
+                                        <Button onClick={handleApplyInterest} disabled={isSubmitting || monthlyInterest <= 0} className="w-full">
+                                            {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
+                                            Apply Interest for {format(new Date(), 'MMMM')}
+                                        </Button>
+                                    )}
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle>Interest History</CardTitle></CardHeader>
+                                <CardContent>
+                                    <ScrollArea className="h-60">
+                                        {(!selectedInvestor.interestEntries || selectedInvestor.interestEntries.length === 0) ? (
+                                            <Alert><AlertTitle>No Interest Added</AlertTitle><AlertDescription>No interest has been applied yet.</AlertDescription></Alert>
+                                        ) : (
+                                            <Table>
+                                                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                                <TableBody>
+                                                    {[...selectedInvestor.interestEntries].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(entry => (
+                                                        <TableRow key={entry.entryId}>
+                                                            <TableCell>{format(new Date((entry.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                            <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        )}
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
                         </div>
-                    </ScrollArea>
+                        <div>
+                             <Card>
+                                <CardHeader><CardTitle>Withdrawal Requests</CardTitle></CardHeader>
+                                <CardContent>
+                                     <ScrollArea className="h-[33.5rem]">
+                                        {(!selectedInvestor.withdrawals || selectedInvestor.withdrawals.length === 0) ? (
+                                            <Alert><AlertTitle>No Withdrawals</AlertTitle><AlertDescription>This investor has not made any withdrawal requests.</AlertDescription></Alert>
+                                        ) : (
+                                            <Table>
+                                                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                                <TableBody>
+                                                    {[...selectedInvestor.withdrawals].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(w => (
+                                                        <TableRow key={w.withdrawalId}>
+                                                            <TableCell>{format(new Date((w.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                                            <TableCell>{w.amount.toLocaleString()}</TableCell>
+                                                            <TableCell>
+                                                                <Badge variant={w.status === 'pending' ? 'secondary' : w.status === 'processed' ? 'default' : 'destructive'}>
+                                                                    {w.status}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                {w.status === 'pending' && (
+                                                                    <>
+                                                                        <Button variant="ghost" size="sm" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600" /></Button>
+                                                                        <Button variant="ghost" size="sm" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive" /></Button>
+                                                                    </>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        )}
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
                     <DialogFooter className="mt-4">
                         <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
                     </DialogFooter>

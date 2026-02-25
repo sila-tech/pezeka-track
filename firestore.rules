@@ -15,7 +15,7 @@ service cloud.firestore {
     // WARNING: The following functions use `get()` and CANNOT be used in `list` rules.
     // They are safe for single document access (`get`, `create`, `update`, `delete`).
     function getUserRole() {
-      return (request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)))
+      return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
         : '';
     }
@@ -86,7 +86,7 @@ service cloud.firestore {
 
     // Rules for the Investors collection
     match /investors/{investorId} {
-      // Any authenticated user can list investors. The UI controls visibility.
+      // Any authenticated admin user can list investors. The UI controls visibility.
       allow list: if request.auth != null;
       
       // An investor can read their own portfolio data
@@ -95,7 +95,12 @@ service cloud.firestore {
       // Finance, or SuperAdmins have read access to individual documents.
       allow get: if isFinance() || isSuperAdmin();
       
-      // Only Finance and Super Admin can update portfolios.
+      // An investor can update their own document to request a withdrawal.
+      // We check that only the 'withdrawals' array is being modified.
+      allow update: if isOwner(investorId) 
+                    && request.resource.data.keys().hasOnly(['withdrawals', 'updatedAt']);
+
+      // Only Finance and Super Admin can update portfolios for other reasons (e.g. applying interest).
       allow update: if isFinance() || isSuperAdmin();
 
       // Only Super Admin can create or delete portfolios.
