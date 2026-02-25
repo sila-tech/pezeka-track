@@ -15,10 +15,9 @@ service cloud.firestore {
     // WARNING: The following functions use `get()` and CANNOT be used in `list` rules.
     // They are safe for single document access (`get`, `create`, `update`, `delete`).
     function getUserRole() {
-      if (request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      }
-      return ''; // Return empty string if profile doesn't exist, preventing errors.
+      return (request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : '';
     }
 
     function isStaff() {
