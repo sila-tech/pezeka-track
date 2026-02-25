@@ -70,12 +70,12 @@ service cloud.firestore {
 
     // Rules for Investors
     match /investors/{investorId} {
-      // Admins can write.
-      allow write: if isStaff() || isFinance() || isSuperAdmin();
-      // The investor page is admin-only, so only the super admin needs list permission.
+      // Only the Super Admin can create, update, or delete investor profiles.
+      allow write: if isSuperAdmin();
+      // Only the Super Admin can list all investors.
       allow list: if isSuperAdmin();
-      // An investor can read their own profile, and admins can read any profile.
-      allow get: if isOwner(investorId) || isStaff() || isFinance() || isSuperAdmin();
+      // An investor can read their own profile, and the Super Admin can read any profile.
+      allow get: if isOwner(investorId) || isSuperAdmin();
     }
     
     // Rules for Investments
