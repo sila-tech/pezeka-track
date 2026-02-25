@@ -10,7 +10,10 @@ service cloud.firestore {
 
     function getUserRole() {
       // A user's role is stored in their profile document in the 'users' collection.
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      }
+      return '';
     }
 
     function isStaff() {
