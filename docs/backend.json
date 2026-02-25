@@ -114,6 +114,34 @@
         }
       },
       "required": ["type", "date", "amount"]
+    },
+    "Investor": {
+      "title": "Investor",
+      "description": "Represents an investor in Pezeka Credit Ltd.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "Investment": {
+      "title": "Investment",
+      "description": "Represents a single investment made by an investor.",
+      "type": "object",
+      "properties": {
+        "investorId": { "type": "string", "description": "The UID of the investor." },
+        "investorName": { "type": "string" },
+        "principal": { "type": "number", "description": "The initial amount invested." },
+        "monthlyInterestRate": { "type": "number", "description": "The agreed monthly interest rate in percentage." },
+        "startDate": { "type": "string", "format": "date-time", "description": "The date the investment started." },
+        "status": { "type": "string", "enum": ["active", "withdrawn"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["investorId", "investorName", "principal", "monthlyInterestRate", "startDate", "status"]
     }
   },
   "auth": {
@@ -135,6 +163,14 @@
     "/financeEntries/{entryId}": {
       "schema": { "$ref": "#/entities/FinanceEntry" },
       "description": "Stores all financial entries."
+    },
+    "/investors/{investorId}": {
+      "schema": { "$ref": "#/entities/Investor" },
+      "description": "Stores investor profiles."
+    },
+    "/investments/{investmentId}": {
+      "schema": { "$ref": "#/entities/Investment" },
+      "description": "Stores all investment records."
     }
   }
 }

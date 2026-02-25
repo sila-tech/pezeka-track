@@ -63,5 +63,24 @@ service cloud.firestore {
       // Only Finance users and the Super Admin can read or write finance entries.
       allow read, write: if isFinance() || isSuperAdmin();
     }
+
+    // Rules for Investors
+    match /investors/{investorId} {
+      // Admins have full access.
+      allow read, write: if isStaff() || isFinance() || isSuperAdmin();
+      // Investor can read their own profile.
+      allow get: if isOwner(investorId);
+      // An investor can create their own profile during signup.
+      allow create: if request.auth.uid == request.resource.data.uid;
+    }
+    
+    // Rules for Investments
+    match /investments/{investmentId} {
+      // Admins have full access.
+      allow read, write: if isStaff() || isFinance() || isSuperAdmin();
+      // An investor can read their own investments.
+      allow get: if request.auth.uid == resource.data.investorId;
+      allow list: if request.auth != null; // Client query must filter by investorId
+    }
   }
 }

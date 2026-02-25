@@ -403,3 +403,24 @@ export async function deleteUserProfile(db: Firestore, userId: string) {
         throw serverError;
     }
 }
+
+export async function createInvestorProfile(db: Firestore, userId: string, data: { email: string, name: string }) {
+    const investorRef = doc(db, 'investors', userId);
+    const profileData = {
+        uid: userId,
+        email: data.email,
+        name: data.name,
+        createdAt: serverTimestamp(),
+    };
+    try {
+        await setDoc(investorRef, profileData);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: investorRef.path,
+            operation: 'create',
+            requestResourceData: profileData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
