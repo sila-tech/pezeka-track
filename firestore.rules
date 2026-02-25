@@ -62,20 +62,5 @@ service cloud.firestore {
       // Granular rules for specific documents
       allow get, write: if isSuperAdmin() || isFinance();
     }
-
-    // Rules for Investors
-    match /investors/{investorId} {
-      // Broad read rule for LIST queries to avoid invalid lookups.
-      allow list: if request.auth != null; 
-      
-      // Granular rules for staff/admin/owner to GET a specific document.
-      allow get: if isSuperAdmin() || isFinance() || isStaff();
-      allow get: if resource.data.uid != null && request.auth.uid == resource.data.uid;
-
-      // Granular rules for WRITES which can use lookups.
-      allow create, delete: if isSuperAdmin();
-      allow update: if isSuperAdmin() || isFinance();
-    }
-
   }
 }

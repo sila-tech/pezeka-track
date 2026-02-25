@@ -114,20 +114,6 @@
         }
       },
       "required": ["type", "date", "amount"]
-    },
-    "Investor": {
-      "title": "Investor",
-      "description": "Represents an investor and their portfolio.",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string", "description": "The associated Firebase Auth UID for the investor user." },
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "totalInvestment": { "type": "number", "description": "The total principal amount invested." },
-        "currentBalance": { "type": "number", "description": "The current value of the portfolio including interest." },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["uid", "name", "email", "totalInvestment", "currentBalance"]
     }
   },
   "auth": {
@@ -149,10 +135,6 @@
     "/financeEntries/{entryId}": {
       "schema": { "$ref": "#/entities/FinanceEntry" },
       "description": "Stores all financial entries."
-    },
-    "/investors/{investorId}": {
-      "schema": { "$ref": "#/entities/Investor" },
-      "description": "Stores investor portfolio information."
     }
   }
 }
