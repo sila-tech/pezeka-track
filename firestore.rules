@@ -4,18 +4,21 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions to check user roles by looking up their profile
+    // =====================================================================
+    // Helper Functions
+    // =====================================================================
     function isSuperAdmin() {
+      // Super admin is defined by a specific email in the auth token.
       return request.auth.token.email == 'simon@pezeka.com';
     }
 
+    // WARNING: The following functions use `get()` and CANNOT be used in `list` rules.
+    // They are safe for single document access (`get`, `create`, `update`, `delete`).
     function getUserRole() {
-      // A user's role is stored in their profile document in the 'users' collection.
-      // This now safely returns an empty string if the document doesn't exist.
       if (exists(/databases/$(database)/documents/users/$(request.auth.uid))) {
         return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
       }
-      return '';
+      return ''; // Return empty string if profile doesn't exist, preventing errors.
     }
 
     function isStaff() {
@@ -30,40 +33,70 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    // =====================================================================
+    // Collection Rules
+    // =====================================================================
+
     // Rules for User Profiles
     match /users/{userId} {
-      allow get: if isSuperAdmin() || isOwner(userId);
-      allow list, write: if isSuperAdmin();
+      // ONLY the super admin can list all user profiles.
+      allow list: if isSuperAdmin();
+      
+      // Super admin can write/delete user profiles.
+      allow write: if isSuperAdmin();
+
+      // An admin can get any user's profile. A user can get their own profile.
+      allow get: if isOwner(userId) || isStaff() || isFinance() || isSuperAdmin();
     }
 
     // Rules for Customers collection
     match /customers/{customerId} {
-      allow read: if request.auth != null; 
-      allow write: if isSuperAdmin() || isStaff() || isFinance(); 
+      // Any authenticated user can list customers. The UI controls visibility.
+      allow list: if request.auth != null;
+      
+      // Only authorized roles can get a single customer document or write data.
+      allow get, write: if isStaff() || isFinance() || isSuperAdmin();
     }
 
     // Rules for Loans
     match /loans/{loanId} {
-      allow read: if request.auth != null;
-      allow write: if isSuperAdmin() || isStaff() || isFinance();
+      // Any authenticated user can list loans. The UI filters what is shown.
+      allow list: if request.auth != null;
+      
+      // An admin can get any single loan document.
+      allow get: if isStaff() || isFinance() || isSuperAdmin();
+      
+      // A customer can get their own loan document.
+      allow get: if request.auth.uid == resource.data.customerId;
+      
+      // Admins have full write access.
+      allow write: if isStaff() || isFinance() || isSuperAdmin();
+      
+      // Customers can create new loan applications for themselves.
       allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     }
     
     // Rules for Finance Entries
     match /financeEntries/{entryId} {
-      allow read: if request.auth != null;
-      allow write: if isSuperAdmin() || isFinance();
+      // Any authenticated user can list finance entries. The UI controls visibility.
+      allow list: if request.auth != null;
+      // Only Finance and Super Admin can get single entries or write.
+      allow get, write: if isFinance() || isSuperAdmin();
     }
-
+    
     // Rules for Investors collection
     match /investors/{investorId} {
-      // Allow any authenticated user to list for the admin dashboard. UI will handle role visibility.
+      // Any authenticated user can list investors. The UI controls visibility.
       allow list: if request.auth != null;
-      // Allow an investor to read their own document, and admins to read any
+      
+      // An investor can read their own document, and admins can read any.
       allow get: if isOwner(investorId) || isSuperAdmin() || isFinance() || isStaff();
-      // Allow super admin to create/delete, and finance/superadmin to update
+      
+      // Super admin can create/delete investor profiles.
       allow create, delete: if isSuperAdmin();
-      allow update: if isSuperAdmin() || isFinance();
+      
+      // Finance and Super Admin can update investor portfolios.
+      allow update: if isFinance() || isSuperAdmin();
     }
   }
 }
