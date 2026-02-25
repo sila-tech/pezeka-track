@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -71,6 +70,7 @@ const investorSchema = z.object({
   email: z.string().email('A valid email is required.'),
   totalInvestment: z.coerce.number().min(0, 'Total investment cannot be negative.'),
   interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.').optional(),
+  createdAt: z.string().optional(),
 });
 
 export default function InvestorsPage() {
@@ -102,7 +102,7 @@ export default function InvestorsPage() {
 
     const addForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
-        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0, interestRate: 0 },
+        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0, interestRate: 0, createdAt: undefined },
     });
 
     const editForm = useForm<z.infer<typeof investorSchema>>({
@@ -138,6 +138,7 @@ export default function InvestorsPage() {
             email: investor.email,
             totalInvestment: investor.totalInvestment,
             interestRate: investor.interestRate || 0,
+            createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : undefined,
         });
         setEditDialogOpen(true);
     };
@@ -146,7 +147,18 @@ export default function InvestorsPage() {
       if (!investorToEdit) return;
       setIsSubmitting(true);
       try {
-        await updateInvestor(firestore, investorToEdit.id, values);
+        const updateData: { [key: string]: any } = {
+            name: values.name,
+            email: values.email,
+            totalInvestment: values.totalInvestment,
+            interestRate: values.interestRate,
+        };
+
+        if (values.createdAt) {
+            updateData.createdAt = new Date(values.createdAt);
+        }
+        
+        await updateInvestor(firestore, investorToEdit.id, updateData);
         toast({ title: "Investor Profile Updated" });
         setEditDialogOpen(false);
         setInvestorToEdit(null);
@@ -262,15 +274,15 @@ export default function InvestorsPage() {
                   </TableHeader>
                   <TableBody>
                       {investors.map((investor) => {
-                          const roi = investor.totalInvestment > 0 ? ((investor.currentBalance - investor.totalInvestment) / investor.totalInvestment) * 100 : 0;
+                          const roi = (investor.totalInvestment || 0) > 0 ? (((investor.currentBalance || 0) - (investor.totalInvestment || 0)) / (investor.totalInvestment || 0)) * 100 : 0;
                           return (
                             <TableRow key={investor.id}>
                                 <TableCell className="font-medium">{investor.name}</TableCell>
                                 <TableCell>{investor.email}</TableCell>
                                 <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
                                 <TableCell>{investor.interestRate || 0}%</TableCell>
-                                <TableCell className="text-right">{investor.totalInvestment.toLocaleString()}</TableCell>
-                                <TableCell className="text-right font-bold">{investor.currentBalance.toLocaleString()}</TableCell>
+                                <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
                                 <TableCell className={`text-right font-medium ${roi >= 0 ? 'text-green-600' : 'text-destructive'}`}>{roi.toFixed(2)}%</TableCell>
                                 
                                 {(isSuperAdmin || isFinance) && (
@@ -320,6 +332,9 @@ export default function InvestorsPage() {
                     )}/>
                     <FormField control={editForm.control} name="interestRate" render={({ field }) => (
                     <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={editForm.control} name="createdAt" render={({ field }) => (
+                    <FormItem><FormLabel>Investment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                 </form>
               </ScrollArea>
