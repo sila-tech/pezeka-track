@@ -82,7 +82,7 @@ export default function InvestorLoginPage() {
                   <FormField control={form.control} name="email" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Email</FormLabel>
-                      <FormControl><Input placeholder="you@example.com" {...field} /></FormControl>
+                      <FormControl><Input placeholder="your@email.com" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
