@@ -92,8 +92,8 @@ service cloud.firestore {
       // An investor can read their own portfolio data
       allow get: if isOwner(investorId);
 
-      // Staff, Finance, or SuperAdmins have read access to individual documents.
-      allow get: if isStaff() || isFinance() || isSuperAdmin();
+      // Finance, or SuperAdmins have read access to individual documents.
+      allow get: if isFinance() || isSuperAdmin();
       
       // Only Finance and Super Admin can update portfolios.
       allow update: if isFinance() || isSuperAdmin();

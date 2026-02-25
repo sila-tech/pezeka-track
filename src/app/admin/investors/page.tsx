@@ -74,6 +74,7 @@ export default function InvestorsPage() {
     const { user: currentUser, loading: userLoading } = useAppUser();
     const firestore = useFirestore();
     const { toast } = useToast();
+    const router = useRouter();
 
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -85,7 +86,14 @@ export default function InvestorsPage() {
     
     const isSuperAdmin = currentUser?.email === 'simon@pezeka.com';
     const isFinance = currentUser?.role === 'finance';
-    const canViewPage = isSuperAdmin || isFinance || currentUser?.role === 'staff';
+    const canViewPage = isSuperAdmin || isFinance;
+
+    useEffect(() => {
+        if (!userLoading && !canViewPage) {
+            toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
+            router.push('/admin');
+        }
+    }, [userLoading, canViewPage, router, toast]);
 
     const { data: investors, loading: investorsLoading } = useCollection<Investor>(canViewPage ? 'investors' : null);
 
@@ -165,6 +173,10 @@ export default function InvestorsPage() {
     }
     
     const isLoading = userLoading || investorsLoading;
+
+    if (isLoading || !canViewPage) {
+        return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
 
     return (
     <>
