@@ -155,6 +155,20 @@
                 },
                 "required": ["withdrawalId", "date", "amount", "status"]
             }
+        },
+        "deposits": {
+            "type": "array",
+            "description": "History of deposits made into this portfolio.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "depositId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "amount": { "type": "number" },
+                    "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+                },
+                "required": ["depositId", "date", "amount", "status"]
+            }
         }
       },
       "required": ["uid", "name", "email", "totalInvestment", "currentBalance"]

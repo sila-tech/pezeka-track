@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { calculateInterestForOneInstalment } from './utils';
@@ -562,6 +562,90 @@ export async function rejectWithdrawal(db: Firestore, investorId: string, withdr
         });
     } catch(e) {
         const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { withdrawals: 'REJECT_WITHDRAWAL' }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
+    }
+}
+
+export async function requestDeposit(db: Firestore, investorId: string, amount: number) {
+    const investorRef = doc(db, 'investors', investorId);
+    const depositId = doc(collection(db, 'temp')).id;
+    const depositRequest = {
+        depositId,
+        amount,
+        date: new Date(),
+        status: 'pending'
+    };
+
+    try {
+        await updateDoc(investorRef, {
+            deposits: arrayUnion(depositRequest),
+            updatedAt: serverTimestamp(),
+        });
+        return depositRequest;
+    } catch(e) {
+        const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { deposits: 'ADD_DEPOSIT_REQUEST' }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
+    }
+}
+
+export async function approveDeposit(db: Firestore, investorId: string, depositId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+    
+    const investorDoc = await getDoc(investorRef);
+    if (!investorDoc.exists()) throw new Error("Investor not found");
+
+    const investorData = investorDoc.data();
+    const deposit = investorData.deposits?.find((d: any) => d.depositId === depositId);
+
+    if (!deposit || deposit.status !== 'pending') {
+        throw new Error("Deposit request not found or already processed.");
+    }
+
+    const updatedDeposits = investorData.deposits.map((d: any) => 
+        d.depositId === depositId ? { ...d, status: 'approved' } : d
+    );
+    
+    await addFinanceEntry(db, {
+        type: 'receipt',
+        date: new Date(),
+        amount: deposit.amount,
+        description: `Investor deposit from ${investorData.name}`,
+    });
+
+    try {
+         await updateDoc(investorRef, {
+            deposits: updatedDeposits,
+            currentBalance: increment(deposit.amount),
+            totalInvestment: increment(deposit.amount),
+            updatedAt: serverTimestamp()
+        });
+    } catch (e) {
+         const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { currentBalance: `increment by ${deposit.amount}` }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw e;
+    }
+}
+
+export async function rejectDeposit(db: Firestore, investorId: string, depositId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+
+    const investorDoc = await getDoc(investorRef);
+    if (!investorDoc.exists()) throw new Error("Investor not found");
+
+    const deposits = investorDoc.data().deposits || [];
+    const updatedDeposits = deposits.map((d: any) => 
+        d.depositId === depositId ? { ...d, status: 'rejected' } : d
+    );
+
+    try {
+        await updateDoc(investorRef, {
+            deposits: updatedDeposits,
+            updatedAt: serverTimestamp()
+        });
+    } catch(e) {
+        const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { deposits: 'REJECT_DEPOSIT' }});
         errorEmitter.emit('permission-error', permissionError);
         throw e;
     }

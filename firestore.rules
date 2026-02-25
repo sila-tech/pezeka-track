@@ -95,10 +95,13 @@ service cloud.firestore {
       // Finance, or SuperAdmins have read access to individual documents.
       allow get: if isFinance() || isSuperAdmin();
       
-      // An investor can update their own document to request a withdrawal.
-      // We check that only the 'withdrawals' array is being modified.
-      allow update: if isOwner(investorId) 
-                    && request.resource.data.keys().hasOnly(['withdrawals', 'updatedAt']);
+      // An investor can update their own document to request a withdrawal or notify of a deposit.
+      // We check that only the 'withdrawals' or 'deposits' array is being modified.
+      allow update: if isOwner(investorId) && 
+                    (
+                      request.resource.data.keys().hasOnly(['withdrawals', 'updatedAt']) ||
+                      request.resource.data.keys().hasOnly(['deposits', 'updatedAt'])
+                    );
 
       // Only Finance and Super Admin can update portfolios for other reasons (e.g. applying interest).
       allow update: if isFinance() || isSuperAdmin();
