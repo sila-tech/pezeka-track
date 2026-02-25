@@ -30,70 +30,38 @@ service cloud.firestore {
     }
 
     // Rules for User Profiles
-    match /users/{userId} {
-      // Admins can list all users and write to any user profile.
-      allow list, write: if isSuperAdmin();
-      // A user can read their own profile, or the super admin can read any profile.
-      allow get: if isOwner(userId) || isSuperAdmin();
-    }
+    // A user can read their own profile, or the super admin can read any profile.
+    allow get: if isOwner(userId) || isSuperAdmin();
+    
+    // Admins can list all users and write to any user profile.
+    allow list, write: if isSuperAdmin();
 
     // Rules for Customers collection
-    match /customers/{customerId} {
-      // Separated rules for clarity and to avoid OR evaluation issues.
-      allow read, write: if isSuperAdmin();
-      allow read, write: if isStaff();
-      allow read, write: if isFinance();
-    }
+    allow read, write: if isSuperAdmin() || isStaff() || isFinance();
 
     // Rules for Loans
-    match /loans/{loanId} {
-      // Separated write access for each role
-      allow write: if isSuperAdmin();
-      allow write: if isStaff();
-      allow write: if isFinance();
-      
-      // Separated read access for each role
-      allow read: if isSuperAdmin();
-      allow read: if isStaff();
-      allow read: if isFinance();
-      
-      // CUSTOMER-specific rules (for non-admins)
-      // Customers can GET their own single loan document.
-      allow get: if request.auth.uid == resource.data.customerId;
-      
-      // Customers can LIST loans. The client-side query must be properly filtered.
-      allow list: if request.auth != null;
-      
-      // Customers can CREATE new loan applications for themselves.
-      allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
-    }
+    // Write access
+    allow write: if isSuperAdmin();
+    allow write: if isStaff();
+    allow write: if isFinance();
+    
+    // Read access
+    allow read: if isSuperAdmin();
+    allow read: if isStaff();
+    allow read: if isFinance();
+    
+    // CUSTOMER-specific rules (for non-admins)
+    // Customers can GET their own single loan document.
+    allow get: if request.auth.uid == resource.data.customerId;
+    
+    // Customers can LIST loans. The client-side query must be properly filtered.
+    allow list: if request.auth != null;
+    
+    // Customers can CREATE new loan applications for themselves.
+    allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
     
     // Rules for Finance Entries
-    match /financeEntries/{entryId} {
-      // Separated access for each role
-      allow read, write: if isSuperAdmin();
-      allow read, write: if isFinance();
-    }
-
-    // Rules for Investors & Investments
-    match /investors/{investorId} {
-      // Super admin can create, update, and delete investor profiles.
-      allow write: if isSuperAdmin();
-      
-      // ONLY the super admin can list all investors.
-      allow list: if isSuperAdmin();
-      
-      // An investor can read their own profile, or the super admin can read any profile.
-      allow get: if isSuperAdmin() || request.auth.uid == resource.data.uid;
-    }
-    
-    match /investments/{investmentId} {
-      // Separated access for each role
-      allow write, get, list: if isSuperAdmin();
-      allow write, get, list: if isFinance();
-
-      // An investor can view their own investment documents.
-      allow get: if request.auth.uid == resource.data.investorId;
-    }
+    allow read, write: if isSuperAdmin();
+    allow read, write: if isFinance();
   }
 }
