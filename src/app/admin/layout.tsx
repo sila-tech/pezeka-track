@@ -54,16 +54,6 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
         <FileText className="h-4 w-4" />
         Application Forms
     </Link>
-    {(isSuperAdmin || isFinance || isStaff) && (
-        <Link
-            href="/admin/investors"
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-            onClick={onLinkClick}
-        >
-            <PiggyBank className="h-4 w-4" />
-            Investors
-        </Link>
-    )}
     {isSuperAdmin && (
         <Link
             href="/admin/users"

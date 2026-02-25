@@ -114,34 +114,6 @@
         }
       },
       "required": ["type", "date", "amount"]
-    },
-    "Investor": {
-      "title": "Investor",
-      "description": "Represents an investor's profile and portfolio.",
-      "type": "object",
-      "properties": {
-        "uid": { "type": "string", "description": "The Firebase Auth UID of the investor." },
-        "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "initialInvestment": { "type": "number" },
-        "currentBalance": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "interestEntries": {
-          "type": "array",
-          "description": "A history of manually added interest.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "entryId": { "type": "string" },
-              "date": { "type": "string", "format": "date-time" },
-              "amount": { "type": "number" },
-              "description": { "type": "string" }
-            },
-            "required": ["entryId", "date", "amount"]
-          }
-        }
-      },
-      "required": ["uid", "name", "email", "initialInvestment", "currentBalance"]
     }
   },
   "auth": {
@@ -163,10 +135,6 @@
     "/financeEntries/{entryId}": {
       "schema": { "$ref": "#/entities/FinanceEntry" },
       "description": "Stores all financial entries."
-    },
-    "/investors/{investorId}": {
-      "schema": { "$ref": "#/entities/Investor" },
-      "description": "Stores investor portfolio data."
     }
   }
 }

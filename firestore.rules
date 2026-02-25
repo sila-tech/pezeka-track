@@ -30,10 +30,6 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    function isInvestorOwner(investorId) {
-      return request.auth.uid == investorId;
-    }
-
     // Rules for User Profiles
     match /users/{userId} {
       allow get: if isSuperAdmin();
@@ -70,23 +66,6 @@ service cloud.firestore {
     match /financeEntries/{entryId} {
       allow read, write: if isSuperAdmin();
       allow read, write: if isFinance();
-    }
-
-    // Rules for Investors
-    match /investors/{investorId} {
-      // Allow any authenticated user to read. The UI controls which roles can access the investors page.
-      // This is necessary because Firestore rules for queries ('list') cannot perform document lookups.
-      allow read: if request.auth != null;
-
-      // Allow only the superAdmin to create new investor profiles.
-      allow create: if isSuperAdmin();
-
-      // Allow superAdmin and finance to update. These are separated to avoid evaluation errors.
-      allow update: if isSuperAdmin();
-      allow update: if isFinance();
-      
-      // Allow only superAdmin to delete.
-      allow delete: if isSuperAdmin();
     }
 
   }
