@@ -68,28 +68,5 @@ service cloud.firestore {
       // Only Finance users and the Super Admin can read or write finance entries.
       allow read, write: if isFinance() || isSuperAdmin();
     }
-
-    // Rules for Investors
-    match /investors/{investorId} {
-      // Only the Super Admin can manage investor profiles.
-      allow list, write: if isSuperAdmin();
-      // An investor can view their own profile, or the super admin can.
-      allow get: if isOwner(investorId) || isSuperAdmin();
-    }
-    
-    // Rules for Investments
-    match /investments/{investmentId} {
-      // Only Finance and Super Admins can manage investments.
-      allow write: if isFinance() || isSuperAdmin();
-      
-      // Finance and Super Admins have full read access to all investments.
-      allow read: if isFinance() || isSuperAdmin();
-      
-      // An investor can read their own specific investment record.
-      allow get: if request.auth.uid == resource.data.investorId;
-
-      // An investor can list investments, but the client query must filter by their UID.
-      allow list: if request.auth != null;
-    }
   }
 }
