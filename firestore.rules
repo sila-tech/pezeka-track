@@ -73,14 +73,11 @@ service cloud.firestore {
       // Super admin can manage investor profiles.
       allow write: if isSuperAdmin();
       
-      // Super admin and Finance can list all investors.
-      allow list: if isSuperAdmin();
-      allow list: if isFinance();
+      // Super admin can list all investors. Finance can view them for investment purposes.
+      allow list: if isSuperAdmin() || isFinance();
       
       // An investor can read their own profile. Super admin and Finance can also read any profile.
-      allow get: if isSuperAdmin();
-      allow get: if isFinance();
-      allow get: if request.auth.uid == resource.data.uid;
+      allow get: if isSuperAdmin() || isFinance() || request.auth.uid == resource.data.uid;
     }
     
     match /investments/{investmentId} {
@@ -91,12 +88,10 @@ service cloud.firestore {
       allow get: if request.auth.uid == resource.data.investorId;
 
       // Finance and Super Admin can list all investments.
-      allow list: if isFinance();
-      allow list: if isSuperAdmin();
+      allow list: if isFinance() || isSuperAdmin();
 
       // Finance and Super Admin can get any investment document.
-      allow get: if isFinance();
-      allow get: if isSuperAdmin();
+      allow get: if isFinance() || isSuperAdmin();
     }
   }
 }
