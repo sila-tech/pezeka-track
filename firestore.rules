@@ -62,5 +62,11 @@ service cloud.firestore {
       // Granular rules for specific documents
       allow get, write: if isSuperAdmin() || isFinance();
     }
+
+    // Rules for Investors collection
+    match /investors/{investorId} {
+      // Explicit rule for super admin to bypass helper function issues.
+      allow read, write: if request.auth.token.email == 'simon@pezeka.com';
+    }
   }
 }
