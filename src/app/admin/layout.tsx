@@ -57,6 +57,14 @@ const NavLinks = ({ isFinance, isSuperAdmin, onLinkClick }: { isFinance: boolean
     {isSuperAdmin && (
         <>
             <Link
+                href="/admin/investors"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                onClick={onLinkClick}
+            >
+                <PiggyBank className="h-4 w-4" />
+                Investors
+            </Link>
+            <Link
                 href="/admin/users"
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
                 onClick={onLinkClick}

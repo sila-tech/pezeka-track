@@ -30,35 +30,60 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    function isInvestorOwner(investorId) {
+      return request.auth.uid == investorId;
+    }
+
     // Rules for User Profiles
-    allow get: if isSuperAdmin();
-    allow get: if isOwner(userId);
-    allow list, write: if isSuperAdmin();
+    match /users/{userId} {
+      allow get: if isSuperAdmin();
+      allow get: if isOwner(userId);
+      allow list, write: if isSuperAdmin();
+    }
 
     // Rules for Customers collection
-    allow read, write: if isSuperAdmin();
-    allow read, write: if isStaff();
-    allow read, write: if isFinance();
+    match /customers/{customerId} {
+      allow read, write: if isSuperAdmin();
+      allow read, write: if isStaff();
+      allow read, write: if isFinance();
+    }
 
     // Rules for Loans
-    // Write access
-    allow write: if isSuperAdmin();
-    allow write: if isStaff();
-    allow write: if isFinance();
-    
-    // Read access
-    allow read: if isSuperAdmin();
-    allow read: if isStaff();
-    allow read: if isFinance();
-    
-    // CUSTOMER-specific rules (for non-admins)
-    allow get: if request.auth.uid == resource.data.customerId;
-    allow list: if request.auth != null;
-    allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
+    match /loans/{loanId} {
+      // Write access
+      allow write: if isSuperAdmin();
+      allow write: if isStaff();
+      allow write: if isFinance();
+      
+      // Read access
+      allow read: if isSuperAdmin();
+      allow read: if isStaff();
+      allow read: if isFinance();
+      
+      // CUSTOMER-specific rules (for non-admins)
+      allow get: if request.auth.uid == resource.data.customerId;
+      allow list: if request.auth.uid == request.resource.data.customerId;
+      allow create: if request.auth.uid == request.resource.data.customerId && request.resource.data.status == 'application';
+    }
     
     // Rules for Finance Entries
-    allow read, write: if isSuperAdmin();
-    allow read, write: if isFinance();
+    match /financeEntries/{entryId} {
+      allow read, write: if isSuperAdmin();
+      allow read, write: if isFinance();
+    }
+
+    // Rules for Investors
+    match /investors/{investorId} {
+      // Admin Access: Any authenticated user on the admin domain can list/get.
+      // UI must control who sees the page. Create/Update/Delete is more specific.
+      allow list, get: if request.auth != null; 
+      // Specific investor can get their own document.
+      allow get: if isInvestorOwner(investorId);
+
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin() || isFinance();
+      allow delete: if isSuperAdmin();
+    }
 
   }
 }
