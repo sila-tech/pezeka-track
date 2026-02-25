@@ -286,36 +286,44 @@ export default function InvestorsPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Date Joined</TableHead>
-                        <TableHead>Interest Rate</TableHead>
+                        <TableHead>Monthly ROI (%)</TableHead>
                         <TableHead className="text-right">Total Investment (Ksh)</TableHead>
                         <TableHead className="text-right">Current Balance (Ksh)</TableHead>
                         {(isSuperAdmin || isFinance) && <TableHead className="text-right w-[80px]">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {investors.map((investor) => (
-                          <TableRow key={investor.id}>
-                              <TableCell className="font-medium">{investor.name}</TableCell>
-                              <TableCell>{investor.email}</TableCell>
-                              <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
-                              <TableCell>{investor.interestRate || 0}%</TableCell>
-                              <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
-                              <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
-                              {(isSuperAdmin || isFinance) && (
-                                  <TableCell className="text-right">
-                                  <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
-                                      <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                          {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>}
-                                          {isSuperAdmin && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
-                                      </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              )}
-                          </TableRow>
-                        )
+                      {investors.map((investor) => {
+                          const totalReturn = (investor.currentBalance || 0) - (investor.totalInvestment || 0);
+                          const monthsInvested = investor.createdAt ? differenceInMonths(new Date(), new Date(investor.createdAt.seconds * 1000)) : 0;
+                          const monthlyRoi = (investor.totalInvestment > 0 && monthsInvested > 0)
+                            ? (totalReturn / investor.totalInvestment / monthsInvested) * 100
+                            : 0;
+
+                          return (
+                              <TableRow key={investor.id}>
+                                  <TableCell className="font-medium">{investor.name}</TableCell>
+                                  <TableCell>{investor.email}</TableCell>
+                                  <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
+                                  <TableCell>{monthlyRoi.toFixed(2)}%</TableCell>
+                                  <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
+                                  {(isSuperAdmin || isFinance) && (
+                                      <TableCell className="text-right">
+                                      <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
+                                          <DropdownMenuTrigger asChild>
+                                              <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                                              {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>}
+                                              {isSuperAdmin && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
+                                          </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </TableCell>
+                                  )}
+                              </TableRow>
+                            )
+                        }
                       )}
                   </TableBody>
               </Table>
