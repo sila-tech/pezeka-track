@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History, CircleDollarSign } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -183,12 +183,17 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
-    // 1. Process LOAN BOOK data into entries
+    // 1. Process LOAN BOOK data into entries (The Source of Truth for lending)
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
-        // Upfront Fees Tab Data
-        const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
+        // Upfront Fees
+        const reg = Number(loan.registrationFee) || 0;
+        const proc = Number(loan.processingFee) || 0;
+        const track = Number(loan.carTrackInstallationFee) || 0;
+        const charge = Number(loan.chargingCost) || 0;
+        const totalFees = reg + proc + track + charge;
+
         if (totalFees > 0) {
             upfrontFees.push({
                 id: `fee-${loan.id}`,
@@ -227,51 +232,44 @@ export default function FinancePage() {
         });
     });
 
-    // 2. Process MANUAL finance entries
+    // 2. Process MANUAL finance entries, filtering out lending duplicates
     financeEntries.forEach(entry => {
-        // Handle standard receipts (excl. derived upfront fees to avoid double counting if they exist manually)
+        const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
+
         if (entry.type === 'receipt') {
-            if (entry.receiptCategory === 'upfront_fees') {
-                upfrontFees.push(entry);
-            } else {
+            if (!isLendingDuplicate) {
                 receipts.push(entry);
             }
-        }
-        
-        // Per User: Payouts is money out, which means even expenses are payouts.
-        if (entry.type === 'payout' || entry.type === 'expense') {
-            // Check if it's already a derived disbursement
-            if (entry.payoutCategory !== 'loan_disbursement' || !entry.loanId) {
+        } else if (entry.type === 'payout' || entry.type === 'expense') {
+            if (!isLendingDuplicate) {
+                // Payouts tab shows all money leaving the company
                 payouts.push(entry);
-            } else if (entry.payoutCategory === 'loan_disbursement' && entry.loanId) {
-                // If it's a manual payout for a loan, we might want to prioritize derived or manual
-                // For now, let's stick to derived for automated ones and manual for everything else
+                
+                // Expenses tab shows only operational expenses
+                if (entry.type === 'expense') {
+                    expenses.push(entry);
+                }
             }
-        }
-        
-        if (entry.type === 'expense') {
-            expenses.push(entry);
         }
     });
 
-    return { allReceipts: receipts, allUpfrontFees: upfrontFees, allPayouts: payouts, allExpenses: expenses };
+    return { allReceipts, allUpfrontFees, allPayouts, allExpenses };
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    // Total Receipts Card = standard receipts + upfront fees (Total Money In)
-    let receiptsOnlyTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
-    let upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (e.amount || 0), 0);
-    let totalMoneyIn = receiptsOnlyTotal + upfrontFeesTotal;
+    const receiptsOnlyTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
+    const upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (e.amount || 0), 0);
+    const totalMoneyIn = receiptsOnlyTotal + upfrontFeesTotal;
 
-    // Total Payouts Card = all payouts + expenses (Total Money Out)
-    let payoutsTotal = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
-    let expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
+    // allPayouts already includes expenses based on logic above
+    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
+    const expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     
     return {
       totalReceipts: totalMoneyIn,
-      totalPayouts: payoutsTotal,
+      totalPayouts: totalMoneyOut,
       totalExpenses: expensesTotal,
-      cashAtHand: totalMoneyIn - payoutsTotal
+      cashAtHand: totalMoneyIn - totalMoneyOut
     };
   }, [allReceipts, allUpfrontFees, allPayouts, allExpenses]);
 
@@ -435,6 +433,10 @@ export default function FinancePage() {
     }
   }
 
+  if (isLoading) {
+    return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-4 mb-6">
@@ -487,6 +489,7 @@ export default function FinancePage() {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Expenses</CardTitle><CreditCard className="h-4 w-4 text-orange-600"/></CardHeader>
                 <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {stats.totalExpenses.toLocaleString()}</div></CardContent>
+            </Card>
         </div>
       </div>
 
@@ -504,13 +507,40 @@ export default function FinancePage() {
           </ScrollArea>
           
           <TabsContent value="receipts">
-              <EditableFinanceReportTab title="Receipts" description="Includes loan repayments, investor deposits, and other income." entries={allReceipts} loading={isLoading} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
+              <EditableFinanceReportTab 
+                title="Receipts" 
+                description="Includes loan repayments, investor deposits, and other income." 
+                entries={allReceipts} 
+                loading={isLoading} 
+                onDelete={(e) => {
+                    if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
+                    deleteFinanceEntry(firestore, e.id);
+                }} 
+              />
           </TabsContent>
           <TabsContent value="upfront">
-              <EditableFinanceReportTab title="Upfront Fees" description="Registration, processing, and other fees retained during disbursement." entries={allUpfrontFees} loading={isLoading} onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} />
+              <EditableFinanceReportTab 
+                title="Upfront Fees" 
+                description="Registration, processing, and other fees retained during disbursement." 
+                entries={allUpfrontFees} 
+                loading={isLoading} 
+                onDelete={(e) => {
+                    if (e.id.startsWith('fee-')) return;
+                    deleteFinanceEntry(firestore, e.id);
+                }}
+              />
           </TabsContent>
           <TabsContent value="payouts">
-              <EditableFinanceReportTab title="Payouts" description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." entries={allPayouts} loading={isLoading} onDelete={(e) => !e.id.startsWith('disb-') && deleteFinanceEntry(firestore, e.id)} />
+              <EditableFinanceReportTab 
+                title="Payouts" 
+                description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." 
+                entries={allPayouts} 
+                loading={isLoading} 
+                onDelete={(e) => {
+                    if (e.id.startsWith('disb-')) return;
+                    deleteFinanceEntry(firestore, e.id);
+                }}
+              />
           </TabsContent>
           <TabsContent value="expenses">
                <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={allExpenses} loading={isLoading} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
@@ -577,7 +607,7 @@ export default function FinancePage() {
                                     const track = Number(loan.carTrackInstallationFee) || 0;
                                     const charge = Number(loan.chargingCost) || 0;
                                     const totalFees = reg + proc + track + charge;
-                                    const takeHome = loan.principalAmount - totalFees;
+                                    const takeHome = Number(loan.principalAmount) - totalFees;
                                     const expectedInterest = (loan.totalRepayableAmount || 0) - loan.principalAmount;
                                     const expectedIncome = expectedInterest + totalFees;
                                     const balance = (loan.totalRepayableAmount || 0) - loan.totalPaid;
