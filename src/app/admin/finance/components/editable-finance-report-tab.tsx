@@ -15,6 +15,7 @@ import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 interface FinanceEntry {
   id: string;
@@ -26,6 +27,7 @@ interface FinanceEntry {
   loanId?: string;
   expenseCategory?: string;
   receiptCategory?: string;
+  payoutCategory?: string;
 }
 
 interface FinanceReportTabProps {
@@ -118,7 +120,8 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
         filtered = filtered.filter(entry =>
             (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (entry.expenseCategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (entry.receiptCategory || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (entry.receiptCategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (entry.payoutCategory || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
     }
 
@@ -144,7 +147,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             'Description': entry.description,
             'Amount (Ksh)': entry.amount,
         };
-        const category = entry.expenseCategory || entry.receiptCategory;
+        const category = entry.expenseCategory || entry.receiptCategory || entry.payoutCategory;
         if (category) record['Category'] = category.replace(/_/g, ' ').toUpperCase();
         
         if(showTransactionCost) {
@@ -243,8 +246,9 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                         <div className="font-medium">{entry.description || '-'}</div>
                     </TableCell>
                     <TableCell>
-                        {entry.expenseCategory && <Badge variant="secondary">{entry.expenseCategory.replace(/_/g, ' ')}</Badge>}
-                        {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ')}</Badge>}
+                        {entry.expenseCategory && <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-none">{entry.expenseCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                        {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                        {entry.payoutCategory && <Badge variant="destructive" className="bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
                     </TableCell>
                     <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
                     {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}

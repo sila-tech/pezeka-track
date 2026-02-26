@@ -61,8 +61,7 @@ import { calculateAmortization } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const addFinanceEntrySchema = z.object({
-  type: z.enum(['receipt', 'payout'], { required_error: 'Please select an entry type.' }),
-  payoutReason: z.enum(['loan_disbursement', 'expense']).optional(),
+  type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   transactionCost: z.coerce.number().optional(),
@@ -70,21 +69,19 @@ const addFinanceEntrySchema = z.object({
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
   receiptCategory: z.enum(['loan_repayment', 'upfront_fees', 'investment', 'other']).optional(),
+  payoutCategory: z.enum(['loan_disbursement', 'investor_withdrawal', 'other']).optional(),
 }).superRefine((data, ctx) => {
     if (data.type === 'receipt' && !data.receiptCategory) {
         ctx.addIssue({ code: 'custom', message: 'Please select a receipt category.', path: ['receiptCategory'] });
     }
+    if (data.type === 'expense' && !data.expenseCategory) {
+        ctx.addIssue({ code: 'custom', message: 'Please select an expense category.', path: ['expenseCategory'] });
+    }
+    if (data.type === 'payout' && !data.payoutCategory) {
+        ctx.addIssue({ code: 'custom', message: 'Please select a payout category.', path: ['payoutCategory'] });
+    }
     if (data.type === 'receipt' && (data.receiptCategory === 'loan_repayment' || data.receiptCategory === 'upfront_fees') && !data.loanId) {
         ctx.addIssue({ code: 'custom', message: 'Please select the associated loan.', path: ['loanId'] });
-    }
-    if (data.type === 'payout') {
-        if (!data.payoutReason) {
-            ctx.addIssue({ code: 'custom', message: 'Please select a reason for the payout.', path: ['payoutReason'] });
-        } else if (data.payoutReason === 'loan_disbursement' && !data.loanId) {
-            ctx.addIssue({ code: 'custom', message: 'Please select the loan being disbursed.', path: ['loanId'] });
-        } else if (data.payoutReason === 'expense' && !data.expenseCategory) {
-            ctx.addIssue({ code: 'custom', message: 'Please select an expense category.', path: ['expenseCategory'] });
-        }
     }
 });
 
@@ -152,6 +149,7 @@ interface FinanceEntry {
   loanId?: string;
   expenseCategory?: string;
   receiptCategory?: string;
+  payoutCategory?: string;
 }
 
 export default function FinancePage() {
@@ -243,9 +241,7 @@ export default function FinancePage() {
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
-      const entryType = values.type === 'payout' ? (values.payoutReason === 'loan_disbursement' ? 'payout' : 'expense') : 'receipt';
-      const rawEntryData = { ...values, type: entryType, date: new Date(values.date) };
-      delete (rawEntryData as any).payoutReason;
+      const rawEntryData = { ...values, date: new Date(values.date) };
       const docRef = await addFinanceEntry(firestore, rawEntryData as any);
       
       if (values.type === 'receipt' && values.loanId) {
@@ -393,16 +389,21 @@ export default function FinancePage() {
                     <Form {...addForm}>
                         <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                             <FormField control={addForm.control} name="type" render={({ field }) => (
-                                <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem></SelectContent></Select></FormItem>
+                                <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Major Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></SelectContent></Select></FormItem>
                             )} />
                             {addFinanceEntryType === 'payout' && (
-                                <FormField control={addForm.control} name="payoutReason" render={({ field }) => (
-                                    <FormItem><FormLabel>Reason</FormLabel><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="loan_disbursement"/></FormControl> <FormLabel className="font-normal">Loan Disbursement</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="expense"/></FormControl> <FormLabel className="font-normal">General Expense</FormLabel></FormItem></RadioGroup></FormItem>
+                                <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
+                                    <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_disbursement">Loan Disbursement</SelectItem><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
+                                )} />
+                            )}
+                            {addFinanceEntryType === 'expense' && (
+                                <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
+                                    <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation & Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
                                 )} />
                             )}
                             {addFinanceEntryType === 'receipt' && (
                                 <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                    <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fee Income</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
+                                    <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fee Income</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
                                 )} />
                             )}
                             <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
@@ -452,7 +453,7 @@ export default function FinancePage() {
               <EditableFinanceReportTab title="Receipts" description="Incoming cash flows including loan repayments, upfront fees, and investor deposits." entries={receipts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="payouts">
-              <EditableFinanceReportTab title="Payouts" description="Outgoing loan disbursements and major payouts." entries={payouts} loading={isLoading} />
+              <EditableFinanceReportTab title="Payouts" description="Outgoing loan disbursements, investor withdrawals, and major payouts." entries={payouts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="expenses">
                <EditableFinanceReportTab title="Expenses" description="Operational, facilitation, and miscellaneous office costs." entries={expenses} loading={isLoading} />

@@ -70,8 +70,9 @@ type FinanceEntryData = {
     description?: string;
     loanId?: string;
     transactionCost?: number;
-    expenseCategory?: string;
+    expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
     receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'investment' | 'other';
+    payoutCategory?: 'loan_disbursement' | 'investor_withdrawal' | 'other';
 }
 
 export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData): Promise<DocumentReference<DocumentData>> {
@@ -177,6 +178,7 @@ async function recordDisbursement(db: Firestore, loan: any) {
 
     await addFinanceEntry(db, {
         type: 'payout',
+        payoutCategory: 'loan_disbursement',
         date: disbursementDate,
         amount: Number(loan.principalAmount),
         description: `Disbursement for Loan #${loan.loanNumber}`,
@@ -580,6 +582,7 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
     
     await addFinanceEntry(db, {
         type: 'payout',
+        payoutCategory: 'investor_withdrawal',
         date: new Date(),
         amount: withdrawal.amount,
         description: `Investor withdrawal for ${investorData.name}`,
