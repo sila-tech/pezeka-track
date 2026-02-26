@@ -174,16 +174,15 @@ export default function FinancePage() {
   
   const isLoading = userLoading || loansLoading || financeEntriesLoading;
 
-  // Aggregated Finance Logic
   const { allReceipts, allUpfrontFees, allPayouts, allExpenses } = useMemo(() => {
     const receipts: any[] = [];
-    const upfrontFees: any[] = [];
+    const upfront: any[] = [];
     const payouts: any[] = [];
     const expenses: any[] = [];
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
-    // 1. Process LOAN BOOK data into entries (The Source of Truth for lending)
+    // 1. Process LOAN BOOK data
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
@@ -195,7 +194,7 @@ export default function FinancePage() {
         const totalFees = reg + proc + track + charge;
 
         if (totalFees > 0) {
-            upfrontFees.push({
+            upfront.push({
                 id: `fee-${loan.id}`,
                 type: 'receipt',
                 receiptCategory: 'upfront_fees',
@@ -232,8 +231,9 @@ export default function FinancePage() {
         });
     });
 
-    // 2. Process MANUAL finance entries, filtering out lending duplicates
+    // 2. Process MANUAL finance entries
     financeEntries.forEach(entry => {
+        // Exclude derived lending duplicates to prevent double-counting
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
         if (entry.type === 'receipt') {
@@ -245,7 +245,7 @@ export default function FinancePage() {
                 // Payouts tab shows all money leaving the company
                 payouts.push(entry);
                 
-                // Expenses tab shows only operational expenses
+                // Track expenses separately for summary but they are already in payouts
                 if (entry.type === 'expense') {
                     expenses.push(entry);
                 }
@@ -253,7 +253,7 @@ export default function FinancePage() {
         }
     });
 
-    return { allReceipts, allUpfrontFees, allPayouts, allExpenses };
+    return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses };
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
@@ -285,7 +285,6 @@ export default function FinancePage() {
     });
   }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
 
-  // Form Handlers
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
     defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), transactionCost: 0 }
