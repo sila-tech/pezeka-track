@@ -182,11 +182,9 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
-    // 1. Process LOAN BOOK data
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
-        // Upfront Fees
         const reg = Number(loan.registrationFee) || 0;
         const proc = Number(loan.processingFee) || 0;
         const track = Number(loan.carTrackInstallationFee) || 0;
@@ -205,7 +203,6 @@ export default function FinancePage() {
             });
         }
 
-        // Disbursement Payout (Take Home)
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -217,7 +214,6 @@ export default function FinancePage() {
             loanId: loan.id
         });
 
-        // Repayment Receipts
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -231,9 +227,7 @@ export default function FinancePage() {
         });
     });
 
-    // 2. Process MANUAL finance entries
     financeEntries.forEach(entry => {
-        // Exclude derived lending duplicates to prevent double-counting
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
         if (entry.type === 'receipt') {
@@ -242,10 +236,7 @@ export default function FinancePage() {
             }
         } else if (entry.type === 'payout' || entry.type === 'expense') {
             if (!isLendingDuplicate) {
-                // Payouts tab shows all money leaving the company
                 payouts.push(entry);
-                
-                // Track expenses separately for summary but they are already in payouts
                 if (entry.type === 'expense') {
                     expenses.push(entry);
                 }
@@ -261,7 +252,6 @@ export default function FinancePage() {
     const upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (e.amount || 0), 0);
     const totalMoneyIn = receiptsOnlyTotal + upfrontFeesTotal;
 
-    // allPayouts already includes expenses based on logic above
     const totalMoneyOut = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     const expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     
@@ -328,8 +318,9 @@ export default function FinancePage() {
     if (!loanToEdit) return;
     setIsUpdating(true);
     try {
+        const paymentId = doc(collection(firestore, 'payments')).id;
         const paymentData = {
-            paymentId: doc(collection(firestore, 'payments')).id, 
+            paymentId, 
             amount: values.paymentAmount,
             date: new Date(values.paymentDate)
         };
@@ -447,25 +438,32 @@ export default function FinancePage() {
                 <DialogContent>
                     <DialogHeader><DialogTitle>New Finance Entry</DialogTitle></DialogHeader>
                     <Form {...addForm}>
-                        <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                            <FormField control={addForm.control} name="type" render={({ field }) => (
-                                <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></SelectContent></Select></FormItem>
-                            )} />
-                            {addFinanceEntryType === 'payout' && (
-                                <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
-                                    <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
+                        <ScrollArea className="max-h-[70vh] pr-4">
+                            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
+                                <FormField control={addForm.control} name="type" render={({ field }) => (
+                                    <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></SelectContent></Select></FormItem>
                                 )} />
-                            )}
-                            {addFinanceEntryType === 'receipt' && (
-                                <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                    <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
-                                )} />
-                            )}
-                            <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
-                            <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
-                        </form>
+                                {addFinanceEntryType === 'payout' && (
+                                    <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
+                                        <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
+                                    )} />
+                                )}
+                                {addFinanceEntryType === 'receipt' && (
+                                    <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
+                                        <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
+                                    )} />
+                                )}
+                                {addFinanceEntryType === 'expense' && (
+                                    <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
+                                        <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
+                                    )} />
+                                )}
+                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                                <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
+                                <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
+                            </form>
+                        </ScrollArea>
                     </Form>
                 </DialogContent>
             </Dialog>
