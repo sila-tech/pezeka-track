@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -68,9 +69,13 @@ const addFinanceEntrySchema = z.object({
   description: z.string().optional(),
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
+  receiptCategory: z.enum(['loan_repayment', 'upfront_fees', 'investment', 'other']).optional(),
 }).superRefine((data, ctx) => {
-    if (data.type === 'receipt' && !data.loanId) {
-        ctx.addIssue({ code: 'custom', message: 'Please select the loan this receipt is for.', path: ['loanId'] });
+    if (data.type === 'receipt' && !data.receiptCategory) {
+        ctx.addIssue({ code: 'custom', message: 'Please select a receipt category.', path: ['receiptCategory'] });
+    }
+    if (data.type === 'receipt' && (data.receiptCategory === 'loan_repayment' || data.receiptCategory === 'upfront_fees') && !data.loanId) {
+        ctx.addIssue({ code: 'custom', message: 'Please select the associated loan.', path: ['loanId'] });
     }
     if (data.type === 'payout') {
         if (!data.payoutReason) {
@@ -146,6 +151,7 @@ interface FinanceEntry {
   transactionCost?: number;
   loanId?: string;
   expenseCategory?: string;
+  receiptCategory?: string;
 }
 
 export default function FinancePage() {
@@ -264,6 +270,7 @@ export default function FinancePage() {
     try {
         const receiptData = {
             type: 'receipt' as const,
+            receiptCategory: 'loan_repayment' as const,
             date: new Date(values.paymentDate),
             amount: values.paymentAmount,
             description: `Payment for Loan #${loanToEdit.loanNumber}${values.comments ? ': ' + values.comments : ''}`,
@@ -393,6 +400,11 @@ export default function FinancePage() {
                                     <FormItem><FormLabel>Reason</FormLabel><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="loan_disbursement"/></FormControl> <FormLabel className="font-normal">Loan Disbursement</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="expense"/></FormControl> <FormLabel className="font-normal">General Expense</FormLabel></FormItem></RadioGroup></FormItem>
                                 )} />
                             )}
+                            {addFinanceEntryType === 'receipt' && (
+                                <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
+                                    <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fee Income</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
+                                )} />
+                            )}
                             <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                             <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                             <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
@@ -437,13 +449,13 @@ export default function FinancePage() {
           </ScrollArea>
           
           <TabsContent value="receipts">
-              <EditableFinanceReportTab title="Receipts" description="Incoming payments and fee income." entries={receipts} loading={isLoading} />
+              <EditableFinanceReportTab title="Receipts" description="Incoming cash flows including loan repayments, upfront fees, and investor deposits." entries={receipts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="payouts">
-              <EditableFinanceReportTab title="Payouts" description="Outgoing loan disbursements." entries={payouts} loading={isLoading} />
+              <EditableFinanceReportTab title="Payouts" description="Outgoing loan disbursements and major payouts." entries={payouts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="expenses">
-               <EditableFinanceReportTab title="Expenses" description="Operational and facilitation costs." entries={expenses} loading={isLoading} />
+               <EditableFinanceReportTab title="Expenses" description="Operational, facilitation, and miscellaneous office costs." entries={expenses} loading={isLoading} />
           </TabsContent>
           
           <TabsContent value="loanbook">
@@ -646,8 +658,15 @@ export default function FinancePage() {
                                                 <CardContent>
                                                     <Form {...rolloverForm}>
                                                         <form onSubmit={rolloverForm.handleSubmit(onRolloverSubmit)} className="space-y-2">
-                                                            <FormField control={rolloverForm.control} name="rolloverDate" render={({field}) => (<FormItem><FormLabel className="text-xs">Rollover Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                                                            <Button type="submit" variant="outline" className="w-full" disabled={isRollingOver || !canPerformActions}>{isRollingOver && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Process Rollover</Button>
+                                                            <FormField control={rolloverForm.control} name="rolloverDate" render={({field}) => (
+                                                                <FormItem>
+                                                                    <FormLabel className="text-xs">Rollover Date</FormLabel>
+                                                                    <FormControl><Input type="date" {...field}/></FormControl>
+                                                                </FormItem>
+                                                            )} />
+                                                            <Button type="submit" variant="outline" className="w-full" disabled={isRollingOver || !canPerformActions}>
+                                                                {isRollingOver && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Process Rollover
+                                                            </Button>
                                                         </form>
                                                     </Form>
                                                 </CardContent>

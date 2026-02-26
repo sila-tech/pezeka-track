@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -70,6 +71,7 @@ type FinanceEntryData = {
     loanId?: string;
     transactionCost?: number;
     expenseCategory?: string;
+    receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'investment' | 'other';
 }
 
 export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData): Promise<DocumentReference<DocumentData>> {
@@ -144,7 +146,6 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
   try {
     const docRef = await addDoc(loanCollection, newLoan);
     
-    // Automatically record disbursement if active
     if (loanData.status === 'active') {
         await recordDisbursement(db, { ...newLoan, id: docRef.id });
     }
@@ -161,7 +162,6 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
   }
 }
 
-// Internal helper to automate upfront fee deductions and principal payout
 async function recordDisbursement(db: Firestore, loan: any) {
     if (loan.disbursementRecorded) return;
 
@@ -175,7 +175,6 @@ async function recordDisbursement(db: Firestore, loan: any) {
         ? loan.disbursementDate 
         : (loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date());
 
-    // 1. Record Principal Payout
     await addFinanceEntry(db, {
         type: 'payout',
         date: disbursementDate,
@@ -184,10 +183,10 @@ async function recordDisbursement(db: Firestore, loan: any) {
         loanId: loan.id
     });
 
-    // 2. Record Receipt for upfront fees (Income)
     if (totalFees > 0) {
         await addFinanceEntry(db, {
             type: 'receipt',
+            receiptCategory: 'upfront_fees',
             date: disbursementDate,
             amount: totalFees,
             description: `Upfront fees for Loan #${loan.loanNumber} (Reg: ${reg}, Proc: ${proc}, Track: ${track}, Charge: ${charge})`,
@@ -195,14 +194,12 @@ async function recordDisbursement(db: Firestore, loan: any) {
         });
     }
 
-    // Mark as recorded
     await updateDoc(doc(db, 'loans', loan.id), { disbursementRecorded: true });
 }
 
 export async function approveLoanApplication(db: Firestore, loan: Loan, updateData: any) {
     const loanRef = doc(db, 'loans', loan.id);
     
-    // Calculate new totals based on updated interest/principal/instalments
     const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
         updateData.principalAmount || loan.principalAmount,
         updateData.interestRate ?? loan.interestRate ?? 0,
@@ -225,7 +222,6 @@ export async function approveLoanApplication(db: Firestore, loan: Loan, updateDa
 export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {
     const loanRef = doc(db, 'loans', loanId);
 
-    // If status becomes active, trigger disbursement logic
     if (data.status === 'active') {
         const loanSnap = await getDoc(loanRef);
         if (loanSnap.exists()) {
@@ -304,6 +300,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
     const receiptDescription = `Rollover interest payment for Loan #${originalLoan.loanNumber}`;
     const receiptData = { 
         type: 'receipt' as const,
+        receiptCategory: 'loan_repayment' as const,
         date: rolloverDate,
         amount: interestAmount,
         description: receiptDescription,
@@ -666,6 +663,7 @@ export async function approveDeposit(db: Firestore, investorId: string, depositI
     
     await addFinanceEntry(db, {
         type: 'receipt',
+        receiptCategory: 'investment',
         date: new Date(),
         amount: deposit.amount,
         description: `Investor deposit from ${investorData.name}`,

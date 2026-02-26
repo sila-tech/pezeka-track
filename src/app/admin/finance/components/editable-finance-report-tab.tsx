@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -24,6 +25,7 @@ interface FinanceEntry {
   transactionCost?: number;
   loanId?: string;
   expenseCategory?: string;
+  receiptCategory?: string;
 }
 
 interface FinanceReportTabProps {
@@ -115,7 +117,8 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
     if (searchTerm) {
         filtered = filtered.filter(entry =>
             (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (entry.expenseCategory || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (entry.expenseCategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (entry.receiptCategory || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
     }
 
@@ -141,7 +144,9 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             'Description': entry.description,
             'Amount (Ksh)': entry.amount,
         };
-        if (entry.expenseCategory) record['Category'] = entry.expenseCategory;
+        const category = entry.expenseCategory || entry.receiptCategory;
+        if (category) record['Category'] = category.replace(/_/g, ' ').toUpperCase();
+        
         if(showTransactionCost) {
             record['Transaction Cost (Ksh)'] = entry.transactionCost || 0;
             record['Total (Ksh)'] = entry.amount + (entry.transactionCost || 0);
@@ -223,6 +228,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount (Ksh)</TableHead>
                     {showTransactionCost && <TableHead className="text-right">Trans. Cost</TableHead>}
                     {showTransactionCost && <TableHead className="text-right">Total</TableHead>}
@@ -235,11 +241,14 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                     <TableCell>{format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
                     <TableCell>
                         <div className="font-medium">{entry.description || '-'}</div>
-                        {entry.expenseCategory && <div className="text-xs text-muted-foreground">{entry.expenseCategory}</div>}
                     </TableCell>
-                    <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
+                    <TableCell>
+                        {entry.expenseCategory && <Badge variant="secondary">{entry.expenseCategory.replace(/_/g, ' ')}</Badge>}
+                        {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ')}</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
                     {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
-                    {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
+                    {showTransactionCost && <TableCell className="text-right font-bold">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
                     {isEditable && onEdit && onDelete && (
                         <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
@@ -253,7 +262,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                     </TableRow>
                 ))}
                     <TableRow className="font-bold bg-muted/50">
-                        <TableCell colSpan={2} className="text-right">Total</TableCell>
+                        <TableCell colSpan={3} className="text-right">Total</TableCell>
                         {showTransactionCost ? (
                             <>
                                 <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>

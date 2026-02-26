@@ -113,6 +113,11 @@
           "type": "string",
           "enum": ["facilitation_commission", "office_purchase", "other"],
           "description": "Category for an expense entry."
+        },
+        "receiptCategory": {
+          "type": "string",
+          "enum": ["loan_repayment", "upfront_fees", "investment", "other"],
+          "description": "Category for a receipt entry."
         }
       },
       "required": ["type", "date", "amount"]
