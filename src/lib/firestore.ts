@@ -3,7 +3,7 @@
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { calculateInterestForOneInstalment } from './utils';
+import { calculateInterestForOneInstalment, calculateAmortization } from './utils';
 
 type CustomerData = {
   name: string;
@@ -199,10 +199,27 @@ async function recordDisbursement(db: Firestore, loan: any) {
     await updateDoc(doc(db, 'loans', loan.id), { disbursementRecorded: true });
 }
 
-export async function approveLoanApplication(db: Firestore, loan: Loan) {
+export async function approveLoanApplication(db: Firestore, loan: Loan, updateData: any) {
     const loanRef = doc(db, 'loans', loan.id);
-    await updateDoc(loanRef, { status: 'active', updatedAt: serverTimestamp() });
-    await recordDisbursement(db, { ...loan, status: 'active' });
+    
+    // Calculate new totals based on updated interest/principal/instalments
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
+        updateData.principalAmount || loan.principalAmount,
+        updateData.interestRate ?? loan.interestRate ?? 0,
+        updateData.numberOfInstalments || loan.numberOfInstalments,
+        updateData.paymentFrequency || loan.paymentFrequency
+    );
+
+    const finalUpdate = {
+        ...updateData,
+        status: 'active',
+        instalmentAmount,
+        totalRepayableAmount,
+        updatedAt: serverTimestamp()
+    };
+
+    await updateDoc(loanRef, finalUpdate);
+    await recordDisbursement(db, { ...loan, ...finalUpdate });
 }
 
 export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {

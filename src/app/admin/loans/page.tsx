@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -78,6 +77,18 @@ const loanSchema = z.object({
   }
 });
 
+const approvalSchema = z.object({
+    disbursementDate: z.string().min(1, 'Disbursement date is required.'),
+    principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
+    interestRate: z.coerce.number().min(0, 'Interest rate is required.'),
+    processingFee: z.coerce.number().min(0, 'Processing fee is required.'),
+    registrationFee: z.coerce.number().optional(),
+    carTrackInstallationFee: z.coerce.number().optional(),
+    chargingCost: z.coerce.number().optional(),
+    numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
+    paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+});
+
 
 interface Customer {
   id: string;
@@ -126,7 +137,7 @@ export default function LoansPage() {
   const { toast } = useToast();
 
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
-  const isFinance = user?.role === 'finance';
+  const isFinance = user?.role === 'finance' || user?.email?.endsWith('@finance.pezeka.com');
   const isStaff = user?.role === 'staff';
 
   const canAdd = isSuperAdmin || isFinance || isStaff;
@@ -181,6 +192,10 @@ export default function LoansPage() {
       newCustomerName: '',
       newCustomerPhone: '',
     },
+  });
+
+  const approvalForm = useForm<z.infer<typeof approvalSchema>>({
+      resolver: zodResolver(approvalSchema),
   });
 
   const { watch } = form;
@@ -285,30 +300,52 @@ export default function LoansPage() {
     }
   };
 
-  const handleUpdateStatus = async (loan: Loan, newStatus: 'active' | 'rejected') => {
+  const handleManageApplication = (loan: Loan) => {
+      setApplicationToManage(loan);
+      approvalForm.reset({
+          disbursementDate: format(new Date(), 'yyyy-MM-dd'),
+          principalAmount: loan.principalAmount,
+          interestRate: 0,
+          processingFee: 0,
+          registrationFee: 0,
+          carTrackInstallationFee: 0,
+          chargingCost: 0,
+          numberOfInstalments: 1,
+          paymentFrequency: 'monthly',
+      });
+  };
+
+  const onApproveSubmit = async (values: z.infer<typeof approvalSchema>) => {
+    if (!applicationToManage) return;
     setIsUpdatingStatus(true);
     try {
-        if (newStatus === 'active') {
-            await approveLoanApplication(firestore, loan);
-        } else {
-            await updateLoan(firestore, loan.id, { status: newStatus });
-        }
-        
-        toast({
-            title: `Application ${newStatus === 'active' ? 'Approved' : 'Rejected'}`,
-            description: `Loan application #${loan.loanNumber} has been updated. ${newStatus === 'active' ? 'Disbursement recorded.' : ''}`,
-        });
+        const updateData = {
+            ...values,
+            disbursementDate: new Date(values.disbursementDate),
+        };
+        await approveLoanApplication(firestore, applicationToManage, updateData);
+        toast({ title: 'Application Approved', description: `Loan #${applicationToManage.loanNumber} is now active.`});
         setApplicationToManage(null);
     } catch (error: any) {
-        toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: error.message || "Could not update the loan status.",
-        });
+        toast({ variant: "destructive", title: "Approval Failed", description: error.message });
     } finally {
         setIsUpdatingStatus(false);
     }
-  }
+  };
+
+  const handleReject = async () => {
+      if (!applicationToManage) return;
+      setIsUpdatingStatus(true);
+      try {
+          await updateLoan(firestore, applicationToManage.id, { status: 'rejected' });
+          toast({ title: 'Application Rejected' });
+          setApplicationToManage(null);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+      } finally {
+          setIsUpdatingStatus(false);
+      }
+  };
   
   const isLoading = userLoading || customersLoading || loansLoading;
 
@@ -463,7 +500,7 @@ export default function LoansPage() {
                       name="registrationFee"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Registration Fee (Optional)</FormLabel>
+                          <FormLabel>Registration Fee</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
                           </FormControl>
@@ -476,7 +513,7 @@ export default function LoansPage() {
                       name="processingFee"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Processing Fee (Optional)</FormLabel>
+                          <FormLabel>Processing Fee</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
                           </FormControl>
@@ -489,7 +526,7 @@ export default function LoansPage() {
                       name="carTrackInstallationFee"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Car Track Fee (Optional)</FormLabel>
+                          <FormLabel>Car Track Fee</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
                           </FormControl>
@@ -502,7 +539,7 @@ export default function LoansPage() {
                       name="chargingCost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Charging Cost (Optional)</FormLabel>
+                          <FormLabel>Charging Cost</FormLabel>
                           <FormControl>
                             <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
                           </FormControl>
@@ -740,7 +777,7 @@ export default function LoansPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {applicationLoans.map((loan) => (
-                                        <TableRow key={loan.id} className="cursor-pointer" onClick={() => setApplicationToManage(loan)}>
+                                        <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleManageApplication(loan)}>
                                             <TableCell className="font-medium">{loan.customerName}</TableCell>
                                             <TableCell>{loan.customerPhone}</TableCell>
                                             <TableCell>{loan.loanType || 'N/A'}</TableCell>
@@ -763,30 +800,57 @@ export default function LoansPage() {
             {applicationToManage && (
                 <>
                     <DialogHeader>
-                        <DialogTitle>Manage Application #{applicationToManage.loanNumber}</DialogTitle>
+                        <DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle>
                         <DialogDescription>
-                            Review and approve or reject this loan application from {applicationToManage.customerName}.
+                            Enter the final financial terms to approve this loan for {applicationToManage.customerName}.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-4 grid gap-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><div className="text-sm text-muted-foreground">Applicant Name</div><div className="font-semibold">{applicationToManage.customerName}</div></div>
-                            <div><div className="text-sm text-muted-foreground">Applicant Phone</div><div className="font-semibold">{applicationToManage.customerPhone}</div></div>
-                            <div><div className="text-sm text-muted-foreground">National ID</div><div className="font-semibold">{applicationToManage.idNumber || 'N/A'}</div></div>
-                            <div><div className="text-sm text-muted-foreground">Application Date</div><div className="font-semibold">{format(new Date(applicationToManage.disbursementDate.seconds * 1000), 'PPP')}</div></div>
-                            <div><div className="text-sm text-muted-foreground">Loan Type</div><div className="font-semibold">{applicationToManage.loanType || 'N/A'}</div></div>
-                            <div><div className="text-sm text-muted-foreground">Amount Requested</div><div className="font-bold text-lg">Ksh {applicationToManage.principalAmount.toLocaleString()}</div></div>
-                        </div>
-                    </div>
-                    <DialogFooter className="mt-6">
+                    <Form {...approvalForm}>
+                        <ScrollArea className="max-h-[60vh] pr-4">
+                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
+                                <div className="col-span-2 grid grid-cols-2 gap-2 text-sm bg-muted/50 p-3 rounded-lg mb-2">
+                                    <div><span className="text-muted-foreground">Applicant:</span> {applicationToManage.customerName}</div>
+                                    <div><span className="text-muted-foreground">Requested:</span> Ksh {applicationToManage.principalAmount.toLocaleString()}</div>
+                                    <div><span className="text-muted-foreground">Type:</span> {applicationToManage.loanType}</div>
+                                </div>
+                                <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (
+                                    <FormItem className="col-span-2"><FormLabel>Approved Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (
+                                    <FormItem><FormLabel>Approved Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="interestRate" render={({field}) => (
+                                    <FormItem><FormLabel>Monthly Interest (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="processingFee" render={({field}) => (
+                                    <FormItem><FormLabel>Processing Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (
+                                    <FormItem><FormLabel>Registration Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (
+                                    <FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="paymentFrequency" render={({field}) => (
+                                    <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                                )} />
+                                <div className="col-span-2 grid grid-cols-2 gap-4 mt-2">
+                                    <FormField control={approvalForm.control} name="carTrackInstallationFee" render={({field}) => (
+                                        <FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                    )} />
+                                    <FormField control={approvalForm.control} name="chargingCost" render={({field}) => (
+                                        <FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                    )} />
+                                </div>
+                            </form>
+                        </ScrollArea>
+                    </Form>
+                    <DialogFooter className="mt-6 flex gap-2">
                         <Button variant="outline" onClick={() => setApplicationToManage(null)} disabled={isUpdatingStatus}>Cancel</Button>
                         {canManageApplications && (
                             <>
-                                <Button variant="destructive" onClick={() => handleUpdateStatus(applicationToManage, 'rejected')} disabled={isUpdatingStatus}>
-                                    {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Reject
-                                </Button>
-                                <Button onClick={() => handleUpdateStatus(applicationToManage, 'active')} disabled={isUpdatingStatus}>
+                                <Button variant="destructive" onClick={handleReject} disabled={isUpdatingStatus}>Reject</Button>
+                                <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>
                                     {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Approve & Disburse
                                 </Button>

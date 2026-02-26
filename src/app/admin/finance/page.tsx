@@ -464,6 +464,7 @@ export default function FinancePage() {
                                     <SelectItem value="overdue">Overdue</SelectItem>
                                     <SelectItem value="paid">Paid</SelectItem>
                                     <SelectItem value="rollover">Rollover</SelectItem>
+                                    <SelectItem value="application">Application</SelectItem>
                                 </SelectContent>
                             </Select>
                             <div className="relative">
@@ -507,9 +508,9 @@ export default function FinancePage() {
                                     const charge = Number(loan.chargingCost) || 0;
                                     const totalFees = reg + proc + track + charge;
                                     const takeHome = loan.principalAmount - totalFees;
-                                    const expectedInterest = loan.totalRepayableAmount - loan.principalAmount;
+                                    const expectedInterest = (loan.totalRepayableAmount || 0) - loan.principalAmount;
                                     const expectedIncome = expectedInterest + totalFees;
-                                    const balance = loan.totalRepayableAmount - loan.totalPaid;
+                                    const balance = (loan.totalRepayableAmount || 0) - loan.totalPaid;
 
                                     return (
                                         <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
@@ -525,7 +526,7 @@ export default function FinancePage() {
                                             <TableCell className="text-right">{charge.toLocaleString()}</TableCell>
                                             <TableCell className="text-center">{loan.numberOfInstalments} ({loan.paymentFrequency[0].toUpperCase()})</TableCell>
                                             <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
-                                            <TableCell className="text-right font-medium">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                            <TableCell className="text-right font-medium">{loan.totalRepayableAmount?.toLocaleString()}</TableCell>
                                             <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                                             <TableCell className="text-right font-bold text-destructive">{balance.toLocaleString()}</TableCell>
                                             <TableCell className="text-right text-blue-600">{expectedInterest.toLocaleString()}</TableCell>
@@ -574,7 +575,7 @@ export default function FinancePage() {
                                 <Card>
                                     <CardHeader><CardTitle className="text-sm flex items-center gap-2"><HandCoins className="h-4 w-4"/> Financial Overview</CardTitle></CardHeader>
                                     <CardContent className="grid grid-cols-2 gap-4">
-                                        <div><p className="text-xs text-muted-foreground">Total Repayable</p><p className="font-bold">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</p></div>
+                                        <div><p className="text-xs text-muted-foreground">Total Repayable</p><p className="font-bold">Ksh {loanToEdit.totalRepayableAmount?.toLocaleString()}</p></div>
                                         <div><p className="text-xs text-muted-foreground">Total Paid</p><p className="font-bold text-green-600">Ksh {loanToEdit.totalPaid.toLocaleString()}</p></div>
                                         <div><p className="text-xs text-muted-foreground">Outstanding Balance</p><p className="font-bold text-lg text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</p></div>
                                         <div><p className="text-xs text-muted-foreground">Instalment</p><p className="font-bold">Ksh {loanToEdit.instalmentAmount.toLocaleString()} ({loanToEdit.paymentFrequency})</p></div>
@@ -685,7 +686,7 @@ export default function FinancePage() {
       {/* Edit Loan Parameters Dialog */}
       <Dialog open={isEditingLoan} onOpenChange={setIsEditingLoan}>
           <DialogContent className="sm:max-w-2xl">
-              <DialogHeader><DialogTitle>Edit Loan Parameters</DialogTitle><DialogDescription>Update principal, rates, or dates. This will recalculate totals.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>Edit Loan Parameters</DialogTitle><DialogDescription>Update principal, rates, fees or dates. This will recalculate totals.</DialogDescription></DialogHeader>
               <Form {...editLoanForm}>
                   <form onSubmit={editLoanForm.handleSubmit(onEditLoanSubmit)} className="grid grid-cols-2 gap-4 py-4">
                       <FormField control={editLoanForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
@@ -693,6 +694,12 @@ export default function FinancePage() {
                       <FormField control={editLoanForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>)} />
+                      
+                      <FormField control={editLoanForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charge Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+
                       <FormField control={editLoanForm.control} name="status" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></SelectContent></Select></FormItem>)} />
                       <div className="col-span-2 pt-4 flex gap-2">
                           <Button type="submit" className="flex-1" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
