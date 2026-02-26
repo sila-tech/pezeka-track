@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useAppUser, useCollection } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2 } from 'lucide-react';
+import { Bell, Loader2, TrendingUp, HandCoins } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -13,13 +13,17 @@ interface DashboardLoan {
   id: string;
   loanNumber: string;
   customerName: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementDate: { seconds: number; nanoseconds: number };
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
   totalRepayableAmount: number;
   totalPaid: number;
   principalAmount: number;
+  registrationFee?: number;
+  processingFee?: number;
+  carTrackInstallationFee?: number;
+  chargingCost?: number;
   loanType?: string;
 }
 
@@ -30,13 +34,49 @@ export default function Dashboard() {
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
+  const stats = useMemo(() => {
+    if (!loans) return { totalRevenue: 0, disbursedCount: 0 };
+    
+    let realizedRevenue = 0;
+    let disbursedCount = 0;
+    
+    loans.forEach(loan => {
+        // Exclude applications and rejections from counts
+        if (loan.status !== 'application' && loan.status !== 'rejected') {
+            disbursedCount++;
+            
+            // Revenue includes upfront fees (collected at disbursement)
+            const upfrontFees = (Number(loan.registrationFee) || 0) + 
+                               (Number(loan.processingFee) || 0) + 
+                               (Number(loan.carTrackInstallationFee) || 0) + 
+                               (Number(loan.chargingCost) || 0);
+            
+            realizedRevenue += upfrontFees;
+
+            // Interest revenue realized from payments made
+            // Simplified: If TotalPaid > Principal, the excess is interest.
+            // But wait, penalties also count as revenue.
+            // Let's use: Realized Interest/Penalty = Any payment amount that contributes to balance beyond the principal.
+            // To be accurate we'd need to know principal remaining.
+            // MVP version: Show realized revenue as (Upfront Fees + Interest component of payments).
+            // For now, let's show Realized Revenue = Upfront Fees + Total Interest from fully paid or active loans.
+            // Actually, let's just show Upfront Fees + Total Paid (portion above principal)
+            if (loan.totalPaid > loan.principalAmount) {
+                realizedRevenue += (loan.totalPaid - loan.principalAmount);
+            }
+        }
+    });
+    
+    return { realizedRevenue, disbursedCount };
+  }, [loans]);
+
   const dueLoans = useMemo(() => {
     if (!loans) return [];
 
     const today = startOfToday();
     
     return loans
-      .filter(loan => loan.status !== 'paid' && loan.status !== 'rollover' && loan.status !== 'application')
+      .filter(loan => loan.status !== 'paid' && loan.status !== 'rollover' && loan.status !== 'application' && loan.status !== 'rejected')
       .map(loan => {
         const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
         let endDate: Date;
@@ -83,14 +123,14 @@ export default function Dashboard() {
          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                Total Revenue
+                Total Realized Revenue
                 </CardTitle>
-                <span className="text-muted-foreground">Ksh</span>
+                <TrendingUp className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">Ksh 0.00</div>
+                <div className="text-2xl font-bold">Ksh {stats.realizedRevenue.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">
-                +0% from last month
+                Fees and interest collected
                 </p>
             </CardContent>
         </Card>
@@ -99,12 +139,12 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-medium">
                 Loans Disbursed
                 </CardTitle>
-                <span className="text-muted-foreground">#</span>
+                <HandCoins className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-2xl font-bold">{stats.disburnedCount}</div>
                  <p className="text-xs text-muted-foreground">
-                +0% from last month
+                Total historical count
                 </p>
             </CardContent>
         </Card>

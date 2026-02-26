@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -141,13 +140,14 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     createdAt: serverTimestamp(),
     payments: [],
     comments: loanData.comments || "",
-    disbursementRecorded: loanData.status === 'active'
+    disbursementRecorded: false // Initialize as false to allow recordDisbursement to trigger
   };
 
   try {
     const docRef = await addDoc(loanCollection, newLoan);
     
     if (loanData.status === 'active') {
+        // Pass the generated ID to recordDisbursement
         await recordDisbursement(db, { ...newLoan, id: docRef.id });
     }
 
@@ -164,7 +164,10 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
 }
 
 async function recordDisbursement(db: Firestore, loan: any) {
-    if (loan.disbursementRecorded) return;
+    // Re-check if already recorded to prevent race conditions
+    const loanRef = doc(db, 'loans', loan.id);
+    const loanSnap = await getDoc(loanRef);
+    if (loanSnap.exists() && loanSnap.data().disbursementRecorded) return;
 
     const reg = Number(loan.registrationFee) || 0;
     const proc = Number(loan.processingFee) || 0;
@@ -179,7 +182,7 @@ async function recordDisbursement(db: Firestore, loan: any) {
         ? loan.disbursementDate 
         : (loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date());
 
-    // Record the Take Home as the actual payout amount
+    // Record the Take Home as the actual payout amount in Finance
     await addFinanceEntry(db, {
         type: 'payout',
         payoutCategory: 'loan_disbursement',
@@ -189,11 +192,8 @@ async function recordDisbursement(db: Firestore, loan: any) {
         loanId: loan.id
     });
 
-    // Note: We do NOT record a receipt for upfront fees here because the cash never left the bank.
-    // Recording it as a receipt would incorrectly increase the "Cash at Hand" stats.
-    // The fees are represented as the difference between Principal and Payout.
-
-    await updateDoc(doc(db, 'loans', loan.id), { disbursementRecorded: true });
+    // Mark as recorded
+    await updateDoc(loanRef, { disbursementRecorded: true });
 }
 
 export async function approveLoanApplication(db: Firestore, loan: Loan, updateData: any) {
