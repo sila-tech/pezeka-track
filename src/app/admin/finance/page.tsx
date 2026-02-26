@@ -62,7 +62,7 @@ const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
-  transactionCost: z.coerce.number().optional(),
+  transactionCost: z.coerce.number().optional().default(0),
   description: z.string().optional(),
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
@@ -210,6 +210,7 @@ export default function FinancePage() {
             payoutCategory: 'loan_disbursement',
             date: loan.disbursementDate,
             amount: takeHome,
+            transactionCost: 0,
             description: `Take-home disbursement for Loan #${loan.loanNumber} (${loan.customerName})`,
             loanId: loan.id
         });
@@ -459,6 +460,11 @@ export default function FinancePage() {
                                     )} />
                                 )}
                                 <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                {(addFinanceEntryType === 'payout' || addFinanceEntryType === 'expense') && (
+                                    <FormField control={addForm.control} name="transactionCost" render={({ field }) => (
+                                        <FormItem><FormLabel>Transaction Cost (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                    )} />
+                                )}
                                 <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                                 <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
                                 <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
@@ -804,7 +810,7 @@ export default function FinancePage() {
                       <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charge Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
 
-                      <FormField control={editLoanForm.control} name="status" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></SelectContent></Select></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="status" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></Select></FormItem>)} />
                       <div className="col-span-2 pt-4 flex gap-2">
                           <Button type="submit" className="flex-1" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
                           <Button type="button" variant="outline" onClick={() => setIsEditingLoan(false)}>Cancel</Button>
