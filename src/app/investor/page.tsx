@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { useUser, useDoc, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, FileText, Bell, Download, Wallet, TrendingUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, Bell, Download, Wallet, TrendingUp, ArrowDownCircle } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -57,6 +57,7 @@ interface Investor {
   name: string;
   email: string;
   totalInvestment: number;
+  totalWithdrawn: number;
   currentBalance: number;
   interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
@@ -86,7 +87,30 @@ export default function InvestorPage() {
 
   const monthlyReturn = useMemo(() => {
     if (!portfolio || !portfolio.interestRate) return 0;
-    return (portfolio.currentBalance || 0) * (portfolio.interestRate / 100);
+    
+    const now = new Date();
+    const startOfCurrentMonth = startOfMonth(now);
+    const endOfCurrentMonth = endOfMonth(now);
+    const daysInMonth = getDaysInMonth(now);
+    const monthlyRate = portfolio.interestRate / 100;
+
+    const approvedThisMonth = (portfolio.deposits || [])
+        .filter(d => d.status === 'approved')
+        .filter(d => {
+            const date = new Date((d.date as any).seconds * 1000);
+            return date >= startOfCurrentMonth && date <= endOfCurrentMonth;
+        });
+    
+    const basis = portfolio.currentBalance - approvedThisMonth.reduce((acc, d) => acc + d.amount, 0);
+    let totalInterest = basis * monthlyRate;
+
+    approvedThisMonth.forEach(deposit => {
+        const depositDate = new Date((deposit.date as any).seconds * 1000);
+        const daysRemaining = differenceInDays(endOfCurrentMonth, depositDate) + 1;
+        totalInterest += (deposit.amount * monthlyRate) * (daysRemaining / daysInMonth);
+    });
+
+    return totalInterest;
   }, [portfolio]);
 
   async function onWithdrawalSubmit(values: z.infer<typeof withdrawalSchema>) {
@@ -132,7 +156,7 @@ export default function InvestorPage() {
       await requestDeposit(firestore, user.uid, values.amount);
       toast({
         title: "Deposit Noted",
-        description: "Your deposit notification has been sent. It will be approved once payment is confirmed.",
+        description: "Your deposit notification has been sent. Interest starts from today once verified.",
       });
 
       const phoneNumber = "254757664047";
@@ -157,27 +181,24 @@ export default function InvestorPage() {
     if (!portfolio) return;
     const statementData = [];
 
-    // Initial Investment
     if (portfolio.createdAt) {
         statementData.push({
             Date: format(new Date(portfolio.createdAt.seconds * 1000), 'PPP'),
-            Description: 'Initial Investment',
+            Description: 'Investment',
             Amount: portfolio.totalInvestment,
             Type: 'Credit'
         });
     }
 
-    // Deposit Entries
     (portfolio.deposits || []).filter(d => d.status === 'approved').forEach(entry => {
         statementData.push({
             Date: format(new Date((entry.date as any).seconds * 1000), 'PPP'),
-            Description: 'Deposit',
+            Description: 'Subsequent Investment',
             Amount: entry.amount,
             Type: 'Credit'
         });
     });
 
-    // Interest Entries
     (portfolio.interestEntries || []).forEach(entry => {
         statementData.push({
             Date: format(new Date((entry.date as any).seconds * 1000), 'PPP'),
@@ -187,7 +208,6 @@ export default function InvestorPage() {
         });
     });
 
-    // Withdrawal Entries
     (portfolio.withdrawals || []).filter(w => w.status === 'processed').forEach(w => {
         statementData.push({
             Date: format(new Date((w.date as any).seconds * 1000), 'PPP'),
@@ -197,7 +217,6 @@ export default function InvestorPage() {
         });
     });
 
-    // Sort by date
     statementData.sort((a,b) => new Date(a.Date).getTime() - new Date(b.Date).getTime());
 
     exportToCsv(statementData, `${portfolio.name.replace(/ /g, '_')}_statement`);
@@ -235,7 +254,7 @@ export default function InvestorPage() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Invested Amount</CardTitle>
+                        <CardTitle className="text-sm font-medium">Investments</CardTitle>
                         <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -244,7 +263,16 @@ export default function InvestorPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Current Portfolio Value</CardTitle>
+                        <CardTitle className="text-sm font-medium">Withdrawals</CardTitle>
+                        <ArrowDownCircle className="h-4 w-4 text-destructive" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-destructive">Ksh {(portfolio.totalWithdrawn || 0).toLocaleString()}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
                          <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -253,24 +281,14 @@ export default function InvestorPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Monthly Interest Rate</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">
-                           {(portfolio.interestRate || 0).toFixed(2)}%
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Est. Monthly Return</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <TrendingUp className="h-4 w-4 text-green-600" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">
                            Ksh {monthlyReturn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">Based on {(portfolio.interestRate || 0)}% rate & pro-rated deposits</p>
                     </CardContent>
                 </Card>
             </div>
@@ -279,15 +297,15 @@ export default function InvestorPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Add Funds to Portfolio</CardTitle>
-                        <CardDescription>Deposit funds using the details below and then notify us of your deposit.</CardDescription>
+                        <CardDescription>Notify us after depositing funds. Interest will be pro-rated from the deposit day.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            <div className="text-sm p-4 bg-muted rounded-lg">
+                            <div className="text-sm p-4 bg-muted rounded-lg border">
                                 <h4 className="font-semibold mb-2">Payment Details</h4>
                                 <p><strong>M-Pesa PayBill:</strong> 522522</p>
                                 <p><strong>Account Number:</strong> 1347823360</p>
-                                <p className="mt-2 text-xs text-muted-foreground">Use your registered email or phone number in the payment reference if possible.</p>
+                                <p className="mt-2 text-xs text-muted-foreground">Use your registered name as the payment reference.</p>
                             </div>
                             <Form {...depositForm}>
                                 <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">
@@ -300,7 +318,7 @@ export default function InvestorPage() {
                                     )}/>
                                     <Button type="submit" className="w-full" disabled={isSubmittingDeposit}>
                                         {isSubmittingDeposit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        I Have Deposited
+                                        Notify Deposit
                                     </Button>
                                 </form>
                             </Form>
@@ -310,16 +328,16 @@ export default function InvestorPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Deposit History</CardTitle>
-                        <CardDescription>A log of your deposit notifications.</CardDescription>
+                        <CardDescription>A log of your recent investment activities.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-60">
                          {(!portfolio.deposits || portfolio.deposits.length === 0) ? (
                             <Alert>
                                 <Bell className="h-4 w-4" />
-                                <AlertTitle>No deposit notifications yet</AlertTitle>
+                                <AlertTitle>No deposit activities</AlertTitle>
                                 <AlertDescription>
-                                    Your deposit notifications will appear here.
+                                    Your verified deposits will appear here.
                                 </AlertDescription>
                             </Alert>
                          ) : (
@@ -334,8 +352,8 @@ export default function InvestorPage() {
                                 <TableBody>
                                     {[...portfolio.deposits].sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(d => (
                                         <TableRow key={d.depositId}>
-                                            <TableCell>{format(new Date((d.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                            <TableCell>{d.amount.toLocaleString()}</TableCell>
+                                            <TableCell className="text-xs">{format(new Date((d.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                            <TableCell className="font-medium tabular-nums">{d.amount.toLocaleString()}</TableCell>
                                             <TableCell>
                                                 <Badge variant={d.status === 'pending' ? 'secondary' : d.status === 'approved' ? 'default' : 'destructive'}>
                                                     {d.status}
@@ -354,7 +372,7 @@ export default function InvestorPage() {
                  <Card>
                     <CardHeader>
                         <CardTitle>Request a Withdrawal</CardTitle>
-                        <CardDescription>Request to withdraw funds from your portfolio. Requests will be processed by an administrator.</CardDescription>
+                        <CardDescription>Requests will be processed and the balance updated upon approval.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-6 md:grid-cols-2">
@@ -367,9 +385,9 @@ export default function InvestorPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )}/>
-                                    <Button type="submit" className="w-full" disabled={isSubmittingWithdrawal}>
+                                    <Button type="submit" variant="outline" className="w-full" disabled={isSubmittingWithdrawal}>
                                         {isSubmittingWithdrawal && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Submit Withdrawal Request
+                                        Submit Request
                                     </Button>
                                 </form>
                             </Form>
@@ -396,8 +414,8 @@ export default function InvestorPage() {
                                     <TableBody>
                                         {[...portfolio.withdrawals].sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(w => (
                                             <TableRow key={w.withdrawalId}>
-                                                <TableCell>{format(new Date((w.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                <TableCell>{w.amount.toLocaleString()}</TableCell>
+                                                <TableCell className="text-xs">{format(new Date((w.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                                <TableCell className="font-medium tabular-nums">{w.amount.toLocaleString()}</TableCell>
                                                 <TableCell>
                                                     <Badge variant={w.status === 'pending' ? 'secondary' : w.status === 'processed' ? 'default' : 'destructive'}>
                                                         {w.status}

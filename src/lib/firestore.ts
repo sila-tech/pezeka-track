@@ -140,14 +140,13 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     createdAt: serverTimestamp(),
     payments: [],
     comments: loanData.comments || "",
-    disbursementRecorded: false // Initialize as false to allow recordDisbursement to trigger
+    disbursementRecorded: false 
   };
 
   try {
     const docRef = await addDoc(loanCollection, newLoan);
     
     if (loanData.status === 'active') {
-        // Pass the generated ID to recordDisbursement
         await recordDisbursement(db, { ...newLoan, id: docRef.id });
     }
 
@@ -164,7 +163,6 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
 }
 
 async function recordDisbursement(db: Firestore, loan: any) {
-    // Re-check if already recorded to prevent race conditions
     const loanRef = doc(db, 'loans', loan.id);
     const loanSnap = await getDoc(loanRef);
     if (loanSnap.exists() && loanSnap.data().disbursementRecorded) return;
@@ -175,14 +173,12 @@ async function recordDisbursement(db: Firestore, loan: any) {
     const charge = Number(loan.chargingCost) || 0;
     const totalFees = reg + proc + track + charge;
     
-    // Calculate the actual cash out (Take Home)
     const takeHome = Number(loan.principalAmount) - totalFees;
     
     const disbursementDate = loan.disbursementDate instanceof Date 
         ? loan.disbursementDate 
         : (loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date());
 
-    // Record the Take Home as the actual payout amount in Finance
     await addFinanceEntry(db, {
         type: 'payout',
         payoutCategory: 'loan_disbursement',
@@ -192,7 +188,6 @@ async function recordDisbursement(db: Firestore, loan: any) {
         loanId: loan.id
     });
 
-    // Mark as recorded
     await updateDoc(loanRef, { disbursementRecorded: true });
 }
 
@@ -467,6 +462,7 @@ export async function addInvestor(db: Firestore, investorData: { uid: string; na
     const investorRef = doc(db, 'investors', investorData.uid);
     const data = {
         ...investorData,
+        totalWithdrawn: 0,
         interestRate: investorData.interestRate || 0,
         withdrawals: [],
         deposits: [],
@@ -589,6 +585,7 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
          await updateDoc(investorRef, {
             withdrawals: updatedWithdrawals,
             currentBalance: increment(-withdrawal.amount),
+            totalWithdrawn: increment(withdrawal.amount),
             updatedAt: serverTimestamp()
         });
     } catch (e) {

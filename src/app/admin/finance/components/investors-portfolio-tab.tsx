@@ -1,10 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from 'date-fns';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor, approveDeposit, rejectDeposit } from '@/lib/firestore';
@@ -32,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, PenSquare, Trash2, Check, X } from 'lucide-react';
+import { Loader2, PenSquare, Trash2, Check, X, Calculator } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -64,6 +61,7 @@ interface Investor {
   name: string;
   email: string;
   totalInvestment: number;
+  totalWithdrawn: number;
   currentBalance: number;
   interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
@@ -83,8 +81,7 @@ export function InvestorsPortfolioTab() {
   const [investorToDelete, setInvestorToDelete] = useState<Investor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Robust check for finance or admin roles
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.email?.endsWith('@finance.pezeka.com')) : false;
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
 
   const { data: investors, loading: investorsLoading } = useCollection<Investor>(isAuthorized ? 'investors' : null);
 
@@ -186,18 +183,51 @@ export function InvestorsPortfolioTab() {
   }, [investors]);
   
   const portfolioTotals = useMemo(() => {
-    if (!sortedInvestors) return { initial: 0, balance: 0 };
+    if (!sortedInvestors) return { initial: 0, balance: 0, withdrawn: 0 };
     return sortedInvestors.reduce((acc, investor) => {
         acc.initial += (investor.totalInvestment || 0);
         acc.balance += (investor.currentBalance || 0);
+        acc.withdrawn += (investor.totalWithdrawn || 0);
         return acc;
-    }, { initial: 0, balance: 0 });
+    }, { initial: 0, balance: 0, withdrawn: 0 });
   }, [sortedInvestors]);
 
   const monthlyInterest = useMemo(() => {
     if (!selectedInvestor || !selectedInvestor.interestRate) return 0;
-    const rate = selectedInvestor.interestRate / 100;
-    return (selectedInvestor.currentBalance || 0) * rate;
+    
+    const now = new Date();
+    const startOfCurrentMonth = startOfMonth(now);
+    const endOfCurrentMonth = endOfMonth(now);
+    const daysInMonth = getDaysInMonth(now);
+    const monthlyRate = selectedInvestor.interestRate / 100;
+
+    // Calculate basis: Starting Balance (Balance before current month's new deposits)
+    // For simplicity, we calculate interest per day for every basis shift.
+    
+    let totalInterest = 0;
+    
+    // 1. Initial basis (current balance minus this month's approved deposits)
+    const approvedThisMonth = (selectedInvestor.deposits || [])
+        .filter(d => d.status === 'approved')
+        .filter(d => {
+            const date = new Date((d.date as any).seconds * 1000);
+            return date >= startOfCurrentMonth && date <= endOfCurrentMonth;
+        });
+    
+    const initialBasis = selectedInvestor.currentBalance - approvedThisMonth.reduce((acc, d) => acc + d.amount, 0);
+    
+    // Interest on the initial basis for the whole month
+    totalInterest += initialBasis * monthlyRate;
+
+    // 2. Add pro-rated interest for each new deposit made this month
+    approvedThisMonth.forEach(deposit => {
+        const depositDate = new Date((deposit.date as any).seconds * 1000);
+        const daysRemaining = differenceInDays(endOfCurrentMonth, depositDate) + 1;
+        const proRatedInterest = (deposit.amount * monthlyRate) * (daysRemaining / daysInMonth);
+        totalInterest += proRatedInterest;
+    });
+
+    return totalInterest;
   }, [selectedInvestor]);
 
   const hasInterestBeenAppliedThisMonth = useMemo(() => {
@@ -215,27 +245,24 @@ export function InvestorsPortfolioTab() {
     if (!selectedInvestor) return [];
     const allTransactions: any[] = [];
     
-    // Initial Investment
     if (selectedInvestor.createdAt) {
         allTransactions.push({
             date: new Date((selectedInvestor.createdAt as any).seconds * 1000),
-            description: 'Initial Investment',
+            description: 'Investment',
             amount: selectedInvestor.totalInvestment || 0,
             type: 'credit'
         });
     }
 
-    // Deposits
     (selectedInvestor.deposits || []).filter(d => d.status === 'approved').forEach(d => {
         allTransactions.push({
             date: new Date((d.date as any).seconds * 1000),
-            description: 'Deposit',
+            description: 'Subsequent Investment',
             amount: d.amount,
             type: 'credit'
         });
     });
 
-    // Interest
     (selectedInvestor.interestEntries || []).forEach(i => {
         allTransactions.push({
             date: new Date((i.date as any).seconds * 1000),
@@ -245,7 +272,6 @@ export function InvestorsPortfolioTab() {
         });
     });
 
-    // Withdrawals
     (selectedInvestor.withdrawals || []).filter(w => w.status === 'processed').forEach(w => {
         allTransactions.push({
             date: new Date((w.date as any).seconds * 1000),
@@ -274,7 +300,7 @@ export function InvestorsPortfolioTab() {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <CardTitle>Investment Portfolios</CardTitle>
-            <CardDescription>Track investment portfolios and their accumulated interest.</CardDescription>
+            <CardDescription>Track investment portfolios, withdrawals, and accumulated interest.</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -291,7 +317,8 @@ export function InvestorsPortfolioTab() {
                   <TableHeader className="sticky top-0 bg-card">
                       <TableRow>
                           <TableHead>Portfolio Holder</TableHead>
-                          <TableHead className="text-right">Initial Investment (Ksh)</TableHead>
+                          <TableHead className="text-right">Investment (Ksh)</TableHead>
+                          <TableHead className="text-right">Withdrawals (Ksh)</TableHead>
                           <TableHead className="text-right">Current Balance (Ksh)</TableHead>
                           <TableHead className="text-right">Total Interest (Ksh)</TableHead>
                           <TableHead className="text-center">Actions</TableHead>
@@ -299,11 +326,12 @@ export function InvestorsPortfolioTab() {
                   </TableHeader>
                   <TableBody>
                       {sortedInvestors.map(investor => {
-                          const totalInterest = (investor.currentBalance || 0) - (investor.totalInvestment || 0);
+                          const totalInterest = (investor.interestEntries || []).reduce((acc, i) => acc + i.amount, 0);
                           return (
                               <TableRow key={investor.id}>
                                   <TableCell className="font-medium">{investor.name}</TableCell>
                                   <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right text-destructive">{(investor.totalWithdrawn || 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
                                   <TableCell className="text-right text-green-600">{totalInterest.toLocaleString()}</TableCell>
                                   <TableCell className="text-center">
@@ -323,8 +351,9 @@ export function InvestorsPortfolioTab() {
                    <TableRow className="font-bold bg-muted/50 sticky bottom-0">
                         <TableCell>Totals</TableCell>
                         <TableCell className="text-right">{(portfolioTotals.initial || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-destructive">{(portfolioTotals.withdrawn || 0).toLocaleString()}</TableCell>
                         <TableCell className="text-right">{(portfolioTotals.balance || 0).toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-green-600">{((portfolioTotals.balance - portfolioTotals.initial) || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-green-600">{((portfolioTotals.balance + portfolioTotals.withdrawn - portfolioTotals.initial) || 0).toLocaleString()}</TableCell>
                         <TableCell />
                     </TableRow>
               </Table>
@@ -339,72 +368,76 @@ export function InvestorsPortfolioTab() {
                   <>
                     <DialogHeader>
                         <DialogTitle>Manage Portfolio: {selectedInvestor.name}</DialogTitle>
-                        <DialogDescription>Apply interest, approve deposits, and review history.</DialogDescription>
+                        <DialogDescription>Apply pro-rated interest, approve transactions, and review history.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] pr-4">
                       <div className="space-y-6 mt-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Card>
-                                <CardHeader><CardTitle>Apply Interest</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Calculator className="h-4 w-4"/> Monthly Interest</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2 rounded-md bg-muted p-4">
                                         <div className="flex justify-between"><span className="text-sm">Rate</span><span className="font-bold">{(selectedInvestor.interestRate || 0)}%</span></div>
-                                        <div className="flex justify-between"><span className="text-sm">Interest Amount</span><span className="font-bold">Ksh {monthlyInterest.toLocaleString()}</span></div>
+                                        <div className="flex justify-between"><span className="text-sm">Basis & Pro-rating</span><span className="text-xs text-muted-foreground">Accounts for mid-month deposits</span></div>
+                                        <div className="flex justify-between border-t pt-2"><span className="text-sm">Suggested Amount</span><span className="font-bold text-green-600">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
                                     </div>
                                     {hasInterestBeenAppliedThisMonth ? (
-                                        <Badge className="w-full justify-center">Interest Already Applied This Month</Badge>
+                                        <Badge className="w-full justify-center h-10">Interest Already Applied This Month</Badge>
                                     ) : (
                                         <Button onClick={handleApplyInterest} disabled={isSubmitting || monthlyInterest <= 0} className="w-full">
                                             {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
-                                            Apply Interest for {format(new Date(), 'MMMM')}
+                                            Apply for {format(new Date(), 'MMMM')}
                                         </Button>
                                     )}
                                 </CardContent>
                             </Card>
                             <Card>
-                                <CardHeader><CardTitle>Requests</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-sm">Pending Actions</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                     <ScrollArea className="h-[150px]">
                                         <div className="space-y-2">
-                                            <p className="text-xs font-semibold uppercase text-muted-foreground">Pending Deposits</p>
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground">New Deposits</p>
                                             {selectedInvestor.deposits?.filter(d => d.status === 'pending').map(d => (
                                                 <div key={d.depositId} className="flex items-center justify-between p-2 border rounded-md text-sm">
                                                     <span>Ksh {d.amount.toLocaleString()}</span>
                                                     <div className="flex gap-1">
-                                                        <Button size="icon" variant="ghost" onClick={() => handleApproveDeposit(d.depositId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
-                                                        <Button size="icon" variant="ghost" onClick={() => handleRejectDeposit(d.depositId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleApproveDeposit(d.depositId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRejectDeposit(d.depositId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
                                                     </div>
                                                 </div>
                                             ))}
-                                            <p className="text-xs font-semibold uppercase text-muted-foreground mt-4">Pending Withdrawals</p>
+                                            {selectedInvestor.deposits?.filter(d => d.status === 'pending').length === 0 && <p className="text-xs text-muted-foreground italic">No pending deposits</p>}
+                                            
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mt-4">Withdrawal Requests</p>
                                             {selectedInvestor.withdrawals?.filter(w => w.status === 'pending').map(w => (
                                                 <div key={w.withdrawalId} className="flex items-center justify-between p-2 border rounded-md text-sm">
                                                     <span>Ksh {w.amount.toLocaleString()}</span>
                                                     <div className="flex gap-1">
-                                                        <Button size="icon" variant="ghost" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
-                                                        <Button size="icon" variant="ghost" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
                                                     </div>
                                                 </div>
                                             ))}
+                                            {selectedInvestor.withdrawals?.filter(w => w.status === 'pending').length === 0 && <p className="text-xs text-muted-foreground italic">No pending withdrawals</p>}
                                         </div>
                                     </ScrollArea>
                                 </CardContent>
                             </Card>
                         </div>
                         <Card>
-                            <CardHeader><CardTitle>Statement</CardTitle></CardHeader>
+                            <CardHeader><CardTitle className="text-sm">Transaction Ledger</CardTitle></CardHeader>
                             <CardContent>
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Balance</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Balance</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                         {statementEntries.map((e, i) => (
                                             <TableRow key={i}>
                                                 <TableCell>{format(e.date, 'dd/MM/yy')}</TableCell>
-                                                <TableCell>{e.description}</TableCell>
-                                                <TableCell className={`text-right ${e.type === 'credit' ? 'text-green-600' : 'text-destructive'}`}>
+                                                <TableCell className="text-xs">{e.description}</TableCell>
+                                                <TableCell className={`text-right font-medium ${e.type === 'credit' ? 'text-green-600' : 'text-destructive'}`}>
                                                     {e.type === 'credit' ? '+' : '-'}{e.amount.toLocaleString()}
                                                 </TableCell>
-                                                <TableCell className="text-right font-bold">{e.balance.toLocaleString()}</TableCell>
+                                                <TableCell className="text-right font-bold tabular-nums">{e.balance.toLocaleString()}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
