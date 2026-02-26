@@ -106,8 +106,8 @@ service cloud.firestore {
       // Only Finance and Super Admin can update portfolios for other reasons (e.g. applying interest).
       allow update: if isFinance() || isSuperAdmin();
 
-      // Only Super Admin can create or delete portfolios.
-      allow create, delete: if isSuperAdmin();
+      // Super Admin and Finance can create or delete portfolios.
+      allow create, delete: if isSuperAdmin() || isFinance();
     }
   }
 }

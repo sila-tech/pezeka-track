@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -106,6 +107,7 @@ export function InvestorsPortfolioTab() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  const isFinanceOrAdmin = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
 
   const { data: investors, loading: investorsLoading } = useCollection<Investor>(isAuthorized ? 'investors' : null);
 
@@ -362,7 +364,7 @@ export function InvestorsPortfolioTab() {
                                       <Button variant="ghost" size="sm" onClick={() => handleManageClick(investor)}>
                                           <PenSquare className="mr-2 h-4 w-4" /> Manage
                                       </Button>
-                                      {user?.email === 'simon@pezeka.com' && (
+                                      {isFinanceOrAdmin && (
                                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(investor)}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>

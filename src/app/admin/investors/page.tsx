@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -220,7 +221,7 @@ export default function InvestorsPage() {
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Investors</h1>
-        {isSuperAdmin && (
+        {(isSuperAdmin || isFinance) && (
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
             <DialogTrigger asChild>
                 <Button>
@@ -316,7 +317,7 @@ export default function InvestorsPage() {
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
                                               {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>}
-                                              {isSuperAdmin && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
+                                              {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
                                           </DropdownMenuContent>
                                       </DropdownMenu>
                                     </TableCell>
