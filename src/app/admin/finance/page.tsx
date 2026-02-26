@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -6,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History, CircleDollarSign } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -176,21 +175,22 @@ export default function FinancePage() {
   const isLoading = userLoading || loansLoading || financeEntriesLoading;
 
   // Aggregated Finance Logic
-  const { allReceipts, allPayouts, allExpenses } = useMemo(() => {
+  const { allReceipts, allUpfrontFees, allPayouts, allExpenses } = useMemo(() => {
     const receipts: any[] = [];
+    const upfrontFees: any[] = [];
     const payouts: any[] = [];
     const expenses: any[] = [];
 
-    if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [], allExpenses: [] };
+    if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
     // 1. Process LOAN BOOK data into entries
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
-        // Upfront Fees Receipt
+        // Upfront Fees Tab Data
         const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
         if (totalFees > 0) {
-            receipts.push({
+            upfrontFees.push({
                 id: `fee-${loan.id}`,
                 type: 'receipt',
                 receiptCategory: 'upfront_fees',
@@ -229,33 +229,51 @@ export default function FinancePage() {
 
     // 2. Process MANUAL finance entries
     financeEntries.forEach(entry => {
-        // Skip automated entries we are now deriving from the Loan Book to avoid double-counting
-        if (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement') {
-            return;
+        // Handle standard receipts (excl. derived upfront fees to avoid double counting if they exist manually)
+        if (entry.type === 'receipt') {
+            if (entry.receiptCategory === 'upfront_fees') {
+                upfrontFees.push(entry);
+            } else {
+                receipts.push(entry);
+            }
         }
-
-        if (entry.type === 'receipt') receipts.push(entry);
+        
         // Per User: Payouts is money out, which means even expenses are payouts.
-        if (entry.type === 'payout' || entry.type === 'expense') payouts.push(entry);
-        if (entry.type === 'expense') expenses.push(entry);
+        if (entry.type === 'payout' || entry.type === 'expense') {
+            // Check if it's already a derived disbursement
+            if (entry.payoutCategory !== 'loan_disbursement' || !entry.loanId) {
+                payouts.push(entry);
+            } else if (entry.payoutCategory === 'loan_disbursement' && entry.loanId) {
+                // If it's a manual payout for a loan, we might want to prioritize derived or manual
+                // For now, let's stick to derived for automated ones and manual for everything else
+            }
+        }
+        
+        if (entry.type === 'expense') {
+            expenses.push(entry);
+        }
     });
 
-    return { allReceipts: receipts, allPayouts: payouts, allExpenses: expenses };
+    return { allReceipts: receipts, allUpfrontFees: upfrontFees, allPayouts: payouts, allExpenses: expenses };
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    let receiptsTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
-    // PayoutsTotal now includes expenses based on allPayouts construction above
+    // Total Receipts Card = standard receipts + upfront fees (Total Money In)
+    let receiptsOnlyTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
+    let upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (e.amount || 0), 0);
+    let totalMoneyIn = receiptsOnlyTotal + upfrontFeesTotal;
+
+    // Total Payouts Card = all payouts + expenses (Total Money Out)
     let payoutsTotal = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     let expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     
     return {
-      totalReceipts: receiptsTotal,
+      totalReceipts: totalMoneyIn,
       totalPayouts: payoutsTotal,
       totalExpenses: expensesTotal,
-      cashAtHand: receiptsTotal - payoutsTotal
+      cashAtHand: totalMoneyIn - payoutsTotal
     };
-  }, [allReceipts, allPayouts, allExpenses]);
+  }, [allReceipts, allUpfrontFees, allPayouts, allExpenses]);
 
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
@@ -314,7 +332,7 @@ export default function FinancePage() {
     setIsUpdating(true);
     try {
         const paymentData = {
-            paymentId: doc(collection(firestore, 'temp')).id, 
+            paymentId: doc(collection(firestore, 'payments')).id, 
             amount: values.paymentAmount,
             date: new Date(values.paymentDate)
         };
@@ -469,7 +487,6 @@ export default function FinancePage() {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Expenses</CardTitle><CreditCard className="h-4 w-4 text-orange-600"/></CardHeader>
                 <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {stats.totalExpenses.toLocaleString()}</div></CardContent>
-            </Card>
         </div>
       </div>
 
@@ -477,6 +494,7 @@ export default function FinancePage() {
           <ScrollArea className="w-full whitespace-nowrap pb-4">
               <TabsList className="inline-flex w-max">
                   <TabsTrigger value="receipts">Receipts</TabsTrigger>
+                  <TabsTrigger value="upfront">Upfront Fees</TabsTrigger>
                   <TabsTrigger value="payouts">Payouts</TabsTrigger>
                   <TabsTrigger value="expenses">Expenses</TabsTrigger>
                   <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
@@ -486,7 +504,10 @@ export default function FinancePage() {
           </ScrollArea>
           
           <TabsContent value="receipts">
-              <EditableFinanceReportTab title="Receipts" description="Includes loan repayments, upfront fees, and investor deposits." entries={allReceipts} loading={isLoading} onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} />
+              <EditableFinanceReportTab title="Receipts" description="Includes loan repayments, investor deposits, and other income." entries={allReceipts} loading={isLoading} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
+          </TabsContent>
+          <TabsContent value="upfront">
+              <EditableFinanceReportTab title="Upfront Fees" description="Registration, processing, and other fees retained during disbursement." entries={allUpfrontFees} loading={isLoading} onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           <TabsContent value="payouts">
               <EditableFinanceReportTab title="Payouts" description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." entries={allPayouts} loading={isLoading} onDelete={(e) => !e.id.startsWith('disb-') && deleteFinanceEntry(firestore, e.id)} />
