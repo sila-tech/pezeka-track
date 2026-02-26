@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard } from "lucide-react";
 import { arrayUnion, increment } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -105,7 +105,7 @@ const editLoanSchema = z.object({
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application']),
+  status: z.enum(['active', 'due', 'overdue', 'paid', 'rollover', 'application', 'rejected']),
 });
 
 const rolloverSchema = z.object({
@@ -134,7 +134,7 @@ interface Loan {
   payments?: { paymentId: string; date: any; amount: number; }[];
   penalties?: { penaltyId: string; date: any; amount: number; description: string; }[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
+  status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
 }
 
 interface FinanceEntry {
@@ -174,6 +174,29 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   
   const isLoading = userLoading || loansLoading || financeEntriesLoading;
+
+  const stats = useMemo(() => {
+    if (!financeEntries) return { cashAtHand: 0, totalReceipts: 0, totalPayouts: 0, totalExpenses: 0 };
+    
+    let receipts = 0;
+    let payouts = 0;
+    let expenses = 0;
+    
+    financeEntries.forEach(entry => {
+      const amount = entry.amount || 0;
+      const cost = entry.transactionCost || 0;
+      if (entry.type === 'receipt') receipts += amount;
+      if (entry.type === 'payout') payouts += (amount + cost);
+      if (entry.type === 'expense') expenses += (amount + cost);
+    });
+    
+    return {
+      totalReceipts: receipts,
+      totalPayouts: payouts,
+      totalExpenses: expenses,
+      cashAtHand: receipts - payouts - expenses
+    };
+  }, [financeEntries]);
 
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
@@ -218,14 +241,12 @@ export default function FinancePage() {
       const rawEntryData = { ...values, type: entryType, date: new Date(values.date) };
       delete (rawEntryData as any).payoutReason;
       const docRef = await addFinanceEntry(firestore, rawEntryData as any);
+      
       if (values.type === 'receipt' && values.loanId) {
-        const loan = loans?.find(l => l.id === values.loanId);
-        if (loan) {
-            await updateLoan(firestore, loan.id, {
-                totalPaid: increment(values.amount),
-                payments: arrayUnion({ paymentId: docRef.id, amount: values.amount, date: new Date(values.date) })
-            });
-        }
+        await updateLoan(firestore, values.loanId, {
+            totalPaid: increment(values.amount),
+            payments: arrayUnion({ paymentId: docRef.id, amount: values.amount, date: new Date(values.date) })
+        });
       }
       toast({ title: 'Success', description: 'Finance entry recorded.' });
       addForm.reset();
@@ -293,7 +314,7 @@ export default function FinancePage() {
         chargingCost: loanToEdit.chargingCost,
         numberOfInstalments: loanToEdit.numberOfInstalments,
         paymentFrequency: loanToEdit.paymentFrequency,
-        status: loanToEdit.status as any
+        status: loanToEdit.status
     });
     setIsEditingLoan(true);
   };
@@ -310,7 +331,7 @@ export default function FinancePage() {
             totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0)
         };
         await updateLoan(firestore, loanToEdit.id, updateData);
-        toast({ title: 'Loan Updated', description: 'The loan parameters have been updated successfully.'});
+        toast({ title: 'Loan Updated', description: 'Loan parameters updated.'});
         setIsEditingLoan(false);
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
@@ -324,7 +345,7 @@ export default function FinancePage() {
     setIsRollingOver(true);
     try {
         await rolloverLoan(firestore, loanToEdit, new Date(values.rolloverDate));
-        toast({ title: 'Loan Rolled Over', description: 'New active loan created and rollover payment recorded.'});
+        toast({ title: 'Loan Rolled Over', description: 'New active loan created.'});
         setLoanToEdit(null);
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Rollover Failed', description: e.message });
@@ -338,7 +359,7 @@ export default function FinancePage() {
     setIsUpdating(true);
     try {
         await deleteLoan(firestore, loanToEdit.id);
-        toast({ title: 'Loan Deleted', description: 'The loan record has been permanently removed.'});
+        toast({ title: 'Loan Deleted' });
         setLoanToEdit(null);
         setDeleteLoanOpen(false);
     } catch (e: any) {
@@ -354,33 +375,55 @@ export default function FinancePage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-3xl font-bold tracking-tight">Finance</h1>
-        {canPerformActions && (
-          <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
-              <DialogContent>
-                  <DialogHeader><DialogTitle>New Finance Entry</DialogTitle></DialogHeader>
-                  <Form {...addForm}>
-                      <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                          <FormField control={addForm.control} name="type" render={({ field }) => (
-                              <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem></SelectContent></Select></FormItem>
-                          )} />
-                          {addFinanceEntryType === 'payout' && (
-                              <FormField control={addForm.control} name="payoutReason" render={({ field }) => (
-                                  <FormItem><FormLabel>Reason</FormLabel><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="loan_disbursement"/></FormControl> <FormLabel className="font-normal">Loan Disbursement</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="expense"/></FormControl> <FormLabel className="font-normal">Expense</FormLabel></FormItem></RadioGroup></FormItem>
-                              )} />
-                          )}
-                          <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description (Optional)</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
-                          <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
-                      </form>
-                  </Form>
-              </DialogContent>
-          </Dialog>
-        )}
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold tracking-tight">Finance Dashboard</h1>
+            {canPerformActions && (
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>New Finance Entry</DialogTitle></DialogHeader>
+                    <Form {...addForm}>
+                        <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
+                            <FormField control={addForm.control} name="type" render={({ field }) => (
+                                <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem></SelectContent></Select></FormItem>
+                            )} />
+                            {addFinanceEntryType === 'payout' && (
+                                <FormField control={addForm.control} name="payoutReason" render={({ field }) => (
+                                    <FormItem><FormLabel>Reason</FormLabel><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="loan_disbursement"/></FormControl> <FormLabel className="font-normal">Loan Disbursement</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="expense"/></FormControl> <FormLabel className="font-normal">General Expense</FormLabel></FormItem></RadioGroup></FormItem>
+                                )} />
+                            )}
+                            <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
+                            <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+            )}
+        </div>
+
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Cash at Hand</CardTitle><Wallet className="h-4 w-4 text-muted-foreground"/></CardHeader>
+                <CardContent><div className="text-2xl font-bold">Ksh {stats.cashAtHand.toLocaleString()}</div></CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Receipts</CardTitle><ArrowUpCircle className="h-4 w-4 text-green-600"/></CardHeader>
+                <CardContent><div className="text-2xl font-bold text-green-600">Ksh {stats.totalReceipts.toLocaleString()}</div></CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Payouts</CardTitle><ArrowDownCircle className="h-4 w-4 text-destructive"/></CardHeader>
+                <CardContent><div className="text-2xl font-bold text-destructive">Ksh {stats.totalPayouts.toLocaleString()}</div></CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Expenses</CardTitle><CreditCard className="h-4 w-4 text-orange-600"/></CardHeader>
+                <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {stats.totalExpenses.toLocaleString()}</div></CardContent>
+            </Card>
+        </div>
       </div>
+
       <Tabs defaultValue="receipts">
           <ScrollArea className="w-full whitespace-nowrap pb-4">
               <TabsList className="inline-flex w-max">
@@ -392,22 +435,24 @@ export default function FinancePage() {
               </TabsList>
               <ScrollBar orientation="horizontal" />
           </ScrollArea>
+          
           <TabsContent value="receipts">
-              <EditableFinanceReportTab title="Receipts" description="Incoming payments." entries={receipts} loading={isLoading} />
+              <EditableFinanceReportTab title="Receipts" description="Incoming payments and fee income." entries={receipts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="payouts">
-              <EditableFinanceReportTab title="Payouts" description="Outgoing disbursements." entries={payouts} loading={isLoading} />
+              <EditableFinanceReportTab title="Payouts" description="Outgoing loan disbursements." entries={payouts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="expenses">
-               <EditableFinanceReportTab title="Expenses" description="Facilitation costs." entries={expenses} loading={isLoading} />
+               <EditableFinanceReportTab title="Expenses" description="Operational and facilitation costs." entries={expenses} loading={isLoading} />
           </TabsContent>
+          
           <TabsContent value="loanbook">
               <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <CardTitle>Loan Book</CardTitle>
-                            <CardDescription>Comprehensive list of all loans and their balances.</CardDescription>
+                            <CardDescription>Comprehensive list of all loans and their outstanding balances.</CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
                             <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
@@ -443,7 +488,7 @@ export default function FinancePage() {
                             </TableHeader>
                             <TableBody>
                                 {filteredLoans.map(loan => (
-                                    <TableRow key={loan.id} className="cursor-pointer" onClick={() => setLoanToEdit(loan)}>
+                                    <TableRow key={loan.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLoanToEdit(loan)}>
                                         <TableCell className="font-medium">{loan.loanNumber}</TableCell>
                                         <TableCell>{loan.customerName}</TableCell>
                                         <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
@@ -459,6 +504,7 @@ export default function FinancePage() {
                 </CardContent>
               </Card>
           </TabsContent>
+          
           {canPerformActions && (
             <TabsContent value="investors">
                 <InvestorsPortfolioTab />
@@ -530,7 +576,7 @@ export default function FinancePage() {
                                                                 <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<FormItem className="flex-1"><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                                                             </div>
                                                             <div className="flex gap-2">
-                                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<FormItem className="flex-1"><FormControl><Input placeholder="Reason (e.g. Late Payment)" {...field}/></FormControl></FormItem>)} />
+                                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<FormItem className="flex-1"><FormControl><Input placeholder="Reason" {...field}/></FormControl></FormItem>)} />
                                                                 <Button type="submit" variant="destructive" disabled={isAddingPenalty}>{isAddingPenalty && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Add</Button>
                                                             </div>
                                                         </form>
@@ -616,7 +662,7 @@ export default function FinancePage() {
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteLoanOpen} onOpenChange={setDeleteLoanOpen}>
           <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently delete Loan #{loanToEdit?.loanNumber} and all its payment history. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently delete Loan #{loanToEdit?.loanNumber} and all history. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setDeleteLoanOpen(false)}>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={confirmDeleteLoan} className="bg-destructive hover:bg-destructive/90 text-white" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Delete Permanently</AlertDialogAction>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -36,7 +35,7 @@ interface Loan {
   payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
   penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; }[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
+  status: 'active' | 'due' | 'paid' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementRecorded?: boolean;
 }
 
@@ -335,7 +334,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         payments: [],
         comments: `Rollover from Loan #${originalLoan.loanNumber}`,
         createdAt: serverTimestamp(),
-        disbursementRecorded: true // Payout and Fees handled by the rollover process itself
+        disbursementRecorded: true 
     };
 
     try {
@@ -368,7 +367,6 @@ export async function deleteLoan(db: Firestore, loanId: string) {
 export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: { amount: number; date: Date; description: string }) {
     const loanRef = doc(db, 'loans', loanId);
     
-    // Firestore can generate IDs client-side without a round trip
     const penaltyId = doc(collection(db, 'temp')).id;
 
     const penaltyWithId = {
@@ -387,7 +385,7 @@ export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: {
             path: loanRef.path,
             operation: 'update',
             requestResourceData: {
-                penalties: 'ADD_PENALTY_DATA', // Placeholder to avoid sending large objects
+                penalties: 'ADD_PENALTY_DATA',
                 totalPenalties: `increment by ${penalty.amount}`,
                 totalRepayableAmount: `increment by ${penalty.amount}`
             },
@@ -552,9 +550,6 @@ export async function requestWithdrawal(db: Firestore, investorId: string, amoun
 
 export async function processWithdrawal(db: Firestore, investorId: string, withdrawalId: string) {
     const investorRef = doc(db, 'investors', investorId);
-    
-    // This part is not transactional and can be improved with a transaction or cloud function in a real app.
-    // 1. Find the withdrawal and update its status
     const investorDoc = await getDoc(investorRef);
     if (!investorDoc.exists()) throw new Error("Investor not found");
 
@@ -569,7 +564,6 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
         w.withdrawalId === withdrawalId ? { ...w, status: 'processed' } : w
     );
     
-    // 2. Create a finance entry for the payout
     await addFinanceEntry(db, {
         type: 'payout',
         date: new Date(),
@@ -577,7 +571,6 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
         description: `Investor withdrawal for ${investorData.name}`,
     });
 
-    // 3. Update the investor's balance and withdrawals array
     try {
          await updateDoc(investorRef, {
             withdrawals: updatedWithdrawals,

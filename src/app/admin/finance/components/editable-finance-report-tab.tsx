@@ -23,6 +23,7 @@ interface FinanceEntry {
   description: string;
   transactionCost?: number;
   loanId?: string;
+  expenseCategory?: string;
 }
 
 interface FinanceReportTabProps {
@@ -113,7 +114,8 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
 
     if (searchTerm) {
         filtered = filtered.filter(entry =>
-            (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (entry.expenseCategory || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
     }
 
@@ -139,6 +141,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             'Description': entry.description,
             'Amount (Ksh)': entry.amount,
         };
+        if (entry.expenseCategory) record['Category'] = entry.expenseCategory;
         if(showTransactionCost) {
             record['Transaction Cost (Ksh)'] = entry.transactionCost || 0;
             record['Total (Ksh)'] = entry.amount + (entry.transactionCost || 0);
@@ -183,7 +186,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 <div className="relative">
                     <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                        placeholder="Search descriptions..."
+                        placeholder="Search entries..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-8 w-full sm:w-[250px]"
@@ -221,8 +224,8 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount (Ksh)</TableHead>
-                    {showTransactionCost && <TableHead className="text-right">Transaction Cost (Ksh)</TableHead>}
-                    {showTransactionCost && <TableHead className="text-right">Total (Ksh)</TableHead>}
+                    {showTransactionCost && <TableHead className="text-right">Trans. Cost</TableHead>}
+                    {showTransactionCost && <TableHead className="text-right">Total</TableHead>}
                     {isEditable && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
                 </TableHeader>
@@ -230,7 +233,10 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 {filteredEntries.map((entry) => (
                     <TableRow key={entry.id}>
                     <TableCell>{format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell className="font-medium">{entry.description || '-'}</TableCell>
+                    <TableCell>
+                        <div className="font-medium">{entry.description || '-'}</div>
+                        {entry.expenseCategory && <div className="text-xs text-muted-foreground">{entry.expenseCategory}</div>}
+                    </TableCell>
                     <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
                     {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
                     {showTransactionCost && <TableCell className="text-right">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
