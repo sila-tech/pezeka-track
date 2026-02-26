@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -50,6 +51,7 @@
         "totalPenalties": { "type": "number", "default": 0, "description": "Total amount of penalties applied to the loan." },
         "paymentFrequency": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
         "status": { "type": "string", "enum": ["due", "paid", "active", "rollover", "overdue", "application", "rejected"] },
+        "disbursementRecorded": { "type": "boolean", "default": false, "description": "Whether disbursement payout and upfront fees have been recorded in finance." },
         "payments": {
             "type": "array",
             "description": "History of payments made for this loan.",

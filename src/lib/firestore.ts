@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -19,7 +20,7 @@ interface Loan {
   customerPhone: string;
   idNumber?: string;
   loanType?: string;
-  disbursementDate: { seconds: number, nanoseconds: number };
+  disbursementDate: { seconds: number, nanoseconds: number } | Date;
   principalAmount: number;
   interestRate?: number;
   registrationFee: number;
@@ -35,7 +36,8 @@ interface Loan {
   payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
   penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; }[];
   comments?: string;
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
+  disbursementRecorded?: boolean;
 }
 
 
@@ -68,6 +70,7 @@ type FinanceEntryData = {
     description?: string;
     loanId?: string;
     transactionCost?: number;
+    expenseCategory?: string;
 }
 
 export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData): Promise<DocumentReference<DocumentData>> {
@@ -122,28 +125,6 @@ export async function deleteFinanceEntry(db: Firestore, entryId: string) {
 }
 
 
-type LoanData = {
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  idNumber?: string;
-  loanType?: string;
-  disbursementDate: Date;
-  principalAmount: number;
-  interestRate: number;
-  registrationFee: number;
-  processingFee: number;
-  carTrackInstallationFee: number;
-  chargingCost: number;
-  numberOfInstalments: number;
-  instalmentAmount: number;
-  totalRepayableAmount: number;
-  totalPaid: number;
-  paymentFrequency: 'daily' | 'weekly' | 'monthly';
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application';
-  comments?: string;
-}
-
 export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: DocumentReference<DocumentData>, newLoanNumber: string}> {
   const loanCollection = collection(db, 'loans');
   
@@ -157,11 +138,18 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     loanNumber: newLoanNumber,
     createdAt: serverTimestamp(),
     payments: [],
-    comments: loanData.comments || ""
+    comments: loanData.comments || "",
+    disbursementRecorded: loanData.status === 'active'
   };
 
   try {
     const docRef = await addDoc(loanCollection, newLoan);
+    
+    // Automatically record disbursement if active
+    if (loanData.status === 'active') {
+        await recordDisbursement(db, { ...newLoan, id: docRef.id });
+    }
+
     return { docRef, newLoanNumber };
   } catch (serverError) {
     const permissionError = new FirestorePermissionError({
@@ -174,8 +162,65 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
   }
 }
 
+// Internal helper to automate upfront fee deductions and principal payout
+async function recordDisbursement(db: Firestore, loan: any) {
+    if (loan.disbursementRecorded) return;
+
+    const reg = Number(loan.registrationFee) || 0;
+    const proc = Number(loan.processingFee) || 0;
+    const track = Number(loan.carTrackInstallationFee) || 0;
+    const charge = Number(loan.chargingCost) || 0;
+    const totalFees = reg + proc + track + charge;
+    
+    const disbursementDate = loan.disbursementDate instanceof Date 
+        ? loan.disbursementDate 
+        : (loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date());
+
+    // 1. Record Principal Payout
+    await addFinanceEntry(db, {
+        type: 'payout',
+        date: disbursementDate,
+        amount: Number(loan.principalAmount),
+        description: `Disbursement for Loan #${loan.loanNumber}`,
+        loanId: loan.id
+    });
+
+    // 2. Record Receipt for upfront fees (Income)
+    if (totalFees > 0) {
+        await addFinanceEntry(db, {
+            type: 'receipt',
+            date: disbursementDate,
+            amount: totalFees,
+            description: `Upfront fees for Loan #${loan.loanNumber} (Reg: ${reg}, Proc: ${proc}, Track: ${track}, Charge: ${charge})`,
+            loanId: loan.id
+        });
+    }
+
+    // Mark as recorded
+    await updateDoc(doc(db, 'loans', loan.id), { disbursementRecorded: true });
+}
+
+export async function approveLoanApplication(db: Firestore, loan: Loan) {
+    const loanRef = doc(db, 'loans', loan.id);
+    await updateDoc(loanRef, { status: 'active', updatedAt: serverTimestamp() });
+    await recordDisbursement(db, { ...loan, status: 'active' });
+}
+
 export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {
     const loanRef = doc(db, 'loans', loanId);
+
+    // If status becomes active, trigger disbursement logic
+    if (data.status === 'active') {
+        const loanSnap = await getDoc(loanRef);
+        if (loanSnap.exists()) {
+            const loanData = loanSnap.data();
+            if (!loanData.disbursementRecorded) {
+                await recordDisbursement(db, { ...loanData, id: loanId, ...data });
+                data.disbursementRecorded = true;
+            }
+        }
+    }
+
     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
 
     try {
@@ -290,6 +335,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         payments: [],
         comments: `Rollover from Loan #${originalLoan.loanNumber}`,
         createdAt: serverTimestamp(),
+        disbursementRecorded: true // Payout and Fees handled by the rollover process itself
     };
 
     try {
