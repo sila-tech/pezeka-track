@@ -51,7 +51,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { Badge } from '@/components/ui/badge';
@@ -244,16 +243,14 @@ export default function FinancePage() {
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    const { allReceipts, allUpfrontFees, allPayouts } = financialData;
+    const { allReceipts, allUpfrontFees, allPayouts, allExpenses } = financialData;
     
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
     const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
-    
-    // Expenses are a subset of payouts already accounted for in totalMoneyOut
-    const expensesOnlyTotal = financialData.allExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
+    const expensesOnlyTotal = allExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
     
     return {
       totalReceipts: totalMoneyIn,
@@ -819,7 +816,6 @@ export default function FinancePage() {
           </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteLoanOpen} onOpenChange={setDeleteLoanOpen}>
           <AlertDialogContent>
               <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the loan and all history. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
