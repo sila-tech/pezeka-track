@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -50,7 +50,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, approveLoanApplication } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
@@ -58,7 +58,6 @@ import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
@@ -79,9 +78,6 @@ const addFinanceEntrySchema = z.object({
     }
     if (data.type === 'payout' && !data.payoutCategory) {
         ctx.addIssue({ code: 'custom', message: 'Please select a payout category.', path: ['payoutCategory'] });
-    }
-    if (data.type === 'receipt' && (data.receiptCategory === 'loan_repayment' || data.receiptCategory === 'upfront_fees') && !data.loanId) {
-        ctx.addIssue({ code: 'custom', message: 'Please select the associated loan.', path: ['loanId'] });
     }
 });
 
@@ -179,28 +175,85 @@ export default function FinancePage() {
   
   const isLoading = userLoading || loansLoading || financeEntriesLoading;
 
-  const stats = useMemo(() => {
-    if (!financeEntries) return { cashAtHand: 0, totalReceipts: 0, totalPayouts: 0, totalExpenses: 0 };
-    
-    let receipts = 0;
-    let payouts = 0;
-    let expenses = 0;
-    
-    financeEntries.forEach(entry => {
-      const amount = entry.amount || 0;
-      const cost = entry.transactionCost || 0;
-      if (entry.type === 'receipt') receipts += amount;
-      if (entry.type === 'payout') payouts += (amount + cost);
-      if (entry.type === 'expense') expenses += (amount + cost);
+  // Aggregated Finance Logic
+  const { allReceipts, allPayouts, allExpenses } = useMemo(() => {
+    const receipts: any[] = [];
+    const payouts: any[] = [];
+    const expenses: any[] = [];
+
+    if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [], allExpenses: [] };
+
+    // 1. Process LOAN BOOK data into entries
+    loans.forEach(loan => {
+        if (loan.status === 'application' || loan.status === 'rejected') return;
+
+        // Upfront Fees Receipt
+        const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
+        if (totalFees > 0) {
+            receipts.push({
+                id: `fee-${loan.id}`,
+                type: 'receipt',
+                receiptCategory: 'upfront_fees',
+                date: loan.disbursementDate,
+                amount: totalFees,
+                description: `Upfront fees for Loan #${loan.loanNumber} (${loan.customerName})`,
+                loanId: loan.id
+            });
+        }
+
+        // Disbursement Payout (Take Home)
+        const takeHome = Number(loan.principalAmount) - totalFees;
+        payouts.push({
+            id: `disb-${loan.id}`,
+            type: 'payout',
+            payoutCategory: 'loan_disbursement',
+            date: loan.disbursementDate,
+            amount: takeHome,
+            description: `Take-home disbursement for Loan #${loan.loanNumber} (${loan.customerName})`,
+            loanId: loan.id
+        });
+
+        // Repayment Receipts
+        (loan.payments || []).forEach(p => {
+            receipts.push({
+                id: p.paymentId,
+                type: 'receipt',
+                receiptCategory: 'loan_repayment',
+                date: p.date,
+                amount: p.amount,
+                description: `Payment for Loan #${loan.loanNumber} (${loan.customerName})`,
+                loanId: loan.id
+            });
+        });
     });
+
+    // 2. Process MANUAL finance entries
+    financeEntries.forEach(entry => {
+        // Skip automated entries we are now deriving from the Loan Book to avoid double-counting
+        if (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement') {
+            return;
+        }
+
+        if (entry.type === 'receipt') receipts.push(entry);
+        if (entry.type === 'payout') payouts.push(entry);
+        if (entry.type === 'expense') expenses.push(entry);
+    });
+
+    return { allReceipts: receipts, allPayouts: payouts, allExpenses: expenses };
+  }, [loans, financeEntries]);
+
+  const stats = useMemo(() => {
+    let receiptsTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
+    let payoutsTotal = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
+    let expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     
     return {
-      totalReceipts: receipts,
-      totalPayouts: payouts,
-      totalExpenses: expenses,
-      cashAtHand: receipts - payouts - expenses
+      totalReceipts: receiptsTotal,
+      totalPayouts: payoutsTotal,
+      totalExpenses: expensesTotal,
+      cashAtHand: receiptsTotal - payoutsTotal - expensesTotal
     };
-  }, [financeEntries]);
+  }, [allReceipts, allPayouts, allExpenses]);
 
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
@@ -214,6 +267,7 @@ export default function FinancePage() {
     });
   }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
 
+  // Form Handlers
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
     defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), transactionCost: 0 }
@@ -242,14 +296,7 @@ export default function FinancePage() {
     setIsSubmitting(true);
     try {
       const rawEntryData = { ...values, date: new Date(values.date) };
-      const docRef = await addFinanceEntry(firestore, rawEntryData as any);
-      
-      if (values.type === 'receipt' && values.loanId) {
-        await updateLoan(firestore, values.loanId, {
-            totalPaid: increment(values.amount),
-            payments: arrayUnion({ paymentId: docRef.id, amount: values.amount, date: new Date(values.date) })
-        });
-      }
+      await addFinanceEntry(firestore, rawEntryData as any);
       toast({ title: 'Success', description: 'Finance entry recorded.' });
       addForm.reset();
       setOpen(false);
@@ -264,21 +311,17 @@ export default function FinancePage() {
     if (!loanToEdit) return;
     setIsUpdating(true);
     try {
-        const receiptData = {
-            type: 'receipt' as const,
-            receiptCategory: 'loan_repayment' as const,
-            date: new Date(values.paymentDate),
+        const paymentData = {
+            paymentId: doc(firestore, 'temp').id, // Generate a unique ID for the payment entry
             amount: values.paymentAmount,
-            description: `Payment for Loan #${loanToEdit.loanNumber}${values.comments ? ': ' + values.comments : ''}`,
-            loanId: loanToEdit.id
+            date: new Date(values.paymentDate)
         };
-        const receiptDocRef = await addFinanceEntry(firestore, receiptData);
         await updateLoan(firestore, loanToEdit.id, {
             totalPaid: increment(values.paymentAmount),
-            payments: arrayUnion({ paymentId: receiptDocRef.id, amount: values.paymentAmount, date: new Date(values.paymentDate) }),
+            payments: arrayUnion(paymentData),
             comments: values.comments ? `${loanToEdit.comments || ''}\n[${values.paymentDate}] ${values.comments}`.trim() : loanToEdit.comments
         });
-        toast({ title: 'Payment Recorded', description: `Receipt created for Ksh ${values.paymentAmount.toLocaleString()}`});
+        toast({ title: 'Payment Recorded', description: `Successfully added Ksh ${values.paymentAmount.toLocaleString()}`});
         paymentForm.reset();
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Error', description: e.message });
@@ -296,7 +339,7 @@ export default function FinancePage() {
             date: new Date(values.penaltyDate),
             description: values.penaltyDescription
         });
-        toast({ title: 'Penalty Added', description: `Penalty of Ksh ${values.penaltyAmount.toLocaleString()} added to loan.`});
+        toast({ title: 'Penalty Added', description: `Penalty of Ksh ${values.penaltyAmount.toLocaleString()} added.`});
         penaltyForm.reset();
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Error', description: e.message });
@@ -334,7 +377,7 @@ export default function FinancePage() {
             totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0)
         };
         await updateLoan(firestore, loanToEdit.id, updateData);
-        toast({ title: 'Loan Updated', description: 'Loan parameters updated.'});
+        toast({ title: 'Loan Updated' });
         setIsEditingLoan(false);
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
@@ -348,7 +391,7 @@ export default function FinancePage() {
     setIsRollingOver(true);
     try {
         await rolloverLoan(firestore, loanToEdit, new Date(values.rolloverDate));
-        toast({ title: 'Loan Rolled Over', description: 'New active loan created.'});
+        toast({ title: 'Loan Rolled Over' });
         setLoanToEdit(null);
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Rollover Failed', description: e.message });
@@ -372,10 +415,6 @@ export default function FinancePage() {
     }
   }
 
-  const receipts = useMemo(() => financeEntries?.filter(e => e.type === 'receipt') ?? null, [financeEntries]);
-  const payouts = useMemo(() => financeEntries?.filter(e => e.type === 'payout') ?? null, [financeEntries]);
-  const expenses = useMemo(() => financeEntries?.filter(e => e.type === 'expense') ?? null, [financeEntries]);
-
   return (
     <div>
       <div className="flex flex-col gap-4 mb-6">
@@ -389,21 +428,16 @@ export default function FinancePage() {
                     <Form {...addForm}>
                         <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                             <FormField control={addForm.control} name="type" render={({ field }) => (
-                                <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Major Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></SelectContent></Select></FormItem>
+                                <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></SelectContent></Select></FormItem>
                             )} />
                             {addFinanceEntryType === 'payout' && (
                                 <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
-                                    <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_disbursement">Loan Disbursement</SelectItem><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
-                                )} />
-                            )}
-                            {addFinanceEntryType === 'expense' && (
-                                <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
-                                    <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation & Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
+                                    <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
                                 )} />
                             )}
                             {addFinanceEntryType === 'receipt' && (
                                 <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                    <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fee Income</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
+                                    <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
                                 )} />
                             )}
                             <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
@@ -450,13 +484,13 @@ export default function FinancePage() {
           </ScrollArea>
           
           <TabsContent value="receipts">
-              <EditableFinanceReportTab title="Receipts" description="Incoming cash flows including loan repayments, upfront fees, and investor deposits." entries={receipts} loading={isLoading} />
+              <EditableFinanceReportTab title="Receipts" description="Includes loan repayments, upfront fees, and investor deposits." entries={allReceipts} loading={isLoading} onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           <TabsContent value="payouts">
-              <EditableFinanceReportTab title="Payouts" description="Outgoing loan disbursements, investor withdrawals, and major payouts." entries={payouts} loading={isLoading} />
+              <EditableFinanceReportTab title="Payouts" description="Includes take-home disbursements and investor withdrawals." entries={allPayouts} loading={isLoading} onDelete={(e) => !e.id.startsWith('disb-') && deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           <TabsContent value="expenses">
-               <EditableFinanceReportTab title="Expenses" description="Operational, facilitation, and miscellaneous office costs." entries={expenses} loading={isLoading} />
+               <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={allExpenses} loading={isLoading} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           
           <TabsContent value="loanbook">
@@ -465,7 +499,7 @@ export default function FinancePage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <CardTitle>Loan Book</CardTitle>
-                            <CardDescription>Comprehensive list of all loans and their detailed financial breakdown.</CardDescription>
+                            <CardDescription>Comprehensive list of all loans and financial breakdowns.</CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
                             <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
@@ -580,7 +614,7 @@ export default function FinancePage() {
                             <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
                             <Badge>{loanToEdit.status.toUpperCase()}</Badge>
                         </div>
-                        <DialogDescription>Customer: {loanToEdit.customerName} ({loanToEdit.customerPhone})</DialogDescription>
+                        <DialogDescription>Customer: {loanToEdit.customerName}</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[75vh] pr-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
@@ -706,7 +740,7 @@ export default function FinancePage() {
       {/* Edit Loan Parameters Dialog */}
       <Dialog open={isEditingLoan} onOpenChange={setIsEditingLoan}>
           <DialogContent className="sm:max-w-2xl">
-              <DialogHeader><DialogTitle>Edit Loan Parameters</DialogTitle><DialogDescription>Update principal, rates, fees or dates. This will recalculate totals.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>Edit Loan Parameters</DialogTitle><DialogDescription>Update principal, rates, or fees. This recalculates totals.</DialogDescription></DialogHeader>
               <Form {...editLoanForm}>
                   <form onSubmit={editLoanForm.handleSubmit(onEditLoanSubmit)} className="grid grid-cols-2 gap-4 py-4">
                       <FormField control={editLoanForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
@@ -733,7 +767,7 @@ export default function FinancePage() {
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteLoanOpen} onOpenChange={setDeleteLoanOpen}>
           <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently delete Loan #{loanToEdit?.loanNumber} and all history. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the loan and all history. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setDeleteLoanOpen(false)}>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={confirmDeleteLoan} className="bg-destructive hover:bg-destructive/90 text-white" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Delete Permanently</AlertDialogAction>
