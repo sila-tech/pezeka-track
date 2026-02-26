@@ -102,7 +102,11 @@ export default function CustomersPage() {
   
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance';
-  const canPerformActions = isSuperAdmin || isFinance;
+  const isStaff = user?.role === 'staff';
+  
+  // Staff can add, but not edit or delete
+  const canAdd = isSuperAdmin || isFinance || isStaff;
+  const canEditDelete = isSuperAdmin || isFinance;
   
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
@@ -292,7 +296,7 @@ export default function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-        {canPerformActions && (
+        {canAdd && (
           <Dialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -409,7 +413,7 @@ export default function CustomersPage() {
                           <TableHead>Name</TableHead>
                           <TableHead>Phone Number</TableHead>
                           <TableHead>ID Number</TableHead>
-                          {canPerformActions && <TableHead className="text-right w-[80px]">Actions</TableHead>}
+                          {canEditDelete && <TableHead className="text-right w-[80px]">Actions</TableHead>}
                       </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -419,7 +423,7 @@ export default function CustomersPage() {
                               <TableCell className="font-medium">{customer.name}</TableCell>
                               <TableCell>{customer.phone}</TableCell>
                               <TableCell>{customer.idNumber || 'N/A'}</TableCell>
-                              {canPerformActions && (
+                              {canEditDelete && (
                                 <TableCell className="text-right">
                                   <DropdownMenu open={openMenu === customer.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? customer.id : null)}>
                                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>

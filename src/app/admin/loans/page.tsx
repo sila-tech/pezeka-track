@@ -121,7 +121,11 @@ export default function LoansPage() {
 
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance';
-  const canPerformActions = isSuperAdmin || isFinance;
+  const isStaff = user?.role === 'staff';
+
+  // Staff can add loans, but Finance/Admin manage approvals
+  const canAdd = isSuperAdmin || isFinance || isStaff;
+  const canManageApplications = isSuperAdmin || isFinance;
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
@@ -345,7 +349,7 @@ export default function LoansPage() {
   const copyToClipboard = () => {
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         navigator.clipboard.writeText(generatedMessage);
-        toast({ title: "Message Copied!", description: "The message has been copied to your clipboard." });
+        toast({ title: "Message Copies!", description: "The message has been copied to your clipboard." });
       }
   };
 
@@ -375,7 +379,7 @@ export default function LoansPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Loans</h1>
-        {canPerformActions && (
+        {canAdd && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -715,7 +719,7 @@ export default function LoansPage() {
                         <AlertDescription>
                             {searchTerm || statusFilter !== 'all'
                                 ? "No loans match your search criteria."
-                                : "There are no loans in the system yet. Add one to see it here."
+                                : "There are no loans in the system yet. Add a loan to see it here."
                             }
                         </AlertDescription>
                     </Alert>
@@ -925,7 +929,7 @@ export default function LoansPage() {
                     </div>
                     <DialogFooter className="mt-6">
                         <Button variant="outline" onClick={() => setApplicationToManage(null)} disabled={isUpdatingStatus}>Cancel</Button>
-                        {canPerformActions && (
+                        {canManageApplications && (
                             <>
                                 <Button variant="destructive" onClick={() => handleUpdateStatus(applicationToManage, 'rejected')} disabled={isUpdatingStatus}>
                                     {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
