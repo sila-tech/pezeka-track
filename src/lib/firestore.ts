@@ -172,29 +172,26 @@ async function recordDisbursement(db: Firestore, loan: any) {
     const charge = Number(loan.chargingCost) || 0;
     const totalFees = reg + proc + track + charge;
     
+    // Calculate the actual cash out (Take Home)
+    const takeHome = Number(loan.principalAmount) - totalFees;
+    
     const disbursementDate = loan.disbursementDate instanceof Date 
         ? loan.disbursementDate 
         : (loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date());
 
+    // Record the Take Home as the actual payout amount
     await addFinanceEntry(db, {
         type: 'payout',
         payoutCategory: 'loan_disbursement',
         date: disbursementDate,
-        amount: Number(loan.principalAmount),
-        description: `Disbursement for Loan #${loan.loanNumber}`,
+        amount: takeHome,
+        description: `Disbursement for Loan #${loan.loanNumber}. Principal: Ksh ${Number(loan.principalAmount).toLocaleString()}, Retained Fees: Ksh ${totalFees.toLocaleString()}`,
         loanId: loan.id
     });
 
-    if (totalFees > 0) {
-        await addFinanceEntry(db, {
-            type: 'receipt',
-            receiptCategory: 'upfront_fees',
-            date: disbursementDate,
-            amount: totalFees,
-            description: `Upfront fees for Loan #${loan.loanNumber} (Reg: ${reg}, Proc: ${proc}, Track: ${track}, Charge: ${charge})`,
-            loanId: loan.id
-        });
-    }
+    // Note: We do NOT record a receipt for upfront fees here because the cash never left the bank.
+    // Recording it as a receipt would incorrectly increase the "Cash at Hand" stats.
+    // The fees are represented as the difference between Principal and Payout.
 
     await updateDoc(doc(db, 'loans', loan.id), { disbursementRecorded: true });
 }
