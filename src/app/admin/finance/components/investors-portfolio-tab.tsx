@@ -1,14 +1,13 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
-import { addInvestor, applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor, approveDeposit, rejectDeposit } from '@/lib/firestore';
+import { applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor, approveDeposit, rejectDeposit } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +19,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -34,30 +32,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2, PlusCircle, PenSquare, Trash2, Check, X, CircleSlash } from 'lucide-react';
+import { Loader2, PenSquare, Trash2, Check, X } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
-
-// Schemas
-const addInvestorSchema = z.object({
-  name: z.string().min(1, 'Portfolio holder name is required.'),
-  initialInvestment: z.coerce.number().min(1, 'Initial investment must be greater than 0.'),
-});
-
-
-// Interfaces
 interface InterestEntry {
   entryId: string;
   date: { seconds: number; nanoseconds: number } | Date;
@@ -93,46 +72,23 @@ interface Investor {
   deposits?: Deposit[];
 }
 
-
 export function InvestorsPortfolioTab() {
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const [addInvestorOpen, setAddInvestorOpen] = useState(false);
   const [manageInvestorOpen, setManageInvestorOpen] = useState(false);
   const [deleteInvestorOpen, setDeleteInvestorOpen] = useState(false);
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
   const [investorToDelete, setInvestorToDelete] = useState<Investor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
-  const isFinanceOrAdmin = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  // Robust check for finance or admin roles
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.email?.endsWith('@finance.pezeka.com')) : false;
 
   const { data: investors, loading: investorsLoading } = useCollection<Investor>(isAuthorized ? 'investors' : null);
 
   const isLoading = userLoading || investorsLoading;
-
-  const addInvestorForm = useForm<z.infer<typeof addInvestorSchema>>({
-    resolver: zodResolver(addInvestorSchema),
-    defaultValues: { name: '', initialInvestment: undefined },
-  });
-
-
-  // Handlers
-  async function onAddInvestorSubmit(values: z.infer<typeof addInvestorSchema>) {
-    setIsSubmitting(true);
-    try {
-        await addInvestor(firestore, values);
-        toast({ title: 'Portfolio Created', description: `A new portfolio for ${values.name} has been created.` });
-        addInvestorForm.reset();
-        setAddInvestorOpen(false);
-    } catch(error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not create portfolio.' });
-    } finally {
-        setIsSubmitting(false);
-    }
-  }
 
   const handleManageClick = (investor: Investor) => {
     setSelectedInvestor(investor);
@@ -146,7 +102,6 @@ export function InvestorsPortfolioTab() {
         const description = `Monthly interest for ${format(new Date(), 'MMMM yyyy')}`;
         await applyInterestToPortfolio(firestore, selectedInvestor.id, monthlyInterest, description);
         toast({ title: 'Interest Applied', description: `Ksh ${monthlyInterest.toLocaleString()} applied to ${selectedInvestor.name}'s portfolio.`});
-        // Data will refresh from Firestore listener
     } catch(error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not apply interest.' });
     } finally {
@@ -206,7 +161,6 @@ export function InvestorsPortfolioTab() {
     }
   };
 
-
   const handleDeleteClick = (investor: Investor) => {
     setInvestorToDelete(investor);
     setDeleteInvestorOpen(true);
@@ -242,9 +196,6 @@ export function InvestorsPortfolioTab() {
 
   const monthlyInterest = useMemo(() => {
     if (!selectedInvestor || !selectedInvestor.interestRate) return 0;
-    // As per user, month starts on investment date. But for simplicity and regular cadence,
-    // we'll apply monthly interest on the current balance.
-    // A more complex implementation could track the exact investment date.
     const rate = selectedInvestor.interestRate / 100;
     return (selectedInvestor.currentBalance || 0) * rate;
   }, [selectedInvestor]);
@@ -262,21 +213,19 @@ export function InvestorsPortfolioTab() {
 
   const statementEntries = useMemo(() => {
     if (!selectedInvestor) return [];
-
     const allTransactions: any[] = [];
     
-    // Handle legacy portfolios created before 'deposits' field existed.
-    // If no approved deposits, use totalInvestment as the initial investment.
-    if ((selectedInvestor.deposits || []).filter(d => d.status === 'approved').length === 0 && (selectedInvestor.totalInvestment || 0) > 0 && selectedInvestor.createdAt) {
+    // Initial Investment
+    if (selectedInvestor.createdAt) {
         allTransactions.push({
             date: new Date((selectedInvestor.createdAt as any).seconds * 1000),
             description: 'Initial Investment',
-            amount: selectedInvestor.totalInvestment,
+            amount: selectedInvestor.totalInvestment || 0,
             type: 'credit'
         });
     }
 
-    // Deposits (which are investments)
+    // Deposits
     (selectedInvestor.deposits || []).filter(d => d.status === 'approved').forEach(d => {
         allTransactions.push({
             date: new Date((d.date as any).seconds * 1000),
@@ -286,7 +235,7 @@ export function InvestorsPortfolioTab() {
         });
     });
 
-    // Interest Entries
+    // Interest
     (selectedInvestor.interestEntries || []).forEach(i => {
         allTransactions.push({
             date: new Date((i.date as any).seconds * 1000),
@@ -319,7 +268,6 @@ export function InvestorsPortfolioTab() {
     }).reverse();
   }, [selectedInvestor]);
 
-
   return (
     <>
       <Card>
@@ -330,16 +278,14 @@ export function InvestorsPortfolioTab() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && (
+          {isLoading ? (
             <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          )}
-          {!isLoading && (!sortedInvestors || sortedInvestors.length === 0) && (
+          ) : !sortedInvestors || sortedInvestors.length === 0 ? (
               <Alert>
                   <AlertTitle>No Portfolios Found</AlertTitle>
                   <AlertDescription>Go to the Investors page to add a new portfolio.</AlertDescription>
               </Alert>
-          )}
-          {!isLoading && sortedInvestors && sortedInvestors.length > 0 && (
+          ) : (
             <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
@@ -364,7 +310,7 @@ export function InvestorsPortfolioTab() {
                                       <Button variant="ghost" size="sm" onClick={() => handleManageClick(investor)}>
                                           <PenSquare className="mr-2 h-4 w-4" /> Manage
                                       </Button>
-                                      {isFinanceOrAdmin && (
+                                      {isAuthorized && (
                                         <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(investor)}>
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -387,201 +333,98 @@ export function InvestorsPortfolioTab() {
         </CardContent>
       </Card>
       
-      {/* Manage Investor Dialog */}
       <Dialog open={manageInvestorOpen} onOpenChange={setManageInvestorOpen}>
           <DialogContent className="sm:max-w-4xl">
               {selectedInvestor && (
                   <>
                     <DialogHeader>
-                        <DialogTitle>Manage Portfolio for: {selectedInvestor.name}</DialogTitle>
-                        <DialogDescription>Review portfolio statement, apply interest, and manage requests.</DialogDescription>
+                        <DialogTitle>Manage Portfolio: {selectedInvestor.name}</DialogTitle>
+                        <DialogDescription>Apply interest, approve deposits, and review history.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[70vh] pr-4">
                       <div className="space-y-6 mt-4">
-
-                        <Card>
-                            <CardHeader><CardTitle>Portfolio Summary</CardTitle></CardHeader>
-                            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                                <div>
-                                    <div className="text-muted-foreground">Total Investment</div>
-                                    <div className="font-semibold">Ksh {(selectedInvestor.totalInvestment || 0).toLocaleString()}</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Investment Date</div>
-                                    <div className="font-semibold">{selectedInvestor.createdAt ? format(new Date(selectedInvestor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Current Balance</div>
-                                    <div className="font-semibold">Ksh {(selectedInvestor.currentBalance || 0).toLocaleString()}</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Monthly Interest Rate</div>
-                                    <div className="font-semibold">{selectedInvestor.interestRate || 0}%</div>
-                                </div>
-                                <div>
-                                    <div className="text-muted-foreground">Est. Monthly Return</div>
-                                    <div className="font-semibold">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-6">
-                                <Card>
-                                  <CardHeader><CardTitle>Apply Monthly Interest</CardTitle></CardHeader>
-                                  <CardContent className="space-y-4">
-                                      <div className="space-y-2 rounded-md bg-muted p-4">
-                                          <div className="flex justify-between">
-                                              <span className="text-sm font-medium">Monthly Interest Rate</span>
-                                              <span className="text-sm font-bold">{selectedInvestor.interestRate || 0}%</span>
-                                          </div>
-                                          <div className="flex justify-between">
-                                              <span className="text-sm font-medium">Calculated Interest</span>
-                                              <span className="text-sm font-bold">Ksh {monthlyInterest.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                                          </div>
-                                      </div>
-                                      {hasInterestBeenAppliedThisMonth ? (
-                                          <Alert variant="default">
-                                              <Check className="h-4 w-4" />
-                                              <AlertTitle>Interest Already Applied</AlertTitle>
-                                              <AlertDescription>Monthly interest has already been applied for this portfolio this month.</AlertDescription>
-                                          </Alert>
-                                      ) : (
-                                          <Button onClick={handleApplyInterest} disabled={isSubmitting || monthlyInterest <= 0} className="w-full">
-                                              {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
-                                              Apply Interest for {format(new Date(), 'MMMM')}
-                                          </Button>
-                                      )}
-                                  </CardContent>
-                                </Card>
-                            </div>
-                            <div className="space-y-6">
-                              <Card>
-                                <CardHeader><CardTitle>Deposit Requests</CardTitle></CardHeader>
-                                <CardContent>
-                                    <ScrollArea className="h-[200px]">
-                                      {(!selectedInvestor.deposits || selectedInvestor.deposits.length === 0) ? (
-                                          <Alert><AlertTitle>No Deposits</AlertTitle><AlertDescription>No deposit notifications found.</AlertDescription></Alert>
-                                      ) : (
-                                          <Table>
-                                              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                                              <TableBody>
-                                                  {[...selectedInvestor.deposits].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(d => (
-                                                      <TableRow key={d.depositId}>
-                                                          <TableCell>{format(new Date((d.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
-                                                          <TableCell>{d.amount.toLocaleString()}</TableCell>
-                                                          <TableCell><Badge variant={d.status === 'pending' ? 'secondary' : d.status === 'approved' ? 'default' : 'destructive'}>{d.status}</Badge></TableCell>
-                                                          <TableCell className="text-right">
-                                                              {d.status === 'pending' && (
-                                                                  <>
-                                                                      <Button variant="ghost" size="icon" onClick={() => handleApproveDeposit(d.depositId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600" /></Button>
-                                                                      <Button variant="ghost" size="icon" onClick={() => handleRejectDeposit(d.depositId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive" /></Button>
-                                                                  </>
-                                                              )}
-                                                          </TableCell>
-                                                      </TableRow>
-                                                  ))}
-                                              </TableBody>
-                                          </Table>
-                                      )}
+                            <Card>
+                                <CardHeader><CardTitle>Apply Interest</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2 rounded-md bg-muted p-4">
+                                        <div className="flex justify-between"><span className="text-sm">Rate</span><span className="font-bold">{(selectedInvestor.interestRate || 0)}%</span></div>
+                                        <div className="flex justify-between"><span className="text-sm">Interest Amount</span><span className="font-bold">Ksh {monthlyInterest.toLocaleString()}</span></div>
+                                    </div>
+                                    {hasInterestBeenAppliedThisMonth ? (
+                                        <Badge className="w-full justify-center">Interest Already Applied This Month</Badge>
+                                    ) : (
+                                        <Button onClick={handleApplyInterest} disabled={isSubmitting || monthlyInterest <= 0} className="w-full">
+                                            {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
+                                            Apply Interest for {format(new Date(), 'MMMM')}
+                                        </Button>
+                                    )}
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardHeader><CardTitle>Requests</CardTitle></CardHeader>
+                                <CardContent className="space-y-4">
+                                    <ScrollArea className="h-[150px]">
+                                        <div className="space-y-2">
+                                            <p className="text-xs font-semibold uppercase text-muted-foreground">Pending Deposits</p>
+                                            {selectedInvestor.deposits?.filter(d => d.status === 'pending').map(d => (
+                                                <div key={d.depositId} className="flex items-center justify-between p-2 border rounded-md text-sm">
+                                                    <span>Ksh {d.amount.toLocaleString()}</span>
+                                                    <div className="flex gap-1">
+                                                        <Button size="icon" variant="ghost" onClick={() => handleApproveDeposit(d.depositId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
+                                                        <Button size="icon" variant="ghost" onClick={() => handleRejectDeposit(d.depositId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <p className="text-xs font-semibold uppercase text-muted-foreground mt-4">Pending Withdrawals</p>
+                                            {selectedInvestor.withdrawals?.filter(w => w.status === 'pending').map(w => (
+                                                <div key={w.withdrawalId} className="flex items-center justify-between p-2 border rounded-md text-sm">
+                                                    <span>Ksh {w.amount.toLocaleString()}</span>
+                                                    <div className="flex gap-1">
+                                                        <Button size="icon" variant="ghost" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
+                                                        <Button size="icon" variant="ghost" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </ScrollArea>
                                 </CardContent>
-                              </Card>
-                              <Card>
-                                  <CardHeader><CardTitle>Withdrawal Requests</CardTitle></CardHeader>
-                                  <CardContent>
-                                      <ScrollArea className="h-[200px]">
-                                          {(!selectedInvestor.withdrawals || selectedInvestor.withdrawals.length === 0) ? (
-                                              <Alert><AlertTitle>No Withdrawals</AlertTitle><AlertDescription>This investor has not made any withdrawal requests.</AlertDescription></Alert>
-                                          ) : (
-                                              <Table>
-                                                  <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                                                  <TableBody>
-                                                      {[...selectedInvestor.withdrawals].sort((a, b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(w => (
-                                                          <TableRow key={w.withdrawalId}>
-                                                              <TableCell>{format(new Date((w.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
-                                                              <TableCell>{w.amount.toLocaleString()}</TableCell>
-                                                              <TableCell><Badge variant={w.status === 'pending' ? 'secondary' : w.status === 'processed' ? 'default' : 'destructive'}>{w.status}</Badge></TableCell>
-                                                              <TableCell className="text-right">
-                                                                  {w.status === 'pending' && (
-                                                                      <>
-                                                                          <Button variant="ghost" size="icon" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600" /></Button>
-                                                                          <Button variant="ghost" size="icon" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive" /></Button>
-                                                                      </>
-                                                                  )}
-                                                              </TableCell>
-                                                          </TableRow>
-                                                      ))}
-                                                  </TableBody>
-                                              </Table>
-                                          )}
-                                      </ScrollArea>
-                                  </CardContent>
-                              </Card>
-                            </div>
+                            </Card>
                         </div>
-
                         <Card>
-                            <CardHeader><CardTitle>Portfolio Statement</CardTitle></CardHeader>
+                            <CardHeader><CardTitle>Statement</CardTitle></CardHeader>
                             <CardContent>
-                                <ScrollArea className="h-72">
-                                    {statementEntries.length === 0 ? (
-                                        <Alert>
-                                            <AlertTitle>No Transactions</AlertTitle>
-                                            <AlertDescription>No transactions have been recorded for this portfolio yet.</AlertDescription>
-                                        </Alert>
-                                    ) : (
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Date</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead className="text-right">Debit</TableHead>
-                                                    <TableHead className="text-right">Credit</TableHead>
-                                                    <TableHead className="text-right">Balance</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {statementEntries.map((item, index) => (
-                                                    <TableRow key={index}>
-                                                        <TableCell>{format(item.date, 'PPP')}</TableCell>
-                                                        <TableCell>{item.description}</TableCell>
-                                                        <TableCell className="text-right text-destructive">
-                                                            {item.type === 'debit' ? item.amount.toLocaleString() : '-'}
-                                                        </TableCell>
-                                                        <TableCell className="text-right text-green-600">
-                                                            {item.type === 'credit' ? item.amount.toLocaleString() : '-'}
-                                                        </TableCell>
-                                                        <TableCell className="text-right font-semibold">{item.balance.toLocaleString()}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    )}
-                                </ScrollArea>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="text-right">Balance</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {statementEntries.map((e, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell>{format(e.date, 'dd/MM/yy')}</TableCell>
+                                                <TableCell>{e.description}</TableCell>
+                                                <TableCell className={`text-right ${e.type === 'credit' ? 'text-green-600' : 'text-destructive'}`}>
+                                                    {e.type === 'credit' ? '+' : '-'}{e.amount.toLocaleString()}
+                                                </TableCell>
+                                                <TableCell className="text-right font-bold">{e.balance.toLocaleString()}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             </CardContent>
                         </Card>
-
                       </div>
                     </ScrollArea>
-                    <DialogFooter className="mt-4">
-                        <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
-                    </DialogFooter>
+                    <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
           </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteInvestorOpen} onOpenChange={setDeleteInvestorOpen}>
           <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>This will permanently delete the investment portfolio for <strong>{investorToDelete?.name}</strong>. This action cannot be undone.</AlertDialogDescription>
-              </AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Delete Portfolio?</AlertDialogTitle><AlertDialogDescription>This action is irreversible.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">{isSubmitting && <Loader2 className="mr-2 animate-spin" />} Delete</AlertDialogAction>
+                  <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>

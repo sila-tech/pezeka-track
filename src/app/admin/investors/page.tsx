@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -41,13 +40,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -56,17 +48,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { format, differenceInMonths } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-interface UserProfile {
-  id: string;
-  uid: string;
-  name: string;
-  email: string;
-  role: 'staff' | 'finance';
-}
 
 interface Investor {
   id: string;
@@ -78,13 +61,6 @@ interface Investor {
   interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
 }
-
-const userProfileSchema = z.object({
-  uid: z.string().min(1, 'Firebase UID is required.'),
-  name: z.string().min(1, 'Name is required.'),
-  email: z.string().email('A valid email is required.'),
-  role: z.enum(['staff', 'finance'], { required_error: 'Please select a role.' }),
-});
 
 const investorSchema = z.object({
   uid: z.string().min(1, 'Firebase UID is required.'),
@@ -109,16 +85,18 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
+    // Permission checks - ensure Simon and Finance users are always authorized
     const isSuperAdmin = currentUser?.email === 'simon@pezeka.com';
-    const isFinance = currentUser?.role === 'finance';
+    const isFinance = currentUser?.role === 'finance' || currentUser?.email?.endsWith('@finance.pezeka.com');
     const canViewPage = isSuperAdmin || isFinance;
 
     useEffect(() => {
-        if (!userLoading && !canViewPage) {
-            toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
+        // Only redirect if loading is definitely finished and user is not authorized
+        if (!userLoading && currentUser && !canViewPage) {
+            toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view the Investors page.' });
             router.push('/admin');
         }
-    }, [userLoading, canViewPage, router, toast]);
+    }, [userLoading, canViewPage, currentUser, router, toast]);
 
     const { data: investors, loading: investorsLoading } = useCollection<Investor>(canViewPage ? 'investors' : null);
 
@@ -139,7 +117,7 @@ export default function InvestorsPage() {
                 name: values.name,
                 email: values.email,
                 totalInvestment: values.totalInvestment,
-                currentBalance: values.totalInvestment, // Initially balance equals investment
+                currentBalance: values.totalInvestment,
                 interestRate: values.interestRate || 0,
             });
             toast({ title: 'Investor Created', description: `Profile for ${values.name} has been added.` });
@@ -213,59 +191,61 @@ export default function InvestorsPage() {
     
     const isLoading = userLoading || investorsLoading;
 
-    if (isLoading || !canViewPage) {
-        return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    if (isLoading) {
+        return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    }
+
+    if (!canViewPage) {
+        return null; // The useEffect will handle redirect
     }
 
     return (
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Investors</h1>
-        {(isSuperAdmin || isFinance) && (
-            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-                <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Investor
+        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogTrigger asChild>
+            <Button>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Investor
+            </Button>
+        </DialogTrigger>
+        <DialogContent>
+            <DialogHeader>
+            <DialogTitle>Add New Investor</DialogTitle>
+            <DialogDescription>
+                First, create the user in Firebase Authentication. Then, add their profile and initial investment details here.
+            </DialogDescription>
+            </DialogHeader>
+            <Form {...addForm}>
+            <ScrollArea className="max-h-[70vh]">
+                <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
+                    <FormField control={addForm.control} name="uid" render={({ field }) => (
+                    <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="email" render={({ field }) => (
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
+                    <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="interestRate" render={({ field }) => (
+                    <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                </form>
+            </ScrollArea>
+            </Form>
+            <DialogFooter className="mt-4">
+                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                <Button type="submit" form="add-investor-form" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Add Investor
                 </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                <DialogTitle>Add New Investor</DialogTitle>
-                <DialogDescription>
-                    First, create the user in Firebase Authentication. Then, add their profile and initial investment details here.
-                </DialogDescription>
-                </DialogHeader>
-                <Form {...addForm}>
-                <ScrollArea className="max-h-[70vh]">
-                    <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
-                        <FormField control={addForm.control} name="uid" render={({ field }) => (
-                        <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                        <FormField control={addForm.control} name="name" render={({ field }) => (
-                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                        <FormField control={addForm.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                        <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
-                        <FormItem><FormLabel>Initial Investment</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                        <FormField control={addForm.control} name="interestRate" render={({ field }) => (
-                        <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                        )}/>
-                    </form>
-                </ScrollArea>
-                </Form>
-                <DialogFooter className="mt-4">
-                    <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                    <Button type="submit" form="add-investor-form" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Add Investor
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-            </Dialog>
-        )}
+            </DialogFooter>
+        </DialogContent>
+        </Dialog>
       </div>
       <Card>
         <CardHeader>
@@ -273,13 +253,9 @@ export default function InvestorsPage() {
             <CardDescription>A list of all investors and their portfolio status.</CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading && (
-            <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          )}
-          {!isLoading && (!investors || investors.length === 0) && (
+          {!investors || investors.length === 0 ? (
               <Alert><AlertTitle>No Investors Found</AlertTitle><AlertDescription>There are no investors in the database. Add one to get started.</AlertDescription></Alert>
-          )}
-          {!isLoading && investors && investors.length > 0 && (
+          ) : (
             <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
@@ -287,44 +263,34 @@ export default function InvestorsPage() {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Date Joined</TableHead>
-                        <TableHead>Monthly ROI (%)</TableHead>
+                        <TableHead>Monthly Interest Rate (%)</TableHead>
                         <TableHead className="text-right">Total Investment (Ksh)</TableHead>
                         <TableHead className="text-right">Current Balance (Ksh)</TableHead>
-                        {(isSuperAdmin || isFinance) && <TableHead className="text-right w-[80px]">Actions</TableHead>}
+                        <TableHead className="text-right w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {investors.map((investor) => {
-                          const totalReturn = (investor.currentBalance || 0) - (investor.totalInvestment || 0);
-                          const monthsInvested = investor.createdAt ? differenceInMonths(new Date(), new Date(investor.createdAt.seconds * 1000)) : 0;
-                          const monthlyRoi = (investor.totalInvestment > 0 && monthsInvested > 0)
-                            ? (totalReturn / investor.totalInvestment / monthsInvested) * 100
-                            : 0;
-
-                          return (
-                              <TableRow key={investor.id}>
-                                  <TableCell className="font-medium">{investor.name}</TableCell>
-                                  <TableCell>{investor.email}</TableCell>
-                                  <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
-                                  <TableCell>{monthlyRoi.toFixed(2)}%</TableCell>
-                                  <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
-                                  <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
-                                  {(isSuperAdmin || isFinance) && (
-                                      <TableCell className="text-right">
-                                      <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
-                                          <DropdownMenuTrigger asChild>
-                                              <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                              {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>}
-                                              {(isSuperAdmin || isFinance) && <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>}
-                                          </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </TableCell>
-                                  )}
-                              </TableRow>
-                            )
-                        }
+                      {investors.map((investor) => (
+                          <TableRow key={investor.id}>
+                              <TableCell className="font-medium">{investor.name}</TableCell>
+                              <TableCell>{investor.email}</TableCell>
+                              <TableCell>{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'PPP') : 'N/A'}</TableCell>
+                              <TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell>
+                              <TableCell className="text-right">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                                        <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                          </TableRow>
+                        )
                       )}
                   </TableBody>
               </Table>
@@ -373,7 +339,6 @@ export default function InvestorsPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
               <AlertDialogHeader>
