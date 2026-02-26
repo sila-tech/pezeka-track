@@ -35,7 +35,7 @@ export default function Dashboard() {
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
   const stats = useMemo(() => {
-    if (!loans) return { totalRevenue: 0, disbursedCount: 0 };
+    if (!loans) return { realizedRevenue: 0, disbursedCount: 0 };
     
     let realizedRevenue = 0;
     let disbursedCount = 0;
@@ -55,12 +55,6 @@ export default function Dashboard() {
 
             // Interest revenue realized from payments made
             // Simplified: If TotalPaid > Principal, the excess is interest.
-            // But wait, penalties also count as revenue.
-            // Let's use: Realized Interest/Penalty = Any payment amount that contributes to balance beyond the principal.
-            // To be accurate we'd need to know principal remaining.
-            // MVP version: Show realized revenue as (Upfront Fees + Interest component of payments).
-            // For now, let's show Realized Revenue = Upfront Fees + Total Interest from fully paid or active loans.
-            // Actually, let's just show Upfront Fees + Total Paid (portion above principal)
             if (loan.totalPaid > loan.principalAmount) {
                 realizedRevenue += (loan.totalPaid - loan.principalAmount);
             }
@@ -142,7 +136,7 @@ export default function Dashboard() {
                 <HandCoins className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">{stats.disburnedCount}</div>
+                <div className="text-2xl font-bold">{stats.disbursedCount}</div>
                  <p className="text-xs text-muted-foreground">
                 Total historical count
                 </p>
