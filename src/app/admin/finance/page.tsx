@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
 import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History } from "lucide-react";
-import { arrayUnion, increment } from 'firebase/firestore';
+import { arrayUnion, increment, doc } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,7 +50,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, approveLoanApplication } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
@@ -235,7 +235,8 @@ export default function FinancePage() {
         }
 
         if (entry.type === 'receipt') receipts.push(entry);
-        if (entry.type === 'payout') payouts.push(entry);
+        // Per User: Payouts is money out, which means even expenses are payouts.
+        if (entry.type === 'payout' || entry.type === 'expense') payouts.push(entry);
         if (entry.type === 'expense') expenses.push(entry);
     });
 
@@ -244,6 +245,7 @@ export default function FinancePage() {
 
   const stats = useMemo(() => {
     let receiptsTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
+    // PayoutsTotal now includes expenses based on allPayouts construction above
     let payoutsTotal = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     let expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
     
@@ -251,7 +253,7 @@ export default function FinancePage() {
       totalReceipts: receiptsTotal,
       totalPayouts: payoutsTotal,
       totalExpenses: expensesTotal,
-      cashAtHand: receiptsTotal - payoutsTotal - expensesTotal
+      cashAtHand: receiptsTotal - payoutsTotal
     };
   }, [allReceipts, allPayouts, allExpenses]);
 
@@ -312,7 +314,7 @@ export default function FinancePage() {
     setIsUpdating(true);
     try {
         const paymentData = {
-            paymentId: doc(firestore, 'temp').id, // Generate a unique ID for the payment entry
+            paymentId: doc(firestore, 'temp').id, 
             amount: values.paymentAmount,
             date: new Date(values.paymentDate)
         };
@@ -487,7 +489,7 @@ export default function FinancePage() {
               <EditableFinanceReportTab title="Receipts" description="Includes loan repayments, upfront fees, and investor deposits." entries={allReceipts} loading={isLoading} onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           <TabsContent value="payouts">
-              <EditableFinanceReportTab title="Payouts" description="Includes take-home disbursements and investor withdrawals." entries={allPayouts} loading={isLoading} onDelete={(e) => !e.id.startsWith('disb-') && deleteFinanceEntry(firestore, e.id)} />
+              <EditableFinanceReportTab title="Payouts" description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." entries={allPayouts} loading={isLoading} onDelete={(e) => !e.id.startsWith('disb-') && deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           <TabsContent value="expenses">
                <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={allExpenses} loading={isLoading} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
