@@ -172,8 +172,6 @@ export default function FinancePage() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   
-  const isLoading = userLoading || loansLoading || financeEntriesLoading;
-
   const { allReceipts, allUpfrontFees, allPayouts, allExpenses } = useMemo(() => {
     const receipts: any[] = [];
     const upfront: any[] = [];
@@ -249,12 +247,12 @@ export default function FinancePage() {
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    const receiptsOnlyTotal = allReceipts.reduce((acc, e) => acc + (e.amount || 0), 0);
-    const upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (e.amount || 0), 0);
+    const receiptsOnlyTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsOnlyTotal + upfrontFeesTotal;
 
-    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
-    const expensesTotal = allExpenses.reduce((acc, e) => acc + ((e.amount || 0) + (e.transactionCost || 0)), 0);
+    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
+    const expensesTotal = allExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
     
     return {
       totalReceipts: totalMoneyIn,
@@ -424,7 +422,7 @@ export default function FinancePage() {
     }
   }
 
-  if (isLoading) {
+  if (userLoading || loansLoading || financeEntriesLoading) {
     return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
@@ -514,7 +512,7 @@ export default function FinancePage() {
                 title="Receipts" 
                 description="Includes loan repayments, investor deposits, and other income." 
                 entries={allReceipts} 
-                loading={isLoading} 
+                loading={false} 
                 onDelete={(e) => {
                     if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
                     deleteFinanceEntry(firestore, e.id);
@@ -526,7 +524,7 @@ export default function FinancePage() {
                 title="Upfront Fees" 
                 description="Registration, processing, and other fees retained during disbursement." 
                 entries={allUpfrontFees} 
-                loading={isLoading} 
+                loading={false} 
                 onDelete={(e) => {
                     if (e.id.startsWith('fee-')) return;
                     deleteFinanceEntry(firestore, e.id);
@@ -538,7 +536,7 @@ export default function FinancePage() {
                 title="Payouts" 
                 description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." 
                 entries={allPayouts} 
-                loading={isLoading} 
+                loading={false} 
                 onDelete={(e) => {
                     if (e.id.startsWith('disb-')) return;
                     deleteFinanceEntry(firestore, e.id);
@@ -546,7 +544,7 @@ export default function FinancePage() {
               />
           </TabsContent>
           <TabsContent value="expenses">
-               <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={allExpenses} loading={isLoading} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
+               <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={allExpenses} loading={false} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           
           <TabsContent value="loanbook">
