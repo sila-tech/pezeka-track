@@ -4,7 +4,20 @@ import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from 'date-fns';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
-import { applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor, approveDeposit, rejectDeposit } from '@/lib/firestore';
+import { 
+    applyInterestToPortfolio, 
+    processWithdrawal, 
+    rejectWithdrawal, 
+    deleteInvestor, 
+    approveDeposit, 
+    rejectDeposit,
+    updateInvestorInterestEntry,
+    deleteInvestorInterestEntry,
+    updateInvestorDepositEntry,
+    deleteInvestorDepositEntry,
+    updateInvestorWithdrawalEntry,
+    deleteInvestorWithdrawalEntry
+} from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,10 +42,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, PenSquare, Trash2, Check, X, Calculator } from 'lucide-react';
+import { Loader2, PenSquare, Trash2, Check, X, Calculator, Pencil, Trash } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 
 interface InterestEntry {
   entryId: string;
@@ -70,6 +88,11 @@ interface Investor {
   deposits?: Deposit[];
 }
 
+const editEntrySchema = z.object({
+    amount: z.coerce.number().min(0.01, "Amount must be positive"),
+    description: z.string().optional(),
+});
+
 export function InvestorsPortfolioTab() {
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -80,6 +103,14 @@ export function InvestorsPortfolioTab() {
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
   const [investorToDelete, setInvestorToDelete] = useState<Investor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit states
+  const [editEntryOpen, setEditEntryOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<{ id: string, type: 'interest' | 'deposit' | 'withdrawal' } | null>(null);
+
+  const editForm = useForm<z.infer<typeof editEntrySchema>>({
+      resolver: zodResolver(editEntrySchema),
+  });
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
 
@@ -177,6 +208,56 @@ export function InvestorsPortfolioTab() {
         setIsSubmitting(false);
     }
   }
+
+  // Sub-entry edit handlers
+  const openEditDialog = (entry: any, type: 'interest' | 'deposit' | 'withdrawal') => {
+      setEditingEntry({ id: type === 'interest' ? entry.entryId : (type === 'deposit' ? entry.depositId : entry.withdrawalId), type });
+      editForm.reset({
+          amount: entry.amount,
+          description: entry.description || ''
+      });
+      setEditEntryOpen(true);
+  };
+
+  const onEditEntrySubmit = async (values: z.infer<typeof editEntrySchema>) => {
+      if (!selectedInvestor || !editingEntry) return;
+      setIsSubmitting(true);
+      try {
+          if (editingEntry.type === 'interest') {
+              await updateInvestorInterestEntry(firestore, selectedInvestor.id, editingEntry.id, values.amount, values.description || '');
+          } else if (editingEntry.type === 'deposit') {
+              await updateInvestorDepositEntry(firestore, selectedInvestor.id, editingEntry.id, values.amount);
+          } else if (editingEntry.type === 'withdrawal') {
+              await updateInvestorWithdrawalEntry(firestore, selectedInvestor.id, editingEntry.id, values.amount);
+          }
+          toast({ title: 'Entry Updated' });
+          setEditEntryOpen(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
+  };
+
+  const handleDeleteEntry = async (entryId: string, type: 'interest' | 'deposit' | 'withdrawal') => {
+      if (!selectedInvestor) return;
+      if (!confirm(`Are you sure you want to delete this ${type} entry? This will adjust the balance automatically.`)) return;
+      setIsSubmitting(true);
+      try {
+          if (type === 'interest') {
+              await deleteInvestorInterestEntry(firestore, selectedInvestor.id, entryId);
+          } else if (type === 'deposit') {
+              await deleteInvestorDepositEntry(firestore, selectedInvestor.id, entryId);
+          } else if (type === 'withdrawal') {
+              await deleteInvestorWithdrawalEntry(firestore, selectedInvestor.id, entryId);
+          }
+          toast({ title: 'Entry Deleted' });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
+  };
   
   const sortedInvestors = useMemo(() => {
       return investors ? [...investors].sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)) : [];
@@ -201,12 +282,8 @@ export function InvestorsPortfolioTab() {
     const daysInMonth = getDaysInMonth(now);
     const monthlyRate = selectedInvestor.interestRate / 100;
 
-    // Calculate basis: Starting Balance (Balance before current month's new deposits)
-    // For simplicity, we calculate interest per day for every basis shift.
-    
     let totalInterest = 0;
     
-    // 1. Initial basis (current balance minus this month's approved deposits)
     const approvedThisMonth = (selectedInvestor.deposits || [])
         .filter(d => d.status === 'approved')
         .filter(d => {
@@ -216,10 +293,8 @@ export function InvestorsPortfolioTab() {
     
     const initialBasis = selectedInvestor.currentBalance - approvedThisMonth.reduce((acc, d) => acc + d.amount, 0);
     
-    // Interest on the initial basis for the whole month
     totalInterest += initialBasis * monthlyRate;
 
-    // 2. Add pro-rated interest for each new deposit made this month
     approvedThisMonth.forEach(deposit => {
         const depositDate = new Date((deposit.date as any).seconds * 1000);
         const daysRemaining = differenceInDays(endOfCurrentMonth, depositDate) + 1;
@@ -363,14 +438,14 @@ export function InvestorsPortfolioTab() {
       </Card>
       
       <Dialog open={manageInvestorOpen} onOpenChange={setManageInvestorOpen}>
-          <DialogContent className="sm:max-w-4xl">
+          <DialogContent className="sm:max-w-5xl">
               {selectedInvestor && (
                   <>
                     <DialogHeader>
                         <DialogTitle>Manage Portfolio: {selectedInvestor.name}</DialogTitle>
                         <DialogDescription>Apply pro-rated interest, approve transactions, and review history.</DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[70vh] pr-4">
+                    <ScrollArea className="max-h-[75vh] pr-4">
                       <div className="space-y-6 mt-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Card>
@@ -392,35 +467,72 @@ export function InvestorsPortfolioTab() {
                                 </CardContent>
                             </Card>
                             <Card>
-                                <CardHeader><CardTitle className="text-sm">Pending Actions</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-sm">Sub-Record Ledger</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
-                                    <ScrollArea className="h-[150px]">
-                                        <div className="space-y-2">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground">New Deposits</p>
-                                            {selectedInvestor.deposits?.filter(d => d.status === 'pending').map(d => (
-                                                <div key={d.depositId} className="flex items-center justify-between p-2 border rounded-md text-sm">
-                                                    <span>Ksh {d.amount.toLocaleString()}</span>
-                                                    <div className="flex gap-1">
-                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleApproveDeposit(d.depositId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
-                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRejectDeposit(d.depositId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {selectedInvestor.deposits?.filter(d => d.status === 'pending').length === 0 && <p className="text-xs text-muted-foreground italic">No pending deposits</p>}
-                                            
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mt-4">Withdrawal Requests</p>
-                                            {selectedInvestor.withdrawals?.filter(w => w.status === 'pending').map(w => (
-                                                <div key={w.withdrawalId} className="flex items-center justify-between p-2 border rounded-md text-sm">
-                                                    <span>Ksh {w.amount.toLocaleString()}</span>
-                                                    <div className="flex gap-1">
-                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleProcessWithdrawal(w.withdrawalId)} disabled={isSubmitting}><Check className="h-4 w-4 text-green-600"/></Button>
-                                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRejectWithdrawal(w.withdrawalId)} disabled={isSubmitting}><X className="h-4 w-4 text-destructive"/></Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {selectedInvestor.withdrawals?.filter(w => w.status === 'pending').length === 0 && <p className="text-xs text-muted-foreground italic">No pending withdrawals</p>}
-                                        </div>
-                                    </ScrollArea>
+                                    <Tabs defaultValue="interests">
+                                        <TabsList className="grid grid-cols-3 w-full">
+                                            <TabsTrigger value="interests">Interests</TabsTrigger>
+                                            <TabsTrigger value="deposits">Deposits</TabsTrigger>
+                                            <TabsTrigger value="withdrawals">Withdr.</TabsTrigger>
+                                        </TabsList>
+                                        <TabsContent value="interests">
+                                            <ScrollArea className="h-[250px]">
+                                                <Table>
+                                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amt</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                                    <TableBody>
+                                                        {selectedInvestor.interestEntries?.map(e => (
+                                                            <TableRow key={e.entryId}>
+                                                                <TableCell className="text-xs">{format(new Date((e.date as any).seconds * 1000), 'dd/MM')}</TableCell>
+                                                                <TableCell className="text-xs font-bold">{e.amount.toLocaleString()}</TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog(e, 'interest')}><Pencil className="h-3 w-3"/></Button>
+                                                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteEntry(e.entryId, 'interest')}><Trash className="h-3 w-3"/></Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </ScrollArea>
+                                        </TabsContent>
+                                        <TabsContent value="deposits">
+                                            <ScrollArea className="h-[250px]">
+                                                <Table>
+                                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amt</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                                    <TableBody>
+                                                        {selectedInvestor.deposits?.map(e => (
+                                                            <TableRow key={e.depositId}>
+                                                                <TableCell className="text-xs">{format(new Date((e.date as any).seconds * 1000), 'dd/MM')}</TableCell>
+                                                                <TableCell className="text-xs font-bold">{e.amount.toLocaleString()} <span className="text-[8px] opacity-50 uppercase">({e.status})</span></TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog(e, 'deposit')}><Pencil className="h-3 w-3"/></Button>
+                                                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteEntry(e.depositId, 'deposit')}><Trash className="h-3 w-3"/></Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </ScrollArea>
+                                        </TabsContent>
+                                        <TabsContent value="withdrawals">
+                                            <ScrollArea className="h-[250px]">
+                                                <Table>
+                                                    <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Amt</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                                    <TableBody>
+                                                        {selectedInvestor.withdrawals?.map(e => (
+                                                            <TableRow key={e.withdrawalId}>
+                                                                <TableCell className="text-xs">{format(new Date((e.date as any).seconds * 1000), 'dd/MM')}</TableCell>
+                                                                <TableCell className="text-xs font-bold">{e.amount.toLocaleString()} <span className="text-[8px] opacity-50 uppercase">({e.status})</span></TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog(e, 'withdrawal')}><Pencil className="h-3 w-3"/></Button>
+                                                                    <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteEntry(e.withdrawalId, 'withdrawal')}><Trash className="h-3 w-3"/></Button>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </ScrollArea>
+                                        </TabsContent>
+                                    </Tabs>
                                 </CardContent>
                             </Card>
                         </div>
@@ -452,6 +564,31 @@ export function InvestorsPortfolioTab() {
           </DialogContent>
       </Dialog>
       
+      {/* Edit Entry Dialog */}
+      <Dialog open={editEntryOpen} onOpenChange={setEditEntryOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Edit {editingEntry?.type.toUpperCase()} Entry</DialogTitle>
+                  <DialogDescription>Updating an entry will automatically adjust the current balance.</DialogDescription>
+              </DialogHeader>
+              <Form {...editForm}>
+                  <form onSubmit={editForm.handleSubmit(onEditEntrySubmit)} className="space-y-4 py-4">
+                      <FormField control={editForm.control} name="amount" render={({field}) => (
+                          <FormItem><FormLabel>New Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl><FormMessage/></FormItem>
+                      )}/>
+                      {editingEntry?.type === 'interest' && (
+                          <FormField control={editForm.control} name="description" render={({field}) => (
+                              <FormItem><FormLabel>Description</FormLabel><FormControl><Input {...field}/></FormControl></FormItem>
+                          )}/>
+                      )}
+                      <Button type="submit" className="w-full" disabled={isSubmitting}>
+                          {isSubmitting && <Loader2 className="mr-2 animate-spin"/>} Save Changes
+                      </Button>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteInvestorOpen} onOpenChange={setDeleteInvestorOpen}>
           <AlertDialogContent>
               <AlertDialogHeader><AlertDialogTitle>Delete Portfolio?</AlertDialogTitle><AlertDialogDescription>This action is irreversible.</AlertDialogDescription></AlertDialogHeader>

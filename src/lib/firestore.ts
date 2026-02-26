@@ -535,6 +535,135 @@ export async function applyInterestToPortfolio(db: Firestore, investorId: string
     }
 }
 
+export async function updateInvestorInterestEntry(db: Firestore, investorId: string, entryId: string, newAmount: number, newDescription: string) {
+    const ref = doc(db, 'investors', investorId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const entries = data.interestEntries || [];
+    const entry = entries.find((e: any) => e.entryId === entryId);
+    if (!entry) return;
+    const diff = newAmount - entry.amount;
+    const updatedEntries = entries.map((e: any) => e.entryId === entryId ? { ...e, amount: newAmount, description: newDescription } : e);
+    await updateDoc(ref, {
+        interestEntries: updatedEntries,
+        currentBalance: increment(diff),
+        updatedAt: serverTimestamp()
+    });
+}
+
+export async function deleteInvestorInterestEntry(db: Firestore, investorId: string, entryId: string) {
+    const ref = doc(db, 'investors', investorId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const entries = data.interestEntries || [];
+    const entry = entries.find((e: any) => e.entryId === entryId);
+    if (!entry) return;
+    const updatedEntries = entries.filter((e: any) => e.entryId !== entryId);
+    await updateDoc(ref, {
+        interestEntries: updatedEntries,
+        currentBalance: increment(-entry.amount),
+        updatedAt: serverTimestamp()
+    });
+}
+
+export async function updateInvestorDepositEntry(db: Firestore, investorId: string, depositId: string, newAmount: number) {
+    const ref = doc(db, 'investors', investorId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const deposits = data.deposits || [];
+    const deposit = deposits.find((d: any) => d.depositId === depositId);
+    if (!deposit) return;
+
+    const diff = newAmount - deposit.amount;
+    const updatedDeposits = deposits.map((d: any) => d.depositId === depositId ? { ...d, amount: newAmount } : d);
+    
+    const updateData: any = {
+        deposits: updatedDeposits,
+        updatedAt: serverTimestamp()
+    };
+
+    if (deposit.status === 'approved') {
+        updateData.currentBalance = increment(diff);
+        updateData.totalInvestment = increment(diff);
+    }
+
+    await updateDoc(ref, updateData);
+}
+
+export async function deleteInvestorDepositEntry(db: Firestore, investorId: string, depositId: string) {
+    const ref = doc(db, 'investors', investorId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const deposits = data.deposits || [];
+    const deposit = deposits.find((d: any) => d.depositId === depositId);
+    if (!deposit) return;
+
+    const updatedDeposits = deposits.filter((d: any) => d.depositId !== depositId);
+    const updateData: any = {
+        deposits: updatedDeposits,
+        updatedAt: serverTimestamp()
+    };
+
+    if (deposit.status === 'approved') {
+        updateData.currentBalance = increment(-deposit.amount);
+        updateData.totalInvestment = increment(-deposit.amount);
+    }
+
+    await updateDoc(ref, updateData);
+}
+
+export async function updateInvestorWithdrawalEntry(db: Firestore, investorId: string, withdrawalId: string, newAmount: number) {
+    const ref = doc(db, 'investors', investorId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const withdrawals = data.withdrawals || [];
+    const withdrawal = withdrawals.find((w: any) => w.withdrawalId === withdrawalId);
+    if (!withdrawal) return;
+
+    const diff = newAmount - withdrawal.amount;
+    const updatedWithdrawals = withdrawals.map((w: any) => w.withdrawalId === withdrawalId ? { ...w, amount: newAmount } : w);
+    
+    const updateData: any = {
+        withdrawals: updatedWithdrawals,
+        updatedAt: serverTimestamp()
+    };
+
+    if (withdrawal.status === 'processed') {
+        updateData.currentBalance = increment(-diff);
+        updateData.totalWithdrawn = increment(diff);
+    }
+
+    await updateDoc(ref, updateData);
+}
+
+export async function deleteInvestorWithdrawalEntry(db: Firestore, investorId: string, withdrawalId: string) {
+    const ref = doc(db, 'investors', investorId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const withdrawals = data.withdrawals || [];
+    const withdrawal = withdrawals.find((w: any) => w.withdrawalId === withdrawalId);
+    if (!withdrawal) return;
+
+    const updatedWithdrawals = withdrawals.filter((w: any) => w.withdrawalId !== withdrawalId);
+    const updateData: any = {
+        withdrawals: updatedWithdrawals,
+        updatedAt: serverTimestamp()
+    };
+
+    if (withdrawal.status === 'processed') {
+        updateData.currentBalance = increment(withdrawal.amount);
+        updateData.totalWithdrawn = increment(-withdrawal.amount);
+    }
+
+    await updateDoc(ref, updateData);
+}
+
 export async function requestWithdrawal(db: Firestore, investorId: string, amount: number) {
     const investorRef = doc(db, 'investors', investorId);
     const withdrawalId = doc(collection(db, 'temp')).id;
