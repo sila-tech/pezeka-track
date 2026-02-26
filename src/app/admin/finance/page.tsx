@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search } from "lucide-react";
-import { arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator } from "lucide-react";
+import { arrayUnion, increment } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,15 +51,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { addFinanceEntry, updateLoan, updateFinanceEntry, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { exportToCsv } from '@/lib/excel';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FinanceReportTab } from './components/finance-report-tab';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
+import { calculateAmortization } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const addFinanceEntrySchema = z.object({
@@ -84,16 +81,6 @@ const addFinanceEntrySchema = z.object({
             ctx.addIssue({ code: 'custom', message: 'Please select an expense category.', path: ['expenseCategory'] });
         }
     }
-});
-
-const editFinanceEntrySchema = z.object({
-  type: z.enum(['expense', 'payout', 'receipt']),
-  date: z.string().min(1, 'A date is required.'),
-  amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
-  transactionCost: z.coerce.number().optional(),
-  description: z.string().optional(),
-  loanId: z.string().optional(),
-  expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
 });
 
 const paymentSchema = z.object({
@@ -169,14 +156,7 @@ export default function FinancePage() {
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
   const [isEditingLoan, setIsEditingLoan] = useState(false);
   const [isRollingOver, setIsRollingOver] = useState(false);
-  const [editEntryOpen, setEditEntryOpen] = useState(false);
-  const [entryToEdit, setEntryToEdit] = useState<FinanceEntry | null>(null);
-  const [isUpdatingEntry, setIsUpdatingEntry] = useState(false);
-  const [deleteEntryOpen, setDeleteEntryOpen] = useState(false);
-  const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
-  const [isDeletingEntry, setIsDeletingEntry] = useState(false);
   const [deleteLoanOpen, setDeleteLoanOpen] = useState(false);
-  const [isDeletingLoan, setIsDeletingLoan] = useState(false);
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
@@ -186,10 +166,9 @@ export default function FinancePage() {
 
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance' || user?.email?.endsWith('@finance.pezeka.com');
+  const isStaff = user?.role === 'staff';
   const canPerformActions = isSuperAdmin || isFinance;
-
-  // Layout allows staff, but we restrict data access here
-  const isAuthorized = isSuperAdmin || isFinance || user?.role === 'staff';
+  const isAuthorized = isSuperAdmin || isFinance || isStaff;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
@@ -213,15 +192,24 @@ export default function FinancePage() {
     defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), transactionCost: 0 }
   });
 
-  const editForm = useForm<z.infer<typeof editFinanceEntrySchema>>({ resolver: zodResolver(editFinanceEntrySchema) });
-  const paymentForm = useForm<z.infer<typeof paymentSchema>>({ resolver: zodResolver(paymentSchema) });
-  const penaltyForm = useForm<z.infer<typeof penaltySchema>>({ resolver: zodResolver(penaltySchema) });
+  const paymentForm = useForm<z.infer<typeof paymentSchema>>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: { paymentDate: format(new Date(), 'yyyy-MM-dd') }
+  });
+
+  const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
+    resolver: zodResolver(penaltySchema),
+    defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd') }
+  });
+
   const editLoanForm = useForm<z.infer<typeof editLoanSchema>>({ resolver: zodResolver(editLoanSchema) });
-  const rolloverForm = useForm<z.infer<typeof rolloverSchema>>({ resolver: zodResolver(rolloverSchema) });
+  const rolloverForm = useForm<z.infer<typeof rolloverSchema>>({
+    resolver: zodResolver(rolloverSchema),
+    defaultValues: { rolloverDate: format(new Date(), 'yyyy-MM-dd') }
+  });
 
   const { watch: addFinanceEntryWatch } = addForm;
   const addFinanceEntryType = addFinanceEntryWatch('type');
-  const addPayoutReason = addFinanceEntryWatch('payoutReason');
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
@@ -249,6 +237,117 @@ export default function FinancePage() {
     }
   }
 
+  async function onRecordPayment(values: z.infer<typeof paymentSchema>) {
+    if (!loanToEdit) return;
+    setIsUpdating(true);
+    try {
+        const receiptData = {
+            type: 'receipt' as const,
+            date: new Date(values.paymentDate),
+            amount: values.paymentAmount,
+            description: `Payment for Loan #${loanToEdit.loanNumber}${values.comments ? ': ' + values.comments : ''}`,
+            loanId: loanToEdit.id
+        };
+        const receiptDocRef = await addFinanceEntry(firestore, receiptData);
+        await updateLoan(firestore, loanToEdit.id, {
+            totalPaid: increment(values.paymentAmount),
+            payments: arrayUnion({ paymentId: receiptDocRef.id, amount: values.paymentAmount, date: new Date(values.paymentDate) }),
+            comments: values.comments ? `${loanToEdit.comments || ''}\n[${values.paymentDate}] ${values.comments}`.trim() : loanToEdit.comments
+        });
+        toast({ title: 'Payment Recorded', description: `Receipt created for Ksh ${values.paymentAmount.toLocaleString()}`});
+        paymentForm.reset();
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+        setIsUpdating(false);
+    }
+  }
+
+  async function onAddPenalty(values: z.infer<typeof penaltySchema>) {
+    if (!loanToEdit) return;
+    setIsAddingPenalty(true);
+    try {
+        await addPenaltyToLoan(firestore, loanToEdit.id, {
+            amount: values.penaltyAmount,
+            date: new Date(values.penaltyDate),
+            description: values.penaltyDescription
+        });
+        toast({ title: 'Penalty Added', description: `Penalty of Ksh ${values.penaltyAmount.toLocaleString()} added to loan.`});
+        penaltyForm.reset();
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+        setIsAddingPenalty(false);
+    }
+  }
+
+  const handleEditLoanClick = () => {
+    if (!loanToEdit) return;
+    editLoanForm.reset({
+        disbursementDate: format(new Date(loanToEdit.disbursementDate.seconds * 1000), 'yyyy-MM-dd'),
+        principalAmount: loanToEdit.principalAmount,
+        interestRate: loanToEdit.interestRate || 0,
+        registrationFee: loanToEdit.registrationFee,
+        processingFee: loanToEdit.processingFee,
+        carTrackInstallationFee: loanToEdit.carTrackInstallationFee,
+        chargingCost: loanToEdit.chargingCost,
+        numberOfInstalments: loanToEdit.numberOfInstalments,
+        paymentFrequency: loanToEdit.paymentFrequency,
+        status: loanToEdit.status as any
+    });
+    setIsEditingLoan(true);
+  };
+
+  async function onEditLoanSubmit(values: z.infer<typeof editLoanSchema>) {
+    if (!loanToEdit) return;
+    setIsUpdating(true);
+    try {
+        const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
+        const updateData = {
+            ...values,
+            disbursementDate: new Date(values.disbursementDate),
+            instalmentAmount,
+            totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0)
+        };
+        await updateLoan(firestore, loanToEdit.id, updateData);
+        toast({ title: 'Loan Updated', description: 'The loan parameters have been updated successfully.'});
+        setIsEditingLoan(false);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+        setIsUpdating(false);
+    }
+  }
+
+  async function onRolloverSubmit(values: z.infer<typeof rolloverSchema>) {
+    if (!loanToEdit) return;
+    setIsRollingOver(true);
+    try {
+        await rolloverLoan(firestore, loanToEdit, new Date(values.rolloverDate));
+        toast({ title: 'Loan Rolled Over', description: 'New active loan created and rollover payment recorded.'});
+        setLoanToEdit(null);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Rollover Failed', description: e.message });
+    } finally {
+        setIsRollingOver(false);
+    }
+  }
+
+  async function confirmDeleteLoan() {
+    if (!loanToEdit) return;
+    setIsUpdating(true);
+    try {
+        await deleteLoan(firestore, loanToEdit.id);
+        toast({ title: 'Loan Deleted', description: 'The loan record has been permanently removed.'});
+        setLoanToEdit(null);
+        setDeleteLoanOpen(false);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    } finally {
+        setIsUpdating(false);
+    }
+  }
+
   const receipts = useMemo(() => financeEntries?.filter(e => e.type === 'receipt') ?? null, [financeEntries]);
   const payouts = useMemo(() => financeEntries?.filter(e => e.type === 'payout') ?? null, [financeEntries]);
   const expenses = useMemo(() => financeEntries?.filter(e => e.type === 'expense') ?? null, [financeEntries]);
@@ -265,15 +364,16 @@ export default function FinancePage() {
                   <Form {...addForm}>
                       <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                           <FormField control={addForm.control} name="type" render={({ field }) => (
-                              <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem></SelectContent></Select></FormItem>
+                              <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem></SelectContent></Select></FormItem>
                           )} />
                           {addFinanceEntryType === 'payout' && (
                               <FormField control={addForm.control} name="payoutReason" render={({ field }) => (
-                                  <FormItem><FormLabel>Reason</FormLabel><RadioGroup onValueChange={field.onChange}><FormItem className="flex items-center space-x-2"><RadioGroupItem value="loan_disbursement"/> <FormLabel>Loan Disbursement</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><RadioGroupItem value="expense"/> <FormLabel>Expense</FormLabel></FormItem></RadioGroup></FormItem>
+                                  <FormItem><FormLabel>Reason</FormLabel><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="loan_disbursement"/></FormControl> <FormLabel className="font-normal">Loan Disbursement</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="expense"/></FormControl> <FormLabel className="font-normal">Expense</FormLabel></FormItem></RadioGroup></FormItem>
                               )} />
                           )}
                           <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                           <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description (Optional)</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
                           <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
                       </form>
                   </Form>
@@ -293,7 +393,7 @@ export default function FinancePage() {
               <ScrollBar orientation="horizontal" />
           </ScrollArea>
           <TabsContent value="receipts">
-              <EditableFinanceReportTab title="Receipts" description="Incoming payments." entries={receipts} loading={isLoading} onEdit={canPerformActions ? (e) => {} : undefined} onDelete={canPerformActions ? (e) => {} : undefined} />
+              <EditableFinanceReportTab title="Receipts" description="Incoming payments." entries={receipts} loading={isLoading} />
           </TabsContent>
           <TabsContent value="payouts">
               <EditableFinanceReportTab title="Payouts" description="Outgoing disbursements." entries={payouts} loading={isLoading} />
@@ -304,23 +404,53 @@ export default function FinancePage() {
           <TabsContent value="loanbook">
               <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <CardTitle>Loan Book</CardTitle>
-                        <Input placeholder="Search..." value={loanBookSearchTerm} onChange={(e) => setLoanBookSearchTerm(e.target.value)} className="w-[300px]" />
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <CardTitle>Loan Book</CardTitle>
+                            <CardDescription>Comprehensive list of all loans and their balances.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
+                                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status"/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="due">Due</SelectItem>
+                                    <SelectItem value="overdue">Overdue</SelectItem>
+                                    <SelectItem value="paid">Paid</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Search..." value={loanBookSearchTerm} onChange={(e) => setLoanBookSearchTerm(e.target.value)} className="pl-8 w-[250px]" />
+                            </div>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[60vh]">
                         <Table>
-                            <TableHeader><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead className="text-right">Principal</TableHead><TableHead className="text-right">Balance</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                            <TableHeader className="sticky top-0 bg-card">
+                                <TableRow>
+                                    <TableHead>Loan No.</TableHead>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead className="text-right">Principal</TableHead>
+                                    <TableHead className="text-right">Repayable</TableHead>
+                                    <TableHead className="text-right">Paid</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
                             <TableBody>
                                 {filteredLoans.map(loan => (
                                     <TableRow key={loan.id} className="cursor-pointer" onClick={() => setLoanToEdit(loan)}>
-                                        <TableCell>{loan.loanNumber}</TableCell>
+                                        <TableCell className="font-medium">{loan.loanNumber}</TableCell>
                                         <TableCell>{loan.customerName}</TableCell>
                                         <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
-                                        <TableCell className="text-right">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
-                                        <TableCell><Badge>{loan.status}</Badge></TableCell>
+                                        <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
+                                        <TableCell><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -335,6 +465,164 @@ export default function FinancePage() {
             </TabsContent>
           )}
       </Tabs>
+
+      {/* Loan Management Dialog */}
+      <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
+          <DialogContent className="sm:max-w-4xl">
+              {loanToEdit && (
+                  <>
+                    <DialogHeader>
+                        <div className="flex items-center justify-between pr-6">
+                            <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
+                            <Badge>{loanToEdit.status.toUpperCase()}</Badge>
+                        </div>
+                        <DialogDescription>Customer: {loanToEdit.customerName} ({loanToEdit.customerPhone})</DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[75vh] pr-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                            <div className="md:col-span-2 space-y-6">
+                                <Card>
+                                    <CardHeader><CardTitle className="text-sm flex items-center gap-2"><HandCoins className="h-4 w-4"/> Financial Overview</CardTitle></CardHeader>
+                                    <CardContent className="grid grid-cols-2 gap-4">
+                                        <div><p className="text-xs text-muted-foreground">Total Repayable</p><p className="font-bold">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</p></div>
+                                        <div><p className="text-xs text-muted-foreground">Total Paid</p><p className="font-bold text-green-600">Ksh {loanToEdit.totalPaid.toLocaleString()}</p></div>
+                                        <div><p className="text-xs text-muted-foreground">Outstanding Balance</p><p className="font-bold text-lg text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</p></div>
+                                        <div><p className="text-xs text-muted-foreground">Instalment</p><p className="font-bold">Ksh {loanToEdit.instalmentAmount.toLocaleString()} ({loanToEdit.paymentFrequency})</p></div>
+                                    </CardContent>
+                                </Card>
+                                
+                                <Tabs defaultValue="payments">
+                                    <TabsList><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="penalties">Penalties</TabsTrigger><TabsTrigger value="actions">Advanced Actions</TabsTrigger></TabsList>
+                                    <TabsContent value="payments" className="space-y-4">
+                                        {canPerformActions && (
+                                            <Card className="border-primary/20 bg-primary/5">
+                                                <CardHeader><CardTitle className="text-sm">Record New Payment</CardTitle></CardHeader>
+                                                <CardContent>
+                                                    <Form {...paymentForm}>
+                                                        <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="flex items-end gap-2">
+                                                            <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<FormItem className="flex-1"><FormLabel className="text-xs">Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                                            <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<FormItem className="flex-1"><FormLabel className="text-xs">Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                                                            <Button type="submit" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Record</Button>
+                                                        </form>
+                                                    </Form>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                        <Table>
+                                            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                            <TableBody>
+                                                {loanToEdit.payments?.map((p, i) => (
+                                                    <TableRow key={i}><TableCell>{format(new Date(p.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell><TableCell className="text-right">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>
+                                                ))}
+                                                {(!loanToEdit.payments || loanToEdit.payments.length === 0) && <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground py-4">No payments recorded</TableCell></TableRow>}
+                                            </TableBody>
+                                        </Table>
+                                    </TabsContent>
+                                    <TabsContent value="penalties" className="space-y-4">
+                                        {canPerformActions && (
+                                            <Card className="border-destructive/20 bg-destructive/5">
+                                                <CardHeader><CardTitle className="text-sm">Add Penalty</CardTitle></CardHeader>
+                                                <CardContent>
+                                                    <Form {...penaltyForm}>
+                                                        <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2">
+                                                            <div className="flex gap-2">
+                                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<FormItem className="flex-1"><FormControl><Input type="number" placeholder="Amount" {...field}/></FormControl></FormItem>)} />
+                                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<FormItem className="flex-1"><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<FormItem className="flex-1"><FormControl><Input placeholder="Reason (e.g. Late Payment)" {...field}/></FormControl></FormItem>)} />
+                                                                <Button type="submit" variant="destructive" disabled={isAddingPenalty}>{isAddingPenalty && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Add</Button>
+                                                            </div>
+                                                        </form>
+                                                    </Form>
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                        <Table>
+                                            <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Reason</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                                            <TableBody>
+                                                {loanToEdit.penalties?.map((p, i) => (
+                                                    <TableRow key={i}><TableCell>{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</TableCell><TableCell>{p.description}</TableCell><TableCell className="text-right">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>
+                                                ))}
+                                                {(!loanToEdit.penalties || loanToEdit.penalties.length === 0) && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No penalties applied</TableCell></TableRow>}
+                                            </TableBody>
+                                        </Table>
+                                    </TabsContent>
+                                    <TabsContent value="actions" className="space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <Card>
+                                                <CardHeader><CardTitle className="text-sm flex items-center gap-2"><RefreshCw className="h-4 w-4"/> Rollover</CardTitle></CardHeader>
+                                                <CardContent>
+                                                    <Form {...rolloverForm}>
+                                                        <form onSubmit={rolloverForm.handleSubmit(onRolloverSubmit)} className="space-y-2">
+                                                            <FormField control={rolloverForm.control} name="rolloverDate" render={({field}) => (<FormItem><FormLabel className="text-xs">Rollover Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                                                            <Button type="submit" variant="outline" className="w-full" disabled={isRollingOver || !canPerformActions}>{isRollingOver && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Process Rollover</Button>
+                                                        </form>
+                                                    </Form>
+                                                </CardContent>
+                                            </Card>
+                                            <Card>
+                                                <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Calculator className="h-4 w-4"/> Structure</CardTitle></CardHeader>
+                                                <CardContent className="space-y-2">
+                                                    <Button onClick={handleEditLoanClick} variant="outline" className="w-full" disabled={!canPerformActions}><PenSquare className="mr-2 h-4 w-4"/> Edit Parameters</Button>
+                                                    {isSuperAdmin && <Button onClick={() => setDeleteLoanOpen(true)} variant="destructive" className="w-full"><Trash2 className="mr-2 h-4 w-4"/> Delete Loan</Button>}
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                            <div className="space-y-6">
+                                <Card>
+                                    <CardHeader><CardTitle className="text-sm flex items-center gap-2"><AlertCircle className="h-4 w-4"/> Loan Profile</CardTitle></CardHeader>
+                                    <CardContent className="text-sm space-y-2">
+                                        <div className="flex justify-between"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
+                                        <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}% monthly</span></div>
+                                        <div className="flex justify-between"><span>Instalments:</span><span className="font-medium">{loanToEdit.numberOfInstalments}</span></div>
+                                        <div className="flex justify-between"><span>Disbursed:</span><span className="font-medium">{format(new Date(loanToEdit.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</span></div>
+                                        <div className="pt-2 border-t text-xs italic text-muted-foreground">{loanToEdit.comments || 'No comments'}</div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
+                  </>
+              )}
+          </DialogContent>
+      </Dialog>
+
+      {/* Edit Loan Parameters Dialog */}
+      <Dialog open={isEditingLoan} onOpenChange={setIsEditingLoan}>
+          <DialogContent className="sm:max-w-2xl">
+              <DialogHeader><DialogTitle>Edit Loan Parameters</DialogTitle><DialogDescription>Update principal, rates, or dates. This will recalculate totals.</DialogDescription></DialogHeader>
+              <Form {...editLoanForm}>
+                  <form onSubmit={editLoanForm.handleSubmit(onEditLoanSubmit)} className="grid grid-cols-2 gap-4 py-4">
+                      <FormField control={editLoanForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="status" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></SelectContent></Select></FormItem>)} />
+                      <div className="col-span-2 pt-4 flex gap-2">
+                          <Button type="submit" className="flex-1" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
+                          <Button type="button" variant="outline" onClick={() => setIsEditingLoan(false)}>Cancel</Button>
+                      </div>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteLoanOpen} onOpenChange={setDeleteLoanOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently delete Loan #{loanToEdit?.loanNumber} and all its payment history. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setDeleteLoanOpen(false)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDeleteLoan} className="bg-destructive hover:bg-destructive/90 text-white" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Delete Permanently</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
