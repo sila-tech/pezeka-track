@@ -229,7 +229,7 @@ export default function InvestorsPage() {
                     <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
-                    <FormItem><FormLabel>Initial Investment Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Total Investment Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="interestRate" render={({ field }) => (
                     <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
