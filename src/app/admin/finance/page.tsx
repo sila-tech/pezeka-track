@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
 import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History } from "lucide-react";
-import { arrayUnion, increment, doc } from 'firebase/firestore';
+import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -314,7 +314,7 @@ export default function FinancePage() {
     setIsUpdating(true);
     try {
         const paymentData = {
-            paymentId: doc(firestore, 'temp').id, 
+            paymentId: doc(collection(firestore, 'temp')).id, 
             amount: values.paymentAmount,
             date: new Date(values.paymentDate)
         };
