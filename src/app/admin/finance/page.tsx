@@ -458,11 +458,12 @@ export default function FinancePage() {
                             <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
                                 <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status"/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="all">All Loans</SelectItem>
                                     <SelectItem value="active">Active</SelectItem>
                                     <SelectItem value="due">Due</SelectItem>
                                     <SelectItem value="overdue">Overdue</SelectItem>
                                     <SelectItem value="paid">Paid</SelectItem>
+                                    <SelectItem value="rollover">Rollover</SelectItem>
                                 </SelectContent>
                             </Select>
                             <div className="relative">
