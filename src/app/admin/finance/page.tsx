@@ -163,16 +163,13 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email === 'simon@pezeka.com';
-  const isFinance = user?.role === 'finance' || user?.email?.endsWith('@finance.pezeka.com');
-  const isStaff = user?.role === 'staff';
-  const canPerformActions = isSuperAdmin || isFinance;
-  const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
+  const canPerformActions = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   
-  const { allReceipts, allUpfrontFees, allPayouts, allExpenses } = useMemo(() => {
+  const financialData = useMemo(() => {
     const receipts: any[] = [];
     const upfront: any[] = [];
     const payouts: any[] = [];
@@ -247,20 +244,24 @@ export default function FinancePage() {
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    const receiptsOnlyTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const upfrontFeesTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const totalMoneyIn = receiptsOnlyTotal + upfrontFeesTotal;
+    const { allReceipts, allUpfrontFees, allPayouts } = financialData;
+    
+    const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const totalMoneyIn = receiptsTotal + upfrontTotal;
 
     const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
-    const expensesTotal = allExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
+    
+    // Expenses are a subset of payouts already accounted for in totalMoneyOut
+    const expensesOnlyTotal = financialData.allExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
     
     return {
       totalReceipts: totalMoneyIn,
       totalPayouts: totalMoneyOut,
-      totalExpenses: expensesTotal,
+      totalExpenses: expensesOnlyTotal,
       cashAtHand: totalMoneyIn - totalMoneyOut
     };
-  }, [allReceipts, allUpfrontFees, allPayouts, allExpenses]);
+  }, [financialData]);
 
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
@@ -440,21 +441,21 @@ export default function FinancePage() {
                         <ScrollArea className="max-h-[70vh] pr-4">
                             <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                                 <FormField control={addForm.control} name="type" render={({ field }) => (
-                                    <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></SelectContent></Select></FormItem>
+                                    <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></Select></FormItem>
                                 )} />
                                 {addFinanceEntryType === 'payout' && (
                                     <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
+                                        <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></Select></FormItem>
                                     )} />
                                 )}
                                 {addFinanceEntryType === 'receipt' && (
                                     <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></SelectContent></Select></FormItem>
+                                        <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></Select></FormItem>
                                     )} />
                                 )}
                                 {addFinanceEntryType === 'expense' && (
                                     <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
+                                        <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></Select></FormItem>
                                     )} />
                                 )}
                                 <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
@@ -511,7 +512,7 @@ export default function FinancePage() {
               <EditableFinanceReportTab 
                 title="Receipts" 
                 description="Includes loan repayments, investor deposits, and other income." 
-                entries={allReceipts} 
+                entries={financialData.allReceipts} 
                 loading={false} 
                 onDelete={(e) => {
                     if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
@@ -523,7 +524,7 @@ export default function FinancePage() {
               <EditableFinanceReportTab 
                 title="Upfront Fees" 
                 description="Registration, processing, and other fees retained during disbursement." 
-                entries={allUpfrontFees} 
+                entries={financialData.allUpfrontFees} 
                 loading={false} 
                 onDelete={(e) => {
                     if (e.id.startsWith('fee-')) return;
@@ -535,7 +536,7 @@ export default function FinancePage() {
               <EditableFinanceReportTab 
                 title="Payouts" 
                 description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." 
-                entries={allPayouts} 
+                entries={financialData.allPayouts} 
                 loading={false} 
                 onDelete={(e) => {
                     if (e.id.startsWith('disb-')) return;
@@ -544,7 +545,7 @@ export default function FinancePage() {
               />
           </TabsContent>
           <TabsContent value="expenses">
-               <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={allExpenses} loading={false} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
+               <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={financialData.allExpenses} loading={false} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           
           <TabsContent value="loanbook">
@@ -764,7 +765,7 @@ export default function FinancePage() {
                                                 <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Calculator className="h-4 w-4"/> Structure</CardTitle></CardHeader>
                                                 <CardContent className="space-y-2">
                                                     <Button onClick={handleEditLoanClick} variant="outline" className="w-full" disabled={!canPerformActions}><PenSquare className="mr-2 h-4 w-4"/> Edit Parameters</Button>
-                                                    {isSuperAdmin && <Button onClick={() => setDeleteLoanOpen(true)} variant="destructive" className="w-full"><Trash2 className="mr-2 h-4 w-4"/> Delete Loan</Button>}
+                                                    {user?.email === 'simon@pezeka.com' && <Button onClick={() => setDeleteLoanOpen(true)} variant="destructive" className="w-full"><Trash2 className="mr-2 h-4 w-4"/> Delete Loan</Button>}
                                                 </CardContent>
                                             </Card>
                                         </div>
