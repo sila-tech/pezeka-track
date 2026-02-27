@@ -1,13 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DollarSign, Briefcase, UserCheck, Banknote } from 'lucide-react';
+import { DollarSign, Briefcase, UserCheck, Banknote, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
 const products = [
   {
+    icon: <Zap className="h-8 w-8 text-primary" />,
+    title: 'Quick Pesa',
+    description: "Our fastest solution for immediate cash needs. Quick Pesa is a convenient one-month loan designed to bridge short-term financial gaps with minimal fuss.",
+    href: '/customer-login'
+  },
+  {
     icon: <UserCheck className="h-8 w-8 text-primary" />,
-    title: 'Individual Short-Term Loans',
-    description: "Access the funds you need for life's important moments. Our personal loans offer competitive rates and flexible terms for everything from home renovations to unexpected expenses.",
+    title: 'Individual & Business Loans',
+    description: "Flexible short-term financing for personal or business use. Access capital to manage household expenses or scale your small business operations efficiently.",
     href: '/customer-login'
   },
   {
@@ -19,15 +25,9 @@ const products = [
   {
     icon: <DollarSign className="h-8 w-8 text-primary" />,
     title: 'Logbook Loans',
-    description: "Leverage your vehicle's value to get fast and secure financing. Our logbook loans provide immediate cash to address urgent needs without selling your asset.",
+    description: "Leverage your vehicle's value to get fast and secure financing. Our logbook loans provide immediate cash without the need to sell your asset.",
     href: '/customer-login'
-  },
-  {
-    icon: <Briefcase className="h-8 w-8 text-primary" />,
-    title: 'Business Loans',
-    description: 'Power your business ambitions with our tailored SME loan products. Get the working capital you need to scale operations, purchase inventory, or invest in new opportunities.',
-    href: '/customer-login'
-  },
+  }
 ];
 
 export default function Products() {
@@ -50,7 +50,7 @@ export default function Products() {
                 {product.icon}
                 <div className="space-y-2">
                     <CardTitle>{product.title}</CardTitle>
-                    <CardDescription>{product.description}</CardDescription>
+                    <CardDescription className="text-xs">{product.description}</CardDescription>
                 </div>
               </CardHeader>
               <CardContent className="mt-auto p-6 pt-0">

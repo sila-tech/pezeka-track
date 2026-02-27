@@ -22,7 +22,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { addLoan } from '@/lib/firestore';
-import { calculateAmortization } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
@@ -113,9 +112,6 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
-      // In a real scenario, you'd upload the optional statement to Firebase Storage here.
-      // For now, we'll proceed with creating the loan application record.
-
       const loanApplicationData = {
         customerId: user.uid,
         customerName: user.displayName || user.email,
@@ -123,17 +119,17 @@ export default function AccountPage() {
         idNumber: values.idNumber,
         disbursementDate: new Date(),
         principalAmount: values.loanAmount,
-        interestRate: 0, // To be determined by staff
+        interestRate: 0, 
         registrationFee: 0,
         processingFee: 0,
         carTrackInstallationFee: 0,
         chargingCost: 0,
-        numberOfInstalments: 1, // To be determined by staff
-        paymentFrequency: 'monthly' as const, // Default
+        numberOfInstalments: values.loanType === 'Quick Pesa' ? 1 : 1, 
+        paymentFrequency: values.loanType === 'Quick Pesa' ? 'monthly' as const : 'monthly' as const,
         status: 'application' as const,
         loanType: values.loanType,
-        instalmentAmount: values.loanAmount, // Placeholder
-        totalRepayableAmount: values.loanAmount, // Placeholder
+        instalmentAmount: values.loanAmount,
+        totalRepayableAmount: values.loanAmount, 
         totalPaid: 0,
         comments: `Application for ${values.loanType}.`,
       };
@@ -142,7 +138,7 @@ export default function AccountPage() {
 
       toast({
         title: "Application Submitted",
-        description: "Your loan application has been submitted successfully. Our team will review it and contact you.",
+        description: "Your application has been submitted. Our team will review it shortly.",
       });
 
       applicationForm.reset();
@@ -150,7 +146,7 @@ export default function AccountPage() {
       toast({
         variant: 'destructive',
         title: 'Application failed',
-        description: e.message || 'Could not submit your application. Please try again.',
+        description: e.message || 'Could not submit your application.',
       });
     } finally {
       setIsSubmitting(false);
@@ -176,7 +172,7 @@ export default function AccountPage() {
             <CardHeader>
                 <CardTitle>Welcome, {user?.displayName || user?.email || user?.phoneNumber}!</CardTitle>
                 <CardDescription>
-                    Here is a summary of your loan accounts.
+                    Summary of your loan accounts.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -210,7 +206,7 @@ export default function AccountPage() {
                                     <CardContent>
                                         <div className="grid gap-4 sm:grid-cols-3">
                                             <div>
-                                                <div className="text-sm text-muted-foreground">{loan.status === 'application' ? 'Amount Requested' : 'Principal'}</div>
+                                                <div className="text-sm text-muted-foreground">Principal</div>
                                                 <div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div>
                                             </div>
                                              <div>
@@ -222,33 +218,6 @@ export default function AccountPage() {
                                                 <div className="font-bold text-lg">Ksh {balance.toLocaleString()}</div>
                                             </div>
                                         </div>
-                                        {loan.payments && loan.payments.length > 0 && (
-                                            <Accordion type="single" collapsible className="w-full mt-4">
-                                                <AccordionItem value="item-1">
-                                                    <AccordionTrigger>View Payment History</AccordionTrigger>
-                                                    <AccordionContent>
-                                                        <ScrollArea className="h-72">
-                                                            <Table>
-                                                                <TableHeader>
-                                                                    <TableRow>
-                                                                        <TableHead>Date</TableHead>
-                                                                        <TableHead className="text-right">Amount (Ksh)</TableHead>
-                                                                    </TableRow>
-                                                                </TableHeader>
-                                                                <TableBody>
-                                                                    {loan.payments.sort((a,b) => new Date(b.date as Date).getTime() - new Date(a.date as Date).getTime()).map(payment => (
-                                                                        <TableRow key={payment.paymentId}>
-                                                                            <TableCell>{format(new Date((payment.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                                                            <TableCell className="text-right">{payment.amount.toLocaleString()}</TableCell>
-                                                                        </TableRow>
-                                                                    ))}
-                                                                </TableBody>
-                                                            </Table>
-                                                        </ScrollArea>
-                                                    </AccordionContent>
-                                                </AccordionItem>
-                                            </Accordion>
-                                        )}
                                     </CardContent>
                                 </Card>
                             )
@@ -256,7 +225,7 @@ export default function AccountPage() {
                     </div>
                 ) : (
                    <div className="text-center py-8">
-                        <p className="text-muted-foreground mb-4">You do not have any loans or applications with us yet.</p>
+                        <p className="text-muted-foreground mb-4">No active loans or applications.</p>
                    </div>
                 )}
             </CardContent>
@@ -266,7 +235,7 @@ export default function AccountPage() {
             <CardHeader>
                 <CardTitle>Apply for a New Loan</CardTitle>
                 <CardDescription>
-                To begin your loan application, please fill out the form below. Our team will review your submission and contact you.
+                Select a product and submit your details.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -277,18 +246,18 @@ export default function AccountPage() {
                         name="loanType"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Loan Type</FormLabel>
+                            <FormLabel>Loan Product</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select the type of loan you are applying for" />
+                                    <SelectValue placeholder="Select loan product" />
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                <SelectItem value="Individual Short-Term Loan">Individual Short-Term Loan</SelectItem>
+                                <SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem>
+                                <SelectItem value="Individual & Business Loan">Individual & Business Short-Term Loan</SelectItem>
                                 <SelectItem value="Salary Advance Loan">Salary Advance Loan</SelectItem>
                                 <SelectItem value="Logbook Loan">Logbook Loan</SelectItem>
-                                <SelectItem value="Business Loan">Business Loan</SelectItem>
                                 </SelectContent>
                             </Select>
                             <FormMessage />
@@ -302,7 +271,7 @@ export default function AccountPage() {
                           <FormItem>
                           <FormLabel>Loan Amount Requested (Ksh)</FormLabel>
                           <FormControl>
-                              <Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} />
+                              <Input type="number" placeholder="e.g., 10000" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                           </FormItem>
@@ -333,26 +302,6 @@ export default function AccountPage() {
                           <FormMessage />
                           </FormItem>
                       )}
-                    />
-                    <FormField
-                    control={applicationForm.control}
-                    name="statement"
-                    render={({ field: { onChange, value, ...rest } }) => (
-                        <FormItem>
-                        <FormLabel>M-Pesa Statement (PDF) - Optional</FormLabel>
-                        <FormControl>
-                            <Input 
-                                type="file" 
-                                accept=".pdf"
-                                {...rest}
-                                onChange={(e) => {
-                                    onChange(e.target.files);
-                                }} 
-                            />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
                     />
                     <FormField
                       control={applicationForm.control}

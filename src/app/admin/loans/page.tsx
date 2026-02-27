@@ -7,11 +7,10 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, FileDown, MessageSquare, Copy } from 'lucide-react';
+import { Loader2, PlusCircle, Search } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -37,13 +36,10 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { addLoan, addCustomer, updateLoan, approveLoanApplication } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format, addDays, addWeeks, addMonths, isToday } from 'date-fns';
+import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { calculateAmortization } from '@/lib/utils';
-import { Textarea } from '@/components/ui/textarea';
-import { exportToCsv } from '@/lib/excel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -60,6 +56,7 @@ const loanSchema = z.object({
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application']),
+  loanType: z.string().optional(),
   customerType: z.enum(['existing', 'new']),
   newCustomerName: z.string().optional(),
   newCustomerPhone: z.string().optional(),
@@ -118,7 +115,6 @@ interface Loan {
     processingFee: number;
     carTrackInstallationFee: number;
     chargingCost: number;
-    disbursementRecorded?: boolean;
 }
 
 
@@ -127,8 +123,6 @@ export default function LoansPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [messageLoan, setMessageLoan] = useState<Loan | null>(null);
   const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
@@ -140,10 +134,8 @@ export default function LoansPage() {
   const isFinance = user?.role === 'finance';
   const isStaff = user?.role === 'staff';
   
-  // Both Staff and Finance can manage applications and add loans
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  const canAdd = isAuthorized;
-  const canManageApplications = isAuthorized;
+  const canAdd = isSuperAdmin || isFinance;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -162,17 +154,8 @@ export default function LoansPage() {
   
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
-    return loans.filter(loan => {
-        const isApplication = loan.status === 'application';
-        if (!isApplication) return false;
-
-        const searchMatch = searchTerm === '' ||
-            loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            loan.customerPhone.includes(searchTerm);
-        return searchMatch;
-    });
-  }, [loans, searchTerm]);
+    return loans.filter(loan => loan.status === 'application').sort((a, b) => b.disbursementDate.seconds - a.disbursementDate.seconds);
+  }, [loans]);
 
 
   const form = useForm<z.infer<typeof loanSchema>>({
@@ -185,10 +168,11 @@ export default function LoansPage() {
       processingFee: 0,
       carTrackInstallationFee: 0,
       chargingCost: 0,
-      numberOfInstalments: undefined,
+      numberOfInstalments: 1,
       paymentFrequency: 'monthly',
       status: 'active',
       customerType: 'existing',
+      loanType: 'Quick Pesa',
       newCustomerName: '',
       newCustomerPhone: '',
     },
@@ -228,15 +212,9 @@ export default function LoansPage() {
         customerId = newCustomerDocRef.id;
         customerName = newCustomerData.name;
         customerPhone = newCustomerData.phone;
-        toast({
-            title: 'Customer Added',
-            description: `${customerName} has been added successfully.`,
-        });
       } else {
         const selectedCustomer = customers?.find(c => c.id === customerId);
-        if (!selectedCustomer) {
-            throw new Error("Selected customer not found.");
-        }
+        if (!selectedCustomer) throw new Error("Selected customer not found.");
         customerName = selectedCustomer.name;
         customerPhone = selectedCustomer.phone;
       }
@@ -257,48 +235,24 @@ export default function LoansPage() {
         totalRepayableAmount,
         instalmentAmount,
         totalPaid: 0,
-        registrationFee: values.registrationFee || 0,
-        processingFee: values.processingFee || 0,
-        carTrackInstallationFee: values.carTrackInstallationFee || 0,
-        chargingCost: values.chargingCost || 0,
       };
       
       delete (loanData as any).customerType;
       delete (loanData as any).newCustomerName;
       delete (loanData as any).newCustomerPhone;
       
-      const { newLoanNumber } = await addLoan(firestore, loanData);
+      await addLoan(firestore, loanData);
 
-      toast({
-        title: 'Loan Added',
-        description: `Loan #${newLoanNumber} has been added successfully. Finance entries for disbursement and upfront fees have been recorded.`,
-      });
+      toast({ title: 'Loan Added', description: `Loan has been disbursed successfully.` });
       form.reset();
       setOpen(false);
 
     } catch (e: any) {
-        toast({
-            variant: 'destructive',
-            title: 'Error creating loan',
-            description: e.message || 'An unexpected error occurred.',
-        });
+        toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
         setIsSubmitting(false);
     }
   }
-
-  const handleRowClick = (loan: Loan) => {
-    const customer = customers?.find(c => c.id === loan.customerId);
-    if (customer) {
-        setSelectedCustomer(customer);
-    } else {
-        toast({
-            variant: "destructive",
-            title: "Customer not found",
-            description: `Could not find the customer details for loan #${loan.loanNumber}`
-        });
-    }
-  };
 
   const handleManageApplication = (loan: Loan) => {
       setApplicationToManage(loan);
@@ -324,7 +278,7 @@ export default function LoansPage() {
             disbursementDate: new Date(values.disbursementDate),
         };
         await approveLoanApplication(firestore, applicationToManage, updateData);
-        toast({ title: 'Application Approved', description: `Loan #${applicationToManage.loanNumber} is now active.`});
+        toast({ title: 'Application Approved' });
         setApplicationToManage(null);
     } catch (error: any) {
         toast({ variant: "destructive", title: "Approval Failed", description: error.message });
@@ -351,7 +305,6 @@ export default function LoansPage() {
       return (
           <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
               <h2 className="text-xl font-semibold">Access Restricted</h2>
-              <p className="text-muted-foreground">Only authorized staff and finance roles can access loan records.</p>
           </div>
       );
   }
@@ -371,9 +324,6 @@ export default function LoansPage() {
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Add a New Loan</DialogTitle>
-                <DialogDescription>
-                  Fill in the details below to create a new loan record.
-                </DialogDescription>
               </DialogHeader>
               <Form {...form}>
                 <ScrollArea className="max-h-[65vh] pr-4">
@@ -384,258 +334,72 @@ export default function LoansPage() {
                       render={({ field }) => (
                         <FormItem className="col-span-2">
                           <FormLabel>Customer Type</FormLabel>
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex space-x-4"
-                            >
-                              <FormItem className="flex items-center space-x-2">
-                                <FormControl>
-                                  <RadioGroupItem value="existing" id="existing" />
-                                </FormControl>
-                                <FormLabel htmlFor="existing">Existing Customer</FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-2">
-                                <FormControl>
-                                  <RadioGroupItem value="new" id="new" />
-                                </FormControl>
-                                <FormLabel htmlFor="new">New Customer</FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
+                          <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                              <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="existing" /></FormControl><FormLabel className="font-normal">Existing</FormLabel></FormItem>
+                              <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="new" /></FormControl><FormLabel className="font-normal">New</FormLabel></FormItem>
+                          </RadioGroup>
                         </FormItem>
                       )}
                     />
-
                     {customerType === 'existing' ? (
-                      <FormField
-                        control={form.control}
-                        name="customerId"
-                        render={({ field }) => (
+                      <FormField control={form.control} name="customerId" render={({ field }) => (
                           <FormItem className="col-span-2">
                             <FormLabel>Customer</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={customersLoading}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select a customer"} />
-                                </SelectTrigger>
-                              </FormControl>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
                               <SelectContent>
-                                {customers && customers.map(customer => (
-                                  <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
-                                ))}
+                                {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            <FormMessage />
                           </FormItem>
-                        )}
-                      />
+                      )} />
                     ) : (
                       <>
-                        <FormField
-                          control={form.control}
-                          name="newCustomerName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>New Customer Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="John Doe" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="newCustomerPhone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>New Customer Phone</FormLabel>
-                              <FormControl>
-                                <Input placeholder="0712345678" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        <FormField control={form.control} name="newCustomerName" render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                       </>
                     )}
-                    <FormField
-                      control={form.control}
-                      name="disbursementDate"
-                      render={({ field }) => (
+                    <FormField control={form.control} name="loanType" render={({ field }) => (
                         <FormItem className="col-span-2">
-                          <FormLabel>Disbursement Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="principalAmount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Principal Amount</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="e.g. 50000" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="interestRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Monthly Interest Rate (%)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="e.g. 1.25" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="registrationFee"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Registration Fee</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="processingFee"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Processing Fee</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="carTrackInstallationFee"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Car Track Fee</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="chargingCost"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Charging Cost</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="0" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="numberOfInstalments"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>No. of Instalments</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="e.g. 12" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="paymentFrequency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Payment Frequency</FormLabel>
+                          <FormLabel>Loan Product</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select frequency" />
-                              </SelectTrigger>
-                            </FormControl>
+                            <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                             <SelectContent>
-                              <SelectItem value="daily">Daily</SelectItem>
-                              <SelectItem value="weekly">Weekly</SelectItem>
-                              <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="Quick Pesa">Quick Pesa</SelectItem>
+                              <SelectItem value="Individual & Business Loan">Individual & Business Loan</SelectItem>
+                              <SelectItem value="Salary Advance Loan">Salary Advance Loan</SelectItem>
+                              <SelectItem value="Logbook Loan">Logbook Loan</SelectItem>
+                              <SelectItem value="Staff Loan">Staff Loan</SelectItem>
                             </SelectContent>
                           </Select>
-                          <FormMessage />
                         </FormItem>
-                      )}
-                    />
+                    )} />
+                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Frequency</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
                     <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Calculated Instalment Amount</span>
-                        <span className="text-sm font-bold">Ksh {calculatedValues.instalmentAmount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Total Repayable Amount</span>
-                        <span className="text-sm font-bold">Ksh {calculatedValues.totalRepayableAmount}</span>
-                      </div>
+                      <div className="flex justify-between"><span className="text-sm">Instalment</span><span className="font-bold">Ksh {calculatedValues.instalmentAmount}</span></div>
+                      <div className="flex justify-between"><span className="text-sm">Total</span><span className="font-bold">Ksh {calculatedValues.totalRepayableAmount}</span></div>
                     </div>
-
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem className="col-span-2">
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="due">Due</SelectItem>
-                              <SelectItem value="overdue">Overdue</SelectItem>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="rollover">Rollover</SelectItem>
-                              <SelectItem value="application">Application</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </form>
                 </ScrollArea>
-
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="ghost">Cancel</Button>
-                  </DialogClose>
-                  <Button type="submit" form="add-loan-form" disabled={isSubmitting || customersLoading}>
-                    {(isSubmitting || customersLoading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Add Loan
-                  </Button>
+                <DialogFooter className="mt-4">
+                  <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                  <Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button>
                 </DialogFooter>
               </Form>
             </DialogContent>
@@ -643,226 +407,90 @@ export default function LoansPage() {
         )}
       </div>
       <Tabs defaultValue="all" className="w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-            <TabsList>
-                <TabsTrigger value="all">All Loans</TabsTrigger>
-                <TabsTrigger value="applications" className="relative">
-                    New Applications
-                    {applicationLoans && applicationLoans.length > 0 && (
-                        <Badge variant="destructive" className="absolute -top-2 -right-2 h-5 w-5 justify-center p-0">{applicationLoans.length}</Badge>
-                    )}
-                </TabsTrigger>
-            </TabsList>
-            <div className="relative">
-                <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                    placeholder="Search loans..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 w-full sm:w-[300px]"
-                />
-            </div>
-        </div>
+        <TabsList className="mb-4">
+            <TabsTrigger value="all">All Loans</TabsTrigger>
+            <TabsTrigger value="applications">Applications ({applicationLoans.length})</TabsTrigger>
+        </TabsList>
         <TabsContent value="all">
             <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <CardTitle>Loan Records</CardTitle>
-                            <CardDescription>A list of all loans disbursed.</CardDescription>
-                        </div>
-                        <Select value={statusFilter} onValueChange={setStatusFilter}>
-                            <SelectTrigger className="w-full sm:w-[180px]">
-                                <SelectValue placeholder="Filter by status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Statuses</SelectItem>
-                                <SelectItem value="active">Active</SelectItem>
-                                <SelectItem value="due">Due</SelectItem>
-                                <SelectItem value="overdue">Overdue</SelectItem>
-                                <SelectItem value="paid">Paid</SelectItem>
-                                <SelectItem value="rollover">Rollover</SelectItem>
-                                <SelectItem value="application">Application</SelectItem>
-                                <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Loan Book</CardTitle>
+                    <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[250px]" /></div>
                 </CardHeader>
                 <CardContent>
-                {loansLoading && (
-                    <div className="flex items-center justify-center p-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                )}
-                {!loansLoading && (!filteredLoans || filteredLoans.length === 0) && (
-                    <Alert>
-                        <AlertTitle>No Loans Found</AlertTitle>
-                        <AlertDescription>
-                            {searchTerm || statusFilter !== 'all'
-                                ? "No loans match your search criteria."
-                                : "There are no loans in the system yet. Add a loan to see it here."
-                            }
-                        </AlertDescription>
-                    </Alert>
-                )}
-                {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
                     <ScrollArea className="h-[60vh]">
                       <Table>
-                          <TableHeader className="sticky top-0 bg-card">
-                              <TableRow>
-                                  <TableHead>Loan No.</TableHead>
-                                  <TableHead>Customer</TableHead>
-                                  <TableHead>Date</TableHead>
-                                  <TableHead className="text-right">Principal</TableHead>
-                                  <TableHead className="text-right">Amount to Pay</TableHead>
-                                  <TableHead className="text-right">Paid</TableHead>
-                                  <TableHead className="text-right">Balance</TableHead>
-                                  <TableHead className="text-center">Status</TableHead>
-                              </TableRow>
-                          </TableHeader>
+                          <TableHeader><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                           <TableBody>
-                              {filteredLoans.map((loan) => {
-                                  const balance = loan.totalRepayableAmount - loan.totalPaid;
-                                  return (
-                                      <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleRowClick(loan)}>
-                                          <TableCell className="font-medium">{loan.loanNumber}</TableCell>
-                                          <TableCell>{loan.customerName}</TableCell>
-                                          <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                                          <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
-                                          <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
-                                          <TableCell className="text-center">
-                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application' || loan.status === 'rejected') ? 'destructive' : 'secondary'}>
-                                              {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                            </Badge>
-                                          </TableCell>
-                                      </TableRow>
-                                  )
-                              })}
+                              {filteredLoans.map((loan) => (
+                                  <TableRow key={loan.id}>
+                                      <TableCell className="font-medium">{loan.loanNumber}</TableCell>
+                                      <TableCell>{loan.customerName}</TableCell>
+                                      <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                      <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
+                                      <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
+                                  </TableRow>
+                              ))}
                           </TableBody>
                       </Table>
                     </ScrollArea>
-                  )}
                 </CardContent>
             </Card>
         </TabsContent>
         <TabsContent value="applications">
             <Card>
-                <CardHeader>
-                    <CardTitle>New Loan Applications</CardTitle>
-                    <CardDescription>Review and process new loan applications from customers.</CardDescription>
-                </CardHeader>
+                <CardHeader><CardTitle>Review Applications</CardTitle></CardHeader>
                 <CardContent>
-                    {loansLoading && (
-                        <div className="flex items-center justify-center p-8">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                    )}
-                    {!loansLoading && (!applicationLoans || applicationLoans.length === 0) && (
-                        <Alert>
-                            <AlertTitle>No New Applications</AlertTitle>
-                            <AlertDescription>
-                                {searchTerm
-                                    ? "No applications match your search."
-                                    : "There are no new loan applications to review."
-                                }
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    {!loansLoading && applicationLoans && applicationLoans.length > 0 && (
-                        <ScrollArea className="h-[60vh]">
-                            <Table>
-                                <TableHeader className="sticky top-0 bg-card">
-                                    <TableRow>
-                                        <TableHead>Customer Name</TableHead>
-                                        <TableHead>Phone</TableHead>
-                                        <TableHead>Loan Type</TableHead>
-                                        <TableHead>Application Date</TableHead>
-                                        <TableHead className="text-right">Amount Requested</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {applicationLoans.map((loan) => (
-                                        <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleManageApplication(loan)}>
-                                            <TableCell className="font-medium">{loan.customerName}</TableCell>
-                                            <TableCell>{loan.customerPhone}</TableCell>
-                                            <TableCell>{loan.loanType || 'N/A'}</TableCell>
-                                            <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell className="text-right font-bold">{loan.principalAmount.toLocaleString()}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    )}
+                    <Table>
+                        <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {applicationLoans.map((loan) => (
+                                <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleManageApplication(loan)}>
+                                    <TableCell>{loan.customerName}</TableCell>
+                                    <TableCell>{loan.loanType}</TableCell>
+                                    <TableCell className="font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                    <TableCell><Button size="sm">Process</Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Manage Application Dialog */}
       <Dialog open={!!applicationToManage} onOpenChange={(isOpen) => !isOpen && setApplicationToManage(null)}>
         <DialogContent className="sm:max-w-2xl">
             {applicationToManage && (
                 <>
-                    <DialogHeader>
-                        <DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle>
-                        <DialogDescription>
-                            Enter the final financial terms to approve this loan for {applicationToManage.customerName}.
-                        </DialogDescription>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle></DialogHeader>
                     <Form {...approvalForm}>
-                        <ScrollArea className="max-h-[60vh] pr-4">
-                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
-                                <div className="col-span-2 grid grid-cols-2 gap-2 text-sm bg-muted/50 p-3 rounded-lg mb-2">
-                                    <div><span className="text-muted-foreground">Applicant:</span> {applicationToManage.customerName}</div>
-                                    <div><span className="text-muted-foreground">Requested:</span> Ksh {applicationToManage.principalAmount.toLocaleString()}</div>
-                                    <div><span className="text-muted-foreground">Type:</span> {applicationToManage.loanType}</div>
-                                </div>
-                                <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (
-                                    <FormItem className="col-span-2"><FormLabel>Approved Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (
-                                    <FormItem><FormLabel>Approved Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="interestRate" render={({field}) => (
-                                    <FormItem><FormLabel>Monthly Interest (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="processingFee" render={({field}) => (
-                                    <FormItem><FormLabel>Processing Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (
-                                    <FormItem><FormLabel>Registration Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (
-                                    <FormItem><FormLabel>No. of Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="paymentFrequency" render={({field}) => (
-                                    <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
-                                )} />
-                                <div className="col-span-2 grid grid-cols-2 gap-4 mt-2">
-                                    <FormField control={approvalForm.control} name="carTrackInstallationFee" render={({field}) => (
-                                        <FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                    )} />
-                                    <FormField control={approvalForm.control} name="chargingCost" render={({field}) => (
-                                        <FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                    )} />
-                                </div>
-                            </form>
-                        </ScrollArea>
+                        <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
+                            <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="paymentFrequency" render={({field}) => (
+                              <FormItem>
+                                <FormLabel>Frequency</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="daily">Daily</SelectItem>
+                                    <SelectItem value="weekly">Weekly</SelectItem>
+                                    <SelectItem value="monthly">Monthly</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )} />
+                        </form>
                     </Form>
-                    <DialogFooter className="mt-6 flex gap-2">
-                        <Button variant="outline" onClick={() => setApplicationToManage(null)} disabled={isUpdatingStatus}>Cancel</Button>
-                        {canManageApplications && (
-                            <>
-                                <Button variant="destructive" onClick={handleReject} disabled={isUpdatingStatus}>Reject</Button>
-                                <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>
-                                    {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Approve & Disburse
-                                </Button>
-                            </>
-                        )}
+                    <DialogFooter className="mt-6">
+                        <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleReject}>Reject</Button>
+                        <Button type="submit" form="approval-form">Approve & Disburse</Button>
                     </DialogFooter>
                 </>
             )}
