@@ -478,8 +478,8 @@ export default function Dashboard() {
                                             const dateA = a.date instanceof Date ? a.date.getTime() : a.date.seconds * 1000;
                                             const dateB = b.date instanceof Date ? b.date.getTime() : b.date.seconds * 1000;
                                             return dateB - dateA;
-                                        }).map((note) => (
-                                            <div key={note.noteId} className="bg-muted/50 p-2 rounded border text-xs leading-snug">
+                                        }).map((note, index) => (
+                                            <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs leading-snug">
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold flex items-center gap-1">
                                                         <User className="h-2 w-2" /> {note.staffName}

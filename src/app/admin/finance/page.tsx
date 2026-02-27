@@ -598,7 +598,7 @@ export default function FinancePage() {
                                 <SelectContent>
                                     <SelectItem value="all">All Staff</SelectItem>
                                     {staffList?.map((s: any) => (
-                                        <SelectItem key={s.uid} value={s.uid}>{s.name || s.email}</SelectItem>
+                                        <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -838,8 +838,8 @@ export default function FinancePage() {
                                                 {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (
                                                     <p className="text-xs text-muted-foreground text-center py-8">No interaction history recorded.</p>
                                                 ) : (
-                                                    [...loanToEdit.followUpNotes].reverse().map((note) => (
-                                                        <div key={note.noteId} className="bg-muted p-2 rounded border text-[11px]">
+                                                    [...loanToEdit.followUpNotes].reverse().map((note, index) => (
+                                                        <div key={note.noteId || index} className="bg-muted p-2 rounded border text-[11px]">
                                                             <div className="flex justify-between items-center mb-1">
                                                                 <span className="font-bold flex items-center gap-1"><User className="h-2 w-2" /> {note.staffName}</span>
                                                                 <span className="text-[9px] text-muted-foreground">{format(new Date(note.date.seconds * 1000), 'dd/MM/yy HH:mm')}</span>

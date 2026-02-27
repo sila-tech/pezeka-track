@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -202,24 +201,6 @@ export default function LoansPage() {
     },
   });
 
-  const approvalForm = useForm<z.infer<typeof approvalSchema>>({
-      resolver: zodResolver(approvalSchema),
-      defaultValues: {
-        disbursementDate: format(new Date(), 'yyyy-MM-dd'),
-        principalAmount: 0,
-        interestRate: 0,
-        processingFee: 0,
-        registrationFee: 0,
-        carTrackInstallationFee: 0,
-        chargingCost: 0,
-        numberOfInstalments: 1,
-        paymentFrequency: 'monthly',
-        idNumber: '',
-        alternativeNumber: '',
-        assignedStaffId: '',
-      }
-  });
-
   const { watch } = form;
   const principalAmount = watch('principalAmount');
   const interestRate = watch('interestRate');
@@ -297,6 +278,24 @@ export default function LoansPage() {
         setIsSubmitting(false);
     }
   }
+
+  const approvalForm = useForm<z.infer<typeof approvalSchema>>({
+      resolver: zodResolver(approvalSchema),
+      defaultValues: {
+        disbursementDate: format(new Date(), 'yyyy-MM-dd'),
+        principalAmount: 0,
+        interestRate: 0,
+        processingFee: 0,
+        registrationFee: 0,
+        carTrackInstallationFee: 0,
+        chargingCost: 0,
+        numberOfInstalments: 1,
+        paymentFrequency: 'monthly',
+        idNumber: '',
+        alternativeNumber: '',
+        assignedStaffId: '',
+      }
+  });
 
   const handleManageApplication = (loan: Loan) => {
       setApplicationToManage(loan);
@@ -418,7 +417,7 @@ export default function LoansPage() {
                           <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
                             <SelectContent>
-                              {staffList?.map(s => <SelectItem key={s.uid} value={s.uid}>{s.name} ({s.role})</SelectItem>)}
+                              {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name} ({s.role})</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -554,7 +553,7 @@ export default function LoansPage() {
                                   <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                      {staffList?.map(s => <SelectItem key={s.uid} value={s.uid}>{s.name} ({s.role})</SelectItem>)}
+                                      {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name} ({s.role})</SelectItem>)}
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
