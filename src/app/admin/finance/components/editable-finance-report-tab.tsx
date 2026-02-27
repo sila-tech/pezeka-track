@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 interface FinanceEntry {
   id: string;
   type: 'expense' | 'payout' | 'receipt' | 'unearned';
-  date: { seconds: number; nanoseconds: number } | string;
+  date: { seconds: number; nanoseconds: number } | string | Date;
   amount: number;
   description: string;
   loanId?: string;
@@ -101,7 +101,16 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
 
     if (date?.from) {
         filtered = filtered.filter((entry) => {
-            const entryDate = typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000);
+            let entryDate: Date;
+            if (typeof entry.date === 'string') {
+                entryDate = new Date(entry.date);
+            } else if (entry.date instanceof Date) {
+                entryDate = entry.date;
+            } else if (entry.date && 'seconds' in entry.date) {
+                entryDate = new Date(entry.date.seconds * 1000);
+            } else {
+                return false;
+            }
             
             const fromDate = new Date(date.from!);
             fromDate.setHours(0,0,0,0);
@@ -133,8 +142,19 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
   const handleExport = () => {
     if (filteredEntries) {
       const dataForExport = filteredEntries.map(entry => {
+        let entryDate: Date;
+        if (typeof entry.date === 'string') {
+            entryDate = new Date(entry.date);
+        } else if (entry.date instanceof Date) {
+            entryDate = entry.date;
+        } else if (entry.date && 'seconds' in entry.date) {
+            entryDate = new Date(entry.date.seconds * 1000);
+        } else {
+            entryDate = new Date();
+        }
+
         const record: {[key: string]: any} = {
-            'Date': format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'PPP'),
+            'Date': format(entryDate, 'PPP'),
             'Description': entry.description,
             'Amount (Ksh)': entry.amount,
         };
@@ -224,30 +244,43 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {filteredEntries.map((entry) => (
-                    <TableRow key={entry.id}>
-                    <TableCell>{format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'dd/MM/yyyy')}</TableCell>
-                    <TableCell>
-                        <div className="font-medium">{entry.description || '-'}</div>
-                    </TableCell>
-                    <TableCell>
-                        {entry.expenseCategory && <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-none">{entry.expenseCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
-                        {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
-                        {entry.payoutCategory && <Badge variant="destructive" className="bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
-                    </TableCell>
-                    <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
-                    {isEditable && onEdit && onDelete && (
-                        <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
-                            <PenSquare className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => onDelete(entry)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                {filteredEntries.map((entry, index) => {
+                    let entryDate: Date;
+                    if (typeof entry.date === 'string') {
+                        entryDate = new Date(entry.date);
+                    } else if (entry.date instanceof Date) {
+                        entryDate = entry.date;
+                    } else if (entry.date && 'seconds' in entry.date) {
+                        entryDate = new Date(entry.date.seconds * 1000);
+                    } else {
+                        entryDate = new Date();
+                    }
+
+                    return (
+                        <TableRow key={`${entry.id}-${index}`}>
+                        <TableCell>{format(entryDate, 'dd/MM/yyyy')}</TableCell>
+                        <TableCell>
+                            <div className="font-medium">{entry.description || '-'}</div>
                         </TableCell>
-                    )}
-                    </TableRow>
-                ))}
+                        <TableCell>
+                            {entry.expenseCategory && <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-none">{entry.expenseCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                            {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                            {entry.payoutCategory && <Badge variant="destructive" className="bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                        </TableCell>
+                        <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
+                        {isEditable && onEdit && onDelete && (
+                            <TableCell className="text-right">
+                            <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
+                                <PenSquare className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => onDelete(entry)}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                            </TableCell>
+                        )}
+                        </TableRow>
+                    );
+                })}
                     <TableRow className="font-bold bg-muted/50">
                         <TableCell colSpan={3} className="text-right">Total</TableCell>
                         <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>

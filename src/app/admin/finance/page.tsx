@@ -306,7 +306,7 @@ export default function FinancePage() {
       <div className="flex flex-col gap-4 mb-6">
         <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Finance Dashboard</h1>
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if(!isOpen) setEditingEntry(null); }}>
                 <DialogTrigger asChild><Button onClick={() => setEditingEntry(null)}><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
                 <DialogContent>
                     <DialogHeader><DialogTitle>{editingEntry ? 'Edit Entry' : 'New Entry'}</DialogTitle></DialogHeader>
@@ -378,7 +378,27 @@ export default function FinancePage() {
           <TabsContent value="payouts"><EditableFinanceReportTab title="Payouts" description="Master outflow record." entries={financialData.allPayouts} loading={false} onEdit={handleEditEntry} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} /></TabsContent>
           <TabsContent value="loanbook">
               <Card>
-                <CardHeader><CardTitle>Internal Ledger</CardTitle></CardHeader>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <CardTitle>Internal Ledger</CardTitle>
+                        <div className="flex gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Search..." value={loanBookSearchTerm} onChange={(e) => setLoanBookSearchTerm(e.target.value)} className="pl-8 w-[200px]" />
+                            </div>
+                            <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
+                                <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Status</SelectItem>
+                                    <SelectItem value="active">Active</SelectItem>
+                                    <SelectItem value="due">Due</SelectItem>
+                                    <SelectItem value="overdue">Overdue</SelectItem>
+                                    <SelectItem value="paid">Paid</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[60vh]">
                       <Table className="min-w-[1200px]">
@@ -386,6 +406,9 @@ export default function FinancePage() {
                           <TableRow>
                             <TableHead>Client</TableHead>
                             <TableHead>Loan No.</TableHead>
+                            <TableHead className="text-right">Principal</TableHead>
+                            <TableHead className="text-right">Total Payable</TableHead>
+                            <TableHead className="text-right">Paid</TableHead>
                             <TableHead className="text-right">Balance</TableHead>
                             <TableHead className="text-center">Status</TableHead>
                           </TableRow>
@@ -394,12 +417,19 @@ export default function FinancePage() {
                           {filteredLoans.map(loan => (
                             <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                               <TableCell>
-                                <div>{loan.customerName}</div>
+                                <div className="font-medium">{loan.customerName}</div>
                                 <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
                               </TableCell>
                               <TableCell>{loan.loanNumber}</TableCell>
+                              <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                              <TableCell className="text-right text-green-600">{loan.totalPaid.toLocaleString()}</TableCell>
                               <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
-                              <TableCell className="text-center"><Badge>{loan.status}</Badge></TableCell>
+                              <TableCell className="text-center">
+                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                      {loan.status}
+                                  </Badge>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -418,15 +448,89 @@ export default function FinancePage() {
                     <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle></DialogHeader>
                     <ScrollArea className="max-h-[70vh]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
-                            <Card><CardHeader><CardTitle className="text-sm">Summary</CardTitle></CardHeader><CardContent className="space-y-2"><div className="flex justify-between"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div></CardContent></Card>
+                            <div className="space-y-4">
+                                <Card>
+                                    <CardHeader><CardTitle className="text-sm">Summary</CardTitle></CardHeader>
+                                    <CardContent className="space-y-2">
+                                        <div className="flex justify-between"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
+                                        <div className="flex justify-between"><span>Total Repayable:</span><span className="font-medium">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</span></div>
+                                        <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">Ksh {loanToEdit.totalPaid.toLocaleString()}</span></div>
+                                        <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader><CardTitle className="text-sm">Actions</CardTitle></CardHeader>
+                                    <CardContent className="space-y-2">
+                                        <Button 
+                                            variant="outline" 
+                                            className="w-full" 
+                                            onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Loan Rolled Over' }); setLoanToEdit(null); })}
+                                        >
+                                            Perform Rollover
+                                        </Button>
+                                        <Button 
+                                            variant="secondary" 
+                                            className="w-full"
+                                            onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked as Paid' }); setLoanToEdit(null); })}
+                                        >
+                                            Mark as Fully Paid
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            </div>
                             <Tabs defaultValue="payments">
-                                <TabsList><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="penalties">Penalties</TabsTrigger></TabsList>
+                                <TabsList className="grid grid-cols-2 w-full"><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="penalties">Penalties</TabsTrigger></TabsList>
                                 <TabsContent value="payments">
-                                    <Form {...paymentForm}><form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="flex gap-2 mb-4"><FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" {...field}/>)} /><Button type="submit">Pay</Button></form></Form>
-                                    <Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={i}><TableCell>{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</TableCell><TableCell className="text-right">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table>
+                                    <Form {...paymentForm}>
+                                        <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
+                                            <div className="flex gap-2">
+                                                <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field}/>)} />
+                                                <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field}/>)} />
+                                                <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
+                                            </div>
+                                        </form>
+                                    </Form>
+                                    <ScrollArea className="h-64 border rounded-md">
+                                        <Table>
+                                            <TableBody>
+                                                {loanToEdit.payments?.map((p, i) => (
+                                                    <TableRow key={p.paymentId || i}>
+                                                        <TableCell>{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                                        <TableCell className="text-right">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </ScrollArea>
                                 </TabsContent>
                                 <TabsContent value="penalties">
-                                    <Form {...penaltyForm}><form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4"><FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" {...field}/>)} /><FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field}/>)} /><Button type="submit" variant="destructive" className="w-full">Add Penalty</Button></form></Form>
+                                    <Form {...penaltyForm}>
+                                        <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field}/>)} />
+                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field}/>)} />
+                                            </div>
+                                            <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field}/>)} />
+                                            <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
+                                                {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Add Penalty'}
+                                            </Button>
+                                        </form>
+                                    </Form>
+                                    <ScrollArea className="h-64 border rounded-md">
+                                        <Table>
+                                            <TableBody>
+                                                {loanToEdit.penalties?.map((p, i) => (
+                                                    <TableRow key={p.penaltyId || i}>
+                                                        <TableCell>
+                                                            <div className="text-xs">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</div>
+                                                            <div className="font-medium">{p.description}</div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right text-destructive font-bold">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </ScrollArea>
                                 </TabsContent>
                             </Tabs>
                         </div>
