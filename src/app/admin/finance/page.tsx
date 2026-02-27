@@ -169,6 +169,7 @@ export default function FinancePage() {
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
+  const [loanBookStaffFilter, setLoanBookStaffFilter] = useState('all');
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -178,6 +179,7 @@ export default function FinancePage() {
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
+  const { data: staffList, loading: staffLoading } = useCollection<any>(isAuthorized ? 'users' : null);
   
   const financialData = useMemo(() => {
     const receipts: any[] = [];
@@ -248,15 +250,15 @@ export default function FinancePage() {
     if(!loans) return [];
     return loans.filter(loan => {
         const statusMatch = loanBookStatusFilter === 'all' || loan.status === loanBookStatusFilter;
+        const staffMatch = loanBookStaffFilter === 'all' || loan.assignedStaffId === loanBookStaffFilter;
         const searchMatch = loanBookSearchTerm === '' || 
             loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) || 
             loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
             loan.customerPhone?.includes(loanBookSearchTerm) ||
-            loan.idNumber?.includes(loanBookSearchTerm) ||
-            loan.assignedStaffName?.toLowerCase().includes(loanBookSearchTerm.toLowerCase());
-        return statusMatch && searchMatch;
+            loan.idNumber?.includes(loanBookSearchTerm);
+        return statusMatch && staffMatch && searchMatch;
     });
-  }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
+  }, [loans, loanBookSearchTerm, loanBookStatusFilter, loanBookStaffFilter]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
@@ -418,7 +420,6 @@ export default function FinancePage() {
       }
   }
 
-  // Calculated Penalty logic
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
       
@@ -455,7 +456,7 @@ export default function FinancePage() {
       penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
   };
 
-  if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (userLoading || loansLoading || financeEntriesLoading || staffLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!isAuthorized) return <div className="flex h-full w-full flex-col items-center justify-center p-12"><h2>Access Restricted</h2></div>;
 
   return (
@@ -587,11 +588,20 @@ export default function FinancePage() {
                             <CardTitle>Internal Ledger</CardTitle>
                             <CardDescription>Comprehensive record of all disbursed loans and their financial parameters.</CardDescription>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                                <Input placeholder="Search ledger..." value={loanBookSearchTerm} onChange={(e) => setLoanBookSearchTerm(e.target.value)} className="pl-8 w-[250px]" />
+                                <Input placeholder="Search ledger..." value={loanBookSearchTerm} onChange={(e) => setLoanBookSearchTerm(e.target.value)} className="pl-8 w-[200px]" />
                             </div>
+                            <Select value={loanBookStaffFilter} onValueChange={setLoanBookStaffFilter}>
+                                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by Staff" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Staff</SelectItem>
+                                    {staffList?.map((s: any) => (
+                                        <SelectItem key={s.uid} value={s.uid}>{s.name || s.email}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <Select value={loanBookStatusFilter} onValueChange={setLoanBookStatusFilter}>
                                 <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
                                 <SelectContent>
