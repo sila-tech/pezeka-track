@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, FileText } from 'lucide-react';
+import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -17,13 +18,22 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { addLoan } from '@/lib/firestore';
+import { addLoan, addFollowUpNoteToLoan } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface FollowUpNote {
+    noteId: string;
+    date: { seconds: number; nanoseconds: number } | Date;
+    staffName: string;
+    staffId: string;
+    content: string;
+}
 
 interface DashboardLoan {
   id: string;
   loanNumber: string;
   customerName: string;
+  customerPhone: string;
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementDate: { seconds: number; nanoseconds: number };
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
@@ -37,11 +47,17 @@ interface DashboardLoan {
   chargingCost?: number;
   loanType?: string;
   idNumber?: string;
+  assignedStaffName?: string;
+  followUpNotes?: FollowUpNote[];
 }
 
 const staffLoanSchema = z.object({
   amount: z.coerce.number().min(1000, "Minimum application is Ksh 1,000"),
   reason: z.string().min(10, "Please provide a brief reason for the loan request."),
+});
+
+const followUpNoteSchema = z.object({
+    content: z.string().min(5, "Note must be at least 5 characters long."),
 });
 
 export default function Dashboard() {
@@ -51,6 +67,8 @@ export default function Dashboard() {
   
   const [isStaffLoanOpen, setIsStaffLoanOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
+  const [isAddingNote, setIsAddingNote] = useState(false);
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
   const isFinanceUser = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
@@ -60,7 +78,12 @@ export default function Dashboard() {
 
   const staffLoanForm = useForm<z.infer<typeof staffLoanSchema>>({
     resolver: zodResolver(staffLoanSchema),
-    defaultValues: { amount: undefined, reason: '' },
+    defaultValues: { amount: 0, reason: '' },
+  });
+
+  const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
+      resolver: zodResolver(followUpNoteSchema),
+      defaultValues: { content: '' },
   });
 
   async function onStaffLoanSubmit(values: z.infer<typeof staffLoanSchema>) {
@@ -106,6 +129,25 @@ export default function Dashboard() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
+      if (!selectedLoanForNotes || !user) return;
+      setIsAddingNote(true);
+      try {
+          await addFollowUpNoteToLoan(firestore, selectedLoanForNotes.id, {
+              content: values.content,
+              staffName: user.name || user.email?.split('@')[0] || "Staff",
+              staffId: user.uid,
+          });
+          toast({ title: "Note Added", description: "Follow-up note has been recorded." });
+          noteForm.reset();
+          // Update the local state if needed, though useCollection should handle it
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+      } finally {
+          setIsAddingNote(false);
+      }
   }
 
   const stats = useMemo(() => {
@@ -155,7 +197,8 @@ export default function Dashboard() {
         if (!loan.endDate || loan.endDate.toString() === 'Invalid Date') return false;
         const daysUntilDue = differenceInDays(loan.endDate, today);
         return daysUntilDue <= 7;
-      });
+      })
+      .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
   }, [loans]);
 
   const newApplications = useMemo(() => {
@@ -195,7 +238,7 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Requested Amount (Ksh)</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="e.g. 5000" {...field} />
+                          <Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -208,7 +251,7 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Reason for Request</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Briefly describe why you need this loan..." {...field} />
+                          <Textarea placeholder="Briefly describe why you need this loan..." {...field} value={field.value ?? ''} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -250,11 +293,11 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="flex flex-col h-[500px]">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="flex flex-col h-[600px]">
             <CardHeader>
-                <CardTitle>Due Loans</CardTitle>
-                <CardDescription>Members with payments that are overdue or due within 7 days.</CardDescription>
+                <CardTitle>Due Loans & Follow-ups</CardTitle>
+                <CardDescription>Accounts requiring attention. Add notes to coordinate collection agreements.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden">
               {isLoading ? (
@@ -273,10 +316,10 @@ export default function Dashboard() {
                     <TableHeader className="sticky top-0 bg-card z-10">
                         <TableRow>
                             <TableHead>Customer</TableHead>
-                            <TableHead>Loan No.</TableHead>
+                            <TableHead>Assigned</TableHead>
                             <TableHead>Due Date</TableHead>
                             <TableHead className="text-right">Balance</TableHead>
-                            <TableHead className="text-center">Status</TableHead>
+                            <TableHead className="text-center">Action</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -284,30 +327,31 @@ export default function Dashboard() {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
                             const daysDue = differenceInDays(loan.endDate, startOfToday());
                             
-                            let statusLabel = '';
-                            let statusVariant: "destructive" | "secondary" | "default" = 'secondary';
-
-                            if (loan.status === 'due' || loan.status === 'overdue' || daysDue < 0) {
-                                statusLabel = `Overdue by ${Math.abs(daysDue)} day(s)`;
-                                statusVariant = 'destructive';
-                            } else if (daysDue === 0) {
-                                statusLabel = 'Due Today';
-                                statusVariant = 'destructive';
-                            } else {
-                                statusLabel = `Due in ${daysDue} day(s)`;
-                            }
+                            let statusVariant: "destructive" | "secondary" = daysDue <= 0 ? 'destructive' : 'secondary';
 
                             return (
                                 <TableRow key={loan.id}>
                                     <TableCell className="font-medium">
                                       <div>{loan.customerName}</div>
-                                      <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                      <div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div>
                                     </TableCell>
-                                    <TableCell>{loan.loanNumber}</TableCell>
-                                    <TableCell className="whitespace-nowrap">{format(loan.endDate, 'MMM dd, yyyy')}</TableCell>
-                                    <TableCell className="text-right font-bold tabular-nums">{balance.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1 text-xs">
+                                            <User className="h-3 w-3" />
+                                            <span>{loan.assignedStaffName || "Unassigned"}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                        <div className="text-xs">{format(loan.endDate, 'MMM dd, yyyy')}</div>
+                                        <Badge variant={statusVariant} className="text-[9px] h-4 py-0">
+                                            {daysDue < 0 ? `Overdue ${Math.abs(daysDue)}d` : daysDue === 0 ? 'Today' : `In ${daysDue}d`}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right font-bold tabular-nums">Ksh {balance.toLocaleString()}</TableCell>
                                     <TableCell className="text-center">
-                                      <Badge variant={statusVariant}>{statusLabel}</Badge>
+                                      <Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}>
+                                          <MessageSquare className="h-4 w-4" />
+                                      </Button>
                                     </TableCell>
                                 </TableRow>
                             )
@@ -318,7 +362,7 @@ export default function Dashboard() {
               )}
             </CardContent>
         </Card>
-        <Card className="flex flex-col h-[500px]">
+        <Card className="flex flex-col h-[600px]">
             <CardHeader>
                 <CardTitle>New Loan Applications</CardTitle>
                 <CardDescription>Recently applied loans, including internal staff applications.</CardDescription>
@@ -366,6 +410,75 @@ export default function Dashboard() {
             </CardContent>
         </Card>
       </div>
+
+      {/* Follow-up Notes Dialog */}
+      <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
+          <DialogContent className="sm:max-w-2xl">
+              {selectedLoanForNotes && (
+                  <>
+                    <DialogHeader>
+                        <DialogTitle>Follow-up Notes: {selectedLoanForNotes.customerName}</DialogTitle>
+                        <DialogDescription>
+                            Loan #{selectedLoanForNotes.loanNumber} | Balance: Ksh {(selectedLoanForNotes.totalRepayableAmount - selectedLoanForNotes.totalPaid).toLocaleString()}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 mt-4">
+                        <Card>
+                            <CardHeader className="py-3"><CardTitle className="text-sm">Record New Interaction</CardTitle></CardHeader>
+                            <CardContent>
+                                <Form {...noteForm}>
+                                    <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-3">
+                                        <FormField control={noteForm.control} name="content" render={({field}) => (
+                                            <FormItem>
+                                                <FormControl><Textarea placeholder="e.g. Spoke to customer, promised to pay Ksh 5,000 by Friday via M-Pesa." {...field} value={field.value ?? ''} /></FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}/>
+                                        <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>
+                                            {isAddingNote ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                                            Add Note
+                                        </Button>
+                                    </form>
+                                </Form>
+                            </CardContent>
+                        </Card>
+                        
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-semibold">Interaction History</h4>
+                            <ScrollArea className="h-64 border rounded-md p-4">
+                                {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (
+                                    <p className="text-sm text-muted-foreground text-center py-8">No follow-up notes recorded yet.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {[...selectedLoanForNotes.followUpNotes].sort((a, b) => {
+                                            const dateA = a.date instanceof Date ? a.date.getTime() : a.date.seconds * 1000;
+                                            const dateB = b.date instanceof Date ? b.date.getTime() : b.date.seconds * 1000;
+                                            return dateB - dateA;
+                                        }).map((note) => (
+                                            <div key={note.noteId} className="bg-muted p-3 rounded-lg border text-sm">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="font-bold flex items-center gap-1">
+                                                        <User className="h-3 w-3" /> {note.staffName}
+                                                    </span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {format(note.date instanceof Date ? note.date : new Date(note.date.seconds * 1000), 'PPP p')}
+                                                    </span>
+                                                </div>
+                                                <p className="text-muted-foreground italic leading-relaxed">"{note.content}"</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </ScrollArea>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                    </DialogFooter>
+                  </>
+              )}
+          </DialogContent>
+      </Dialog>
     </div>
   );
 }

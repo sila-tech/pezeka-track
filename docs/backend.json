@@ -37,6 +37,8 @@
         "customerPhone": { "type": "string" },
         "alternativeNumber": { "type": "string", "description": "Secondary contact number." },
         "idNumber": { "type": "string", "description": "Customer's national ID number." },
+        "assignedStaffId": { "type": "string", "description": "UID of the staff member assigned to follow up on this loan." },
+        "assignedStaffName": { "type": "string", "description": "Name of the staff member assigned to follow up." },
         "loanType": { "type": "string", "description": "The type of loan applied for." },
         "disbursementDate": { "type": "string", "format": "date-time" },
         "principalAmount": { "type": "number", "description": "The initial amount of the loan."},
@@ -78,6 +80,21 @@
                     "description": { "type": "string" }
                 },
                 "required": ["penaltyId", "date", "amount", "description"]
+            }
+        },
+        "followUpNotes": {
+            "type": "array",
+            "description": "Notes made by staff during follow-ups.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "noteId": { "type": "string" },
+                    "date": { "type": "string", "format": "date-time" },
+                    "staffName": { "type": "string" },
+                    "staffId": { "type": "string" },
+                    "content": { "type": "string" }
+                },
+                "required": ["noteId", "date", "staffName", "staffId", "content"]
             }
         },
         "comments": { "type": "string", "description": "General comments about the loan, such as rollover requests." },

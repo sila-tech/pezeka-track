@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -20,6 +21,8 @@ interface Loan {
   alternativeNumber?: string;
   idNumber?: string;
   loanType?: string;
+  assignedStaffId?: string;
+  assignedStaffName?: string;
   disbursementDate: { seconds: number, nanoseconds: number } | Date;
   principalAmount: number;
   interestRate?: number;
@@ -35,6 +38,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
   penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; }[];
+  followUpNotes?: { noteId: string; date: { seconds: number; nanoseconds: number } | Date; staffName: string; staffId: string; content: string; }[];
   comments?: string;
   status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
   disbursementRecorded?: boolean;
@@ -142,6 +146,7 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     loanNumber: newLoanNumber,
     createdAt: serverTimestamp(),
     payments: [],
+    followUpNotes: [],
     comments: loanData.comments || "",
     disbursementRecorded: false 
   };
@@ -333,6 +338,8 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         customerPhone: originalLoan.customerPhone,
         alternativeNumber: originalLoan.alternativeNumber || "",
         idNumber: originalLoan.idNumber || "",
+        assignedStaffId: originalLoan.assignedStaffId || "",
+        assignedStaffName: originalLoan.assignedStaffName || "",
         disbursementDate: rolloverDate,
         principalAmount: originalLoan.principalAmount,
         interestRate: originalLoan.interestRate ?? 0,
@@ -347,6 +354,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         status: 'active',
         totalPaid: 0,
         payments: [],
+        followUpNotes: [],
         comments: `Rollover from Loan #${originalLoan.loanNumber}`,
         createdAt: serverTimestamp(),
         disbursementRecorded: true 
@@ -404,6 +412,31 @@ export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: {
                 totalPenalties: `increment by ${penalty.amount}`,
                 totalRepayableAmount: `increment by ${penalty.amount}`
             },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function addFollowUpNoteToLoan(db: Firestore, loanId: string, note: { content: string; staffName: string; staffId: string }) {
+    const loanRef = doc(db, 'loans', loanId);
+    const noteId = doc(collection(db, 'temp')).id;
+    const newNote = {
+        ...note,
+        noteId,
+        date: new Date(),
+    };
+
+    try {
+        await updateDoc(loanRef, {
+            followUpNotes: arrayUnion(newNote),
+            updatedAt: serverTimestamp()
+        });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loanRef.path,
+            operation: 'update',
+            requestResourceData: { followUpNotes: 'ADD_FOLLOW_UP_NOTE' },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;

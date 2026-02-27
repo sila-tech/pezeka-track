@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ const loanSchema = z.object({
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application']),
   loanType: z.string().optional(),
+  assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
   customerType: z.enum(['existing', 'new']),
   newCustomerName: z.string().optional(),
   newCustomerPhone: z.string().optional(),
@@ -89,6 +90,7 @@ const approvalSchema = z.object({
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
     idNumber: z.string().min(1, "ID number is required."),
     alternativeNumber: z.string().optional(),
+    assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
 });
 
 
@@ -99,6 +101,13 @@ interface Customer {
   idNumber?: string;
 }
 
+interface Staff {
+    id: string;
+    uid: string;
+    name: string;
+    role: string;
+}
+
 interface Loan {
     id: string;
     customerId: string;
@@ -107,6 +116,8 @@ interface Loan {
     customerPhone: string;
     alternativeNumber?: string;
     idNumber?: string;
+    assignedStaffId?: string;
+    assignedStaffName?: string;
     loanType?: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
@@ -145,6 +156,7 @@ export default function LoansPage() {
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
+  const { data: staffList, loading: staffLoading } = useCollection<Staff>(isAuthorized ? 'users' : null);
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
@@ -154,7 +166,8 @@ export default function LoansPage() {
             loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             loan.customerPhone.includes(searchTerm) ||
-            loan.idNumber?.includes(searchTerm);
+            loan.idNumber?.includes(searchTerm) ||
+            loan.assignedStaffName?.toLowerCase().includes(searchTerm.toLowerCase());
         return statusMatch && searchMatch;
     });
   }, [loans, searchTerm, statusFilter]);
@@ -184,6 +197,7 @@ export default function LoansPage() {
       newCustomerPhone: '',
       alternativeNumber: '',
       idNumber: '',
+      assignedStaffId: '',
       disbursementDate: format(new Date(), 'yyyy-MM-dd')
     },
   });
@@ -202,6 +216,7 @@ export default function LoansPage() {
         paymentFrequency: 'monthly',
         idNumber: '',
         alternativeNumber: '',
+        assignedStaffId: '',
       }
   });
 
@@ -242,6 +257,8 @@ export default function LoansPage() {
         customerPhone = selectedCustomer.phone;
       }
       
+      const assignedStaff = staffList?.find(s => s.uid === values.assignedStaffId);
+      
       const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
         values.principalAmount,
         values.interestRate,
@@ -256,6 +273,8 @@ export default function LoansPage() {
         customerPhone,
         alternativeNumber: values.alternativeNumber || "",
         idNumber: values.idNumber,
+        assignedStaffId: values.assignedStaffId,
+        assignedStaffName: assignedStaff?.name || "Unknown",
         disbursementDate: new Date(values.disbursementDate),
         totalRepayableAmount,
         instalmentAmount,
@@ -293,6 +312,7 @@ export default function LoansPage() {
           paymentFrequency: loan.paymentFrequency || 'monthly',
           idNumber: loan.idNumber || "",
           alternativeNumber: loan.alternativeNumber || "",
+          assignedStaffId: loan.assignedStaffId || "",
       });
   };
 
@@ -300,8 +320,11 @@ export default function LoansPage() {
     if (!applicationToManage) return;
     setIsUpdatingStatus(true);
     try {
+        const assignedStaff = staffList?.find(s => s.uid === values.assignedStaffId);
         const updateData = {
             ...values,
+            assignedStaffId: values.assignedStaffId,
+            assignedStaffName: assignedStaff?.name || "Unknown",
             disbursementDate: new Date(values.disbursementDate),
         };
         await approveLoanApplication(firestore, applicationToManage, updateData);
@@ -388,6 +411,20 @@ export default function LoansPage() {
                     )}
                     <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID number" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
                     <FormField control={form.control} name="alternativeNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input placeholder="Secondary contact" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                    
+                    <FormField control={form.control} name="assignedStaffId" render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Assign Staff Follow-up</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              {staffList?.map(s => <SelectItem key={s.uid} value={s.uid}>{s.name} ({s.role})</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                    )} />
+
                     <FormField control={form.control} name="loanType" render={({ field }) => (
                         <FormItem className="col-span-2">
                           <FormLabel>Loan Product</FormLabel>
@@ -449,7 +486,7 @@ export default function LoansPage() {
                 <CardContent>
                     <ScrollArea className="h-[60vh]">
                       <Table>
-                          <TableHeader><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
+                          <TableHeader><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Staff Assigned</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                           <TableBody>
                               {filteredLoans.map((loan) => (
                                   <TableRow key={loan.id}>
@@ -457,6 +494,12 @@ export default function LoansPage() {
                                       <TableCell>
                                           <div>{loan.customerName}</div>
                                           <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                      </TableCell>
+                                      <TableCell>
+                                          <div className="flex items-center gap-1">
+                                              <User className="h-3 w-3 text-muted-foreground" />
+                                              <span className="text-sm">{loan.assignedStaffName || "Unassigned"}</span>
+                                          </div>
                                       </TableCell>
                                       <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
                                       <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
@@ -504,12 +547,26 @@ export default function LoansPage() {
                             <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
                             <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            
+                            <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
+                                <FormItem className="col-span-2">
+                                  <FormLabel>Assign Staff for Follow-up</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                      {staffList?.map(s => <SelectItem key={s.uid} value={s.uid}>{s.name} ({s.role})</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                            )} />
+
                             <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="paymentFrequency" render={({field}) => (
+                            <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Frequency</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -13,7 +14,10 @@ import {
   Wallet,
   HandCoins,
   Receipt,
-  CreditCard
+  CreditCard,
+  User,
+  MessageSquare,
+  Plus
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -28,6 +32,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -60,7 +65,8 @@ import {
   deleteFinanceEntry, 
   rolloverLoan, 
   addPenaltyToLoan, 
-  updateFinanceEntry 
+  updateFinanceEntry,
+  addFollowUpNoteToLoan
 } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
@@ -102,6 +108,18 @@ const penaltySchema = z.object({
     penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
 });
 
+const followUpNoteSchema = z.object({
+    content: z.string().min(5, "Note must be at least 5 characters long."),
+});
+
+interface FollowUpNote {
+    noteId: string;
+    date: any;
+    staffName: string;
+    staffId: string;
+    content: string;
+}
+
 interface Loan {
   id: string;
   loanNumber: string;
@@ -110,6 +128,8 @@ interface Loan {
   customerPhone: string;
   alternativeNumber?: string;
   idNumber?: string;
+  assignedStaffId?: string;
+  assignedStaffName?: string;
   disbursementDate: { seconds: number, nanoseconds: number };
   principalAmount: number;
   interestRate?: number;
@@ -125,6 +145,7 @@ interface Loan {
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   payments?: { paymentId: string; date: any; amount: number; }[];
   penalties?: { penaltyId: string; date: any; amount: number; description: string; }[];
+  followUpNotes?: FollowUpNote[];
   comments?: string;
   status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
 }
@@ -149,6 +170,7 @@ export default function FinancePage() {
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
@@ -234,7 +256,8 @@ export default function FinancePage() {
             loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) || 
             loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
             loan.customerPhone?.includes(loanBookSearchTerm) ||
-            loan.idNumber?.includes(loanBookSearchTerm);
+            loan.idNumber?.includes(loanBookSearchTerm) ||
+            loan.assignedStaffName?.toLowerCase().includes(loanBookSearchTerm.toLowerCase());
         return statusMatch && searchMatch;
     });
   }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
@@ -272,9 +295,13 @@ export default function FinancePage() {
     }
   });
 
+  const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
+      resolver: zodResolver(followUpNoteSchema),
+      defaultValues: { content: '' },
+  });
+
   const addFinanceEntryType = addForm.watch('type');
 
-  // Clear category selections when type changes to prevent redundant data in submission
   useEffect(() => {
     if (addFinanceEntryType === 'receipt') {
         addForm.setValue('payoutCategory', undefined);
@@ -291,7 +318,6 @@ export default function FinancePage() {
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
-      // Data Sanitization: only send fields relevant to the selected type
       const sanitizedData: any = {
         type: values.type,
         date: new Date(values.date),
@@ -376,6 +402,24 @@ export default function FinancePage() {
     } finally { 
       setIsAddingPenalty(false); 
     }
+  }
+
+  async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
+      if (!loanToEdit || !user) return;
+      setIsAddingNote(true);
+      try {
+          await addFollowUpNoteToLoan(firestore, loanToEdit.id, {
+              content: values.content,
+              staffName: user.name || user.email?.split('@')[0] || "Staff",
+              staffId: user.uid,
+          });
+          toast({ title: "Note Added" });
+          noteForm.reset();
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+      } finally {
+          setIsAddingNote(false);
+      }
   }
 
   if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -530,13 +574,14 @@ export default function FinancePage() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-[65vh] w-full">
-                      <Table className="min-w-[2800px]">
+                      <Table className="min-w-[3000px]">
                         <TableHeader className="sticky top-0 bg-card z-10">
                           <TableRow>
                             <TableHead className="w-[250px]">Client Name</TableHead>
                             <TableHead className="w-[150px]">Client Phone</TableHead>
                             <TableHead className="w-[120px]">Loan No.</TableHead>
                             <TableHead className="w-[120px]">Date</TableHead>
+                            <TableHead className="w-[180px]">Follow-up Staff</TableHead>
                             <TableHead className="text-right w-[150px]">Principal</TableHead>
                             <TableHead className="text-right w-[120px]">Reg Fee</TableHead>
                             <TableHead className="text-right w-[120px]">Proc Fee</TableHead>
@@ -574,6 +619,12 @@ export default function FinancePage() {
                                   <TableCell>{loan.customerPhone}</TableCell>
                                   <TableCell>{loan.loanNumber}</TableCell>
                                   <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                  <TableCell>
+                                      <div className="flex items-center gap-1">
+                                          <User className="h-3 w-3 text-muted-foreground" />
+                                          <span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span>
+                                      </div>
+                                  </TableCell>
                                   <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{reg.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{proc.toLocaleString()}</TableCell>
@@ -649,35 +700,37 @@ export default function FinancePage() {
       </Tabs>
 
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
-          <DialogContent className="sm:max-w-4xl">
+          <DialogContent className="sm:max-w-5xl">
               {loanToEdit && (
                   <>
                     <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle></DialogHeader>
-                    <ScrollArea className="max-h-[70vh]">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
-                            <div className="space-y-4">
+                    <ScrollArea className="max-h-[75vh]">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
+                            <div className="space-y-4 md:col-span-1">
                                 <Card>
-                                    <CardHeader><CardTitle className="text-sm">Summary</CardTitle></CardHeader>
-                                    <CardContent className="space-y-2">
-                                        <div className="flex justify-between"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
+                                    <CardHeader className="py-3"><CardTitle className="text-sm">Loan Summary</CardTitle></CardHeader>
+                                    <CardContent className="space-y-2 text-sm">
+                                        <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                        <div className="flex justify-between"><span>Staff Assigned:</span><span className="font-medium text-blue-600">{loanToEdit.assignedStaffName || "Unassigned"}</span></div>
+                                        <div className="flex justify-between border-t pt-2"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
                                         <div className="flex justify-between"><span>Total Repayable:</span><span className="font-medium">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</span></div>
                                         <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">Ksh {loanToEdit.totalPaid.toLocaleString()}</span></div>
                                         <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
                                     </CardContent>
                                 </Card>
                                 <Card>
-                                    <CardHeader><CardTitle className="text-sm">Actions</CardTitle></CardHeader>
+                                    <CardHeader className="py-3"><CardTitle className="text-sm">Collection Actions</CardTitle></CardHeader>
                                     <CardContent className="space-y-2">
                                         <Button 
                                             variant="outline" 
-                                            className="w-full" 
+                                            className="w-full text-xs" 
                                             onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Loan Rolled Over' }); setLoanToEdit(null); })}
                                         >
                                             Perform Rollover
                                         </Button>
                                         <Button 
                                             variant="secondary" 
-                                            className="w-full"
+                                            className="w-full text-xs"
                                             onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked as Paid' }); setLoanToEdit(null); })}
                                         >
                                             Mark as Fully Paid
@@ -685,71 +738,114 @@ export default function FinancePage() {
                                     </CardContent>
                                 </Card>
                             </div>
-                            <Tabs defaultValue="payments">
-                                <TabsList className="grid grid-cols-2 w-full"><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="penalties">Penalties</TabsTrigger></TabsList>
-                                <TabsContent value="payments">
-                                    <Form {...paymentForm}>
-                                        <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
-                                            <div className="flex gap-2">
-                                                <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (
-                                                  <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
-                                                )} />
-                                                <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (
-                                                  <Input type="date" {...field} value={field.value ?? ''}/>
-                                                )} />
-                                                <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
+                            
+                            <div className="md:col-span-2 space-y-6">
+                                <Tabs defaultValue="payments">
+                                    <TabsList className="grid grid-cols-3 w-full">
+                                        <TabsTrigger value="payments">Payments</TabsTrigger>
+                                        <TabsTrigger value="followups">Follow-ups</TabsTrigger>
+                                        <TabsTrigger value="penalties">Penalties</TabsTrigger>
+                                    </TabsList>
+                                    
+                                    <TabsContent value="payments">
+                                        <Form {...paymentForm}>
+                                            <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
+                                                <div className="flex gap-2">
+                                                    <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (
+                                                      <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
+                                                    )} />
+                                                    <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (
+                                                      <Input type="date" {...field} value={field.value ?? ''}/>
+                                                    )} />
+                                                    <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
+                                                </div>
+                                            </form>
+                                        </Form>
+                                        <ScrollArea className="h-64 border rounded-md">
+                                            <Table>
+                                                <TableBody>
+                                                    {loanToEdit.payments?.map((p, i) => (
+                                                        <TableRow key={p.paymentId || i}>
+                                                            <TableCell className="text-xs">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell>
+                                                            <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </ScrollArea>
+                                    </TabsContent>
+
+                                    <TabsContent value="followups">
+                                        <Form {...noteForm}>
+                                            <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-3 mb-4">
+                                                <FormField control={noteForm.control} name="content" render={({field}) => (
+                                                    <FormItem>
+                                                        <FormControl><Textarea placeholder="Add a follow-up note..." className="h-20" {...field} value={field.value ?? ''}/></FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}/>
+                                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>
+                                                    {isAddingNote ? <Loader2 className="animate-spin h-4 w-4"/> : <Plus className="h-4 w-4 mr-2" />}
+                                                    Add Interaction Note
+                                                </Button>
+                                            </form>
+                                        </Form>
+                                        <ScrollArea className="h-64 border rounded-md p-3">
+                                            <div className="space-y-3">
+                                                {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (
+                                                    <p className="text-xs text-muted-foreground text-center py-8">No interaction history recorded.</p>
+                                                ) : (
+                                                    [...loanToEdit.followUpNotes].reverse().map((note) => (
+                                                        <div key={note.noteId} className="bg-muted p-2 rounded border text-[11px]">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="font-bold flex items-center gap-1"><User className="h-2 w-2" /> {note.staffName}</span>
+                                                                <span className="text-[9px] text-muted-foreground">{format(new Date(note.date.seconds * 1000), 'dd/MM/yy HH:mm')}</span>
+                                                            </div>
+                                                            <p className="italic">"{note.content}"</p>
+                                                        </div>
+                                                    ))
+                                                )}
                                             </div>
-                                        </form>
-                                    </Form>
-                                    <ScrollArea className="h-64 border rounded-md">
-                                        <Table>
-                                            <TableBody>
-                                                {loanToEdit.payments?.map((p, i) => (
-                                                    <TableRow key={p.paymentId || i}>
-                                                        <TableCell>{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</TableCell>
-                                                        <TableCell className="text-right">Ksh {p.amount.toLocaleString()}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </ScrollArea>
-                                </TabsContent>
-                                <TabsContent value="penalties">
-                                    <Form {...penaltyForm}>
-                                        <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (
-                                                  <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
+                                        </ScrollArea>
+                                    </TabsContent>
+
+                                    <TabsContent value="penalties">
+                                        <Form {...penaltyForm}>
+                                            <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (
+                                                      <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
+                                                    )} />
+                                                    <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (
+                                                      <Input type="date" {...field} value={field.value ?? ''}/>
+                                                    )} />
+                                                </div>
+                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (
+                                                  <Input placeholder="Reason" {...field} value={field.value ?? ''}/>
                                                 )} />
-                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (
-                                                  <Input type="date" {...field} value={field.value ?? ''}/>
-                                                )} />
-                                            </div>
-                                            <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (
-                                              <Input placeholder="Reason" {...field} value={field.value ?? ''}/>
-                                            )} />
-                                            <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
-                                                {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Add Penalty'}
-                                            </Button>
-                                        </form>
-                                    </Form>
-                                    <ScrollArea className="h-64 border rounded-md">
-                                        <Table>
-                                            <TableBody>
-                                                {loanToEdit.penalties?.map((p, i) => (
-                                                    <TableRow key={p.penaltyId || i}>
-                                                        <TableCell>
-                                                            <div className="text-xs">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</div>
-                                                            <div className="font-medium">{p.description}</div>
-                                                        </TableCell>
-                                                        <TableCell className="text-right text-destructive font-bold">Ksh {p.amount.toLocaleString()}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </ScrollArea>
-                                </TabsContent>
-                            </Tabs>
+                                                <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
+                                                    {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Add Penalty'}
+                                                </Button>
+                                            </form>
+                                        </Form>
+                                        <ScrollArea className="h-64 border rounded-md">
+                                            <Table>
+                                                <TableBody>
+                                                    {loanToEdit.penalties?.map((p, i) => (
+                                                        <TableRow key={p.penaltyId || i}>
+                                                            <TableCell>
+                                                                <div className="text-[10px]">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</div>
+                                                                <div className="font-medium text-xs">{p.description}</div>
+                                                            </TableCell>
+                                                            <TableCell className="text-right text-destructive font-bold text-xs">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </ScrollArea>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
                         </div>
                     </ScrollArea>
                   </>
