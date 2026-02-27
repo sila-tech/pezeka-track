@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -77,12 +78,12 @@ export default function InvestorPage() {
   
   const withdrawalForm = useForm<z.infer<typeof withdrawalSchema>>({
     resolver: zodResolver(withdrawalSchema),
-    defaultValues: { amount: undefined },
+    defaultValues: { amount: 0 },
   });
 
   const depositForm = useForm<z.infer<typeof depositSchema>>({
     resolver: zodResolver(depositSchema),
-    defaultValues: { amount: undefined },
+    defaultValues: { amount: 0 },
   });
 
   const monthlyReturn = useMemo(() => {
@@ -135,7 +136,7 @@ export default function InvestorPage() {
       const message = `Hello! I would like to request a withdrawal of Ksh ${values.amount.toLocaleString()} from my Pezeka Credit portfolio. My investor account is associated with the email ${user.email}. Please process this request.`;
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       
-      window.open(whatsappUrl, '_blank');
+      if (typeof window !== 'undefined') window.open(whatsappUrl, '_blank');
 
       withdrawalForm.reset();
     } catch (error: any) {
@@ -163,7 +164,7 @@ export default function InvestorPage() {
       const message = `Hello! I have just deposited Ksh ${values.amount.toLocaleString()} into my Pezeka Credit portfolio. My investor account is associated with the email ${user.email}. Please verify.`;
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       
-      window.open(whatsappUrl, '_blank');
+      if (typeof window !== 'undefined') window.open(whatsappUrl, '_blank');
 
       depositForm.reset();
     } catch (error: any) {

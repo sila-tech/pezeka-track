@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -101,11 +102,26 @@ export default function InvestorsPage() {
 
     const addForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
-        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0, interestRate: 0, createdAt: undefined },
+        defaultValues: { 
+          uid: '', 
+          name: '', 
+          email: '', 
+          totalInvestment: 0, 
+          interestRate: 0, 
+          createdAt: format(new Date(), 'yyyy-MM-dd') 
+        },
     });
 
     const editForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
+        defaultValues: {
+          uid: '',
+          name: '',
+          email: '',
+          totalInvestment: 0,
+          interestRate: 0,
+          createdAt: ''
+        }
     });
 
     async function onAddSubmit(values: z.infer<typeof investorSchema>) {
@@ -137,7 +153,7 @@ export default function InvestorsPage() {
             email: investor.email,
             totalInvestment: investor.totalInvestment,
             interestRate: investor.interestRate || 0,
-            createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : undefined,
+            createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
         });
         setEditDialogOpen(true);
     };
@@ -220,13 +236,13 @@ export default function InvestorsPage() {
             <ScrollArea className="max-h-[70vh]">
                 <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
                     <FormField control={addForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
                     <FormItem><FormLabel>Total Investment Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
@@ -311,13 +327,13 @@ export default function InvestorsPage() {
               <ScrollArea className="max-h-[70vh]">
                 <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 p-1">
                     <FormField control={editForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={editForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={editForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
                     <FormItem><FormLabel>Total Investment (Basis)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>

@@ -242,17 +242,32 @@ export default function FinancePage() {
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), type: 'receipt', transactionFee: 0 }
+    defaultValues: { 
+      date: format(new Date(), 'yyyy-MM-dd'), 
+      type: 'receipt', 
+      transactionFee: 0,
+      amount: 0,
+      description: '',
+      loanId: ''
+    }
   });
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
-    defaultValues: { paymentDate: format(new Date(), 'yyyy-MM-dd') }
+    defaultValues: { 
+      paymentDate: format(new Date(), 'yyyy-MM-dd'),
+      paymentAmount: 0,
+      comments: ''
+    }
   });
 
   const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
     resolver: zodResolver(penaltySchema),
-    defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd') }
+    defaultValues: { 
+      penaltyDate: format(new Date(), 'yyyy-MM-dd'),
+      penaltyAmount: 0,
+      penaltyDescription: ''
+    }
   });
 
   const addFinanceEntryType = addForm.watch('type');
@@ -344,7 +359,7 @@ export default function FinancePage() {
                             <FormField control={addForm.control} name="type" render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Type</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl>
                                     <SelectContent>
                                       <SelectItem value="receipt">Receipt (Income)</SelectItem>
@@ -358,7 +373,7 @@ export default function FinancePage() {
                                 <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
                                     <FormItem>
                                       <FormLabel>Payout Category</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl>
                                         <SelectContent>
                                           <SelectItem value="loan_disbursement">Loan Disbursement</SelectItem>
@@ -373,7 +388,7 @@ export default function FinancePage() {
                                 <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
                                     <FormItem>
                                       <FormLabel>Receipt Category</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl>
                                         <SelectContent>
                                           <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
@@ -386,13 +401,13 @@ export default function FinancePage() {
                                 )} />
                             )}
                             <div className="grid grid-cols-2 gap-4">
-                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 {addFinanceEntryType !== 'receipt' && (
-                                    <FormField control={addForm.control} name="transactionFee" render={({ field }) => (<FormItem><FormLabel>Tx Fee (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                    <FormField control={addForm.control} name="transactionFee" render={({ field }) => (<FormItem><FormLabel>Tx Fee (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 )}
                             </div>
-                            <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
+                            <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <Button type="submit" className="w-full" disabled={isSubmitting}>{editingEntry ? 'Update' : 'Record'}</Button>
                         </form>
                     </Form>
@@ -605,8 +620,8 @@ export default function FinancePage() {
                                     <Form {...paymentForm}>
                                         <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
                                             <div className="flex gap-2">
-                                                <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field}/>)} />
-                                                <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field}/>)} />
+                                                <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
                                                 <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
                                             </div>
                                         </form>
@@ -628,10 +643,10 @@ export default function FinancePage() {
                                     <Form {...penaltyForm}>
                                         <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
                                             <div className="grid grid-cols-2 gap-2">
-                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field}/>)} />
-                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field}/>)} />
+                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
                                             </div>
-                                            <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field}/>)} />
+                                            <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} />
                                             <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
                                                 {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Add Penalty'}
                                             </Button>

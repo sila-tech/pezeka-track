@@ -89,13 +89,13 @@ export default function AccountPage() {
   const applicationForm = useForm<z.infer<typeof applicationSchema>>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
-      loanType: undefined,
-      loanAmount: undefined,
+      loanType: '',
+      loanAmount: 0,
       idNumber: '',
       phone: user?.phoneNumber || '',
       alternativeNumber: '',
       statement: undefined,
-      agreeToTerms: false,
+      agreeToTerms: false as any,
     },
   });
 
@@ -118,7 +118,7 @@ export default function AccountPage() {
     try {
       const loanApplicationData = {
         customerId: user.uid,
-        customerName: user.displayName || user.email,
+        customerName: user.displayName || user.email || "Customer",
         customerPhone: values.phone,
         alternativeNumber: values.alternativeNumber || "",
         idNumber: values.idNumber,
@@ -129,8 +129,8 @@ export default function AccountPage() {
         processingFee: 0,
         carTrackInstallationFee: 0,
         chargingCost: 0,
-        numberOfInstalments: values.loanType === 'Quick Pesa' ? 1 : 1, 
-        paymentFrequency: values.loanType === 'Quick Pesa' ? 'monthly' as const : 'monthly' as const,
+        numberOfInstalments: 1, 
+        paymentFrequency: 'monthly' as const,
         status: 'application' as const,
         loanType: values.loanType,
         instalmentAmount: values.loanAmount,
@@ -252,7 +252,7 @@ export default function AccountPage() {
                         render={({ field }) => (
                             <FormItem>
                             <FormLabel>Loan Product</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                 <FormControl>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select loan product" />
@@ -289,7 +289,7 @@ export default function AccountPage() {
                           <FormItem>
                           <FormLabel>National ID Number</FormLabel>
                           <FormControl>
-                              <Input placeholder="Your ID Number" {...field} />
+                              <Input placeholder="Your ID Number" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                           </FormItem>
@@ -302,7 +302,7 @@ export default function AccountPage() {
                           <FormItem>
                           <FormLabel>Primary Phone Number</FormLabel>
                           <FormControl>
-                              <Input placeholder="e.g. 0712345678" {...field} />
+                              <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                           </FormItem>
@@ -315,7 +315,7 @@ export default function AccountPage() {
                           <FormItem>
                           <FormLabel>Alternative Phone Number (Optional)</FormLabel>
                           <FormControl>
-                              <Input placeholder="Secondary contact number" {...field} />
+                              <Input placeholder="Secondary contact number" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                           </FormItem>

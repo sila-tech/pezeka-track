@@ -169,8 +169,8 @@ export default function LoansPage() {
     resolver: zodResolver(loanSchema),
     defaultValues: {
       customerId: '',
-      principalAmount: undefined,
-      interestRate: undefined,
+      principalAmount: 0,
+      interestRate: 0,
       registrationFee: 0,
       processingFee: 0,
       carTrackInstallationFee: 0,
@@ -184,11 +184,25 @@ export default function LoansPage() {
       newCustomerPhone: '',
       alternativeNumber: '',
       idNumber: '',
+      disbursementDate: format(new Date(), 'yyyy-MM-dd')
     },
   });
 
   const approvalForm = useForm<z.infer<typeof approvalSchema>>({
       resolver: zodResolver(approvalSchema),
+      defaultValues: {
+        disbursementDate: format(new Date(), 'yyyy-MM-dd'),
+        principalAmount: 0,
+        interestRate: 0,
+        processingFee: 0,
+        registrationFee: 0,
+        carTrackInstallationFee: 0,
+        chargingCost: 0,
+        numberOfInstalments: 1,
+        paymentFrequency: 'monthly',
+        idNumber: '',
+        alternativeNumber: '',
+      }
   });
 
   const { watch } = form;
@@ -270,13 +284,13 @@ export default function LoansPage() {
       approvalForm.reset({
           disbursementDate: format(new Date(), 'yyyy-MM-dd'),
           principalAmount: loan.principalAmount,
-          interestRate: 0,
-          processingFee: 0,
-          registrationFee: 0,
-          carTrackInstallationFee: 0,
-          chargingCost: 0,
-          numberOfInstalments: 1,
-          paymentFrequency: 'monthly',
+          interestRate: loan.interestRate || 0,
+          processingFee: loan.processingFee || 0,
+          registrationFee: loan.registrationFee || 0,
+          carTrackInstallationFee: loan.carTrackInstallationFee || 0,
+          chargingCost: loan.chargingCost || 0,
+          numberOfInstalments: loan.numberOfInstalments || 1,
+          paymentFrequency: loan.paymentFrequency || 'monthly',
           idNumber: loan.idNumber || "",
           alternativeNumber: loan.alternativeNumber || "",
       });
@@ -358,7 +372,7 @@ export default function LoansPage() {
                       <FormField control={form.control} name="customerId" render={({ field }) => (
                           <FormItem className="col-span-2">
                             <FormLabel>Customer</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
                               <SelectContent>
                                 {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -368,16 +382,16 @@ export default function LoansPage() {
                       )} />
                     ) : (
                       <>
-                        <FormField control={form.control} name="newCustomerName" render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                        <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="newCustomerName" render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                       </>
                     )}
-                    <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID number" {...field} /></FormControl><FormMessage/></FormItem>)} />
-                    <FormField control={form.control} name="alternativeNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input placeholder="Secondary contact" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID number" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
+                    <FormField control={form.control} name="alternativeNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input placeholder="Secondary contact" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="loanType" render={({ field }) => (
                         <FormItem className="col-span-2">
                           <FormLabel>Loan Product</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                             <SelectContent>
                               <SelectItem value="Quick Pesa">Quick Pesa</SelectItem>
@@ -389,14 +403,14 @@ export default function LoansPage() {
                           </Select>
                         </FormItem>
                     )} />
-                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Frequency</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                           <SelectContent>
                             <SelectItem value="daily">Daily</SelectItem>
@@ -487,18 +501,18 @@ export default function LoansPage() {
                     <DialogHeader><DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle></DialogHeader>
                     <Form {...approvalForm}>
                         <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
-                            <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>)} />
-                            <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
+                            <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="paymentFrequency" render={({field}) => (
                               <FormItem>
                                 <FormLabel>Frequency</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                   <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                                   <SelectContent>
                                     <SelectItem value="daily">Daily</SelectItem>
