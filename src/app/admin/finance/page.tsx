@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -12,7 +13,8 @@ import {
   TrendingUp,
   Wallet,
   HandCoins,
-  Receipt
+  Receipt,
+  CreditCard
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -71,6 +73,7 @@ const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
+  transactionFee: z.coerce.number().min(0, 'Transaction fee cannot be negative.').optional(),
   description: z.string().optional(),
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
@@ -132,6 +135,7 @@ interface FinanceEntry {
   type: 'expense' | 'payout' | 'receipt' | 'unearned';
   date: any;
   amount: number;
+  transactionFee?: number;
   description: string;
   loanId?: string;
   expenseCategory?: string;
@@ -163,8 +167,9 @@ export default function FinancePage() {
     const upfront: any[] = [];
     const payouts: any[] = [];
     const expenses: any[] = [];
+    const transactionFees: any[] = [];
 
-    if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
+    if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [], allTransactionFees: [] };
 
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
@@ -192,18 +197,33 @@ export default function FinancePage() {
         } else {
             payouts.push(entry);
             if (entry.type === 'expense') expenses.push(entry);
+            
+            if (entry.transactionFee && Number(entry.transactionFee) > 0) {
+                transactionFees.push({
+                    id: `tx-fee-${entry.id}`,
+                    type: 'expense',
+                    expenseCategory: 'other',
+                    date: entry.date,
+                    amount: entry.transactionFee,
+                    description: `Transaction Fee for: ${entry.description}`
+                });
+            }
         }
     });
 
-    return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses };
+    return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    const { allReceipts, allUpfrontFees, allPayouts } = financialData;
+    const { allReceipts, allUpfrontFees, allPayouts, allTransactionFees } = financialData;
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
-    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    
+    const payoutTotal = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const txFeeTotal = allTransactionFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const totalMoneyOut = payoutTotal + txFeeTotal;
+
     return { totalReceipts: totalMoneyIn, totalPayouts: totalMoneyOut, cashAtHand: totalMoneyIn - totalMoneyOut };
   }, [financialData]);
 
@@ -222,7 +242,7 @@ export default function FinancePage() {
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), type: 'receipt' }
+    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), type: 'receipt', transactionFee: 0 }
   });
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
@@ -262,6 +282,7 @@ export default function FinancePage() {
           type: entry.type as any,
           date: format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'yyyy-MM-dd'),
           amount: entry.amount,
+          transactionFee: entry.transactionFee || 0,
           description: entry.description,
           expenseCategory: entry.expenseCategory as any,
           receiptCategory: entry.receiptCategory as any,
@@ -364,7 +385,12 @@ export default function FinancePage() {
                                     </FormItem>
                                 )} />
                             )}
-                            <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                {addFinanceEntryType !== 'receipt' && (
+                                    <FormField control={addForm.control} name="transactionFee" render={({ field }) => (<FormItem><FormLabel>Tx Fee (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                )}
+                            </div>
                             <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                             <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
                             <Button type="submit" className="w-full" disabled={isSubmitting}>{editingEntry ? 'Update' : 'Record'}</Button>
@@ -376,16 +402,17 @@ export default function FinancePage() {
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Cash at Hand</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh {stats.cashAtHand.toLocaleString()}</div></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-600">Total In</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">Ksh {stats.totalReceipts.toLocaleString()}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-destructive">Total Out</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-destructive">Ksh {stats.totalPayouts.toLocaleString()}</div></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-destructive">Total Out (incl. Fees)</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-destructive">Ksh {stats.totalPayouts.toLocaleString()}</div></CardContent></Card>
         </div>
       </div>
 
       <Tabs defaultValue="loanbook" className="w-full">
           <TabsList className="mb-4">
-              <TabsTrigger value="loanbook">Loan Book (Master Ledger)</TabsTrigger>
+              <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
               <TabsTrigger value="upfront">Upfront Fees</TabsTrigger>
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
+              <TabsTrigger value="txfees">Transaction Fees</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
           </TabsList>
           
@@ -518,6 +545,15 @@ export default function FinancePage() {
                 loading={false} 
                 onEdit={handleEditEntry} 
                 onDelete={(e) => deleteFinanceEntry(firestore, e.id)} 
+            />
+          </TabsContent>
+
+          <TabsContent value="txfees">
+            <EditableFinanceReportTab 
+                title="Transaction Fees" 
+                description="Consolidated record of all fees paid for money-out transactions." 
+                entries={financialData.allTransactionFees} 
+                loading={false} 
             />
           </TabsContent>
           

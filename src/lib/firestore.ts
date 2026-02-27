@@ -37,7 +37,7 @@ interface Loan {
   payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
   penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; }[];
   comments?: string;
-  status: 'active' | 'due' | 'paid' | 'rollover' | 'overdue' | 'application' | 'rejected';
+  status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
   disbursementRecorded?: boolean;
 }
 
@@ -68,6 +68,7 @@ type FinanceEntryData = {
     type: 'expense' | 'payout' | 'receipt';
     date: Date;
     amount: number;
+    transactionFee?: number;
     description?: string;
     loanId?: string;
     expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
@@ -80,6 +81,7 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
 
   const newEntry = {
     ...entryData,
+    transactionFee: entryData.transactionFee || 0,
   };
 
   try {
@@ -185,6 +187,7 @@ async function recordDisbursement(db: Firestore, loan: any) {
         payoutCategory: 'loan_disbursement',
         date: disbursementDate,
         amount: takeHome,
+        transactionFee: 0, // Default for auto-disbursement
         description: `Disbursement for Loan #${loan.loanNumber}. Principal: Ksh ${Number(loan.principalAmount).toLocaleString()}, Retained Fees: Ksh ${totalFees.toLocaleString()}`,
         loanId: loan.id
     });
@@ -298,6 +301,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         receiptCategory: 'loan_repayment' as const,
         date: rolloverDate,
         amount: interestAmount,
+        transactionFee: 0,
         description: receiptDescription,
         loanId: originalLoan.id
     };
@@ -710,6 +714,7 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
         payoutCategory: 'investor_withdrawal',
         date: new Date(),
         amount: withdrawal.amount,
+        transactionFee: 0,
         description: `Investor withdrawal for ${investorData.name}`,
     });
 
@@ -795,6 +800,7 @@ export async function approveDeposit(db: Firestore, investorId: string, depositI
         receiptCategory: 'investment',
         date: new Date(),
         amount: deposit.amount,
+        transactionFee: 0,
         description: `Investor deposit from ${investorData.name}`,
     });
 

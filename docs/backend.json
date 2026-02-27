@@ -108,6 +108,7 @@
         "type": { "type": "string", "enum": ["expense", "payout", "receipt"] },
         "date": { "type": "string", "format": "date-time" },
         "amount": { "type": "number" },
+        "transactionFee": { "type": "number", "default": 0, "description": "Transaction fee associated with money out." },
         "description": { "type": "string" },
         "loanId": { "type": "string", "description": "The ID of the associated loan, if applicable." },
         "expenseCategory": {
