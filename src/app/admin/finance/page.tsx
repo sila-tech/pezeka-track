@@ -104,19 +104,6 @@ const penaltySchema = z.object({
     penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
 });
 
-const editLoanSchema = z.object({
-  disbursementDate: z.string().min(1, 'Disbursement date is required.'),
-  principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
-  interestRate: z.coerce.number().min(0, 'Interest rate cannot be negative.'),
-  registrationFee: z.coerce.number().optional(),
-  processingFee: z.coerce.number().optional(),
-  carTrackInstallationFee: z.coerce.number().optional(),
-  chargingCost: z.coerce.number().optional(),
-  numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
-  paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['active', 'due', 'overdue', 'paid', 'rollover', 'application', 'rejected']),
-});
-
 interface Loan {
   id: string;
   loanNumber: string;
