@@ -6,7 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { User, TrendingUp, HandCoins, CheckCircle2 } from 'lucide-react';
+import { User, BarChart2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 interface Loan {
   id: string;
@@ -47,6 +49,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
 
       return {
         id: staff.id,
+        uid: staff.uid || staff.id,
         name: staff.name || staff.email,
         activeCount,
         totalDisbursed,
@@ -84,7 +87,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
         <CardHeader>
           <CardTitle>Staff Performance Ledger</CardTitle>
           <CardDescription>
-            Cumulative tracking of disbursements and collections per staff member.
+            Cumulative tracking. Click "View Performance" for detailed date-filtered analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,6 +100,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                   <TableHead className="text-right">Total Disbursed (Ksh)</TableHead>
                   <TableHead className="text-right">Total Collected (Ksh)</TableHead>
                   <TableHead className="w-[200px]">Collection Efficiency</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -124,6 +128,14 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                         </div>
                         <Progress value={staff.efficiency} className="h-1.5" />
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={`/admin/finance/staff/${staff.uid}`}>
+                                <BarChart2 className="mr-2 h-4 w-4" />
+                                View Performance
+                            </Link>
+                        </Button>
                     </TableCell>
                   </TableRow>
                 ))}
