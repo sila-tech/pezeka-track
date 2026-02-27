@@ -1,13 +1,23 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useAppUser, useCollection } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState } from 'react';
+import { useAppUser, useCollection, useFirestore } from '@/firebase';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2, TrendingUp, HandCoins } from 'lucide-react';
+import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, FileText } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import { addLoan } from '@/lib/firestore';
 
 interface DashboardLoan {
   id: string;
@@ -27,13 +37,72 @@ interface DashboardLoan {
   loanType?: string;
 }
 
+const staffLoanSchema = z.object({
+  amount: z.coerce.number().min(1000, "Minimum application is Ksh 1,000"),
+  reason: z.string().min(10, "Please provide a brief reason for the loan request."),
+});
+
 export default function Dashboard() {
   const { user, loading: userLoading } = useAppUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
   
+  const [isStaffLoanOpen, setIsStaffLoanOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
   const isFinanceUser = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  const isStaffMember = user?.role === 'staff' || user?.role === 'finance';
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
+
+  const staffLoanForm = useForm<z.infer<typeof staffLoanSchema>>({
+    resolver: zodResolver(staffLoanSchema),
+    defaultValues: { amount: undefined, reason: '' },
+  });
+
+  async function onStaffLoanSubmit(values: z.infer<typeof staffLoanSchema>) {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const loanData = {
+        customerId: user.uid,
+        customerName: user.name || user.email?.split('@')[0],
+        customerPhone: "Internal Staff", // Staff don't necessarily have a phone in profile
+        disbursementDate: new Date(),
+        principalAmount: values.amount,
+        interestRate: 0, 
+        registrationFee: 0,
+        processingFee: 0,
+        carTrackInstallationFee: 0,
+        chargingCost: 0,
+        numberOfInstalments: 1,
+        paymentFrequency: 'monthly' as const,
+        status: 'application' as const,
+        loanType: 'Staff Loan',
+        instalmentAmount: values.amount,
+        totalRepayableAmount: values.amount,
+        totalPaid: 0,
+        comments: `Staff Loan Application: ${values.reason}`,
+      };
+
+      await addLoan(firestore, loanData);
+      toast({
+        title: "Application Submitted",
+        description: "Your staff loan application has been sent to Finance for review.",
+      });
+      staffLoanForm.reset();
+      setIsStaffLoanOpen(false);
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Application Failed",
+        description: e.message || "Could not submit application.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   const stats = useMemo(() => {
     if (!loans) return { realizedRevenue: 0, disbursedCount: 0 };
@@ -42,20 +111,14 @@ export default function Dashboard() {
     let disbursedCount = 0;
     
     loans.forEach(loan => {
-        // Exclude applications and rejections from counts
         if (loan.status !== 'application' && loan.status !== 'rejected') {
             disbursedCount++;
-            
-            // Revenue includes upfront fees (collected at disbursement)
             const upfrontFees = (Number(loan.registrationFee) || 0) + 
                                (Number(loan.processingFee) || 0) + 
                                (Number(loan.carTrackInstallationFee) || 0) + 
                                (Number(loan.chargingCost) || 0);
             
             realizedRevenue += upfrontFees;
-
-            // Interest revenue realized from payments made
-            // Simplified: If TotalPaid > Principal, the excess is interest.
             if (loan.totalPaid > loan.principalAmount) {
                 realizedRevenue += (loan.totalPaid - loan.principalAmount);
             }
@@ -67,7 +130,6 @@ export default function Dashboard() {
 
   const dueLoans = useMemo(() => {
     if (!loans) return [];
-
     const today = startOfToday();
     
     return loans
@@ -77,26 +139,16 @@ export default function Dashboard() {
         let endDate: Date;
         try {
             switch (loan.paymentFrequency) {
-                case 'daily':
-                    endDate = addDays(disbursementDate, loan.numberOfInstalments);
-                    break;
-                case 'weekly':
-                    endDate = addWeeks(disbursementDate, loan.numberOfInstalments);
-                    break;
-                case 'monthly':
-                    endDate = addMonths(disbursementDate, loan.numberOfInstalments);
-                    break;
-                default:
-                   endDate = new Date('invalid');
+                case 'daily': endDate = addDays(disbursementDate, loan.numberOfInstalments); break;
+                case 'weekly': endDate = addWeeks(disbursementDate, loan.numberOfInstalments); break;
+                case 'monthly': endDate = addMonths(disbursementDate, loan.numberOfInstalments); break;
+                default: endDate = new Date('invalid');
             }
-        } catch(e) {
-            endDate = new Date('invalid');
-        }
+        } catch(e) { endDate = new Date('invalid'); }
         return { ...loan, endDate };
       })
       .filter(loan => {
         if (!loan.endDate || loan.endDate.toString() === 'Invalid Date') return false;
-        
         const daysUntilDue = differenceInDays(loan.endDate, today);
         return daysUntilDue <= 7;
       });
@@ -111,41 +163,89 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold tracking-tight mb-4">
-        Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!
-      </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">
+          Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!
+        </h1>
+        {isStaffMember && (
+          <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
+            <DialogTrigger asChild>
+              <Button variant="secondary">
+                <UserCheck className="mr-2 h-4 w-4" />
+                Apply for Staff Loan
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Staff Loan Application</DialogTitle>
+                <DialogDescription>
+                  Apply for an interest-free staff loan. Applications are reviewed by the Finance team.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...staffLoanForm}>
+                <form onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
+                  <FormField
+                    control={staffLoanForm.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Requested Amount (Ksh)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="e.g. 5000" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={staffLoanForm.control}
+                    name="reason"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Reason for Request</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Briefly describe why you need this loan..." {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                    Submit Internal Application
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
          {isFinanceUser && (
            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                  Total Realized Revenue
-                  </CardTitle>
+                  <CardTitle className="text-sm font-medium">Total Realized Revenue</CardTitle>
                   <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">Ksh {(stats?.realizedRevenue || 0).toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground">
-                  Fees and interest collected
-                  </p>
+                  <p className="text-xs text-muted-foreground">Fees and interest collected</p>
               </CardContent>
           </Card>
          )}
          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                Loans Disbursed
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Loans Disbursed</CardTitle>
                 <HandCoins className="h-4 w-4 text-primary" />
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{stats?.disbursedCount || 0}</div>
-                 <p className="text-xs text-muted-foreground">
-                Total historical count
-                </p>
+                 <p className="text-xs text-muted-foreground">Total historical count</p>
             </CardContent>
         </Card>
       </div>
+
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <Card>
             <CardHeader>
@@ -162,9 +262,7 @@ export default function Dashboard() {
                 <Alert>
                     <Bell className="h-4 w-4" />
                     <AlertTitle>No Due Loans</AlertTitle>
-                    <AlertDescription>
-                        All customer accounts are up to date.
-                    </AlertDescription>
+                    <AlertDescription>All customer accounts are up to date.</AlertDescription>
                 </Alert>
               )}
               {!isLoading && dueLoans.length > 0 && (
@@ -203,9 +301,7 @@ export default function Dashboard() {
                                     <TableCell>{format(loan.endDate, 'PPP')}</TableCell>
                                     <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                     <TableCell className="text-center">
-                                      <Badge variant={statusVariant}>
-                                        {statusLabel}
-                                      </Badge>
+                                      <Badge variant={statusVariant}>{statusLabel}</Badge>
                                     </TableCell>
                                 </TableRow>
                             )
@@ -218,7 +314,7 @@ export default function Dashboard() {
         <Card>
             <CardHeader>
                 <CardTitle>New Loan Applications</CardTitle>
-                <CardDescription>Customers who have recently applied for a loan.</CardDescription>
+                <CardDescription>Recently applied loans, including internal staff applications.</CardDescription>
             </CardHeader>
             <CardContent>
                 {isLoading && (
@@ -230,9 +326,7 @@ export default function Dashboard() {
                     <Alert>
                         <Bell className="h-4 w-4" />
                         <AlertTitle>No New Applications</AlertTitle>
-                        <AlertDescription>
-                            There are currently no new loan applications to review.
-                        </AlertDescription>
+                        <AlertDescription>There are currently no new loan applications to review.</AlertDescription>
                     </Alert>
                 )}
                 {!isLoading && newApplications.length > 0 && (
@@ -241,7 +335,7 @@ export default function Dashboard() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Customer</TableHead>
-                                    <TableHead>Loan Type</TableHead>
+                                    <TableHead>Type</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead className="text-right">Amount</TableHead>
                                 </TableRow>
@@ -250,7 +344,9 @@ export default function Dashboard() {
                                 {newApplications.map((loan) => (
                                     <TableRow key={loan.id}>
                                         <TableCell className="font-medium">{loan.customerName}</TableCell>
-                                        <TableCell>{loan.loanType || 'N/A'}</TableCell>
+                                        <TableCell>
+                                          {loan.loanType === 'Staff Loan' ? <Badge variant="outline">Staff Loan</Badge> : (loan.loanType || 'N/A')}
+                                        </TableCell>
                                         <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}</TableCell>
                                         <TableCell className="text-right font-bold">{loan.principalAmount.toLocaleString()}</TableCell>
                                     </TableRow>
