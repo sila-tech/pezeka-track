@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, CreditCard, History } from "lucide-react";
+import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, History } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -176,7 +176,6 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
-    // 1. Process Loan Book data (derived)
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
@@ -186,7 +185,6 @@ export default function FinancePage() {
         const charge = Number(loan.chargingCost) || 0;
         const totalFees = reg + proc + track + charge;
 
-        // Upfront Fees (Receipts)
         if (totalFees > 0) {
             upfront.push({
                 id: `fee-${loan.id}`,
@@ -199,7 +197,6 @@ export default function FinancePage() {
             });
         }
 
-        // Disbursement (Payout)
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -212,7 +209,6 @@ export default function FinancePage() {
             loanId: loan.id
         });
 
-        // Repayments (Receipts)
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -226,7 +222,6 @@ export default function FinancePage() {
         });
     });
 
-    // 2. Process Manual Finance Entries
     financeEntries.forEach(entry => {
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
@@ -235,7 +230,6 @@ export default function FinancePage() {
                 receipts.push(entry);
             }
         } else {
-            // Payouts and Expenses
             if (!isLendingDuplicate) {
                 payouts.push(entry);
                 if (entry.type === 'expense') {
@@ -251,12 +245,10 @@ export default function FinancePage() {
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts } = financialData;
     
-    // Money In
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
-    // Money Out (Includes all Payouts, Expenses, and every Transaction Cost)
     const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
     
     return {
