@@ -4,14 +4,16 @@ import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format } from "date-fns";
+import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
 import { 
   PlusCircle, 
   Search, 
   Loader2,
   TrendingUp,
   User,
-  Plus
+  Plus,
+  AlertCircle,
+  ShieldCheck
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -66,6 +68,7 @@ import { EditableFinanceReportTab } from './components/editable-finance-report-t
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { calculateInterestForOneInstalment } from '@/lib/utils';
 
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
@@ -414,6 +417,43 @@ export default function FinancePage() {
           setIsAddingNote(false);
       }
   }
+
+  // Calculated Penalty logic
+  const penaltyCalculation = useMemo(() => {
+      if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
+      
+      const oneInstInterest = calculateInterestForOneInstalment(
+          loanToEdit.principalAmount,
+          loanToEdit.interestRate || 0,
+          loanToEdit.numberOfInstalments,
+          loanToEdit.paymentFrequency
+      );
+      
+      const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
+      const dailyRate = oneInstInterest / daysInFreq;
+
+      const disbursementDate = new Date(loanToEdit.disbursementDate.seconds * 1000);
+      let finalDueDate: Date;
+      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(disbursementDate, loanToEdit.numberOfInstalments);
+      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(disbursementDate, loanToEdit.numberOfInstalments);
+      else finalDueDate = addDays(disbursementDate, loanToEdit.numberOfInstalments);
+      
+      const daysLate = differenceInDays(new Date(), finalDueDate);
+      const validDaysLate = daysLate > 0 ? daysLate : 0;
+      
+      return {
+          dailyRate,
+          daysLate: validDaysLate,
+          suggested: Math.round(validDaysLate * dailyRate)
+      };
+  }, [loanToEdit]);
+
+  const authorizeSuggestedPenalty = () => {
+      if (!penaltyCalculation.suggested) return;
+      penaltyForm.setValue('penaltyAmount', penaltyCalculation.suggested);
+      penaltyForm.setValue('penaltyDate', format(new Date(), 'yyyy-MM-dd'));
+      penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
+  };
 
   if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!isAuthorized) return <div className="flex h-full w-full flex-col items-center justify-center p-12"><h2>Access Restricted</h2></div>;
@@ -803,6 +843,31 @@ export default function FinancePage() {
                                     </TabsContent>
 
                                     <TabsContent value="penalties">
+                                        {penaltyCalculation.daysLate > 0 && (
+                                            <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
+                                                <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase tracking-wider">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    Overdue Penalty Detected
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                    <div>Days Overdue: <span className="font-bold">{penaltyCalculation.daysLate}</span></div>
+                                                    <div>Daily Rate: <span className="font-bold">Ksh {penaltyCalculation.dailyRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                                                    <div className="col-span-2 pt-1 border-t border-orange-100">
+                                                        Total Suggested Penalty: <span className="text-sm font-bold text-destructive">Ksh {penaltyCalculation.suggested.toLocaleString()}</span>
+                                                    </div>
+                                                </div>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="secondary" 
+                                                    className="w-full h-8 text-[11px] bg-orange-100 hover:bg-orange-200 text-orange-900 border-orange-300"
+                                                    onClick={authorizeSuggestedPenalty}
+                                                >
+                                                    <ShieldCheck className="h-3 w-3 mr-2" />
+                                                    Authorize & Fill Form
+                                                </Button>
+                                            </div>
+                                        )}
+
                                         <Form {...penaltyForm}>
                                             <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
                                                 <div className="grid grid-cols-2 gap-2">
@@ -817,7 +882,7 @@ export default function FinancePage() {
                                                   <Input placeholder="Reason" {...field} value={field.value ?? ''}/>
                                                 )} />
                                                 <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
-                                                    {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Add Penalty'}
+                                                    {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Record Penalty'}
                                                 </Button>
                                             </form>
                                         </Form>
