@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useAuth, useCollection, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ interface Loan {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  alternativeNumber?: string;
   idNumber?: string;
   loanType?: string;
   disbursementDate: { seconds: number, nanoseconds: number };
@@ -61,6 +63,7 @@ const applicationSchema = z.object({
   loanAmount: z.coerce.number().min(1, 'Please enter a valid loan amount.'),
   idNumber: z.string().min(5, 'Please enter a valid ID number.'),
   phone: z.string().min(10, 'Please enter a valid phone number.'),
+  alternativeNumber: z.string().optional(),
   statement: z.any().optional(),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the terms and conditions.' }),
@@ -90,6 +93,7 @@ export default function AccountPage() {
       loanAmount: undefined,
       idNumber: '',
       phone: user?.phoneNumber || '',
+      alternativeNumber: '',
       statement: undefined,
       agreeToTerms: false,
     },
@@ -116,6 +120,7 @@ export default function AccountPage() {
         customerId: user.uid,
         customerName: user.displayName || user.email,
         customerPhone: values.phone,
+        alternativeNumber: values.alternativeNumber || "",
         idNumber: values.idNumber,
         disbursementDate: new Date(),
         principalAmount: values.loanAmount,
@@ -180,7 +185,7 @@ export default function AccountPage() {
                     <div className="flex items-center justify-center p-8">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
-                ) : customerLoans && customerLoans.length > 0 ? (
+                ) : (customerLoans && customerLoans.length > 0) ? (
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Your Loans</h3>
                         {customerLoans.map(loan => {
@@ -295,9 +300,22 @@ export default function AccountPage() {
                       name="phone"
                       render={({ field }) => (
                           <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
+                          <FormLabel>Primary Phone Number</FormLabel>
                           <FormControl>
                               <Input placeholder="e.g. 0712345678" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={applicationForm.control}
+                      name="alternativeNumber"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Alternative Phone Number (Optional)</FormLabel>
+                          <FormControl>
+                              <Input placeholder="Secondary contact number" {...field} />
                           </FormControl>
                           <FormMessage />
                           </FormItem>

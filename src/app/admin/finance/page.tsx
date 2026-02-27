@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -37,6 +38,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -236,11 +238,7 @@ export default function FinancePage() {
   });
 
   const editLoanForm = useForm<z.infer<typeof editLoanSchema>>({ resolver: zodResolver(editLoanSchema) });
-  const rolloverForm = useForm<z.infer<typeof rolloverSchema>>({
-    resolver: zodResolver(rolloverSchema),
-    defaultValues: { rolloverDate: format(new Date(), 'yyyy-MM-dd') }
-  });
-
+  
   const addFinanceEntryType = addForm.watch('type');
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
@@ -309,57 +307,6 @@ export default function FinancePage() {
       toast({ variant: 'destructive', title: 'Error', description: e.message }); 
     } finally { 
       setIsAddingPenalty(false); 
-    }
-  }
-
-  const handleEditLoanClick = () => {
-    if (!loanToEdit) return;
-    editLoanForm.reset({
-        disbursementDate: format(new Date(loanToEdit.disbursementDate.seconds * 1000), 'yyyy-MM-dd'),
-        principalAmount: loanToEdit.principalAmount,
-        interestRate: loanToEdit.interestRate || 0,
-        registrationFee: loanToEdit.registrationFee,
-        processingFee: loanToEdit.processingFee,
-        carTrackInstallationFee: loanToEdit.carTrackInstallationFee,
-        chargingCost: loanToEdit.chargingCost,
-        numberOfInstalments: loanToEdit.numberOfInstalments,
-        paymentFrequency: loanToEdit.paymentFrequency,
-        status: loanToEdit.status
-    });
-    setIsEditingLoan(true);
-  };
-
-  async function onEditLoanSubmit(values: z.infer<typeof editLoanSchema>) {
-    if (!loanToEdit) return;
-    setIsUpdating(true);
-    try {
-        const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
-        await updateLoan(firestore, loanToEdit.id, { 
-          ...values, 
-          disbursementDate: new Date(values.disbursementDate), 
-          instalmentAmount, 
-          totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0) 
-        });
-        toast({ title: 'Loan Updated' }); 
-        setIsEditingLoan(false);
-    } catch (e: any) { 
-      toast({ variant: 'destructive', title: 'Error', description: e.message }); 
-    } finally { 
-      setIsUpdating(false); 
-    }
-  }
-
-  async function onRolloverSubmit(values: z.infer<typeof rolloverSchema>) {
-    if (!loanToEdit) return;
-    setIsRollingOver(true);
-    try { 
-      await rolloverLoan(firestore, loanToEdit, new Date(values.rolloverDate)); 
-      toast({ title: 'Loan Rolled Over' }); 
-      setLoanToEdit(null); 
-    } catch (e: any) { 
-      toast({ variant: 'destructive', title: 'Error', description: e.message }); 
-    } finally { 
-      setIsRollingOver(false); 
     }
   }
 

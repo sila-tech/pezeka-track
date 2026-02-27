@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -17,6 +18,7 @@ interface Loan {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  alternativeNumber?: string;
   idNumber?: string;
   loanType?: string;
   disbursementDate: { seconds: number, nanoseconds: number } | Date;
@@ -325,6 +327,8 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         customerId: originalLoan.customerId,
         customerName: originalLoan.customerName,
         customerPhone: originalLoan.customerPhone,
+        alternativeNumber: originalLoan.alternativeNumber || "",
+        idNumber: originalLoan.idNumber || "",
         disbursementDate: rolloverDate,
         principalAmount: originalLoan.principalAmount,
         interestRate: originalLoan.interestRate ?? 0,

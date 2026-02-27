@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -60,6 +61,8 @@ const loanSchema = z.object({
   customerType: z.enum(['existing', 'new']),
   newCustomerName: z.string().optional(),
   newCustomerPhone: z.string().optional(),
+  alternativeNumber: z.string().optional(),
+  idNumber: z.string().min(1, "ID number is required."),
 }).superRefine((data, ctx) => {
   if (data.customerType === 'existing' && !data.customerId) {
     ctx.addIssue({ code: 'custom', message: 'Please select a customer.', path: ['customerId'] });
@@ -84,6 +87,8 @@ const approvalSchema = z.object({
     chargingCost: z.coerce.number().optional(),
     numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+    idNumber: z.string().min(1, "ID number is required."),
+    alternativeNumber: z.string().optional(),
 });
 
 
@@ -100,6 +105,7 @@ interface Loan {
     loanNumber: string;
     customerName: string;
     customerPhone: string;
+    alternativeNumber?: string;
     idNumber?: string;
     loanType?: string;
     disbursementDate: { seconds: number, nanoseconds: number };
@@ -147,7 +153,8 @@ export default function LoansPage() {
         const searchMatch = searchTerm === '' ||
             loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            loan.customerPhone.includes(searchTerm);
+            loan.customerPhone.includes(searchTerm) ||
+            loan.idNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
     });
   }, [loans, searchTerm, statusFilter]);
@@ -175,6 +182,8 @@ export default function LoansPage() {
       loanType: 'Quick Pesa',
       newCustomerName: '',
       newCustomerPhone: '',
+      alternativeNumber: '',
+      idNumber: '',
     },
   });
 
@@ -207,7 +216,7 @@ export default function LoansPage() {
       let customerPhone = '';
 
       if (values.customerType === 'new') {
-        const newCustomerData = { name: values.newCustomerName!, phone: values.newCustomerPhone! };
+        const newCustomerData = { name: values.newCustomerName!, phone: values.newCustomerPhone!, idNumber: values.idNumber };
         const newCustomerDocRef = await addCustomer(firestore, newCustomerData);
         customerId = newCustomerDocRef.id;
         customerName = newCustomerData.name;
@@ -231,6 +240,8 @@ export default function LoansPage() {
         customerId: customerId!,
         customerName,
         customerPhone,
+        alternativeNumber: values.alternativeNumber || "",
+        idNumber: values.idNumber,
         disbursementDate: new Date(values.disbursementDate),
         totalRepayableAmount,
         instalmentAmount,
@@ -266,6 +277,8 @@ export default function LoansPage() {
           chargingCost: 0,
           numberOfInstalments: 1,
           paymentFrequency: 'monthly',
+          idNumber: loan.idNumber || "",
+          alternativeNumber: loan.alternativeNumber || "",
       });
   };
 
@@ -359,6 +372,8 @@ export default function LoansPage() {
                         <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
                       </>
                     )}
+                    <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID number" {...field} /></FormControl><FormMessage/></FormItem>)} />
+                    <FormField control={form.control} name="alternativeNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input placeholder="Secondary contact" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name="loanType" render={({ field }) => (
                         <FormItem className="col-span-2">
                           <FormLabel>Loan Product</FormLabel>
@@ -425,7 +440,10 @@ export default function LoansPage() {
                               {filteredLoans.map((loan) => (
                                   <TableRow key={loan.id}>
                                       <TableCell className="font-medium">{loan.loanNumber}</TableCell>
-                                      <TableCell>{loan.customerName}</TableCell>
+                                      <TableCell>
+                                          <div>{loan.customerName}</div>
+                                          <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                      </TableCell>
                                       <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
                                       <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
                                       <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
@@ -446,7 +464,10 @@ export default function LoansPage() {
                         <TableBody>
                             {applicationLoans.map((loan) => (
                                 <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleManageApplication(loan)}>
-                                    <TableCell>{loan.customerName}</TableCell>
+                                    <TableCell>
+                                        <div>{loan.customerName}</div>
+                                        <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                    </TableCell>
                                     <TableCell>{loan.loanType}</TableCell>
                                     <TableCell className="font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
                                     <TableCell><Button size="sm">Process</Button></TableCell>
@@ -467,6 +488,8 @@ export default function LoansPage() {
                     <Form {...approvalForm}>
                         <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
                             <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field}/></FormControl><FormMessage/></FormItem>)} />
+                            <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
                             <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
