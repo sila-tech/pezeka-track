@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User, CheckCircle2 } from 'lucide-react';
+import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User, CheckCircle2, Briefcase } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -271,7 +271,7 @@ export default function Dashboard() {
                       )}
                     />
                     <FormField
-                      control={staffLoanMember.control}
+                      control={staffLoanForm.control}
                       name="alternativeNumber"
                       render={({ field }) => (
                         <FormItem>
