@@ -11,7 +11,8 @@ import {
   Loader2,
   TrendingUp,
   Wallet,
-  HandCoins
+  HandCoins,
+  Receipt
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -169,10 +170,18 @@ export default function FinancePage() {
         if (loan.status === 'application' || loan.status === 'rejected') return;
         const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
         if (totalFees > 0) {
-            upfront.push({ id: `fee-${loan.id}`, type: 'receipt', receiptCategory: 'upfront_fees', date: loan.disbursementDate, amount: totalFees, description: `Fees: Loan #${loan.loanNumber}`, loanId: loan.id });
+            upfront.push({ 
+                id: `fee-${loan.id}`, 
+                type: 'receipt', 
+                receiptCategory: 'upfront_fees', 
+                date: loan.disbursementDate, 
+                amount: totalFees, 
+                description: `Fees Breakdown: Loan #${loan.loanNumber}. Reg: ${loan.registrationFee}, Proc: ${loan.processingFee}, Track: ${loan.carTrackInstallationFee}, Charge: ${loan.chargingCost}`, 
+                loanId: loan.id 
+            });
         }
         (loan.payments || []).forEach(p => {
-            receipts.push({ id: p.paymentId, type: 'receipt', receiptCategory: 'loan_repayment', date: p.date, amount: p.amount, description: `Pay: Loan #${loan.loanNumber}`, loanId: loan.id });
+            receipts.push({ id: p.paymentId, type: 'receipt', receiptCategory: 'loan_repayment', date: p.date, amount: p.amount, description: `Repayment: Loan #${loan.loanNumber}`, loanId: loan.id });
         });
     });
 
@@ -374,6 +383,7 @@ export default function FinancePage() {
       <Tabs defaultValue="loanbook" className="w-full">
           <TabsList className="mb-4">
               <TabsTrigger value="loanbook">Loan Book (Master Ledger)</TabsTrigger>
+              <TabsTrigger value="upfront">Upfront Fees</TabsTrigger>
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
@@ -478,6 +488,15 @@ export default function FinancePage() {
                     </ScrollArea>
                 </CardContent>
               </Card>
+          </TabsContent>
+
+          <TabsContent value="upfront">
+            <EditableFinanceReportTab 
+                title="Upfront Fees" 
+                description="Fees collected directly from loan disbursements." 
+                entries={financialData.allUpfrontFees} 
+                loading={false} 
+            />
           </TabsContent>
 
           <TabsContent value="receipts">
