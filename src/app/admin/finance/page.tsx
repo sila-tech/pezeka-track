@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, updateFinanceEntry, approveLoanApplication } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, updateFinanceEntry } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
@@ -61,7 +61,6 @@ const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
-  transactionCost: z.coerce.number().min(0, 'Transaction cost cannot be negative.').default(0),
   description: z.string().optional(),
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
@@ -139,7 +138,6 @@ interface FinanceEntry {
   date: any;
   amount: number;
   description: string;
-  transactionCost?: number;
   loanId?: string;
   expenseCategory?: string;
   receiptCategory?: string;
@@ -205,7 +203,6 @@ export default function FinancePage() {
             payoutCategory: 'loan_disbursement',
             date: loan.disbursementDate,
             amount: takeHome,
-            transactionCost: 0,
             description: `Disbursement (Take-home) for Loan #${loan.loanNumber} (${loan.customerName})`,
             loanId: loan.id
         });
@@ -248,7 +245,7 @@ export default function FinancePage() {
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
     const totalMoneyOut = allPayouts.reduce((acc, e) => {
-        return acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0);
+        return acc + (Number(e.amount) || 0);
     }, 0);
     
     return {
@@ -272,7 +269,7 @@ export default function FinancePage() {
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), transactionCost: 0 }
+    defaultValues: { date: format(new Date(), 'yyyy-MM-dd') }
   });
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
@@ -322,7 +319,6 @@ export default function FinancePage() {
           type: entry.type as any,
           date: format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'yyyy-MM-dd'),
           amount: entry.amount,
-          transactionCost: entry.transactionCost || 0,
           description: entry.description,
           expenseCategory: entry.expenseCategory as any,
           receiptCategory: entry.receiptCategory as any,
@@ -479,12 +475,7 @@ export default function FinancePage() {
                                         <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></Select></FormItem>
                                     )} />
                                 )}
-                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Base Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                                {(addFinanceEntryType === 'payout' || addFinanceEntryType === 'expense') && (
-                                    <FormField control={addForm.control} name="transactionCost" render={({ field }) => (
-                                        <FormItem><FormLabel>Transaction Cost (Bank charges, etc.)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
-                                    )} />
-                                )}
+                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                                 <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                                 <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
                                 <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}{editingEntry ? 'Update Entry' : 'Record Entry'}</Button>

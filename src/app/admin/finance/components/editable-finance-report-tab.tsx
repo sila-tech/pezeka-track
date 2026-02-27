@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -23,7 +22,6 @@ interface FinanceEntry {
   date: { seconds: number; nanoseconds: number } | string;
   amount: number;
   description: string;
-  transactionCost?: number;
   loanId?: string;
   expenseCategory?: string;
   receiptCategory?: string;
@@ -94,7 +92,6 @@ export function DatePickerWithRange({
 export function EditableFinanceReportTab({ title, description, entries, loading, onEdit, onDelete }: FinanceReportTabProps) {
   const [date, setDate] = useState<DateRange | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
-  const showTransactionCost = useMemo(() => title === 'Payouts' || title === 'Expenses', [title]);
   const isEditable = !!(onEdit && onDelete);
 
   const filteredEntries = useMemo(() => {
@@ -128,16 +125,10 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
     return filtered;
   }, [entries, date, searchTerm]);
 
-  const { totalAmount, totalTransactionCost } = useMemo(() => {
-    if (!filteredEntries) return { totalAmount: 0, totalTransactionCost: 0 };
-    return filteredEntries.reduce((acc, entry) => {
-        acc.totalAmount += entry.amount;
-        acc.totalTransactionCost += entry.transactionCost || 0;
-        return acc;
-    }, { totalAmount: 0, totalTransactionCost: 0 });
+  const totalAmount = useMemo(() => {
+    if (!filteredEntries) return 0;
+    return filteredEntries.reduce((acc, entry) => acc + (Number(entry.amount) || 0), 0);
   }, [filteredEntries]);
-
-  const grandTotal = totalAmount + totalTransactionCost;
 
   const handleExport = () => {
     if (filteredEntries) {
@@ -150,10 +141,6 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
         const category = entry.expenseCategory || entry.receiptCategory || entry.payoutCategory;
         if (category) record['Category'] = category.replace(/_/g, ' ').toUpperCase();
         
-        if(showTransactionCost) {
-            record['Transaction Cost (Ksh)'] = entry.transactionCost || 0;
-            record['Total (Ksh)'] = entry.amount + (entry.transactionCost || 0);
-        }
         return record;
       });
       exportToCsv(dataForExport, `${title.toLowerCase().replace(/ /g, '_')}_report`);
@@ -233,8 +220,6 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead className="text-right">Amount (Ksh)</TableHead>
-                    {showTransactionCost && <TableHead className="text-right">Trans. Cost</TableHead>}
-                    {showTransactionCost && <TableHead className="text-right">Total</TableHead>}
                     {isEditable && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
                 </TableHeader>
@@ -251,8 +236,6 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                         {entry.payoutCategory && <Badge variant="destructive" className="bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
                     </TableCell>
                     <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
-                    {showTransactionCost && <TableCell className="text-right">{(entry.transactionCost || 0).toLocaleString()}</TableCell>}
-                    {showTransactionCost && <TableCell className="text-right font-bold">{(entry.amount + (entry.transactionCost || 0)).toLocaleString()}</TableCell>}
                     {isEditable && onEdit && onDelete && (
                         <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
@@ -267,15 +250,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 ))}
                     <TableRow className="font-bold bg-muted/50">
                         <TableCell colSpan={3} className="text-right">Total</TableCell>
-                        {showTransactionCost ? (
-                            <>
-                                <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{totalTransactionCost.toLocaleString()}</TableCell>
-                                <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
-                            </>
-                        ) : (
-                            <TableCell className="text-right">{grandTotal.toLocaleString()}</TableCell>
-                        )}
+                        <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
                         {isEditable && <TableCell />}
                     </TableRow>
                 </TableBody>

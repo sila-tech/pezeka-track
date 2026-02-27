@@ -68,7 +68,6 @@ type FinanceEntryData = {
     amount: number;
     description?: string;
     loanId?: string;
-    transactionCost?: number;
     expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
     receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'investment' | 'other';
     payoutCategory?: 'loan_disbursement' | 'investor_withdrawal' | 'other';
