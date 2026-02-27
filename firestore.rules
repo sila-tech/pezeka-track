@@ -8,7 +8,6 @@ service cloud.firestore {
     // =====================================================================
     
     // Check if the user is the Super Admin (Simon)
-    // prioritized UID check for reliability in development environments
     function isSuperAdmin() {
       return request.auth != null && (
         request.auth.token.email == 'simon@pezeka.com' || 
@@ -16,7 +15,7 @@ service cloud.firestore {
       );
     }
 
-    // Safely get the user's role
+    // Safely get the user's role from their profile
     function getUserRole() {
       return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
@@ -41,13 +40,13 @@ service cloud.firestore {
 
     match /users/{userId} {
       // allow Simon or the owner to read/write the profile
+      // Owners must be able to read their own profile for role checks to work in other rules
       allow get: if isOwner(userId) || isSuperAdmin();
       allow list: if isSuperAdmin();
       allow write: if isSuperAdmin();
     }
 
     match /customers/{customerId} {
-      // prioritize super admin for faster evaluation
       allow list, get: if isSuperAdmin() || isStaff() || isFinance();
       allow write: if isSuperAdmin() || isStaff() || isFinance();
     }
@@ -60,7 +59,8 @@ service cloud.firestore {
     }
     
     match /financeEntries/{entryId} {
-      // restricted to Finance and Super Admin as requested
+      // Restricted to Finance and Super Admin
+      // Prioritize super admin for speed
       allow list, get, create, update, delete: if isSuperAdmin() || isFinance();
     }
 

@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -275,18 +274,52 @@ export default function FinancePage() {
 
   const addFinanceEntryType = addForm.watch('type');
 
+  // Clear category selections when type changes to prevent redundant data in submission
+  useEffect(() => {
+    if (addFinanceEntryType === 'receipt') {
+        addForm.setValue('payoutCategory', undefined);
+        addForm.setValue('expenseCategory', undefined);
+    } else if (addFinanceEntryType === 'payout') {
+        addForm.setValue('receiptCategory', undefined);
+        addForm.setValue('expenseCategory', undefined);
+    } else if (addFinanceEntryType === 'expense') {
+        addForm.setValue('receiptCategory', undefined);
+        addForm.setValue('payoutCategory', undefined);
+    }
+  }, [addFinanceEntryType, addForm]);
+
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
-      const rawData = { ...values, date: new Date(values.date) };
-      if (editingEntry) { 
-        await updateFinanceEntry(firestore, editingEntry.id, rawData); 
-      } else { 
-        await addFinanceEntry(firestore, rawData as any); 
+      // Data Sanitization: only send fields relevant to the selected type
+      const sanitizedData: any = {
+        type: values.type,
+        date: new Date(values.date),
+        amount: values.amount,
+        transactionFee: values.transactionFee || 0,
+        description: values.description || '',
+      };
+
+      if (values.loanId) sanitizedData.loanId = values.loanId;
+
+      if (values.type === 'receipt') {
+        sanitizedData.receiptCategory = values.receiptCategory;
+      } else if (values.type === 'payout') {
+        sanitizedData.payoutCategory = values.payoutCategory;
+      } else if (values.type === 'expense') {
+        sanitizedData.expenseCategory = values.expenseCategory;
       }
+
+      if (editingEntry) { 
+        await updateFinanceEntry(firestore, editingEntry.id, sanitizedData); 
+      } else { 
+        await addFinanceEntry(firestore, sanitizedData); 
+      }
+      
       addForm.reset(); 
       setEditingEntry(null); 
       setOpen(false);
+      toast({ title: editingEntry ? 'Entry Updated' : 'Entry Recorded' });
     } catch (e: any) { 
       toast({ variant: "destructive", title: "Error", description: e.message }); 
     } finally { 
@@ -419,13 +452,33 @@ export default function FinancePage() {
                                 )} />
                             )}
                             <div className="grid grid-cols-2 gap-4">
-                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={addForm.control} name="amount" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Amount (Ksh)</FormLabel>
+                                    <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
+                                  </FormItem>
+                                )} />
                                 {addFinanceEntryType !== 'receipt' && (
-                                    <FormField control={addForm.control} name="transactionFee" render={({ field }) => (<FormItem><FormLabel>Tx Fee (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                    <FormField control={addForm.control} name="transactionFee" render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Tx Fee (Ksh)</FormLabel>
+                                        <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
+                                      </FormItem>
+                                    )} />
                                 )}
                             </div>
-                            <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                            <FormField control={addForm.control} name="date" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Date</FormLabel>
+                                <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                              </FormItem>
+                            )} />
+                            <FormField control={addForm.control} name="description" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <FormControl><Textarea {...field} value={field.value ?? ''}/></FormControl>
+                              </FormItem>
+                            )} />
                             <Button type="submit" className="w-full" disabled={isSubmitting}>{editingEntry ? 'Update' : 'Record'}</Button>
                         </form>
                     </Form>
@@ -638,8 +691,12 @@ export default function FinancePage() {
                                     <Form {...paymentForm}>
                                         <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
                                             <div className="flex gap-2">
-                                                <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
-                                                <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (
+                                                  <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
+                                                )} />
+                                                <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (
+                                                  <Input type="date" {...field} value={field.value ?? ''}/>
+                                                )} />
                                                 <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
                                             </div>
                                         </form>
@@ -661,10 +718,16 @@ export default function FinancePage() {
                                     <Form {...penaltyForm}>
                                         <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
                                             <div className="grid grid-cols-2 gap-2">
-                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
-                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (
+                                                  <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
+                                                )} />
+                                                <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (
+                                                  <Input type="date" {...field} value={field.value ?? ''}/>
+                                                )} />
                                             </div>
-                                            <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} />
+                                            <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (
+                                              <Input placeholder="Reason" {...field} value={field.value ?? ''}/>
+                                            )} />
                                             <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
                                                 {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Add Penalty'}
                                             </Button>

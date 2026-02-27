@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -100,7 +99,8 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
 
 export async function updateFinanceEntry(db: Firestore, entryId: string, data: { [key: string]: any }) {
     const entryRef = doc(db, 'financeEntries', entryId);
-    const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
+    // Explicitly handle fields to avoid undefined values in merge
+    const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null));
     try {
         await updateDoc(entryRef, { ...updateData, updatedAt: serverTimestamp() });
     } catch (serverError) {
@@ -231,7 +231,7 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
         }
     }
 
-    const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
+    const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null));
 
     try {
         await updateDoc(loanRef, { ...updateData, updatedAt: serverTimestamp() });
@@ -434,7 +434,7 @@ export async function createUserProfile(db: Firestore, userId: string, data: { e
 
 export async function updateUserProfile(db: Firestore, userId: string, data: { [key: string]: any }) {
     const userRef = doc(db, 'users', userId);
-    const updateData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+    const updateData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null));
 
     try {
         await updateDoc(userRef, { ...updateData, updatedAt: serverTimestamp() });
@@ -491,7 +491,7 @@ export async function addInvestor(db: Firestore, investorData: { uid: string; na
 
 export async function updateInvestor(db: Firestore, investorId: string, data: { [key: string]: any }) {
     const investorRef = doc(db, 'investors', investorId);
-     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== ''));
+     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null));
     try {
         await updateDoc(investorRef, { ...updateData, updatedAt: serverTimestamp() });
     } catch (serverError) {
