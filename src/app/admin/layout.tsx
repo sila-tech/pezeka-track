@@ -137,19 +137,19 @@ export default function AdminLayout({
     const isStaff = user?.role === 'staff';
 
     return (
-        <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
-        <div className="hidden border-r bg-card md:block">
-            <div className="flex h-full max-h-screen flex-col gap-2">
+        <div className="grid h-screen w-full overflow-hidden md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+        <div className="hidden border-r bg-card md:block overflow-y-auto">
+            <div className="flex h-full flex-col gap-2">
             <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
                 <Link href="/admin" className="flex items-center gap-2 font-semibold">
                 < Landmark className="h-6 w-6 text-primary" />
                 <span>Pezeka Credit</span>
                 </Link>
             </div>
-            <div className="flex-1">
+            <div className="flex-1 py-2">
                 <NavLinks isFinance={isFinance} isSuperAdmin={isSuperAdmin} isStaff={isStaff} />
             </div>
-            <div className="mt-auto p-4">
+            <div className="mt-auto p-4 border-t">
                 <Button onClick={handleLogout} variant="ghost" className="w-full justify-start">
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
@@ -157,8 +157,8 @@ export default function AdminLayout({
             </div>
             </div>
         </div>
-        <div className="flex flex-col">
-            <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6">
+        <div className="flex flex-col overflow-hidden">
+            <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 shrink-0">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -192,8 +192,10 @@ export default function AdminLayout({
                 {/* Header content like a search bar can go here */}
             </div>
             </header>
-            <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-background">
-            {children}
+            <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-background">
+                <div className="mx-auto max-w-[1600px] w-full">
+                    {children}
+                </div>
             </main>
         </div>
         </div>

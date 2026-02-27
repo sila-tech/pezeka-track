@@ -10,12 +10,7 @@ import {
   Search, 
   Loader2,
   TrendingUp,
-  Wallet,
-  HandCoins,
-  Receipt,
-  CreditCard,
   User,
-  MessageSquare,
   Plus
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
@@ -31,7 +26,6 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -421,8 +415,8 @@ export default function FinancePage() {
       }
   }
 
-  if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  if (!isAuthorized) return <div className="flex h-screen w-full flex-col items-center justify-center"><h2>Access Restricted</h2></div>;
+  if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!isAuthorized) return <div className="flex h-full w-full flex-col items-center justify-center p-12"><h2>Access Restricted</h2></div>;
 
   return (
     <div className="space-y-6">

@@ -438,7 +438,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Follow-up Notes Dialog - Streamlined Version */}
+      {/* Follow-up Notes Dialog */}
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
           <DialogContent className="sm:max-w-md">
               {selectedLoanForNotes && (
