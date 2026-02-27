@@ -177,11 +177,9 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
-    // 1. Process derived lending data
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
-        // Upfront Fees (Revenue)
         const reg = Number(loan.registrationFee) || 0;
         const proc = Number(loan.processingFee) || 0;
         const track = Number(loan.carTrackInstallationFee) || 0;
@@ -200,7 +198,6 @@ export default function FinancePage() {
             });
         }
 
-        // Payouts (Money Out - Take Home)
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -213,7 +210,6 @@ export default function FinancePage() {
             loanId: loan.id
         });
 
-        // Repayments (Money In)
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -227,7 +223,6 @@ export default function FinancePage() {
         });
     });
 
-    // 2. Process manual finance entries
     financeEntries.forEach(entry => {
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
@@ -235,9 +230,9 @@ export default function FinancePage() {
             if (!isLendingDuplicate) receipts.push(entry);
         } else {
             if (!isLendingDuplicate) {
-                payouts.push(entry); // All money out (payouts AND expenses) go to payouts tab
+                payouts.push(entry);
                 if (entry.type === 'expense') {
-                    expenses.push(entry); // Dedicated subset for expenses tab
+                    expenses.push(entry);
                 }
             }
         }
@@ -248,13 +243,10 @@ export default function FinancePage() {
 
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts } = financialData;
-    
-    // Total Money In = standard receipts + upfront fees
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
-    // Total Money Out = Base amount + all transaction costs
     const totalMoneyOut = allPayouts.reduce((acc, e) => {
         return acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0);
     }, 0);
@@ -294,6 +286,7 @@ export default function FinancePage() {
   });
 
   const editLoanForm = useForm<z.infer<typeof editLoanSchema>>({ resolver: zodResolver(editLoanSchema) });
+  
   const rolloverForm = useForm<z.infer<typeof rolloverSchema>>({
     resolver: zodResolver(rolloverSchema),
     defaultValues: { rolloverDate: format(new Date(), 'yyyy-MM-dd') }
@@ -555,7 +548,7 @@ export default function FinancePage() {
                 entries={financialData.allUpfrontFees} 
                 loading={false} 
                 onDelete={(e) => {
-                    if (e.id.startsWith('fee-')) return; // Cannot delete derived fees
+                    if (e.id.startsWith('fee-')) return;
                     deleteFinanceEntry(firestore, e.id);
                 }}
               />
@@ -840,12 +833,10 @@ export default function FinancePage() {
                       <FormField control={editLoanForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></Select></FormItem>)} />
-                      
                       <FormField control={editLoanForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charge Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-
                       <FormField control={editLoanForm.control} name="status" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></Select></FormItem>)} />
                       <div className="col-span-2 pt-4 flex gap-2">
                           <Button type="submit" className="flex-1" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
