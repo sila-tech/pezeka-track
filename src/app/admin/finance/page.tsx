@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, updateFinanceEntry } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, updateFinanceEntry, approveLoanApplication } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
@@ -177,9 +177,11 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
+    // 1. Process derived lending data
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
+        // Upfront Fees (Revenue)
         const reg = Number(loan.registrationFee) || 0;
         const proc = Number(loan.processingFee) || 0;
         const track = Number(loan.carTrackInstallationFee) || 0;
@@ -193,11 +195,12 @@ export default function FinancePage() {
                 receiptCategory: 'upfront_fees',
                 date: loan.disbursementDate,
                 amount: totalFees,
-                description: `Upfront fees for Loan #${loan.loanNumber} (${loan.customerName})`,
+                description: `Retained upfront fees for Loan #${loan.loanNumber} (${loan.customerName})`,
                 loanId: loan.id
             });
         }
 
+        // Payouts (Money Out - Take Home)
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -206,10 +209,11 @@ export default function FinancePage() {
             date: loan.disbursementDate,
             amount: takeHome,
             transactionCost: 0,
-            description: `Take-home disbursement for Loan #${loan.loanNumber} (${loan.customerName})`,
+            description: `Disbursement (Take-home) for Loan #${loan.loanNumber} (${loan.customerName})`,
             loanId: loan.id
         });
 
+        // Repayments (Money In)
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -217,24 +221,23 @@ export default function FinancePage() {
                 receiptCategory: 'loan_repayment',
                 date: p.date,
                 amount: p.amount,
-                description: `Payment for Loan #${loan.loanNumber} (${loan.customerName})`,
+                description: `Repayment for Loan #${loan.loanNumber} (${loan.customerName})`,
                 loanId: loan.id
             });
         });
     });
 
+    // 2. Process manual finance entries
     financeEntries.forEach(entry => {
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
         if (entry.type === 'receipt') {
-            if (!isLendingDuplicate) {
-                receipts.push(entry);
-            }
+            if (!isLendingDuplicate) receipts.push(entry);
         } else {
             if (!isLendingDuplicate) {
-                payouts.push(entry);
+                payouts.push(entry); // All money out (payouts AND expenses) go to payouts tab
                 if (entry.type === 'expense') {
-                    expenses.push(entry);
+                    expenses.push(entry); // Dedicated subset for expenses tab
                 }
             }
         }
@@ -246,11 +249,15 @@ export default function FinancePage() {
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts } = financialData;
     
+    // Total Money In = standard receipts + upfront fees
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
-    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
+    // Total Money Out = Base amount + all transaction costs
+    const totalMoneyOut = allPayouts.reduce((acc, e) => {
+        return acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0);
+    }, 0);
     
     return {
       totalReceipts: totalMoneyIn,
@@ -479,10 +486,10 @@ export default function FinancePage() {
                                         <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></Select></FormItem>
                                     )} />
                                 )}
-                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                                <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Base Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                                 {(addFinanceEntryType === 'payout' || addFinanceEntryType === 'expense') && (
                                     <FormField control={addForm.control} name="transactionCost" render={({ field }) => (
-                                        <FormItem><FormLabel>Transaction Cost (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                                        <FormItem><FormLabel>Transaction Cost (Bank charges, etc.)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
                                     )} />
                                 )}
                                 <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
@@ -517,8 +524,8 @@ export default function FinancePage() {
               <TabsList className="inline-flex w-max">
                   <TabsTrigger value="receipts">Receipts</TabsTrigger>
                   <TabsTrigger value="upfront">Upfront Fees</TabsTrigger>
-                  <TabsTrigger value="payouts">Payouts</TabsTrigger>
-                  <TabsTrigger value="expenses">Expenses</TabsTrigger>
+                  <TabsTrigger value="payouts">Payouts (Total Out)</TabsTrigger>
+                  <TabsTrigger value="expenses">Expenses (Ops)</TabsTrigger>
                   <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
                   {canPerformActions && <TabsTrigger value="investors">Investors</TabsTrigger>}
               </TabsList>
@@ -544,11 +551,11 @@ export default function FinancePage() {
           <TabsContent value="upfront">
               <EditableFinanceReportTab 
                 title="Upfront Fees" 
-                description="Registration, processing, and other fees retained during disbursement." 
+                description="Revenue from Registration, Processing, and other fees retained during disbursement." 
                 entries={financialData.allUpfrontFees} 
                 loading={false} 
                 onDelete={(e) => {
-                    if (e.id.startsWith('fee-')) return;
+                    if (e.id.startsWith('fee-')) return; // Cannot delete derived fees
                     deleteFinanceEntry(firestore, e.id);
                 }}
               />
@@ -556,7 +563,7 @@ export default function FinancePage() {
           <TabsContent value="payouts">
               <EditableFinanceReportTab 
                 title="Payouts" 
-                description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." 
+                description="Master ledger of all outgoing funds: take-home disbursements, withdrawals, and all expenses." 
                 entries={financialData.allPayouts} 
                 loading={false} 
                 onEdit={(e) => {
@@ -572,7 +579,7 @@ export default function FinancePage() {
           <TabsContent value="expenses">
                <EditableFinanceReportTab 
                 title="Expenses" 
-                description="Operational costs and miscellaneous spending." 
+                description="Dedicated view of operational costs and miscellaneous spending." 
                 entries={financialData.allExpenses} 
                 loading={false} 
                 onEdit={(e) => handleEditEntry(e)}
