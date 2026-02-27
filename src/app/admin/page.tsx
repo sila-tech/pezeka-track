@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User } from 'lucide-react';
+import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User, CheckCircle2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -46,6 +46,7 @@ interface DashboardLoan {
   chargingCost?: number;
   loanType?: string;
   idNumber?: string;
+  assignedStaffId?: string;
   assignedStaffName?: string;
   followUpNotes?: FollowUpNote[];
 }
@@ -149,6 +150,11 @@ export default function Dashboard() {
       }
   }
 
+  const myPortfolio = useMemo(() => {
+      if (!loans || !user) return [];
+      return loans.filter(loan => loan.assignedStaffId === user.uid);
+  }, [loans, user]);
+
   const stats = useMemo(() => {
     if (!loans) return { realizedRevenue: 0, disbursedCount: 0 };
     
@@ -172,6 +178,13 @@ export default function Dashboard() {
     
     return { realizedRevenue, disbursedCount };
   }, [loans]);
+
+  const myPortfolioStats = useMemo(() => {
+      const activeLoans = myPortfolio.filter(l => l.status !== 'paid' && l.status !== 'rejected' && l.status !== 'application');
+      const totalDisbursed = myPortfolio.reduce((acc, l) => acc + (Number(l.principalAmount) || 0), 0);
+      const totalCollected = myPortfolio.reduce((acc, l) => acc + (Number(l.totalPaid) || 0), 0);
+      return { activeCount: activeLoans.length, totalDisbursed, totalCollected };
+  }, [myPortfolio]);
 
   const dueLoans = useMemo(() => {
     if (!loans) return [];
@@ -258,7 +271,7 @@ export default function Dashboard() {
                       )}
                     />
                     <FormField
-                      control={staffLoanForm.control}
+                      control={staffLoanMember.control}
                       name="alternativeNumber"
                       render={({ field }) => (
                         <FormItem>
@@ -294,6 +307,28 @@ export default function Dashboard() {
           </Dialog>
         )}
       </div>
+
+      {user?.role === 'staff' && (
+          <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary
+              </h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                  <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase">Assigned Loans</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold">{myPortfolioStats.activeCount}</div></CardContent>
+                  </Card>
+                  <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase">Disbursed by Me</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold">Ksh {myPortfolioStats.totalDisbursed.toLocaleString()}</div></CardContent>
+                  </Card>
+                  <Card>
+                      <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase">Collected by Me</CardTitle></CardHeader>
+                      <CardContent><div className="text-2xl font-bold text-green-600">Ksh {myPortfolioStats.totalCollected.toLocaleString()}</div></CardContent>
+                  </Card>
+              </div>
+          </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
          {(user?.email === 'simon@pezeka.com' || user?.role === 'finance') && (
@@ -389,53 +424,92 @@ export default function Dashboard() {
               )}
             </CardContent>
         </Card>
-        <Card className="flex flex-col h-[600px]">
-            <CardHeader>
-                <CardTitle>New Loan Applications</CardTitle>
-                <CardDescription>Recently applied loans, including internal staff applications.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-hidden">
-                {isLoading ? (
-                    <div className="flex items-center justify-center p-8 h-full">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                ) : newApplications.length === 0 ? (
-                    <Alert>
-                        <Bell className="h-4 w-4" />
-                        <AlertTitle>No New Applications</AlertTitle>
-                        <AlertDescription>There are currently no new loan applications to review.</AlertDescription>
-                    </Alert>
-                ) : (
+
+        {user?.role === 'staff' ? (
+            <Card className="flex flex-col h-[600px]">
+                <CardHeader>
+                    <CardTitle>My Portfolio</CardTitle>
+                    <CardDescription>Collection accounts assigned specifically to you.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden">
                     <ScrollArea className="h-full">
                         <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
                                     <TableHead>Customer</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {newApplications.map((loan) => (
+                                {myPortfolio.map(loan => (
                                     <TableRow key={loan.id}>
-                                        <TableCell className="font-medium">
-                                          <div>{loan.customerName}</div>
-                                          <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
-                                        </TableCell>
                                         <TableCell>
-                                          {loan.loanType === 'Staff Loan' ? <Badge variant="outline">Staff Loan</Badge> : (loan.loanType || 'N/A')}
+                                            <div className="font-medium text-xs">{loan.customerName}</div>
+                                            <div className="text-[10px] text-muted-foreground">Loan #{loan.loanNumber}</div>
                                         </TableCell>
-                                        <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'MMM dd, yyyy')}</TableCell>
-                                        <TableCell className="text-right font-bold tabular-nums">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold text-xs">
+                                            Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant="outline" className="text-[10px]">{loan.status}</Badge>
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </ScrollArea>
-                )}
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        ) : (
+            <Card className="flex flex-col h-[600px]">
+                <CardHeader>
+                    <CardTitle>New Loan Applications</CardTitle>
+                    <CardDescription>Recently applied loans, including internal staff applications.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-hidden">
+                    {isLoading ? (
+                        <div className="flex items-center justify-center p-8 h-full">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : newApplications.length === 0 ? (
+                        <Alert>
+                            <Bell className="h-4 w-4" />
+                            <AlertTitle>No New Applications</AlertTitle>
+                            <AlertDescription>There are currently no new loan applications to review.</AlertDescription>
+                        </Alert>
+                    ) : (
+                        <ScrollArea className="h-full">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-card z-10">
+                                    <TableRow>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {newApplications.map((loan) => (
+                                        <TableRow key={loan.id}>
+                                            <TableCell className="font-medium">
+                                              <div>{loan.customerName}</div>
+                                              <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                            </TableCell>
+                                            <TableCell>
+                                              {loan.loanType === 'Staff Loan' ? <Badge variant="outline">Staff Loan</Badge> : (loan.loanType || 'N/A')}
+                                            </TableCell>
+                                            <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'MMM dd, yyyy')}</TableCell>
+                                            <TableCell className="text-right font-bold tabular-nums">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    )}
+                </CardContent>
+            </Card>
+        )}
       </div>
 
       {/* Follow-up Notes Dialog */}

@@ -13,7 +13,8 @@ import {
   User,
   Plus,
   AlertCircle,
-  ShieldCheck
+  ShieldCheck,
+  Briefcase
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -66,6 +67,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
+import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateInterestForOneInstalment } from '@/lib/utils';
@@ -602,6 +604,7 @@ export default function FinancePage() {
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
               <TabsTrigger value="txfees">Transaction Fees</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
+              <TabsTrigger value="staff-portfolios">Staff Portfolios</TabsTrigger>
           </TabsList>
           
           <TabsContent value="loanbook">
@@ -763,6 +766,10 @@ export default function FinancePage() {
           
           <TabsContent value="investors">
             <InvestorsPortfolioTab />
+          </TabsContent>
+
+          <TabsContent value="staff-portfolios">
+            <StaffPortfoliosTab loans={loans} staffList={staffList} />
           </TabsContent>
       </Tabs>
 
