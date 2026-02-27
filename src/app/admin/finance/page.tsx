@@ -188,9 +188,10 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
-  const canPerformActions = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.role === 'staff') : false;
-  const canViewInvestors = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  // STAFF RESTRICTION: Staff can NO LONGER access Finance dashboard or Loan Book
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  const canPerformActions = isAuthorized;
+  const canViewInvestors = isAuthorized;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
@@ -453,6 +454,15 @@ export default function FinancePage() {
         <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
+  }
+
+  if (!isAuthorized) {
+      return (
+          <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+              <h2 className="text-xl font-semibold">Access Restricted</h2>
+              <p className="text-muted-foreground">Only Finance and Super Admin roles can access this page.</p>
+          </div>
+      );
   }
 
   return (

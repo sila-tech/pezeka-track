@@ -138,12 +138,12 @@ export default function LoansPage() {
 
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance' || user?.email?.endsWith('@finance.pezeka.com');
-  const isStaff = user?.role === 'staff';
+  
+  // STAFF RESTRICTION: Staff no longer see active loans or processing forms
+  const canAdd = isSuperAdmin || isFinance;
+  const canManageApplications = isSuperAdmin || isFinance;
 
-  const canAdd = isSuperAdmin || isFinance || isStaff;
-  const canManageApplications = isSuperAdmin || isFinance || isStaff;
-
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
+  const isAuthorized = isSuperAdmin || isFinance;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -347,7 +347,14 @@ export default function LoansPage() {
       }
   };
   
-  const isLoading = userLoading || customersLoading || loansLoading;
+  if (!isAuthorized && !userLoading) {
+      return (
+          <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+              <h2 className="text-xl font-semibold">Access Restricted</h2>
+              <p className="text-muted-foreground">Only Finance and Super Admin roles can access active loan data.</p>
+          </div>
+      );
+  }
 
   return (
     <div>
@@ -682,12 +689,12 @@ export default function LoansPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                {isLoading && (
+                {loansLoading && (
                     <div className="flex items-center justify-center p-8">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
                 )}
-                {!isLoading && (!filteredLoans || filteredLoans.length === 0) && (
+                {!loansLoading && (!filteredLoans || filteredLoans.length === 0) && (
                     <Alert>
                         <AlertTitle>No Loans Found</AlertTitle>
                         <AlertDescription>
@@ -698,7 +705,7 @@ export default function LoansPage() {
                         </AlertDescription>
                     </Alert>
                 )}
-                {!isLoading && filteredLoans && filteredLoans.length > 0 && (
+                {!loansLoading && filteredLoans && filteredLoans.length > 0 && (
                     <ScrollArea className="h-[60vh]">
                       <Table>
                           <TableHeader className="sticky top-0 bg-card">
@@ -747,12 +754,12 @@ export default function LoansPage() {
                     <CardDescription>Review and process new loan applications from customers.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {isLoading && (
+                    {loansLoading && (
                         <div className="flex items-center justify-center p-8">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
                     )}
-                    {!isLoading && (!applicationLoans || applicationLoans.length === 0) && (
+                    {!loansLoading && (!applicationLoans || applicationLoans.length === 0) && (
                         <Alert>
                             <AlertTitle>No New Applications</AlertTitle>
                             <AlertDescription>
@@ -763,7 +770,7 @@ export default function LoansPage() {
                             </AlertDescription>
                         </Alert>
                     )}
-                    {!isLoading && applicationLoans && applicationLoans.length > 0 && (
+                    {!loansLoading && applicationLoans && applicationLoans.length > 0 && (
                         <ScrollArea className="h-[60vh]">
                             <Table>
                                 <TableHeader className="sticky top-0 bg-card">

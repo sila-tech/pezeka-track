@@ -102,13 +102,12 @@ export default function CustomersPage() {
   
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance';
-  const isStaff = user?.role === 'staff';
   
-  // Staff can add, but not edit or delete
-  const canAdd = isSuperAdmin || isFinance || isStaff;
+  // STAFF RESTRICTION: Staff can NO LONGER see customer lists or perform data entry
+  const canAdd = isSuperAdmin || isFinance;
   const canEditDelete = isSuperAdmin || isFinance;
   
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
+  const isAuthorized = isSuperAdmin || isFinance;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -290,7 +289,14 @@ export default function CustomersPage() {
       }
   };
   
-  const isLoading = userLoading || customersLoading || loansLoading;
+  if (!isAuthorized && !userLoading) {
+      return (
+          <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+              <h2 className="text-xl font-semibold">Access Restricted</h2>
+              <p className="text-muted-foreground">Only Finance and Super Admin roles can access customer records.</p>
+          </div>
+      );
+  }
 
   return (
     <div>
@@ -388,12 +394,12 @@ export default function CustomersPage() {
             </div>
         </CardHeader>
         <CardContent>
-          {isLoading && (
+          {customersLoading && (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
-          {!isLoading && (!filteredCustomers || filteredCustomers.length === 0) && (
+          {!customersLoading && (!filteredCustomers || filteredCustomers.length === 0) && (
               <Alert>
                   <AlertTitle>No Customers Found</AlertTitle>
                   <AlertDescription>
@@ -404,7 +410,7 @@ export default function CustomersPage() {
                   </AlertDescription>
               </Alert>
           )}
-          {!isLoading && filteredCustomers && filteredCustomers.length > 0 && (
+          {!customersLoading && filteredCustomers && filteredCustomers.length > 0 && (
             <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card">
