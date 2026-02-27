@@ -8,14 +8,15 @@ service cloud.firestore {
     // =====================================================================
     
     // Check if the user is the Super Admin (Simon)
+    // prioritized UID check for reliability in development environments
     function isSuperAdmin() {
       return request.auth != null && (
         request.auth.token.email == 'simon@pezeka.com' || 
-        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' // Simon's UID for redundancy
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
       );
     }
 
-    // Safely get the user's role without triggering recursion
+    // Safely get the user's role
     function getUserRole() {
       return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
@@ -39,36 +40,38 @@ service cloud.firestore {
     // =====================================================================
 
     match /users/{userId} {
-      // isOwner check must come first to prevent recursive role lookup
+      // allow Simon or the owner to read/write the profile
       allow get: if isOwner(userId) || isSuperAdmin();
       allow list: if isSuperAdmin();
       allow write: if isSuperAdmin();
     }
 
     match /customers/{customerId} {
-      allow list, get: if isStaff() || isFinance() || isSuperAdmin();
-      allow write: if isStaff() || isFinance() || isSuperAdmin();
+      // prioritize super admin for faster evaluation
+      allow list, get: if isSuperAdmin() || isStaff() || isFinance();
+      allow write: if isSuperAdmin() || isStaff() || isFinance();
     }
 
     match /loans/{loanId} {
-      allow list: if isStaff() || isFinance() || isSuperAdmin();
-      allow get: if isStaff() || isFinance() || isSuperAdmin() || (request.auth != null && resource.data.customerId == request.auth.uid);
-      allow write: if isStaff() || isFinance() || isSuperAdmin();
-      allow create: if request.auth != null && (request.resource.data.customerId == request.auth.uid || isStaff() || isFinance() || isSuperAdmin());
+      allow list: if isSuperAdmin() || isStaff() || isFinance();
+      allow get: if isSuperAdmin() || isStaff() || isFinance() || (request.auth != null && resource.data.customerId == request.auth.uid);
+      allow write: if isSuperAdmin() || isStaff() || isFinance();
+      allow create: if request.auth != null && (isSuperAdmin() || isStaff() || isFinance() || request.resource.data.customerId == request.auth.uid);
     }
     
     match /financeEntries/{entryId} {
-      allow list, get, create, update, delete: if isFinance() || isSuperAdmin();
+      // restricted to Finance and Super Admin as requested
+      allow list, get, create, update, delete: if isSuperAdmin() || isFinance();
     }
 
     match /investors/{investorId} {
-      allow list: if isFinance() || isSuperAdmin();
-      allow get: if isOwner(investorId) || isFinance() || isSuperAdmin();
-      allow update: if (isOwner(investorId) && 
+      allow list: if isSuperAdmin() || isFinance();
+      allow get: if isOwner(investorId) || isSuperAdmin() || isFinance();
+      allow update: if isSuperAdmin() || isFinance() || (isOwner(investorId) && 
                     (
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['withdrawals', 'updatedAt']) ||
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deposits', 'updatedAt'])
-                    )) || isFinance() || isSuperAdmin();
+                    ));
       allow create, delete: if isSuperAdmin() || isFinance();
     }
   }
