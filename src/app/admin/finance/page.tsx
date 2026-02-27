@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -48,6 +47,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { 
   addFinanceEntry, 
@@ -110,16 +117,14 @@ const editLoanSchema = z.object({
   status: z.enum(['active', 'due', 'overdue', 'paid', 'rollover', 'application', 'rejected']),
 });
 
-const rolloverSchema = z.object({
-    rolloverDate: z.string().min(1, 'Rollover date is required.'),
-});
-
 interface Loan {
   id: string;
   loanNumber: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
+  alternativeNumber?: string;
+  idNumber?: string;
   disbursementDate: { seconds: number, nanoseconds: number };
   principalAmount: number;
   interestRate?: number;
@@ -158,8 +163,6 @@ export default function FinancePage() {
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
-  const [isEditingLoan, setIsEditingLoan] = useState(false);
-  const [isRollingOver, setIsRollingOver] = useState(false);
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
 
@@ -224,7 +227,7 @@ export default function FinancePage() {
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd') }
+    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), type: 'receipt' }
   });
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
@@ -237,8 +240,6 @@ export default function FinancePage() {
     defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd') }
   });
 
-  const editLoanForm = useForm<z.infer<typeof editLoanSchema>>({ resolver: zodResolver(editLoanSchema) });
-  
   const addFinanceEntryType = addForm.watch('type');
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
@@ -328,11 +329,11 @@ export default function FinancePage() {
                                 <FormItem>
                                   <FormLabel>Type</FormLabel>
                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl>
                                     <SelectContent>
-                                      <SelectItem value="receipt">Receipt</SelectItem>
-                                      <SelectItem value="payout">Payout</SelectItem>
-                                      <SelectItem value="expense">Expense</SelectItem>
+                                      <SelectItem value="receipt">Receipt (Income)</SelectItem>
+                                      <SelectItem value="payout">Payout (Outgoing)</SelectItem>
+                                      <SelectItem value="expense">Expense (Operational)</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </FormItem>
@@ -342,11 +343,11 @@ export default function FinancePage() {
                                     <FormItem>
                                       <FormLabel>Payout Category</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl>
                                         <SelectContent>
-                                          <SelectItem value="loan_disbursement">Disbursement</SelectItem>
-                                          <SelectItem value="investor_withdrawal">Withdrawal</SelectItem>
-                                          <SelectItem value="other">Other</SelectItem>
+                                          <SelectItem value="loan_disbursement">Loan Disbursement</SelectItem>
+                                          <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
+                                          <SelectItem value="other">Other Payout</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </FormItem>
@@ -357,12 +358,12 @@ export default function FinancePage() {
                                     <FormItem>
                                       <FormLabel>Receipt Category</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl>
                                         <SelectContent>
-                                          <SelectItem value="loan_repayment">Repayment</SelectItem>
+                                          <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
                                           <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
                                           <SelectItem value="investment">Investor Deposit</SelectItem>
-                                          <SelectItem value="other">Other</SelectItem>
+                                          <SelectItem value="other">Other Income</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </FormItem>
@@ -392,10 +393,31 @@ export default function FinancePage() {
               <Card>
                 <CardHeader><CardTitle>Internal Ledger</CardTitle></CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-[60vh]"><Table className="min-w-[1200px]">
-                        <TableHeader><TableRow><TableHead>Client</TableHead><TableHead>Loan No.</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
-                        <TableBody>{filteredLoans.map(loan => (<TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}><TableCell>{loan.customerName}</TableCell><TableCell>{loan.loanNumber}</TableCell><TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge>{loan.status}</Badge></TableCell></TableRow>))}</TableBody>
-                    </Table></ScrollArea>
+                    <ScrollArea className="h-[60vh]">
+                      <Table className="min-w-[1200px]">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Client</TableHead>
+                            <TableHead>Loan No.</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="text-center">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredLoans.map(loan => (
+                            <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
+                              <TableCell>
+                                <div>{loan.customerName}</div>
+                                <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                              </TableCell>
+                              <TableCell>{loan.loanNumber}</TableCell>
+                              <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
+                              <TableCell className="text-center"><Badge>{loan.status}</Badge></TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
                 </CardContent>
               </Card>
           </TabsContent>

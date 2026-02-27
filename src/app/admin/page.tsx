@@ -36,6 +36,7 @@ interface DashboardLoan {
   carTrackInstallationFee?: number;
   chargingCost?: number;
   loanType?: string;
+  idNumber?: string;
 }
 
 const staffLoanSchema = z.object({
@@ -84,6 +85,8 @@ export default function Dashboard() {
         instalmentAmount: values.amount,
         totalRepayableAmount: values.amount,
         totalPaid: 0,
+        idNumber: "STAFF-ID",
+        alternativeNumber: "",
         comments: `Staff Loan Application: ${values.reason}`,
       };
 
@@ -199,7 +202,7 @@ export default function Dashboard() {
                     )}
                   />
                   <FormField
-                    control={staffLoanMember.control}
+                    control={staffLoanForm.control}
                     name="reason"
                     render={({ field }) => (
                       <FormItem>
@@ -296,7 +299,10 @@ export default function Dashboard() {
 
                             return (
                                 <TableRow key={loan.id}>
-                                    <TableCell className="font-medium">{loan.customerName}</TableCell>
+                                    <TableCell className="font-medium">
+                                      <div>{loan.customerName}</div>
+                                      <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                    </TableCell>
                                     <TableCell>{loan.loanNumber}</TableCell>
                                     <TableCell className="whitespace-nowrap">{format(loan.endDate, 'MMM dd, yyyy')}</TableCell>
                                     <TableCell className="text-right font-bold tabular-nums">{balance.toLocaleString()}</TableCell>
@@ -342,7 +348,10 @@ export default function Dashboard() {
                             <TableBody>
                                 {newApplications.map((loan) => (
                                     <TableRow key={loan.id}>
-                                        <TableCell className="font-medium">{loan.customerName}</TableCell>
+                                        <TableCell className="font-medium">
+                                          <div>{loan.customerName}</div>
+                                          <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
+                                        </TableCell>
                                         <TableCell>
                                           {loan.loanType === 'Staff Loan' ? <Badge variant="outline">Staff Loan</Badge> : (loan.loanType || 'N/A')}
                                         </TableCell>
