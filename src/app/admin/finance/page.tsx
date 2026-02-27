@@ -248,7 +248,10 @@ export default function FinancePage() {
       transactionFee: 0,
       amount: 0,
       description: '',
-      loanId: ''
+      loanId: '',
+      expenseCategory: undefined,
+      receiptCategory: undefined,
+      payoutCategory: undefined
     }
   });
 
@@ -395,6 +398,21 @@ export default function FinancePage() {
                                           <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
                                           <SelectItem value="investment">Investor Deposit</SelectItem>
                                           <SelectItem value="other">Other Income</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </FormItem>
+                                )} />
+                            )}
+                            {addFinanceEntryType === 'expense' && (
+                                <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Expense Category</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
+                                          <SelectItem value="office_purchase">Office Purchase</SelectItem>
+                                          <SelectItem value="other">Other Expense</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </FormItem>
