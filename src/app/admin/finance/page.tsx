@@ -5,7 +5,22 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { FileDown, Loader2, PlusCircle, PenSquare, Trash2, Search, HandCoins, AlertCircle, RefreshCw, Calculator, Wallet, ArrowDownCircle, ArrowUpCircle, History } from "lucide-react";
+import { 
+  FileDown, 
+  Loader2, 
+  PlusCircle, 
+  PenSquare, 
+  Trash2, 
+  Search, 
+  HandCoins, 
+  AlertCircle, 
+  RefreshCw, 
+  Calculator, 
+  Wallet, 
+  ArrowDownCircle, 
+  ArrowUpCircle, 
+  History 
+} from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -49,13 +64,23 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, updateFinanceEntry } from '@/lib/firestore';
+import { 
+  addFinanceEntry, 
+  updateLoan, 
+  deleteFinanceEntry, 
+  rolloverLoan, 
+  deleteLoan, 
+  addPenaltyToLoan, 
+  updateFinanceEntry 
+} from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
+
+// --- SCHEMAS ---
 
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
@@ -107,6 +132,8 @@ const rolloverSchema = z.object({
     rolloverDate: z.string().min(1, 'Rollover date is required.'),
 });
 
+// --- INTERFACES ---
+
 interface Loan {
   id: string;
   loanNumber: string;
@@ -144,6 +171,8 @@ interface FinanceEntry {
   payoutCategory?: string;
 }
 
+// --- MAIN COMPONENT ---
+
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,6 +196,7 @@ export default function FinancePage() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   
+  // Memoize financial view by combining ledger entries and derived lending data
   const financialData = useMemo(() => {
     const receipts: any[] = [];
     const upfront: any[] = [];
@@ -175,9 +205,11 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
+    // 1. Process data from the Loan Book (System of Record for Lending)
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
+        // Upfront Revenue
         const reg = Number(loan.registrationFee) || 0;
         const proc = Number(loan.processingFee) || 0;
         const track = Number(loan.carTrackInstallationFee) || 0;
@@ -196,6 +228,7 @@ export default function FinancePage() {
             });
         }
 
+        // Disbursement Payout
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -207,6 +240,7 @@ export default function FinancePage() {
             loanId: loan.id
         });
 
+        // Repayment Receipts
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -220,7 +254,9 @@ export default function FinancePage() {
         });
     });
 
+    // 2. Process manual Finance Entries (System of Record for Operations & Investments)
     financeEntries.forEach(entry => {
+        // Prevent double-counting if lending entries were also manually recorded
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
         if (entry.type === 'receipt') {
@@ -238,6 +274,7 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses };
   }, [loans, financeEntries]);
 
+  // Aggregate Stats
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts } = financialData;
     
@@ -254,6 +291,7 @@ export default function FinancePage() {
     };
   }, [financialData]);
 
+  // Loan Book Filtering
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
     return loans.filter(loan => {
@@ -266,6 +304,7 @@ export default function FinancePage() {
     });
   }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
 
+  // Forms
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
     defaultValues: { date: format(new Date(), 'yyyy-MM-dd') }
@@ -290,6 +329,8 @@ export default function FinancePage() {
 
   const { watch: addFinanceEntryWatch } = addForm;
   const addFinanceEntryType = addFinanceEntryWatch('type');
+
+  // --- HANDLERS ---
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
@@ -434,6 +475,8 @@ export default function FinancePage() {
         setIsUpdating(false);
     }
   }
+
+  // --- RENDER ---
 
   if (userLoading || loansLoading || financeEntriesLoading) {
     return (
