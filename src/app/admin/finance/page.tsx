@@ -176,6 +176,7 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
+    // 1. Process Loan Book data (derived)
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
@@ -185,6 +186,7 @@ export default function FinancePage() {
         const charge = Number(loan.chargingCost) || 0;
         const totalFees = reg + proc + track + charge;
 
+        // Upfront Fees (Receipts)
         if (totalFees > 0) {
             upfront.push({
                 id: `fee-${loan.id}`,
@@ -197,6 +199,7 @@ export default function FinancePage() {
             });
         }
 
+        // Disbursement (Payout)
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -209,6 +212,7 @@ export default function FinancePage() {
             loanId: loan.id
         });
 
+        // Repayments (Receipts)
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -222,6 +226,7 @@ export default function FinancePage() {
         });
     });
 
+    // 2. Process Manual Finance Entries
     financeEntries.forEach(entry => {
         const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
 
@@ -229,7 +234,8 @@ export default function FinancePage() {
             if (!isLendingDuplicate) {
                 receipts.push(entry);
             }
-        } else if (entry.type === 'payout' || entry.type === 'expense') {
+        } else {
+            // Payouts and Expenses
             if (!isLendingDuplicate) {
                 payouts.push(entry);
                 if (entry.type === 'expense') {
@@ -243,19 +249,19 @@ export default function FinancePage() {
   }, [loans, financeEntries]);
 
   const stats = useMemo(() => {
-    const { allReceipts, allUpfrontFees, allPayouts, allExpenses } = financialData;
+    const { allReceipts, allUpfrontFees, allPayouts } = financialData;
     
+    // Money In
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
+    // Money Out (Includes all Payouts, Expenses, and every Transaction Cost)
     const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
-    const expensesOnlyTotal = allExpenses.reduce((acc, e) => acc + (Number(e.amount) || 0) + (Number(e.transactionCost) || 0), 0);
     
     return {
       totalReceipts: totalMoneyIn,
       totalPayouts: totalMoneyOut,
-      totalExpenses: expensesOnlyTotal,
       cashAtHand: totalMoneyIn - totalMoneyOut
     };
   }, [financialData]);
@@ -421,7 +427,11 @@ export default function FinancePage() {
   }
 
   if (userLoading || loansLoading || financeEntriesLoading) {
-    return <div className="flex h-screen w-full items-center justify-center bg-background"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   return (
@@ -484,10 +494,6 @@ export default function FinancePage() {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Payouts</CardTitle><ArrowDownCircle className="h-4 w-4 text-destructive"/></CardHeader>
                 <CardContent><div className="text-2xl font-bold text-destructive">Ksh {stats.totalPayouts.toLocaleString()}</div></CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Expenses</CardTitle><CreditCard className="h-4 w-4 text-orange-600"/></CardHeader>
-                <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {stats.totalExpenses.toLocaleString()}</div></CardContent>
             </Card>
         </div>
       </div>
@@ -656,7 +662,6 @@ export default function FinancePage() {
           )}
       </Tabs>
 
-      {/* Loan Management Dialog */}
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
           <DialogContent className="sm:max-w-4xl">
               {loanToEdit && (
@@ -789,7 +794,6 @@ export default function FinancePage() {
           </DialogContent>
       </Dialog>
 
-      {/* Edit Loan Parameters Dialog */}
       <Dialog open={isEditingLoan} onOpenChange={setIsEditingLoan}>
           <DialogContent className="sm:max-w-2xl">
               <DialogHeader><DialogTitle>Edit Loan Parameters</DialogTitle><DialogDescription>Update principal, rates, or fees. This recalculates totals.</DialogDescription></DialogHeader>
