@@ -57,6 +57,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
 
+// Zod Schema for Finance Entry (Simplified - No Transaction Cost)
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
@@ -244,9 +245,7 @@ export default function FinancePage() {
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
 
-    const totalMoneyOut = allPayouts.reduce((acc, e) => {
-        return acc + (Number(e.amount) || 0);
-    }, 0);
+    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     
     return {
       totalReceipts: totalMoneyIn,
