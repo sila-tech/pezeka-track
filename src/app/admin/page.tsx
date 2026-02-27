@@ -18,6 +18,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { addLoan } from '@/lib/firestore';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface DashboardLoan {
   id: string;
@@ -68,7 +69,7 @@ export default function Dashboard() {
       const loanData = {
         customerId: user.uid,
         customerName: user.name || user.email?.split('@')[0],
-        customerPhone: "Internal Staff", // Staff don't necessarily have a phone in profile
+        customerPhone: "Internal Staff",
         disbursementDate: new Date(),
         principalAmount: values.amount,
         interestRate: 0, 
@@ -162,8 +163,8 @@ export default function Dashboard() {
   const isLoading = userLoading || loansLoading;
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">
           Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!
         </h1>
@@ -198,7 +199,7 @@ export default function Dashboard() {
                     )}
                   />
                   <FormField
-                    control={staffLoanForm.control}
+                    control={staffLoanMember.control}
                     name="reason"
                     render={({ field }) => (
                       <FormItem>
@@ -246,28 +247,27 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <Card>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="flex flex-col h-[500px]">
             <CardHeader>
                 <CardTitle>Due Loans</CardTitle>
                 <CardDescription>Members with payments that are overdue or due within 7 days.</CardDescription>
             </CardHeader>
-            <CardContent>
-              {isLoading && (
-                <div className="flex items-center justify-center p-8">
+            <CardContent className="flex-1 overflow-hidden">
+              {isLoading ? (
+                <div className="flex items-center justify-center p-8 h-full">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              )}
-              {!isLoading && dueLoans.length === 0 && (
+              ) : dueLoans.length === 0 ? (
                 <Alert>
                     <Bell className="h-4 w-4" />
                     <AlertTitle>No Due Loans</AlertTitle>
                     <AlertDescription>All customer accounts are up to date.</AlertDescription>
                 </Alert>
-              )}
-              {!isLoading && dueLoans.length > 0 && (
+              ) : (
+                <ScrollArea className="h-full">
                  <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-card z-10">
                         <TableRow>
                             <TableHead>Customer</TableHead>
                             <TableHead>Loan No.</TableHead>
@@ -298,8 +298,8 @@ export default function Dashboard() {
                                 <TableRow key={loan.id}>
                                     <TableCell className="font-medium">{loan.customerName}</TableCell>
                                     <TableCell>{loan.loanNumber}</TableCell>
-                                    <TableCell>{format(loan.endDate, 'PPP')}</TableCell>
-                                    <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
+                                    <TableCell className="whitespace-nowrap">{format(loan.endDate, 'MMM dd, yyyy')}</TableCell>
+                                    <TableCell className="text-right font-bold tabular-nums">{balance.toLocaleString()}</TableCell>
                                     <TableCell className="text-center">
                                       <Badge variant={statusVariant}>{statusLabel}</Badge>
                                     </TableCell>
@@ -308,31 +308,30 @@ export default function Dashboard() {
                         })}
                     </TableBody>
                 </Table>
+                </ScrollArea>
               )}
             </CardContent>
         </Card>
-        <Card>
+        <Card className="flex flex-col h-[500px]">
             <CardHeader>
                 <CardTitle>New Loan Applications</CardTitle>
                 <CardDescription>Recently applied loans, including internal staff applications.</CardDescription>
             </CardHeader>
-            <CardContent>
-                {isLoading && (
-                    <div className="flex items-center justify-center p-8">
+            <CardContent className="flex-1 overflow-hidden">
+                {isLoading ? (
+                    <div className="flex items-center justify-center p-8 h-full">
                         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
-                )}
-                {!isLoading && newApplications.length === 0 && (
+                ) : newApplications.length === 0 ? (
                     <Alert>
                         <Bell className="h-4 w-4" />
                         <AlertTitle>No New Applications</AlertTitle>
                         <AlertDescription>There are currently no new loan applications to review.</AlertDescription>
                     </Alert>
-                )}
-                {!isLoading && newApplications.length > 0 && (
-                    <div className="max-h-[300px] overflow-y-auto">
+                ) : (
+                    <ScrollArea className="h-full">
                         <Table>
-                            <TableHeader>
+                            <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Type</TableHead>
@@ -347,13 +346,13 @@ export default function Dashboard() {
                                         <TableCell>
                                           {loan.loanType === 'Staff Loan' ? <Badge variant="outline">Staff Loan</Badge> : (loan.loanType || 'N/A')}
                                         </TableCell>
-                                        <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}</TableCell>
-                                        <TableCell className="text-right font-bold">{loan.principalAmount.toLocaleString()}</TableCell>
+                                        <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'MMM dd, yyyy')}</TableCell>
+                                        <TableCell className="text-right font-bold tabular-nums">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
-                    </div>
+                    </ScrollArea>
                 )}
             </CardContent>
         </Card>
