@@ -6,10 +6,16 @@ service cloud.firestore {
     // =====================================================================
     // Helper Functions
     // =====================================================================
+    
+    // Check if the user is the Super Admin (Simon)
     function isSuperAdmin() {
-      return request.auth != null && request.auth.token.email == 'simon@pezeka.com';
+      return request.auth != null && (
+        request.auth.token.email == 'simon@pezeka.com' || 
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' // Simon's UID for redundancy
+      );
     }
 
+    // Safely get the user's role without triggering recursion
     function getUserRole() {
       return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
@@ -33,9 +39,10 @@ service cloud.firestore {
     // =====================================================================
 
     match /users/{userId} {
+      // isOwner check must come first to prevent recursive role lookup
+      allow get: if isOwner(userId) || isSuperAdmin();
       allow list: if isSuperAdmin();
       allow write: if isSuperAdmin();
-      allow get: if isOwner(userId) || isStaff() || isFinance() || isSuperAdmin();
     }
 
     match /customers/{customerId} {
@@ -51,7 +58,7 @@ service cloud.firestore {
     }
     
     match /financeEntries/{entryId} {
-      allow list, get, write: if isFinance() || isSuperAdmin();
+      allow list, get, create, update, delete: if isFinance() || isSuperAdmin();
     }
 
     match /investors/{investorId} {
