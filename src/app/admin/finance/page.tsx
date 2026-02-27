@@ -189,7 +189,8 @@ export default function FinancePage() {
   const { toast } = useToast();
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
-  const canPerformActions = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  const canPerformActions = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.role === 'staff') : false;
+  const canViewInvestors = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
@@ -562,7 +563,7 @@ export default function FinancePage() {
                   <TabsTrigger value="payouts">Payouts (Total Out)</TabsTrigger>
                   <TabsTrigger value="expenses">Expenses (Ops)</TabsTrigger>
                   <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
-                  {canPerformActions && <TabsTrigger value="investors">Investors</TabsTrigger>}
+                  {canViewInvestors && <TabsTrigger value="investors">Investors</TabsTrigger>}
               </TabsList>
               <ScrollBar orientation="horizontal" />
           </ScrollArea>
@@ -720,7 +721,7 @@ export default function FinancePage() {
               </Card>
           </TabsContent>
           
-          {canPerformActions && (
+          {canViewInvestors && (
             <TabsContent value="investors">
                 <InvestorsPortfolioTab />
             </TabsContent>

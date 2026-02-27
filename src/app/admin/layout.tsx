@@ -36,7 +36,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
         <HandCoins className="h-4 w-4" />
         Loans
     </Link>
-    {(isSuperAdmin || isFinance) && (
+    {(isSuperAdmin || isFinance || isStaff) && (
         <Link
             href="/admin/finance"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
@@ -127,7 +127,7 @@ export default function AdminLayout({
             <div className="flex h-full max-h-screen flex-col gap-2">
             <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
                 <Link href="/admin" className="flex items-center gap-2 font-semibold">
-                <Landmark className="h-6 w-6 text-primary" />
+                < Landmark className="h-6 w-6 text-primary" />
                 <span>Pezeka Credit</span>
                 </Link>
             </div>

@@ -141,7 +141,7 @@ export default function LoansPage() {
   const isStaff = user?.role === 'staff';
 
   const canAdd = isSuperAdmin || isFinance || isStaff;
-  const canManageApplications = isSuperAdmin || isFinance;
+  const canManageApplications = isSuperAdmin || isFinance || isStaff;
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
