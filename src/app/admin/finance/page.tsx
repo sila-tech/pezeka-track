@@ -1,3 +1,5 @@
+'use server';
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -57,7 +59,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
 
-// Zod Schema for Finance Entry (Simplified - No Transaction Cost)
+// Schema for Finance Entry (Simplified - No Transaction Cost)
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
@@ -179,6 +181,7 @@ export default function FinancePage() {
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
+        // Derived Revenue: Upfront Fees
         const reg = Number(loan.registrationFee) || 0;
         const proc = Number(loan.processingFee) || 0;
         const track = Number(loan.carTrackInstallationFee) || 0;
@@ -197,6 +200,7 @@ export default function FinancePage() {
             });
         }
 
+        // Derived Money Out: Disbursements (Take-home)
         const takeHome = Number(loan.principalAmount) - totalFees;
         payouts.push({
             id: `disb-${loan.id}`,
@@ -208,6 +212,7 @@ export default function FinancePage() {
             loanId: loan.id
         });
 
+        // Derived Receipts: Loan Repayments
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -241,6 +246,7 @@ export default function FinancePage() {
 
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts } = financialData;
+    
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
