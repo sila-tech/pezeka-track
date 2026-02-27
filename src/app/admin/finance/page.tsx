@@ -420,6 +420,30 @@ export default function FinancePage() {
       }
   }
 
+  const handleStaffReassignment = async (staffId: string) => {
+      if (!loanToEdit) return;
+      
+      let updateData: any = {};
+      if (staffId === 'unassigned') {
+          updateData = { assignedStaffId: "", assignedStaffName: "" };
+      } else {
+          const staffMember = staffList?.find((s: any) => (s.uid || s.id) === staffId);
+          if (!staffMember) return;
+          updateData = {
+              assignedStaffId: staffId,
+              assignedStaffName: staffMember.name || staffMember.email
+          };
+      }
+      
+      try {
+          await updateLoan(firestore, loanToEdit.id, updateData);
+          toast({ title: 'Staff Re-assigned' });
+          setLoanToEdit({ ...loanToEdit, ...updateData });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+      }
+  };
+
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
       
@@ -752,9 +776,25 @@ export default function FinancePage() {
                             <div className="space-y-4 md:col-span-1">
                                 <Card>
                                     <CardHeader className="py-3"><CardTitle className="text-sm">Loan Summary</CardTitle></CardHeader>
-                                    <CardContent className="space-y-2 text-sm">
+                                    <CardContent className="space-y-4 text-sm">
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
-                                        <div className="flex justify-between"><span>Staff Assigned:</span><span className="font-medium text-blue-600">{loanToEdit.assignedStaffName || "Unassigned"}</span></div>
+                                        <div className="space-y-1.5 pt-2 border-t">
+                                            <span className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">Follow-up Reassignment:</span>
+                                            <Select 
+                                                value={loanToEdit.assignedStaffId || "unassigned"} 
+                                                onValueChange={handleStaffReassignment}
+                                            >
+                                                <SelectTrigger className="h-8 text-xs">
+                                                    <SelectValue placeholder="Assign Staff" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                    {staffList?.map((s: any) => (
+                                                        <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                         <div className="flex justify-between border-t pt-2"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
                                         <div className="flex justify-between"><span>Total Repayable:</span><span className="font-medium">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</span></div>
                                         <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">Ksh {loanToEdit.totalPaid.toLocaleString()}</span></div>
