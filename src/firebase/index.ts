@@ -7,7 +7,7 @@ import {
   FirebaseOptions,
 } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, initializeFirestore } from 'firebase/firestore';
 import { firebaseConfig } from './config';
 
 let firebaseApp: FirebaseApp;
@@ -18,7 +18,10 @@ function initializeFirebase(config: FirebaseOptions) {
   if (!getApps().length) {
     firebaseApp = initializeApp(config);
     auth = getAuth(firebaseApp);
-    firestore = getFirestore(firebaseApp);
+    // Enable long polling for more stable connections in restricted network environments (Workstations)
+    firestore = initializeFirestore(firebaseApp, {
+      experimentalForceLongPolling: true,
+    });
   } else {
     firebaseApp = getApp();
     auth = getAuth(firebaseApp);
