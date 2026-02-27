@@ -171,8 +171,6 @@ interface FinanceEntry {
   payoutCategory?: string;
 }
 
-// --- MAIN COMPONENT ---
-
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -196,7 +194,6 @@ export default function FinancePage() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   
-  // Memoize financial view by combining ledger entries and derived lending data
   const financialData = useMemo(() => {
     const receipts: any[] = [];
     const upfront: any[] = [];
@@ -205,11 +202,9 @@ export default function FinancePage() {
 
     if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [] };
 
-    // 1. Process data from the Loan Book (System of Record for Lending)
     loans.forEach(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return;
 
-        // Upfront Revenue
         const reg = Number(loan.registrationFee) || 0;
         const proc = Number(loan.processingFee) || 0;
         const track = Number(loan.carTrackInstallationFee) || 0;
@@ -228,19 +223,6 @@ export default function FinancePage() {
             });
         }
 
-        // Disbursement Payout
-        const takeHome = Number(loan.principalAmount) - totalFees;
-        payouts.push({
-            id: `disb-${loan.id}`,
-            type: 'payout',
-            payoutCategory: 'loan_disbursement',
-            date: loan.disbursementDate,
-            amount: takeHome,
-            description: `Disbursement (Take-home) for Loan #${loan.loanNumber} (${loan.customerName})`,
-            loanId: loan.id
-        });
-
-        // Repayment Receipts
         (loan.payments || []).forEach(p => {
             receipts.push({
                 id: p.paymentId,
@@ -254,19 +236,14 @@ export default function FinancePage() {
         });
     });
 
-    // 2. Process manual Finance Entries (System of Record for Operations & Investments)
     financeEntries.forEach(entry => {
-        // Prevent double-counting if lending entries were also manually recorded
-        const isLendingDuplicate = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees' || entry.payoutCategory === 'loan_disbursement');
-
+        const isLendingDupe = (entry.receiptCategory === 'loan_repayment' || entry.receiptCategory === 'upfront_fees');
         if (entry.type === 'receipt') {
-            if (!isLendingDuplicate) receipts.push(entry);
+            if (!isLendingDupe) receipts.push(entry);
         } else {
-            if (!isLendingDuplicate) {
-                payouts.push(entry);
-                if (entry.type === 'expense') {
-                    expenses.push(entry);
-                }
+            payouts.push(entry);
+            if (entry.type === 'expense') {
+                expenses.push(entry);
             }
         }
     });
@@ -274,14 +251,11 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses };
   }, [loans, financeEntries]);
 
-  // Aggregate Stats
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts } = financialData;
-    
     const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalMoneyIn = receiptsTotal + upfrontTotal;
-
     const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     
     return {
@@ -291,7 +265,6 @@ export default function FinancePage() {
     };
   }, [financialData]);
 
-  // Loan Book Filtering
   const filteredLoans = useMemo(() => {
     if(!loans) return [];
     return loans.filter(loan => {
@@ -304,7 +277,6 @@ export default function FinancePage() {
     });
   }, [loans, loanBookSearchTerm, loanBookStatusFilter]);
 
-  // Forms
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
     defaultValues: { date: format(new Date(), 'yyyy-MM-dd') }
@@ -329,8 +301,6 @@ export default function FinancePage() {
 
   const { watch: addFinanceEntryWatch } = addForm;
   const addFinanceEntryType = addFinanceEntryWatch('type');
-
-  // --- HANDLERS ---
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
@@ -476,8 +446,6 @@ export default function FinancePage() {
     }
   }
 
-  // --- RENDER ---
-
   if (userLoading || loansLoading || financeEntriesLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -565,11 +533,11 @@ export default function FinancePage() {
                 entries={financialData.allReceipts} 
                 loading={false} 
                 onEdit={(e) => {
-                    if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
+                    if (e.id.startsWith('fee-')) return;
                     handleEditEntry(e);
                 }}
                 onDelete={(e) => {
-                    if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
+                    if (e.id.startsWith('fee-')) return;
                     deleteFinanceEntry(firestore, e.id);
                 }} 
               />
@@ -592,14 +560,8 @@ export default function FinancePage() {
                 description="Master ledger of all outgoing funds: take-home disbursements, withdrawals, and all expenses." 
                 entries={financialData.allPayouts} 
                 loading={false} 
-                onEdit={(e) => {
-                    if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
-                    handleEditEntry(e);
-                }}
-                onDelete={(e) => {
-                    if (e.id.startsWith('disb-')) return;
-                    deleteFinanceEntry(firestore, e.id);
-                }} 
+                onEdit={(e) => handleEditEntry(e)}
+                onDelete={(e) => deleteFinanceEntry(firestore, e.id)} 
               />
           </TabsContent>
           <TabsContent value="expenses">
