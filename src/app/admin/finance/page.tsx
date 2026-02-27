@@ -49,7 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, deleteLoan, addPenaltyToLoan, updateFinanceEntry } from '@/lib/firestore';
 import { Textarea } from '@/components/ui/textarea';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
@@ -61,7 +61,7 @@ const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
   date: z.string().min(1, 'A date is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
-  transactionCost: z.coerce.number().optional().default(0),
+  transactionCost: z.coerce.number().min(0, 'Transaction cost cannot be negative.').default(0),
   description: z.string().optional(),
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
@@ -150,6 +150,7 @@ export default function FinancePage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
+  const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
   const [isEditingLoan, setIsEditingLoan] = useState(false);
@@ -298,9 +299,15 @@ export default function FinancePage() {
     setIsSubmitting(true);
     try {
       const rawEntryData = { ...values, date: new Date(values.date) };
-      await addFinanceEntry(firestore, rawEntryData as any);
-      toast({ title: 'Success', description: 'Finance entry recorded.' });
+      if (editingEntry) {
+          await updateFinanceEntry(firestore, editingEntry.id, rawEntryData);
+          toast({ title: 'Success', description: 'Finance entry updated.' });
+      } else {
+          await addFinanceEntry(firestore, rawEntryData as any);
+          toast({ title: 'Success', description: 'Finance entry recorded.' });
+      }
       addForm.reset();
+      setEditingEntry(null);
       setOpen(false);
     } catch (e: any) {
        toast({ variant: "destructive", title: "Error", description: e.message });
@@ -308,6 +315,21 @@ export default function FinancePage() {
       setIsSubmitting(false);
     }
   }
+
+  const handleEditEntry = (entry: FinanceEntry) => {
+      setEditingEntry(entry);
+      addForm.reset({
+          type: entry.type as any,
+          date: format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'yyyy-MM-dd'),
+          amount: entry.amount,
+          transactionCost: entry.transactionCost || 0,
+          description: entry.description,
+          expenseCategory: entry.expenseCategory as any,
+          receiptCategory: entry.receiptCategory as any,
+          payoutCategory: entry.payoutCategory as any,
+      });
+      setOpen(true);
+  };
 
   async function onRecordPayment(values: z.infer<typeof paymentSchema>) {
     if (!loanToEdit) return;
@@ -432,10 +454,10 @@ export default function FinancePage() {
         <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Finance Dashboard</h1>
             {canPerformActions && (
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
+            <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if(!isOpen) setEditingEntry(null); }}>
+                <DialogTrigger asChild><Button onClick={() => setEditingEntry(null)}><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
                 <DialogContent>
-                    <DialogHeader><DialogTitle>New Finance Entry</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{editingEntry ? 'Edit Finance Entry' : 'New Finance Entry'}</DialogTitle></DialogHeader>
                     <Form {...addForm}>
                         <ScrollArea className="max-h-[70vh] pr-4">
                             <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
@@ -444,12 +466,12 @@ export default function FinancePage() {
                                 )} />
                                 {addFinanceEntryType === 'payout' && (
                                     <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></Select></FormItem>
+                                        <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_disbursement">Loan Disbursement</SelectItem><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></Select></FormItem>
                                     )} />
                                 )}
                                 {addFinanceEntryType === 'receipt' && (
                                     <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></Select></FormItem>
+                                        <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fees</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></Select></FormItem>
                                     )} />
                                 )}
                                 {addFinanceEntryType === 'expense' && (
@@ -465,7 +487,7 @@ export default function FinancePage() {
                                 )}
                                 <FormField control={addForm.control} name="date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                                 <FormField control={addForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field}/></FormControl></FormItem>)} />
-                                <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}Record Entry</Button>
+                                <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 animate-spin"/>}{editingEntry ? 'Update Entry' : 'Record Entry'}</Button>
                             </form>
                         </ScrollArea>
                     </Form>
@@ -509,6 +531,10 @@ export default function FinancePage() {
                 description="Includes loan repayments, investor deposits, and other income." 
                 entries={financialData.allReceipts} 
                 loading={false} 
+                onEdit={(e) => {
+                    if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
+                    handleEditEntry(e);
+                }}
                 onDelete={(e) => {
                     if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
                     deleteFinanceEntry(firestore, e.id);
@@ -533,14 +559,25 @@ export default function FinancePage() {
                 description="Includes all money out: take-home disbursements, investor withdrawals, and operational expenses." 
                 entries={financialData.allPayouts} 
                 loading={false} 
+                onEdit={(e) => {
+                    if (e.id.startsWith('fee-') || e.id.startsWith('disb-')) return;
+                    handleEditEntry(e);
+                }}
                 onDelete={(e) => {
                     if (e.id.startsWith('disb-')) return;
                     deleteFinanceEntry(firestore, e.id);
-                }}
+                }} 
               />
           </TabsContent>
           <TabsContent value="expenses">
-               <EditableFinanceReportTab title="Expenses" description="Operational costs and miscellaneous spending." entries={financialData.allExpenses} loading={false} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
+               <EditableFinanceReportTab 
+                title="Expenses" 
+                description="Operational costs and miscellaneous spending." 
+                entries={financialData.allExpenses} 
+                loading={false} 
+                onEdit={(e) => handleEditEntry(e)}
+                onDelete={(e) => deleteFinanceEntry(firestore, e.id)} 
+               />
           </TabsContent>
           
           <TabsContent value="loanbook">
