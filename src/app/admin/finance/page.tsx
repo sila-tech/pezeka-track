@@ -468,21 +468,62 @@ export default function FinancePage() {
                         <ScrollArea className="max-h-[70vh] pr-4">
                             <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
                                 <FormField control={addForm.control} name="type" render={({ field }) => (
-                                    <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (Income)</SelectItem><SelectItem value="payout">Payout (Outgoing)</SelectItem><SelectItem value="expense">Expense (Operational)</SelectItem></Select></FormItem>
+                                    <FormItem>
+                                        <FormLabel>Type</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="receipt">Receipt (Income)</SelectItem>
+                                                <SelectItem value="payout">Payout (Outgoing)</SelectItem>
+                                                <SelectItem value="expense">Expense (Operational)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
                                 )} />
                                 {addFinanceEntryType === 'payout' && (
                                     <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_disbursement">Loan Disbursement</SelectItem><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></Select></FormItem>
+                                        <FormItem>
+                                            <FormLabel>Payout Category</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="loan_disbursement">Loan Disbursement</SelectItem>
+                                                    <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
+                                                    <SelectItem value="other">Other Payout</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
                                     )} />
                                 )}
                                 {addFinanceEntryType === 'receipt' && (
                                     <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fees</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Income</SelectItem></Select></FormItem>
+                                        <FormItem>
+                                            <FormLabel>Receipt Category</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
+                                                    <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
+                                                    <SelectItem value="investment">Investor Deposit</SelectItem>
+                                                    <SelectItem value="other">Other Income</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
                                     )} />
                                 )}
                                 {addFinanceEntryType === 'expense' && (
                                     <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
-                                        <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></Select></FormItem>
+                                        <FormItem>
+                                            <FormLabel>Expense Category</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
+                                                    <SelectItem value="office_purchase">Office Purchase</SelectItem>
+                                                    <SelectItem value="other">Other Expense</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
                                     )} />
                                 )}
                                 <FormField control={addForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
@@ -827,7 +868,7 @@ export default function FinancePage() {
                       <FormField control={editLoanForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                      <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></Select></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>)} />
                       <FormField control={editLoanForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
