@@ -324,7 +324,7 @@ export default function Dashboard() {
         <Card className="flex flex-col h-[600px]">
             <CardHeader>
                 <CardTitle>Due Loans & Follow-ups</CardTitle>
-                <CardDescription>Accounts requiring attention. Add notes to coordinate collection agreements.</CardDescription>
+                <CardDescription>Accounts requiring attention. Click the interaction icon to add notes.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden">
               {isLoading ? (
@@ -377,7 +377,7 @@ export default function Dashboard() {
                                     <TableCell className="text-right font-bold tabular-nums">Ksh {balance.toLocaleString()}</TableCell>
                                     <TableCell className="text-center">
                                       <Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}>
-                                          <MessageSquare className="h-4 w-4" />
+                                          <MessageSquare className="h-4 w-4 text-blue-600" />
                                       </Button>
                                     </TableCell>
                                 </TableRow>
@@ -438,60 +438,57 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Follow-up Notes Dialog */}
+      {/* Follow-up Notes Dialog - Streamlined Version */}
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
-          <DialogContent className="sm:max-w-2xl">
+          <DialogContent className="sm:max-w-md">
               {selectedLoanForNotes && (
                   <>
                     <DialogHeader>
-                        <DialogTitle>Follow-up Notes: {selectedLoanForNotes.customerName}</DialogTitle>
-                        <DialogDescription>
+                        <DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle>
+                        <DialogDescription className="text-xs">
                             Loan #{selectedLoanForNotes.loanNumber} | Balance: Ksh {(selectedLoanForNotes.totalRepayableAmount - selectedLoanForNotes.totalPaid).toLocaleString()}
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-6 mt-4">
-                        <Card>
-                            <CardHeader className="py-3"><CardTitle className="text-sm">Record New Interaction</CardTitle></CardHeader>
-                            <CardContent>
-                                <Form {...noteForm}>
-                                    <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-3">
-                                        <FormField control={noteForm.control} name="content" render={({field}) => (
-                                            <FormItem>
-                                                <FormControl><Textarea placeholder="e.g. Spoke to customer, promised to pay Ksh 5,000 by Friday via M-Pesa." {...field} value={field.value ?? ''} /></FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}/>
-                                        <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>
-                                            {isAddingNote ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                                            Add Note
-                                        </Button>
-                                    </form>
-                                </Form>
-                            </CardContent>
-                        </Card>
+                    <div className="space-y-4 mt-2">
+                        <div className="space-y-2">
+                            <Form {...noteForm}>
+                                <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2">
+                                    <FormField control={noteForm.control} name="content" render={({field}) => (
+                                        <FormItem>
+                                            <FormControl><Textarea placeholder="What was agreed with the customer?" className="h-16 text-sm" {...field} value={field.value ?? ''} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}/>
+                                    <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>
+                                        {isAddingNote ? <Loader2 className="mr-2 h-3 w-3 animate-spin" /> : <Plus className="mr-2 h-3 w-3" />}
+                                        Save Note
+                                    </Button>
+                                </form>
+                            </Form>
+                        </div>
                         
-                        <div className="space-y-3">
-                            <h4 className="text-sm font-semibold">Interaction History</h4>
-                            <ScrollArea className="h-64 border rounded-md p-4">
+                        <div className="space-y-2">
+                            <h4 className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Recent Interactions</h4>
+                            <ScrollArea className="h-48 border rounded-md p-3">
                                 {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (
-                                    <p className="text-sm text-muted-foreground text-center py-8">No follow-up notes recorded yet.</p>
+                                    <p className="text-xs text-muted-foreground text-center py-8 italic">No interactions recorded.</p>
                                 ) : (
-                                    <div className="space-y-4">
+                                    <div className="space-y-3">
                                         {[...selectedLoanForNotes.followUpNotes].sort((a, b) => {
                                             const dateA = a.date instanceof Date ? a.date.getTime() : a.date.seconds * 1000;
                                             const dateB = b.date instanceof Date ? b.date.getTime() : b.date.seconds * 1000;
                                             return dateB - dateA;
                                         }).map((note) => (
-                                            <div key={note.noteId} className="bg-muted p-3 rounded-lg border text-sm">
-                                                <div className="flex justify-between items-center mb-2">
+                                            <div key={note.noteId} className="bg-muted/50 p-2 rounded border text-xs leading-snug">
+                                                <div className="flex justify-between items-center mb-1">
                                                     <span className="font-bold flex items-center gap-1">
-                                                        <User className="h-3 w-3" /> {note.staffName}
+                                                        <User className="h-2 w-2" /> {note.staffName}
                                                     </span>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        {format(note.date instanceof Date ? note.date : new Date(note.date.seconds * 1000), 'PPP p')}
+                                                    <span className="text-[9px] text-muted-foreground">
+                                                        {format(note.date instanceof Date ? note.date : new Date(note.date.seconds * 1000), 'dd/MM HH:mm')}
                                                     </span>
                                                 </div>
-                                                <p className="text-muted-foreground italic leading-relaxed">"{note.content}"</p>
+                                                <p className="text-muted-foreground italic">"{note.content}"</p>
                                             </div>
                                         ))}
                                     </div>
@@ -500,7 +497,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <DialogFooter>
-                        <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                        <DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose>
                     </DialogFooter>
                   </>
               )}

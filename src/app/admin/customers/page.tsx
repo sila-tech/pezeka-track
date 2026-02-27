@@ -72,6 +72,7 @@ interface Loan {
     customerId: string;
     loanNumber: string;
     customerName: string;
+    customerPhone: string;
     disbursementDate: { seconds: number, nanoseconds: number };
     principalAmount: number;
     interestRate?: number;
@@ -327,7 +328,7 @@ export default function CustomersPage() {
                         <FormItem>
                           <FormLabel>Full Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John Doe" {...field} />
+                            <Input placeholder="John Doe" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -340,7 +341,7 @@ export default function CustomersPage() {
                         <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 0712345678" {...field} />
+                            <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -353,7 +354,7 @@ export default function CustomersPage() {
                         <FormItem>
                           <FormLabel>ID Number (Optional)</FormLabel>
                           <FormControl>
-                            <Input placeholder="e.g. 12345678" {...field} />
+                            <Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -555,20 +556,20 @@ export default function CustomersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Generate Message Dialog */}
+      {/* Generate Message Dialog - Compact Version */}
        <Dialog open={!!messageLoan} onOpenChange={(isOpen) => !isOpen && setMessageLoan(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Compose Customer Message</DialogTitle>
-                <DialogDescription>A message has been generated for this loan. You can copy it to your clipboard.</DialogDescription>
+                <DialogTitle className="text-lg">Customer Message</DialogTitle>
+                <DialogDescription>Reminder message for Loan #{messageLoan?.loanNumber}.</DialogDescription>
             </DialogHeader>
-            <div className="mt-4">
-                <Textarea value={generatedMessage} rows={10} readOnly className="bg-muted/50" />
+            <div className="mt-2">
+                <Textarea value={generatedMessage} rows={6} readOnly className="bg-muted/50 text-xs leading-relaxed" />
             </div>
-            <DialogFooter>
-                 <Button variant="ghost" onClick={() => setMessageLoan(null)}>Cancel</Button>
-                 <Button onClick={copyToClipboard}>
-                    <Copy className="mr-2 h-4 w-4" />
+            <DialogFooter className="sm:justify-center gap-2 mt-4">
+                 <Button variant="outline" size="sm" onClick={() => setMessageLoan(null)}>Cancel</Button>
+                 <Button size="sm" onClick={copyToClipboard}>
+                    <Copy className="mr-2 h-3 w-3" />
                     Copy Message
                 </Button>
             </DialogFooter>
@@ -594,7 +595,7 @@ export default function CustomersPage() {
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="John Doe" {...field} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -607,7 +608,7 @@ export default function CustomersPage() {
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. 0712345678" {...field} />
+                        <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -620,7 +621,7 @@ export default function CustomersPage() {
                     <FormItem>
                       <FormLabel>ID Number (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. 12345678" {...field} />
+                        <Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
