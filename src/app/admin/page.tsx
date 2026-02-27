@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -10,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,6 +52,8 @@ interface DashboardLoan {
 
 const staffLoanSchema = z.object({
   amount: z.coerce.number().min(1000, "Minimum application is Ksh 1,000"),
+  idNumber: z.string().min(5, "ID Number is required."),
+  alternativeNumber: z.string().optional(),
   reason: z.string().min(10, "Please provide a brief reason for the loan request."),
 });
 
@@ -71,14 +72,13 @@ export default function Dashboard() {
   const [isAddingNote, setIsAddingNote] = useState(false);
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
-  const isFinanceUser = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
   const isStaffMember = user?.role === 'staff' || user?.role === 'finance';
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
   const staffLoanForm = useForm<z.infer<typeof staffLoanSchema>>({
     resolver: zodResolver(staffLoanSchema),
-    defaultValues: { amount: 0, reason: '' },
+    defaultValues: { amount: 0, reason: '', idNumber: '', alternativeNumber: '' },
   });
 
   const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
@@ -92,7 +92,7 @@ export default function Dashboard() {
     try {
       const loanData = {
         customerId: user.uid,
-        customerName: user.name || user.email?.split('@')[0],
+        customerName: user.name || user.email?.split('@')[0] || "Staff",
         customerPhone: "Internal Staff",
         disbursementDate: new Date(),
         principalAmount: values.amount,
@@ -108,8 +108,8 @@ export default function Dashboard() {
         instalmentAmount: values.amount,
         totalRepayableAmount: values.amount,
         totalPaid: 0,
-        idNumber: "STAFF-ID",
-        alternativeNumber: "",
+        idNumber: values.idNumber,
+        alternativeNumber: values.alternativeNumber || "",
         comments: `Staff Loan Application: ${values.reason}`,
       };
 
@@ -142,7 +142,6 @@ export default function Dashboard() {
           });
           toast({ title: "Note Added", description: "Follow-up note has been recorded." });
           noteForm.reset();
-          // Update the local state if needed, though useCollection should handle it
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
       } finally {
@@ -244,6 +243,34 @@ export default function Dashboard() {
                       </FormItem>
                     )}
                   />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={staffLoanForm.control}
+                      name="idNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>National ID Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your ID No." {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={staffLoanForm.control}
+                      name="alternativeNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Alt. Phone Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Secondary contact" {...field} value={field.value ?? ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={staffLoanForm.control}
                     name="reason"
@@ -269,7 +296,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-         {isFinanceUser && (
+         {(user?.email === 'simon@pezeka.com' || user?.role === 'finance') && (
            <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Total Realized Revenue</CardTitle>
