@@ -137,13 +137,13 @@ export default function LoansPage() {
   const { toast } = useToast();
 
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
-  const isFinance = user?.role === 'finance' || user?.email?.endsWith('@finance.pezeka.com');
+  const isFinance = user?.role === 'finance';
+  const isStaff = user?.role === 'staff';
   
-  // STAFF RESTRICTION: Staff no longer see active loans or processing forms
-  const canAdd = isSuperAdmin || isFinance;
-  const canManageApplications = isSuperAdmin || isFinance;
-
-  const isAuthorized = isSuperAdmin || isFinance;
+  // Both Staff and Finance can manage applications and add loans
+  const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  const canAdd = isAuthorized;
+  const canManageApplications = isAuthorized;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -351,7 +351,7 @@ export default function LoansPage() {
       return (
           <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
               <h2 className="text-xl font-semibold">Access Restricted</h2>
-              <p className="text-muted-foreground">Only Finance and Super Admin roles can access active loan data.</p>
+              <p className="text-muted-foreground">Only authorized staff and finance roles can access loan records.</p>
           </div>
       );
   }

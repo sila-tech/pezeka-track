@@ -102,12 +102,12 @@ export default function CustomersPage() {
   
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance';
+  const isStaff = user?.role === 'staff';
   
-  // STAFF RESTRICTION: Staff can NO LONGER see customer lists or perform data entry
-  const canAdd = isSuperAdmin || isFinance;
-  const canEditDelete = isSuperAdmin || isFinance;
-  
-  const isAuthorized = isSuperAdmin || isFinance;
+  // Staff act as customer service and can manage customers
+  const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  const canAdd = isAuthorized;
+  const canEditDelete = isAuthorized;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -293,7 +293,7 @@ export default function CustomersPage() {
       return (
           <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
               <h2 className="text-xl font-semibold">Access Restricted</h2>
-              <p className="text-muted-foreground">Only Finance and Super Admin roles can access customer records.</p>
+              <p className="text-muted-foreground">Only authorized roles can access customer records.</p>
           </div>
       );
   }

@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, isStaff: boolean, onLinkClick?: () => void }) => {
     const isManager = isSuperAdmin || isFinance;
+    const isCustomerService = isManager || isStaff;
     
     return (
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
@@ -24,33 +25,37 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                 Dashboard
             </Link>
             
+            {isCustomerService && (
+                <Link
+                    href="/admin/customers"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    onClick={onLinkClick}
+                >
+                    <Users className="h-4 w-4" />
+                    Customers
+                </Link>
+            )}
+
+            {isCustomerService && (
+                <Link
+                    href="/admin/loans"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    onClick={onLinkClick}
+                >
+                    <HandCoins className="h-4 w-4" />
+                    Loans
+                </Link>
+            )}
+            
             {isManager && (
-                <>
-                    <Link
-                        href="/admin/customers"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                        onClick={onLinkClick}
-                    >
-                        <Users className="h-4 w-4" />
-                        Customers
-                    </Link>
-                    <Link
-                        href="/admin/loans"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                        onClick={onLinkClick}
-                    >
-                        <HandCoins className="h-4 w-4" />
-                        Loans
-                    </Link>
-                    <Link
-                        href="/admin/finance"
-                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
-                        onClick={onLinkClick}
-                    >
-                        <FileDown className="h-4 w-4" />
-                        Finance
-                    </Link>
-                </>
+                <Link
+                    href="/admin/finance"
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    onClick={onLinkClick}
+                >
+                    <FileDown className="h-4 w-4" />
+                    Finance
+                </Link>
             )}
 
             <Link

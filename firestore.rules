@@ -7,7 +7,7 @@ service cloud.firestore {
     // Helper Functions
     // =====================================================================
     function isSuperAdmin() {
-      return request.auth.token.email == 'simon@pezeka.com';
+      return request.auth != null && request.auth.token.email == 'simon@pezeka.com';
     }
 
     function getUserRole() {
@@ -39,23 +39,19 @@ service cloud.firestore {
     }
 
     match /customers/{customerId} {
-      allow list: if isFinance() || isSuperAdmin();
-      allow get: if isFinance() || isSuperAdmin();
-      // STAFF RESTRICTION: Removed write access for staff
-      allow write: if isFinance() || isSuperAdmin();
+      allow list, get: if isStaff() || isFinance() || isSuperAdmin();
+      allow write: if isStaff() || isFinance() || isSuperAdmin();
     }
 
     match /loans/{loanId} {
-      allow list: if isFinance() || isSuperAdmin();
-      allow get: if isFinance() || isSuperAdmin() || (request.auth != null && resource.data.customerId == request.auth.uid);
-      // STAFF RESTRICTION: Removed write access for staff
-      allow write: if isFinance() || isSuperAdmin();
-      allow create: if request.auth != null && request.resource.data.customerId == request.auth.uid && request.resource.data.status == 'application';
+      allow list: if isStaff() || isFinance() || isSuperAdmin();
+      allow get: if isStaff() || isFinance() || isSuperAdmin() || (request.auth != null && resource.data.customerId == request.auth.uid);
+      allow write: if isStaff() || isFinance() || isSuperAdmin();
+      allow create: if request.auth != null && (request.resource.data.customerId == request.auth.uid || isStaff() || isFinance() || isSuperAdmin());
     }
     
     match /financeEntries/{entryId} {
-      allow list: if isFinance() || isSuperAdmin();
-      allow get, write: if isFinance() || isSuperAdmin();
+      allow list, get, write: if isFinance() || isSuperAdmin();
     }
 
     match /investors/{investorId} {

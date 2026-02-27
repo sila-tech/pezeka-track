@@ -188,7 +188,7 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // STAFF RESTRICTION: Staff can NO LONGER access Finance dashboard or Loan Book
+  // STAFF RESTRICTION: Only Finance and Super Admin roles can access this page
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
   const canPerformActions = isAuthorized;
   const canViewInvestors = isAuthorized;
@@ -460,7 +460,7 @@ export default function FinancePage() {
       return (
           <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
               <h2 className="text-xl font-semibold">Access Restricted</h2>
-              <p className="text-muted-foreground">Only Finance and Super Admin roles can access this page.</p>
+              <p className="text-muted-foreground">Only authorized roles can access internal cashflow data.</p>
           </div>
       );
   }
