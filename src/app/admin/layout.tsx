@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { NotificationBell } from '@/components/admin/NotificationBell';
 
 
 const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, isStaff: boolean, onLinkClick?: () => void }) => {
@@ -188,8 +189,8 @@ export default function AdminLayout({
               </SheetContent>
             </Sheet>
             
-            <div className="w-full flex-1">
-                {/* Header content like a search bar can go here */}
+            <div className="ml-auto flex items-center gap-2">
+                <NotificationBell />
             </div>
             </header>
             <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-background">
