@@ -868,12 +868,38 @@ export default function FinancePage() {
                       <FormField control={editLoanForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                      <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="paymentFrequency" render={({field}) => (
+                        <FormItem>
+                          <FormLabel>Frequency</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
                       <FormField control={editLoanForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
                       <FormField control={editLoanForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charge Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                      <FormField control={editLoanForm.control} name="status" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="due">Due</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="rollover">Rollover</SelectItem></Select></FormItem>)} />
+                      <FormField control={editLoanForm.control} name="status" render={({field}) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="due">Due</SelectItem>
+                              <SelectItem value="overdue">Overdue</SelectItem>
+                              <SelectItem value="paid">Paid</SelectItem>
+                              <SelectItem value="rollover">Rollover</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )} />
                       <div className="col-span-2 pt-4 flex gap-2">
                           <Button type="submit" className="flex-1" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save Changes</Button>
                           <Button type="button" variant="outline" onClick={() => setIsEditingLoan(false)}>Cancel</Button>
