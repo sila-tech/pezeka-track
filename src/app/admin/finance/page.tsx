@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
+import { format, addDays, addWeeks, addMonths, differenceInDays, startOfToday } from "date-fns";
 import { 
   PlusCircle, 
   Search, 
@@ -183,6 +184,12 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList, loading: staffLoading } = useCollection<any>(isAuthorized ? 'users' : null);
   
+  // Base disbursed loans for ledgers and portfolios (excludes applications and rejected)
+  const disbursedLoans = useMemo(() => {
+    if (!loans) return [];
+    return loans.filter(loan => loan.status !== 'application' && loan.status !== 'rejected');
+  }, [loans]);
+
   const financialData = useMemo(() => {
     const receipts: any[] = [];
     const upfront: any[] = [];
@@ -190,10 +197,9 @@ export default function FinancePage() {
     const expenses: any[] = [];
     const transactionFees: any[] = [];
 
-    if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [], allTransactionFees: [] };
+    if (!disbursedLoans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [], allTransactionFees: [] };
 
-    loans.forEach(loan => {
-        if (loan.status === 'application' || loan.status === 'rejected') return;
+    disbursedLoans.forEach(loan => {
         const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
         if (totalFees > 0) {
             upfront.push({ 
@@ -233,7 +239,7 @@ export default function FinancePage() {
     });
 
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
-  }, [loans, financeEntries]);
+  }, [disbursedLoans, financeEntries]);
 
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts, allTransactionFees } = financialData;
@@ -248,19 +254,52 @@ export default function FinancePage() {
     return { totalReceipts: totalMoneyIn, totalPayouts: totalMoneyOut, cashAtHand: totalMoneyIn - totalMoneyOut };
   }, [financialData]);
 
-  const filteredLoans = useMemo(() => {
-    if(!loans) return [];
-    return loans.filter(loan => {
-        const statusMatch = loanBookStatusFilter === 'all' || loan.status === loanBookStatusFilter;
+  const filteredLoansList = useMemo(() => {
+    if(!disbursedLoans) return [];
+    
+    const today = startOfToday();
+
+    return disbursedLoans.filter(loan => {
+        // Staff Filter
         const staffMatch = loanBookStaffFilter === 'all' || loan.assignedStaffId === loanBookStaffFilter;
+        
+        // Search Match
         const searchMatch = loanBookSearchTerm === '' || 
             loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) || 
             loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
             loan.customerPhone?.includes(loanBookSearchTerm) ||
             loan.idNumber?.includes(loanBookSearchTerm);
+
+        // Date-based Status Match
+        const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
+        let endDate: Date;
+        try {
+            switch (loan.paymentFrequency) {
+                case 'daily': endDate = addDays(disbursementDate, loan.numberOfInstalments); break;
+                case 'weekly': endDate = addWeeks(disbursementDate, loan.numberOfInstalments); break;
+                case 'monthly': endDate = addMonths(disbursementDate, loan.numberOfInstalments); break;
+                default: endDate = new Date(0);
+            }
+        } catch(e) { endDate = new Date(0); }
+        
+        const daysUntilDue = differenceInDays(endDate, today);
+        const isCurrentlyOverdue = daysUntilDue < 0 && loan.status !== 'paid';
+        const isCurrentlyDue = daysUntilDue >= 0 && daysUntilDue <= 7 && loan.status !== 'paid';
+
+        let statusMatch = false;
+        if (loanBookStatusFilter === 'all') {
+            statusMatch = true;
+        } else if (loanBookStatusFilter === 'due') {
+            statusMatch = loan.status === 'due' || isCurrentlyDue;
+        } else if (loanBookStatusFilter === 'overdue') {
+            statusMatch = loan.status === 'overdue' || isCurrentlyOverdue;
+        } else {
+            statusMatch = loan.status === loanBookStatusFilter;
+        }
+
         return statusMatch && staffMatch && searchMatch;
     });
-  }, [loans, loanBookSearchTerm, loanBookStatusFilter, loanBookStaffFilter]);
+  }, [disbursedLoans, loanBookSearchTerm, loanBookStatusFilter, loanBookStaffFilter]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
@@ -429,7 +468,7 @@ export default function FinancePage() {
       if (staffId === 'unassigned') {
           updateData = { assignedStaffId: "", assignedStaffName: "" };
       } else {
-          const staffMember = staffList?.find((s: any) => (s.uid || s.id) === staffId);
+          const staffMember = staffList?.find((s: any) => (s.id) === staffId);
           if (!staffMember) return;
           updateData = {
               assignedStaffId: staffId,
@@ -625,7 +664,7 @@ export default function FinancePage() {
                                 <SelectContent>
                                     <SelectItem value="all">All Staff</SelectItem>
                                     {staffList?.map((s: any) => (
-                                        <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>
+                                        <SelectItem key={s.id} value={s.id}>{s.name || s.email}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -634,9 +673,10 @@ export default function FinancePage() {
                                 <SelectContent>
                                     <SelectItem value="all">All Status</SelectItem>
                                     <SelectItem value="active">Active</SelectItem>
-                                    <SelectItem value="due">Due</SelectItem>
-                                    <SelectItem value="overdue">Overdue</SelectItem>
+                                    <SelectItem value="due">Due (Derived)</SelectItem>
+                                    <SelectItem value="overdue">Overdue (Derived)</SelectItem>
                                     <SelectItem value="paid">Paid</SelectItem>
+                                    <SelectItem value="rollover">Rollover</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -669,7 +709,7 @@ export default function FinancePage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredLoans.map(loan => {
+                          {filteredLoansList.map(loan => {
                             const reg = Number(loan.registrationFee) || 0;
                             const proc = Number(loan.processingFee) || 0;
                             const track = Number(loan.carTrackInstallationFee) || 0;
@@ -769,7 +809,7 @@ export default function FinancePage() {
           </TabsContent>
 
           <TabsContent value="staff-portfolios">
-            <StaffPortfoliosTab loans={loans} staffList={staffList} />
+            <StaffPortfoliosTab loans={disbursedLoans} staffList={staffList} />
           </TabsContent>
       </Tabs>
 
@@ -797,7 +837,7 @@ export default function FinancePage() {
                                                 <SelectContent>
                                                     <SelectItem value="unassigned">Unassigned</SelectItem>
                                                     {staffList?.map((s: any) => (
-                                                        <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>
+                                                        <SelectItem key={s.id} value={s.id}>{s.name || s.email}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -66,7 +67,10 @@ export default function StaffPerformancePage() {
             allTimePortfolio: [] 
         };
 
-        const staffLoans = loans.filter(l => l.assignedStaffId === staffId);
+        // Filter out applications and rejected
+        const disbursedLoans = loans.filter(l => l.status !== 'application' && l.status !== 'rejected');
+        const staffLoans = disbursedLoans.filter(l => l.assignedStaffId === staffId);
+        
         const fromDate = date.from;
         const toDate = date.to || date.from;
         
@@ -234,7 +238,7 @@ export default function StaffPerformancePage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Portfolio Inventory</CardTitle>
-                        <CardDescription>Full list of all loans currently assigned to this staff member.</CardDescription>
+                        <CardDescription>Full list of all active loans currently assigned to this staff member.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-[400px]">

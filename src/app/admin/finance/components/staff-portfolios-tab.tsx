@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -37,19 +38,22 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
   const staffPerformance = useMemo(() => {
     if (!staffList || !loans) return [];
 
+    // Filter out applications and rejected for performance metrics
+    const disbursedLoans = loans.filter(l => l.status !== 'application' && l.status !== 'rejected');
+
     return staffList.map(staff => {
-      const staffLoans = loans.filter(l => l.assignedStaffId === (staff.uid || staff.id));
+      const staffLoans = disbursedLoans.filter(l => l.assignedStaffId === (staff.id));
       
       const totalDisbursed = staffLoans.reduce((acc, l) => acc + (Number(l.principalAmount) || 0), 0);
       const totalCollected = staffLoans.reduce((acc, l) => acc + (Number(l.totalPaid) || 0), 0);
       const totalRepayable = staffLoans.reduce((acc, l) => acc + (Number(l.totalRepayableAmount) || 0), 0);
       
       const efficiency = totalRepayable > 0 ? (totalCollected / totalRepayable) * 100 : 0;
-      const activeCount = staffLoans.filter(l => l.status !== 'paid' && l.status !== 'rejected' && l.status !== 'application').length;
+      const activeCount = staffLoans.filter(l => l.status !== 'paid').length;
 
       return {
         id: staff.id,
-        uid: staff.uid || staff.id,
+        uid: staff.id,
         name: staff.name || staff.email,
         activeCount,
         totalDisbursed,
@@ -87,7 +91,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
         <CardHeader>
           <CardTitle>Staff Performance Ledger</CardTitle>
           <CardDescription>
-            Cumulative tracking. Click "View Performance" for detailed date-filtered analysis.
+            Cumulative tracking of disbursed and collected loans. Click "View Performance" for detailed analysis.
           </CardDescription>
         </CardHeader>
         <CardContent>

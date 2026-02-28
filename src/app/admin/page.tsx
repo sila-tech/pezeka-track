@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -152,7 +153,12 @@ export default function Dashboard() {
 
   const myPortfolio = useMemo(() => {
       if (!loans || !user) return [];
-      return loans.filter(loan => loan.assignedStaffId === user.uid);
+      // Only show disbursed loans in the portfolio list
+      return loans.filter(loan => 
+        loan.assignedStaffId === user.id && 
+        loan.status !== 'application' && 
+        loan.status !== 'rejected'
+      );
   }, [loans, user]);
 
   const stats = useMemo(() => {
@@ -180,7 +186,7 @@ export default function Dashboard() {
   }, [loans]);
 
   const myPortfolioStats = useMemo(() => {
-      const activeLoans = myPortfolio.filter(l => l.status !== 'paid' && l.status !== 'rejected' && l.status !== 'application');
+      const activeLoans = myPortfolio.filter(l => l.status !== 'paid');
       const totalDisbursed = myPortfolio.reduce((acc, l) => acc + (Number(l.principalAmount) || 0), 0);
       const totalCollected = myPortfolio.reduce((acc, l) => acc + (Number(l.totalPaid) || 0), 0);
       return { activeCount: activeLoans.length, totalDisbursed, totalCollected };
