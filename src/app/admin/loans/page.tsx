@@ -596,45 +596,47 @@ export default function LoansPage() {
             {applicationToManage && (
                 <>
                     <DialogHeader><DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle></DialogHeader>
-                    <Form {...approvalForm}>
-                        <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
-                            <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
-                            <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            
-                            <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                  <FormLabel>Assign Staff for Follow-up</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                      {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name} ({s.role})</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                  <FormMessage />
-                                </FormItem>
-                            )} />
+                    <ScrollArea className="max-h-[65vh] pr-4">
+                        <Form {...approvalForm}>
+                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
+                                <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
+                                <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                
+                                <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                      <FormLabel>Assign Staff for Follow-up</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                          {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name} ({s.role})</SelectItem>)}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                )} />
 
-                            <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                            <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Frequency</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                  <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="daily">Daily</SelectItem>
-                                    <SelectItem value="weekly">Weekly</SelectItem>
-                                    <SelectItem value="monthly">Monthly</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </FormItem>
-                            )} />
-                        </form>
-                    </Form>
+                                <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Frequency</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                      <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="daily">Daily</SelectItem>
+                                        <SelectItem value="weekly">Weekly</SelectItem>
+                                        <SelectItem value="monthly">Monthly</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </FormItem>
+                                )} />
+                            </form>
+                        </Form>
+                    </ScrollArea>
                     <DialogFooter className="mt-6">
                         <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleReject}>Reject</Button>

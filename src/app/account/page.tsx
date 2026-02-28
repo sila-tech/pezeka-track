@@ -104,25 +104,10 @@ export default function AccountPage() {
   };
 
   async function onApplicationSubmit(values: z.infer<typeof applicationSchema>) {
-    if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Not logged in",
-        description: "You must be logged in to apply for a loan.",
-      });
-      return;
-    }
+    if (!user) return;
     setIsSubmitting(true);
-    
     try {
-      // 1. Ensure customer profile exists in database for staff to see
-      await upsertCustomer(firestore, user.uid, {
-        name: user.displayName || user.email || "Customer",
-        phone: values.phone,
-        idNumber: values.idNumber,
-      });
-
-      // 2. Submit the loan application
+      await upsertCustomer(firestore, user.uid, { name: user.displayName || user.email || "Customer", phone: values.phone, idNumber: values.idNumber });
       const loanApplicationData = {
         customerId: user.uid,
         customerName: user.displayName || user.email || "Customer",
@@ -145,216 +130,60 @@ export default function AccountPage() {
         totalPaid: 0,
         comments: `Application for ${values.loanType}.`,
       };
-      
       await addLoan(firestore, loanApplicationData);
-
-      toast({
-        title: "Application Submitted",
-        description: "Your application has been submitted. Our team will review it shortly.",
-      });
-
+      toast({ title: "Application Submitted" });
       applicationForm.reset();
-    } catch (e: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Application failed',
-        description: e.message || 'Could not submit your application.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Failed', description: e.message }); } finally { setIsSubmitting(false); }
   }
 
   return (
     <>
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-        <div className="flex items-center gap-2 font-semibold">
-            <Landmark className="h-6 w-6 text-primary" />
-            <span>Customer Portal</span>
-        </div>
-        <div className="ml-auto">
-            <Button onClick={handleLogout} variant="outline">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-            </Button>
-        </div>
+        <div className="flex items-center gap-2 font-semibold"><Landmark className="h-6 w-6 text-primary" /><span>Customer Portal</span></div>
+        <div className="ml-auto"><Button onClick={handleLogout} variant="outline"><LogOut className="mr-2 h-4 w-4" />Logout</Button></div>
       </header>
       <main className="p-4 sm:px-6 sm:py-0">
           <Card>
-            <CardHeader>
-                <CardTitle>Welcome, {user?.displayName || user?.email || user?.phoneNumber}!</CardTitle>
-                <CardDescription>
-                    Summary of your loan accounts.
-                </CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>Welcome, {user?.displayName || user?.email || user?.phoneNumber}!</CardTitle></CardHeader>
             <CardContent>
-                {loansLoading ? (
-                    <div className="flex items-center justify-center p-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                ) : (customerLoans && customerLoans.length > 0) ? (
+                {loansLoading ? (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>) : (customerLoans && customerLoans.length > 0) ? (
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Your Loans</h3>
                         {customerLoans.map(loan => {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
                             return (
-                                <Card key={loan.id}>
-                                    <CardHeader>
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <CardTitle>Loan #{loan.loanNumber}</CardTitle>
-                                                <CardDescription>
-                                                    {loan.status === 'application' 
-                                                      ? `Applied for ${loan.loanType || 'Loan'} on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`
-                                                      : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`
-                                                    }
-                                                </CardDescription>
-                                            </div>
-                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'rejected') ? 'destructive' : 'secondary'}>
-                                                {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                            </Badge>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid gap-4 sm:grid-cols-3">
-                                            <div>
-                                                <div className="text-sm text-muted-foreground">Principal</div>
-                                                <div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div>
-                                            </div>
-                                             <div>
-                                                <div className="text-sm text-muted-foreground">Total Repayable</div>
-                                                <div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-sm text-muted-foreground">Balance</div>
-                                                <div className="font-bold text-lg">Ksh {balance.toLocaleString()}</div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                <Card key={loan.id}><CardHeader><div className="flex justify-between items-start"><div><CardTitle>Loan #{loan.loanNumber}</CardTitle><CardDescription>{loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}</CardDescription></div><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status}</Badge></div></CardHeader><CardContent><div className="grid gap-4 sm:grid-cols-3"><div><div className="text-sm text-muted-foreground">Principal</div><div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div></div><div><div className="text-sm text-muted-foreground">Total Repayable</div><div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div></div><div><div className="text-sm text-muted-foreground">Balance</div><div className="font-bold text-lg">Ksh {balance.toLocaleString()}</div></div></div></CardContent></Card>
                             )
                         })}
                     </div>
-                ) : (
-                   <div className="text-center py-8">
-                        <p className="text-muted-foreground mb-4">No active loans or applications.</p>
-                   </div>
-                )}
+                ) : (<div className="text-center py-8"><p className="text-muted-foreground">No active loans.</p></div>)}
             </CardContent>
           </Card>
 
           <Card className="mt-6">
-            <CardHeader>
-                <CardTitle>Apply for a New Loan</CardTitle>
-                <CardDescription>
-                Select a product and submit your details.
-                </CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle>Apply for a New Loan</CardTitle></CardHeader>
             <CardContent>
                 <Form {...applicationForm}>
                 <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-4">
-                    <FormField
-                        control={applicationForm.control}
-                        name="loanType"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Loan Product</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                <FormControl>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select loan product" />
-                                </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                <SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem>
-                                <SelectItem value="Individual & Business Loan">Individual & Business Short-Term Loan</SelectItem>
-                                <SelectItem value="Salary Advance Loan">Salary Advance Loan</SelectItem>
-                                <SelectItem value="Logbook Loan">Logbook Loan</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    <FormField
-                      control={applicationForm.control}
-                      name="loanAmount"
-                      render={({ field }) => (
-                          <FormItem>
-                          <FormLabel>Loan Amount Requested (Ksh)</FormLabel>
-                          <FormControl>
-                              <Input type="number" placeholder="e.g., 10000" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                          </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={applicationForm.control}
-                      name="idNumber"
-                      render={({ field }) => (
-                          <FormItem>
-                          <FormLabel>National ID Number</FormLabel>
-                          <FormControl>
-                              <Input placeholder="Your ID Number" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                          </FormItem>
-                      )}
-                    />
-                     <FormField
-                      control={applicationForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                          <FormItem>
-                          <FormLabel>Primary Phone Number</FormLabel>
-                          <FormControl>
-                              <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                          </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={applicationForm.control}
-                      name="alternativeNumber"
-                      render={({ field }) => (
-                          <FormItem>
-                          <FormLabel>Alternative Phone Number (Optional)</FormLabel>
-                          <FormControl>
-                              <Input placeholder="Secondary contact number" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                          </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={applicationForm.control}
-                      name="agreeToTerms"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>
-                              Agree to terms and conditions
-                            </FormLabel>
-                            <FormDescription>
-                              You agree to our Data Privacy Terms and Conditions.
-                            </FormDescription>
-                             <FormMessage />
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                        Submit Application
-                    </Button>
+                    <FormField control={applicationForm.control} name="loanType" render={({ field }) => (
+                        <FormItem><FormLabel>Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Short-Term Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={applicationForm.control} name="loanAmount" render={({ field }) => (
+                        <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={applicationForm.control} name="idNumber" render={({ field }) => (
+                        <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={applicationForm.control} name="phone" render={({ field }) => (
+                        <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={applicationForm.control} name="alternativeNumber" render={({ field }) => (
+                        <FormItem><FormLabel>Alt. Phone (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                    )}/>
+                    <FormField control={applicationForm.control} name="agreeToTerms" render={({ field }) => (
+                        <FormItem className="flex items-start space-x-3 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel>Agree to terms</FormLabel><FormMessage /></div></FormItem>
+                    )}/>
+                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}Submit Application</Button>
                 </form>
                 </Form>
             </CardContent>

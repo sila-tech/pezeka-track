@@ -110,29 +110,16 @@ export default function UserManagementPage() {
     async function onAddSubmit(values: z.infer<typeof userProfileSchema>) {
         setIsSubmitting(true);
         try {
-            await createUserProfile(firestore, values.uid, {
-                email: values.email,
-                role: values.role,
-                name: values.name,
-            });
+            await createUserProfile(firestore, values.uid, { email: values.email, role: values.role, name: values.name });
             toast({ title: 'User Profile Created', description: `Profile for ${values.name} has been added.` });
             setAddDialogOpen(false);
             addForm.reset();
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error', description: error.message || "Could not create user profile." });
-        } finally {
-            setIsSubmitting(false);
-        }
+        } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message || "Could not create user profile." }); } finally { setIsSubmitting(false); }
     }
 
     const handleEditClick = (user: UserProfile) => {
         setUserToEdit(user);
-        editForm.reset({
-            uid: user.uid,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-        });
+        editForm.reset({ uid: user.uid, name: user.name, email: user.email, role: user.role });
         setEditDialogOpen(true);
     };
     
@@ -140,19 +127,11 @@ export default function UserManagementPage() {
       if (!userToEdit) return;
       setIsSubmitting(true);
       try {
-        await updateUserProfile(firestore, userToEdit.id, {
-          name: values.name,
-          email: values.email,
-          role: values.role,
-        });
+        await updateUserProfile(firestore, userToEdit.id, { name: values.name, email: values.email, role: values.role });
         toast({ title: "Profile Updated" });
         setEditDialogOpen(false);
         setUserToEdit(null);
-      } catch (error: any) {
-        toast({ variant: "destructive", title: "Update Failed", description: error.message });
-      } finally {
-        setIsSubmitting(false);
-      }
+      } catch (error: any) { toast({ variant: "destructive", title: "Update Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
     const handleDeleteClick = (user: UserProfile) => {
@@ -168,11 +147,7 @@ export default function UserManagementPage() {
             toast({ title: 'User Profile Deleted', description: `Profile for ${userToDelete.name} has been deleted.` });
             setDeleteDialogOpen(false);
             setUserToDelete(null);
-        } catch (error: any) {
-             toast({ variant: "destructive", title: "Delete Failed", description: error.message });
-        } finally {
-            setIsSubmitting(false);
-        }
+        } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
     if (userLoading || !isSuperAdmin) {
@@ -184,33 +159,23 @@ export default function UserManagementPage() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add User Profile
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add User Profile</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New User Profile</DialogTitle>
-              <DialogDescription>
-                First, create the user in the Firebase Authentication console. Then, add their profile details here.
-              </DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Add New User Profile</DialogTitle><DialogDescription>First, create the user in the Firebase Authentication console.</DialogDescription></DialogHeader>
             <Form {...addForm}>
-              <ScrollArea className="max-h-[70vh]">
-                <form id="add-user-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
+              <ScrollArea className="max-h-[70vh] pr-4">
+                <form id="add-user-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
                     <FormField control={addForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Auth" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={addForm.control} name="role" render={({ field }) => (
-                    <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
                         <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
                     </Select><FormMessage /></FormItem>
@@ -218,117 +183,56 @@ export default function UserManagementPage() {
                 </form>
               </ScrollArea>
             </Form>
-             <DialogFooter className="mt-4">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit" form="add-user-form" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Add Profile
-                </Button>
-            </DialogFooter>
+             <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-user-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Profile</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
       <Card>
-        <CardHeader>
-            <CardTitle>Admin Users</CardTitle>
-            <CardDescription>A list of all users with staff or finance roles.</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>Admin Users</CardTitle><CardDescription>A list of all users with staff or finance roles.</CardDescription></CardHeader>
         <CardContent>
-          {usersLoading && (
-            <div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-          )}
-          {!usersLoading && (!users || users.length === 0) && (
-              <Alert><AlertTitle>No User Profiles Found</AlertTitle><AlertDescription>There are no user profiles in the database. Add one to get started.</AlertDescription></Alert>
-          )}
+          {usersLoading && (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>)}
+          {!usersLoading && (!users || users.length === 0) && (<Alert><AlertTitle>No User Profiles Found</AlertTitle></Alert>)}
           {!usersLoading && users && users.length > 0 && (
             <ScrollArea className="h-[60vh]">
-              <Table>
-                  <TableHeader className="sticky top-0 bg-card">
-                    <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead className="text-right w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {users.map((user) => (
-                          <TableRow key={user.id}>
-                              <TableCell className="font-medium">{user.name}</TableCell>
-                              <TableCell>{user.email}</TableCell>
-                              <TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu open={openMenu === user.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? user.id : null)}>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                        <DropdownMenuItem onClick={() => { handleEditClick(user); setOpenMenu(null); }}>Edit</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => { handleDeleteClick(user); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                          </TableRow>
-                      ))}
-                  </TableBody>
-              </Table>
+              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
+                  <TableBody>{users.map((user) => (
+                          <TableRow key={user.id}><TableCell className="font-medium">{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell><Badge variant="secondary">{user.role}</Badge></TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === user.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? user.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(user)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
+                      ))}</TableBody></Table>
             </ScrollArea>
           )}
         </CardContent>
       </Card>
       
-      {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit User Profile</DialogTitle>
-                <DialogDescription>Update the profile for {userToEdit?.name}.</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Edit User Profile</DialogTitle></DialogHeader>
             <Form {...editForm}>
-                <ScrollArea className="max-h-[70vh]">
-                    <form id="edit-user-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 p-1">
+                <ScrollArea className="max-h-[70vh] pr-4">
+                    <form id="edit-user-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
                         <FormField control={editForm.control} name="uid" render={({ field }) => (
-                        <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''} /></FormControl></FormItem>
                         )}/>
                         <FormField control={editForm.control} name="name" render={({ field }) => (
-                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
                         )}/>
                         <FormField control={editForm.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''} /></FormControl></FormItem>
                         )}/>
                         <FormField control={editForm.control} name="role" render={({ field }) => (
-                        <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
-                        </Select><FormMessage /></FormItem>
+                        </Select></FormItem>
                         )}/>
                     </form>
                 </ScrollArea>
             </Form>
-             <DialogFooter className="mt-4">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit" form="edit-user-form" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes
-                </Button>
-            </DialogFooter>
+             <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-user-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This will permanently delete the profile for <strong>{userToDelete?.name}</strong> from Firestore. It will not delete their authentication account.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Delete Profile
-                  </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
+          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Profile?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive">{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </>
   );

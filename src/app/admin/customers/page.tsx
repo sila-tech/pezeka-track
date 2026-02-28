@@ -101,12 +101,7 @@ export default function CustomersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const isSuperAdmin = user?.email === 'simon@pezeka.com';
-  const isFinance = user?.role === 'finance';
-  const isStaff = user?.role === 'staff';
-  
-  // Staff act as customer service and can manage customers
-  const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.role === 'staff');
   const canAdd = isAuthorized;
   const canEditDelete = isAuthorized;
 
@@ -123,50 +118,29 @@ export default function CustomersPage() {
 
   const addForm = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
-    defaultValues: {
-      name: '',
-      phone: '',
-      idNumber: '',
-    },
+    defaultValues: { name: '', phone: '', idNumber: '' },
   });
 
   const editForm = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
-    defaultValues: {
-      name: '',
-      phone: '',
-      idNumber: '',
-    },
+    defaultValues: { name: '', phone: '', idNumber: '' },
   });
 
   async function onAddSubmit(values: z.infer<typeof customerSchema>) {
     setIsSubmitting(true);
     try {
       await addCustomer(firestore, values);
-      toast({
-        title: 'Customer Added',
-        description: `${values.name} has been added successfully.`,
-      });
+      toast({ title: 'Customer Added', description: `${values.name} has been added successfully.` });
       addForm.reset();
       setAddCustomerOpen(false);
     } catch (error) {
-       toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "Could not add customer. Please try again.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+       toast({ variant: "destructive", title: "Uh oh! Something went wrong.", description: "Could not add customer. Please try again." });
+    } finally { setIsSubmitting(false); }
   }
 
   const handleEditClick = (customer: Customer) => {
     setCustomerToEdit(customer);
-    editForm.reset({
-      name: customer.name,
-      phone: customer.phone,
-      idNumber: customer.idNumber || '',
-    });
+    editForm.reset({ name: customer.name, phone: customer.phone, idNumber: customer.idNumber || '' });
     setEditCustomerOpen(true);
   };
 
@@ -175,21 +149,12 @@ export default function CustomersPage() {
     setIsSubmitting(true);
     try {
       await updateCustomer(firestore, customerToEdit.id, values);
-      toast({
-        title: 'Customer Updated',
-        description: `${values.name} has been updated successfully.`,
-      });
+      toast({ title: 'Customer Updated', description: `${values.name} has been updated successfully.` });
       setEditCustomerOpen(false);
       setCustomerToEdit(null);
     } catch (error) {
-       toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "Could not update customer. Please try again.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+       toast({ variant: "destructive", title: "Uh oh! Something went wrong.", description: "Could not update customer. Please try again." });
+    } finally { setIsSubmitting(false); }
   }
 
   const handleDeleteClick = (customer: Customer) => {
@@ -201,16 +166,9 @@ export default function CustomersPage() {
     if (!customerToDelete) return;
     try {
       await deleteCustomer(firestore, customerToDelete.id);
-      toast({
-        title: 'Customer Deleted',
-        description: `${customerToDelete.name} has been deleted.`,
-      });
+      toast({ title: 'Customer Deleted', description: `${customerToDelete.name} has been deleted.` });
     } catch (error) {
-        toast({
-            variant: "destructive",
-            title: "Delete failed",
-            description: "Could not delete customer. Please try again.",
-        });
+        toast({ variant: "destructive", title: "Delete failed", description: "Could not delete customer. Please try again." });
     } finally {
         setDeleteConfirmOpen(false);
         setCustomerToDelete(null);
@@ -224,34 +182,12 @@ export default function CustomersPage() {
 
   const handleDownloadReport = () => {
     if (!selectedCustomer) return;
-
-    const customerData = [{
-      'Customer Name': selectedCustomer.name,
-      'Phone': selectedCustomer.phone,
-      'ID Number': selectedCustomer.idNumber || 'N/A'
-    },
-    {}, // empty row for spacing
-    {
-      'Loan Number': 'Loan Number',
-      'Principal': 'Principal',
-      'Total Repayable': 'Total Repayable',
-      'Total Paid': 'Total Paid',
-      'Balance': 'Balance',
-      'Status': 'Status',
-    },
+    const customerData = [{ 'Customer Name': selectedCustomer.name, 'Phone': selectedCustomer.phone, 'ID Number': selectedCustomer.idNumber || 'N/A' }, {}, 
+    { 'Loan Number': 'Loan Number', 'Principal': 'Principal', 'Total Repayable': 'Total Repayable', 'Total Paid': 'Total Paid', 'Balance': 'Balance', 'Status': 'Status' },
     ...customerLoans.map(loan => {
         const balance = loan.totalRepayableAmount - loan.totalPaid;
-        return {
-            'Loan Number': loan.loanNumber,
-            'Principal': loan.principalAmount,
-            'Total Repayable': loan.totalRepayableAmount,
-            'Total Paid': loan.totalPaid,
-            'Balance': balance,
-            'Status': loan.status,
-        }
-    })
-    ];
-
+        return { 'Loan Number': loan.loanNumber, 'Principal': loan.principalAmount, 'Total Repayable': loan.totalRepayableAmount, 'Total Paid': loan.totalPaid, 'Balance': balance, 'Status': loan.status }
+    })];
     exportToCsv(customerData, `${selectedCustomer.name.replace(/ /g, '_')}_breakdown`);
   };
 
@@ -264,22 +200,14 @@ export default function CustomersPage() {
             case 'monthly': return addMonths(disbursementDate, loan.numberOfInstalments);
             default: return null;
         }
-    } catch(e) {
-        return null;
-    }
+    } catch(e) { return null; }
   };
   
   const generatedMessage = useMemo(() => {
       if (!messageLoan || !selectedCustomer) return "";
       const balance = messageLoan.totalRepayableAmount - messageLoan.totalPaid;
       const dueDate = getLoanDueDate(messageLoan);
-      
-      const dueDateText = dueDate
-        ? isToday(dueDate)
-          ? `\nYour loan is due today.`
-          : `\nDue Date: ${format(dueDate, 'PPP')}`
-        : '';
-
+      const dueDateText = dueDate ? isToday(dueDate) ? `\nYour loan is due today.` : `\nDue Date: ${format(dueDate, 'PPP')}` : '';
       return `Dear ${selectedCustomer.name},\n\nThis is a friendly reminder regarding your loan with Pezeka Credit.\n\nLoan Number: ${messageLoan.loanNumber}\nOutstanding Balance: Ksh ${balance.toLocaleString()}\nNext Instalment: Ksh ${messageLoan.instalmentAmount.toLocaleString()}${dueDateText}\n\nPlease use the following details for your payment:\nPaybill: 522522\nAccount: 1347823360\n\nPlease ensure your payment is made on time to avoid daily penalties.\n\nThank you,\nPezeka Credit Ltd.`;
   }, [messageLoan, selectedCustomer]);
 
@@ -305,71 +233,26 @@ export default function CustomersPage() {
         <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
         {canAdd && (
           <Dialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Customer
-              </Button>
-            </DialogTrigger>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Customer</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add a New Customer</DialogTitle>
-                <DialogDescription>
-                  Fill in the details below to add a new customer.
-                </DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Add a New Customer</DialogTitle><DialogDescription>Fill in the details below to add a new customer.</DialogDescription></DialogHeader>
               <Form {...addForm}>
-                <ScrollArea className="max-h-[70vh]">
-                  <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 pr-6">
-                    <FormField
-                      control={addForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John Doe" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={addForm.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={addForm.control}
-                      name="idNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>ID Number (Optional)</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <ScrollArea className="max-h-[70vh] pr-4">
+                  <form id="add-customer-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
+                    <FormField control={addForm.control} name="name" render={({ field }) => (
+                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="phone" render={({ field }) => (
+                        <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
+                    <FormField control={addForm.control} name="idNumber" render={({ field }) => (
+                        <FormItem><FormLabel>ID Number (Optional)</FormLabel><FormControl><Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )}/>
                   </form>
                 </ScrollArea>
-                <DialogFooter className="mt-4">
-                  <DialogClose asChild>
-                    <Button type="button" variant="ghost">Cancel</Button>
-                  </DialogClose>
-                  <Button type="submit" form="add-customer-form" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Add Customer
-                  </Button>
+                <DialogFooter>
+                  <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                  <Button type="submit" form="add-customer-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Customer</Button>
                 </DialogFooter>
               </Form>
             </DialogContent>
@@ -379,50 +262,17 @@ export default function CustomersPage() {
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <CardTitle>Customer List</CardTitle>
-                    <CardDescription>A list of all customers in the system. Click on a customer to see more details.</CardDescription>
-                </div>
-                <div className="relative">
-                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by name or phone..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-8 w-full sm:w-[300px]"
-                    />
-                </div>
+                <div><CardTitle>Customer List</CardTitle><CardDescription>A list of all customers in the system.</CardDescription></div>
+                <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-full sm:w-[300px]" /></div>
             </div>
         </CardHeader>
         <CardContent>
-          {customersLoading && (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          )}
-          {!customersLoading && (!filteredCustomers || filteredCustomers.length === 0) && (
-              <Alert>
-                  <AlertTitle>No Customers Found</AlertTitle>
-                  <AlertDescription>
-                    {searchTerm 
-                        ? "No customers match your search." 
-                        : "There are no customers in the system yet. Add one to see them here."
-                    }
-                  </AlertDescription>
-              </Alert>
-          )}
+          {customersLoading && (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>)}
+          {!customersLoading && (!filteredCustomers || filteredCustomers.length === 0) && (<Alert><AlertTitle>No Customers Found</AlertTitle><AlertDescription>{searchTerm ? "No customers match your search." : "There are no customers yet."}</AlertDescription></Alert>)}
           {!customersLoading && filteredCustomers && filteredCustomers.length > 0 && (
             <ScrollArea className="h-[60vh]">
               <Table>
-                  <TableHeader className="sticky top-0 bg-card">
-                      <TableRow>
-                          <TableHead className="w-[50px]">#</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Phone Number</TableHead>
-                          <TableHead>ID Number</TableHead>
-                          {canEditDelete && <TableHead className="text-right w-[80px]">Actions</TableHead>}
-                      </TableRow>
-                  </TableHeader>
+                  <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className="w-[50px]">#</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>ID Number</TableHead>{canEditDelete && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
                   <TableBody>
                       {filteredCustomers.map((customer, index) => (
                           <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
@@ -433,30 +283,10 @@ export default function CustomersPage() {
                               {canEditDelete && (
                                 <TableCell className="text-right">
                                   <DropdownMenu open={openMenu === customer.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? customer.id : null)}>
-                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                          <Button variant="ghost" className="h-8 w-8 p-0">
-                                              <span className="sr-only">Open menu</span>
-                                              <MoreHorizontal className="h-4 w-4" />
-                                          </Button>
-                                      </DropdownMenuTrigger>
+                                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                       <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                          <DropdownMenuItem onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleEditClick(customer);
-                                              setOpenMenu(null);
-                                          }}>
-                                              Edit
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                              onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleDeleteClick(customer);
-                                                  setOpenMenu(null);
-                                              }}
-                                              className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
-                                          >
-                                              Delete
-                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditClick(customer); }}>Edit</DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDeleteClick(customer); }} className="text-destructive">Delete</DropdownMenuItem>
                                       </DropdownMenuContent>
                                   </DropdownMenu>
                                 </TableCell>
@@ -470,194 +300,64 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
       
-      {/* Customer Details Dialog */}
-      <Dialog
-        open={!!selectedCustomer}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            setSelectedCustomer(null);
-            setMessageLoan(null);
-          }
-        }}
-      >
+      <Dialog open={!!selectedCustomer} onOpenChange={(isOpen) => !isOpen && setSelectedCustomer(null)}>
         <DialogContent className="sm:max-w-3xl">
           {selectedCustomer && (
             <>
-              <DialogHeader>
-                <DialogTitle>{selectedCustomer.name}'s Dashboard</DialogTitle>
-                <DialogDescription>
-                  Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
-                </DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>{selectedCustomer.name}'s Dashboard</DialogTitle><DialogDescription>Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}</DialogDescription></DialogHeader>
               <ScrollArea className="mt-4 max-h-[70vh]">
                 <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle>Loan History</CardTitle>
-                                <CardDescription>All loans associated with this customer.</CardDescription>
-                            </div>
-                             <Button onClick={handleDownloadReport} variant="outline" size="sm">
-                                <FileDown className="mr-2 h-4 w-4" />
-                                Download Report
-                            </Button>
-                        </div>
-                    </CardHeader>
+                    <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Loan History</CardTitle><Button onClick={handleDownloadReport} variant="outline" size="sm"><FileDown className="mr-2 h-4 w-4" />Report</Button></CardHeader>
                     <CardContent>
-                        {customerLoans.length === 0 ? (
-                             <Alert>
-                                <AlertTitle>No Loans Found</AlertTitle>
-                                <AlertDescription>This customer has no loan history.</AlertDescription>
-                            </Alert>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Loan No.</TableHead>
-                                        <TableHead>Principal</TableHead>
-                                        <TableHead>Balance</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {customerLoans.map(loan => {
+                        {customerLoans.length === 0 ? (<Alert><AlertTitle>No Loans Found</AlertTitle></Alert>) : (
+                            <Table><TableHeader><TableRow><TableHead>Loan No.</TableHead><TableHead>Principal</TableHead><TableHead>Balance</TableHead><TableHead>Status</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                                <TableBody>{customerLoans.map(loan => {
                                         const balance = loan.totalRepayableAmount - loan.totalPaid;
-                                        return (
-                                            <TableRow key={loan.id}>
-                                                <TableCell>{loan.loanNumber}</TableCell>
-                                                <TableCell>{loan.principalAmount.toLocaleString()}</TableCell>
-                                                <TableCell className="font-bold">{balance.toLocaleString()}</TableCell>
-                                                <TableCell>
-                                                  <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>
-                                                    {loan.status.charAt(0).toUpperCase() + loan.status.slice(1)}
-                                                  </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Button variant="ghost" size="sm" onClick={() => setMessageLoan(loan)}>
-                                                        <MessageSquare className="mr-2 h-4 w-4" />
-                                                        Message
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                                        return (<TableRow key={loan.id}><TableCell>{loan.loanNumber}</TableCell><TableCell>{loan.principalAmount.toLocaleString()}</TableCell><TableCell className="font-bold">{balance.toLocaleString()}</TableCell><TableCell><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status}</Badge></TableCell><TableCell><Button variant="ghost" size="sm" onClick={() => setMessageLoan(loan)}><MessageSquare className="mr-2 h-4 w-4" />Msg</Button></TableCell></TableRow>);
+                                })}</TableBody></Table>
                         )}
                     </CardContent>
                 </Card>
               </ScrollArea>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedCustomer(null)}>Close</Button>
-              </DialogFooter>
+              <DialogFooter><Button variant="outline" onClick={() => setSelectedCustomer(null)}>Close</Button></DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Generate Message Dialog - Compact Version */}
        <Dialog open={!!messageLoan} onOpenChange={(isOpen) => !isOpen && setMessageLoan(null)}>
         <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle className="text-lg">Customer Message</DialogTitle>
-                <DialogDescription>Reminder message for Loan #{messageLoan?.loanNumber}.</DialogDescription>
-            </DialogHeader>
-            <div className="mt-2">
-                <Textarea value={generatedMessage} rows={6} readOnly className="bg-muted/50 text-xs leading-relaxed" />
-            </div>
-            <DialogFooter className="sm:justify-center gap-2 mt-4">
-                 <Button variant="outline" size="sm" onClick={() => setMessageLoan(null)}>Cancel</Button>
-                 <Button size="sm" onClick={copyToClipboard}>
-                    <Copy className="mr-2 h-3 w-3" />
-                    Copy Message
-                </Button>
-            </DialogFooter>
+            <DialogHeader><DialogTitle className="text-lg">Customer Message</DialogTitle><DialogDescription>Reminder for Loan #{messageLoan?.loanNumber}.</DialogDescription></DialogHeader>
+            <div className="mt-2"><Textarea value={generatedMessage} rows={6} readOnly className="bg-muted/50 text-xs" /></div>
+            <DialogFooter className="sm:justify-center gap-2 mt-4"><Button variant="outline" size="sm" onClick={() => setMessageLoan(null)}>Cancel</Button><Button size="sm" onClick={copyToClipboard}><Copy className="mr-2 h-3 w-3" />Copy</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Customer Dialog */}
       <Dialog open={editCustomerOpen} onOpenChange={setEditCustomerOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Customer</DialogTitle>
-            <DialogDescription>
-              Update the details for {customerToEdit?.name}.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Edit Customer</DialogTitle></DialogHeader>
           <Form {...editForm}>
-            <ScrollArea className="max-h-[70vh]">
-              <form id="edit-customer-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 pr-6">
-                <FormField
-                  control={editForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="idNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ID Number (Optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <ScrollArea className="max-h-[70vh] pr-4">
+              <form id="edit-customer-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
+                <FormField control={editForm.control} name="name" render={({ field }) => (
+                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={editForm.control} name="phone" render={({ field }) => (
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                )}/>
+                <FormField control={editForm.control} name="idNumber" render={({ field }) => (
+                    <FormItem><FormLabel>ID Number (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                )}/>
               </form>
             </ScrollArea>
-            <DialogFooter className="mt-4">
-              <DialogClose asChild>
-                <Button type="button" variant="ghost">Cancel</Button>
-              </DialogClose>
-              <Button type="submit" form="edit-customer-form" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
-              </Button>
-            </DialogFooter>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-customer-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button></DialogFooter>
           </Form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the customer
-                      "{customerToDelete?.name}" and any associated data.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      Delete
-                  </AlertDialogAction>
-              </AlertDialogFooter>
+          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Customer?</AlertDialogTitle></AlertDialogHeader>
+              <AlertDialogFooter><AlertDialogCancel onClick={() => setCustomerToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
     </div>

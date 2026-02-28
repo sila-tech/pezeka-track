@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -88,12 +87,12 @@ export default function InvestorsPage() {
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
     const isSuperAdmin = currentUser?.email === 'simon@pezeka.com';
-    const isFinance = currentUser?.role === 'finance' || currentUser?.email?.endsWith('@finance.pezeka.com');
+    const isFinance = currentUser?.role === 'finance';
     const canViewPage = isSuperAdmin || isFinance;
 
     useEffect(() => {
         if (!userLoading && currentUser && !canViewPage) {
-            toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view the Investors page.' });
+            toast({ variant: 'destructive', title: 'Access Denied', description: 'Unauthorized access.' });
             router.push('/admin');
         }
     }, [userLoading, canViewPage, currentUser, router, toast]);
@@ -102,59 +101,27 @@ export default function InvestorsPage() {
 
     const addForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
-        defaultValues: { 
-          uid: '', 
-          name: '', 
-          email: '', 
-          totalInvestment: 0, 
-          interestRate: 0, 
-          createdAt: format(new Date(), 'yyyy-MM-dd') 
-        },
+        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0, interestRate: 0, createdAt: format(new Date(), 'yyyy-MM-dd') },
     });
 
     const editForm = useForm<z.infer<typeof investorSchema>>({
         resolver: zodResolver(investorSchema),
-        defaultValues: {
-          uid: '',
-          name: '',
-          email: '',
-          totalInvestment: 0,
-          interestRate: 0,
-          createdAt: ''
-        }
+        defaultValues: { uid: '', name: '', email: '', totalInvestment: 0, interestRate: 0, createdAt: '' }
     });
 
     async function onAddSubmit(values: z.infer<typeof investorSchema>) {
         setIsSubmitting(true);
         try {
-            await addInvestor(firestore, {
-                uid: values.uid,
-                name: values.name,
-                email: values.email,
-                totalInvestment: values.totalInvestment,
-                currentBalance: values.totalInvestment,
-                interestRate: values.interestRate || 0,
-            });
-            toast({ title: 'Investor Created', description: `Profile for ${values.name} has been added.` });
+            await addInvestor(firestore, { uid: values.uid, name: values.name, email: values.email, totalInvestment: values.totalInvestment, currentBalance: values.totalInvestment, interestRate: values.interestRate || 0 });
+            toast({ title: 'Investor Created' });
             setAddDialogOpen(false);
             addForm.reset();
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error', description: error.message || "Could not create investor profile." });
-        } finally {
-            setIsSubmitting(false);
-        }
+        } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message }); } finally { setIsSubmitting(false); }
     }
 
     const handleEditClick = (investor: Investor) => {
         setInvestorToEdit(investor);
-        editForm.reset({
-            uid: investor.uid,
-            name: investor.name,
-            email: investor.email,
-            totalInvestment: investor.totalInvestment,
-            interestRate: investor.interestRate || 0,
-            createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-        });
+        editForm.reset({ uid: investor.uid, name: investor.name, email: investor.email, totalInvestment: investor.totalInvestment, interestRate: investor.interestRate || 0, createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd') });
         setEditDialogOpen(true);
     };
     
@@ -162,215 +129,83 @@ export default function InvestorsPage() {
       if (!investorToEdit) return;
       setIsSubmitting(true);
       try {
-        const updateData: { [key: string]: any } = {
-            name: values.name,
-            email: values.email,
-            totalInvestment: values.totalInvestment,
-            interestRate: values.interestRate || 0,
-        };
-
-        if (values.createdAt) {
-            updateData.createdAt = new Date(values.createdAt);
-        }
-        
+        const updateData: any = { name: values.name, email: values.email, totalInvestment: values.totalInvestment, interestRate: values.interestRate || 0 };
+        if (values.createdAt) updateData.createdAt = new Date(values.createdAt);
         await updateInvestor(firestore, investorToEdit.id, updateData);
-        toast({ title: "Investor Profile Updated" });
+        toast({ title: "Updated" });
         setEditDialogOpen(false);
         setInvestorToEdit(null);
-      } catch (error: any) {
-        toast({ variant: "destructive", title: "Update Failed", description: error.message });
-      } finally {
-        setIsSubmitting(false);
-      }
+      } catch (error: any) { toast({ variant: "destructive", title: "Update Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    const handleDeleteClick = (investor: Investor) => {
-        setInvestorToDelete(investor);
-        setDeleteDialogOpen(true);
-    };
-
+    const handleDeleteClick = (investor: Investor) => { setInvestorToDelete(investor); setDeleteDialogOpen(true); };
     async function confirmDelete() {
         if (!investorToDelete) return;
         setIsSubmitting(true);
-        try {
-            await deleteInvestor(firestore, investorToDelete.id);
-            toast({ title: 'Investor Deleted', description: `Profile for ${investorToDelete.name} has been deleted.` });
-            setDeleteDialogOpen(false);
-            setInvestorToDelete(null);
-        } catch (error: any) {
-             toast({ variant: "destructive", title: "Delete Failed", description: error.message });
-        } finally {
-            setIsSubmitting(false);
-        }
+        try { await deleteInvestor(firestore, investorToDelete.id); toast({ title: 'Deleted' }); setDeleteDialogOpen(false); setInvestorToDelete(null); } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    const isLoading = userLoading || investorsLoading;
-
-    if (isLoading) {
-        return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
-
-    if (!canViewPage) {
-        return null;
-    }
+    if (userLoading || investorsLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    if (!canViewPage) return null;
 
     return (
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Investors</h1>
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogTrigger asChild>
-            <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Investor
-            </Button>
-        </DialogTrigger>
+        <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Investor</Button></DialogTrigger>
         <DialogContent>
-            <DialogHeader>
-            <DialogTitle>Add New Investor</DialogTitle>
-            <DialogDescription>
-                First, create the user in Firebase Authentication. Then, add their profile and investment details here.
-            </DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Add New Investor</DialogTitle></DialogHeader>
             <Form {...addForm}>
-            <ScrollArea className="max-h-[70vh]">
-                <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 p-1">
-                    <FormField control={addForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>Investor User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Firebase Auth" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="investor@email.com" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (
-                    <FormItem><FormLabel>Total Investment Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="50000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="interestRate" render={({ field }) => (
-                    <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
+            <ScrollArea className="max-h-[70vh] pr-4">
+                <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
+                    <FormField control={addForm.control} name="uid" render={({ field }) => (<FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={addForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={addForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (<FormItem><FormLabel>Total Investment (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={addForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
                 </form>
             </ScrollArea>
             </Form>
-            <DialogFooter className="mt-4">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit" form="add-investor-form" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Add Investor
-                </Button>
-            </DialogFooter>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Investor</Button></DialogFooter>
         </DialogContent>
         </Dialog>
       </div>
       <Card>
-        <CardHeader>
-            <CardTitle>Investor Portfolios</CardTitle>
-            <CardDescription>A summary of all registered investors and their current holdings.</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>Investor Portfolios</CardTitle></CardHeader>
         <CardContent>
-          {!investors || investors.length === 0 ? (
-              <Alert><AlertTitle>No Investors Found</AlertTitle><AlertDescription>There are no investors in the database. Add one to get started.</AlertDescription></Alert>
-          ) : (
+          {!investors || investors.length === 0 ? (<Alert><AlertTitle>No Investors Found</AlertTitle></Alert>) : (
             <ScrollArea className="h-[60vh]">
-              <Table>
-                  <TableHeader className="sticky top-0 bg-card">
-                    <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead>Rate (%)</TableHead>
-                        <TableHead className="text-right">Investment (Ksh)</TableHead>
-                        <TableHead className="text-right">Withdrawals (Ksh)</TableHead>
-                        <TableHead className="text-right">Balance (Ksh)</TableHead>
-                        <TableHead className="text-right w-[80px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {investors.map((investor) => (
-                          <TableRow key={investor.id}>
-                              <TableCell className="font-medium">{investor.name}</TableCell>
-                              <TableCell>{investor.email}</TableCell>
-                              <TableCell className="text-xs">{investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'}</TableCell>
-                              <TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell>
-                              <TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell>
-                              <TableCell className="text-right text-destructive">{(investor.totalWithdrawn || 0).toLocaleString()}</TableCell>
-                              <TableCell className="text-right font-bold tabular-nums">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
-                              <TableCell className="text-right">
-                                <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
-                                        <DropdownMenuItem onClick={() => { handleEditClick(investor); setOpenMenu(null); }}>Edit Profile</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => { handleDeleteClick(investor); setOpenMenu(null); }} className="text-destructive focus:bg-destructive focus:text-destructive-foreground">Delete Portfolio</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                          </TableRow>
-                        )
-                      )}
-                  </TableBody>
-              </Table>
+              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
+                  <TableBody>{investors.map((investor) => (
+                          <TableRow key={investor.id}><TableCell className="font-medium">{investor.name}</TableCell><TableCell>{investor.email}</TableCell><TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell><TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(investor)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(investor)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
+                        ))}</TableBody></Table>
             </ScrollArea>
           )}
         </CardContent>
       </Card>
       
-      {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Edit Investor</DialogTitle>
-                <DialogDescription>Update the investment profile for {investorToEdit?.name}.</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Edit Investor</DialogTitle></DialogHeader>
             <Form {...editForm}>
-              <ScrollArea className="max-h-[70vh]">
-                <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 p-1">
-                    <FormField control={editForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={editForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={editForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (
-                    <FormItem><FormLabel>Total Investment (Basis)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={editForm.control} name="interestRate" render={({ field }) => (
-                        <FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={editForm.control} name="createdAt" render={({ field }) => (
-                    <FormItem><FormLabel>Original Investment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
+              <ScrollArea className="max-h-[70vh] pr-4">
+                <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
+                    <FormField control={editForm.control} name="uid" render={({ field }) => (<FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                    <FormField control={editForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                    <FormField control={editForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                    <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (<FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
+                    <FormField control={editForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
+                    <FormField control={editForm.control} name="createdAt" render={({ field }) => (<FormItem><FormLabel>Investment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
                 </form>
               </ScrollArea>
             </Form>
-             <DialogFooter className="mt-4">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit" form="edit-investor-form" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Changes
-                </Button>
-            </DialogFooter>
+             <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This will permanently delete the investor profile for <strong>{investorToDelete?.name}</strong>. This action cannot be undone.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Delete Investor
-                  </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
+          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Portfolio?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </>
   );

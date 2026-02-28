@@ -183,7 +183,6 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList, loading: staffLoading } = useCollection<any>(isAuthorized ? 'users' : null);
   
-  // Base disbursed loans for ledgers and portfolios (strictly excludes applications and rejected)
   const disbursedLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => loan.status !== 'application' && loan.status !== 'rejected');
@@ -255,21 +254,15 @@ export default function FinancePage() {
 
   const filteredLoansList = useMemo(() => {
     if(!disbursedLoans) return [];
-    
     const today = startOfToday();
-
     return disbursedLoans.filter(loan => {
-        // Staff Filter
         const staffMatch = loanBookStaffFilter === 'all' || loan.assignedStaffId === loanBookStaffFilter;
-        
-        // Search Match
         const searchMatch = loanBookSearchTerm === '' || 
             loan.loanNumber.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) || 
             loan.customerName.toLowerCase().includes(loanBookSearchTerm.toLowerCase()) ||
             loan.customerPhone?.includes(loanBookSearchTerm) ||
             loan.idNumber?.includes(loanBookSearchTerm);
 
-        // Date-based Status Match
         const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
         let endDate: Date;
         try {
@@ -295,7 +288,6 @@ export default function FinancePage() {
         } else {
             statusMatch = loan.status === loanBookStatusFilter;
         }
-
         return statusMatch && staffMatch && searchMatch;
     });
   }, [disbursedLoans, loanBookSearchTerm, loanBookStatusFilter, loanBookStaffFilter]);
@@ -317,20 +309,12 @@ export default function FinancePage() {
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
-    defaultValues: { 
-      paymentDate: format(new Date(), 'yyyy-MM-dd'),
-      paymentAmount: 0,
-      comments: ''
-    }
+    defaultValues: { paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentAmount: 0, comments: '' }
   });
 
   const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
     resolver: zodResolver(penaltySchema),
-    defaultValues: { 
-      penaltyDate: format(new Date(), 'yyyy-MM-dd'),
-      penaltyAmount: 0,
-      penaltyDescription: ''
-    }
+    defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd'), penaltyAmount: 0, penaltyDescription: '' }
   });
 
   const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
@@ -363,32 +347,19 @@ export default function FinancePage() {
         transactionFee: values.transactionFee || 0,
         description: values.description || '',
       };
-
       if (values.loanId) sanitizedData.loanId = values.loanId;
+      if (values.type === 'receipt') sanitizedData.receiptCategory = values.receiptCategory;
+      else if (values.type === 'payout') sanitizedData.payoutCategory = values.payoutCategory;
+      else if (values.type === 'expense') sanitizedData.expenseCategory = values.expenseCategory;
 
-      if (values.type === 'receipt') {
-        sanitizedData.receiptCategory = values.receiptCategory;
-      } else if (values.type === 'payout') {
-        sanitizedData.payoutCategory = values.payoutCategory;
-      } else if (values.type === 'expense') {
-        sanitizedData.expenseCategory = values.expenseCategory;
-      }
-
-      if (editingEntry) { 
-        await updateFinanceEntry(firestore, editingEntry.id, sanitizedData); 
-      } else { 
-        await addFinanceEntry(firestore, sanitizedData); 
-      }
+      if (editingEntry) await updateFinanceEntry(firestore, editingEntry.id, sanitizedData); 
+      else await addFinanceEntry(firestore, sanitizedData); 
       
       addForm.reset(); 
       setEditingEntry(null); 
       setOpen(false);
       toast({ title: editingEntry ? 'Entry Updated' : 'Entry Recorded' });
-    } catch (e: any) { 
-      toast({ variant: "destructive", title: "Error", description: e.message }); 
-    } finally { 
-      setIsSubmitting(false); 
-    }
+    } catch (e: any) { toast({ variant: "destructive", title: "Error", description: e.message }); } finally { setIsSubmitting(false); }
   }
 
   const handleEditEntry = (entry: FinanceEntry) => {
@@ -417,11 +388,7 @@ export default function FinancePage() {
         });
         toast({ title: 'Payment Recorded' });
         paymentForm.reset();
-    } catch (e: any) { 
-      toast({ variant: 'destructive', title: 'Error', description: e.message }); 
-    } finally { 
-      setIsUpdating(false); 
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsUpdating(false); }
   }
 
   async function onAddPenalty(values: z.infer<typeof penaltySchema>) {
@@ -435,11 +402,7 @@ export default function FinancePage() {
         });
         toast({ title: 'Penalty Added' });
         penaltyForm.reset();
-    } catch (e: any) { 
-      toast({ variant: 'destructive', title: 'Error', description: e.message }); 
-    } finally { 
-      setIsAddingPenalty(false); 
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsAddingPenalty(false); }
   }
 
   async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
@@ -453,64 +416,38 @@ export default function FinancePage() {
           });
           toast({ title: "Note Added" });
           noteForm.reset();
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
-      } finally {
-          setIsAddingNote(false);
-      }
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsAddingNote(false); }
   }
 
   const handleStaffReassignment = async (staffId: string) => {
       if (!loanToEdit) return;
-      
       let updateData: any = {};
-      if (staffId === 'unassigned') {
-          updateData = { assignedStaffId: "", assignedStaffName: "" };
-      } else {
+      if (staffId === 'unassigned') updateData = { assignedStaffId: "", assignedStaffName: "" };
+      else {
           const staffMember = staffList?.find((s: any) => (s.id) === staffId);
           if (!staffMember) return;
-          updateData = {
-              assignedStaffId: staffId,
-              assignedStaffName: staffMember.name || staffMember.email
-          };
+          updateData = { assignedStaffId: staffId, assignedStaffName: staffMember.name || staffMember.email };
       }
-      
       try {
           await updateLoan(firestore, loanToEdit.id, updateData);
           toast({ title: 'Staff Re-assigned' });
           setLoanToEdit({ ...loanToEdit, ...updateData });
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
-      }
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); }
   };
 
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
-      
-      const oneInstInterest = calculateInterestForOneInstalment(
-          loanToEdit.principalAmount,
-          loanToEdit.interestRate || 0,
-          loanToEdit.numberOfInstalments,
-          loanToEdit.paymentFrequency
-      );
-      
+      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
       const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
       const dailyRate = oneInstInterest / daysInFreq;
-
       const disbursementDate = new Date(loanToEdit.disbursementDate.seconds * 1000);
       let finalDueDate: Date;
       if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(disbursementDate, loanToEdit.numberOfInstalments);
       else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(disbursementDate, loanToEdit.numberOfInstalments);
       else finalDueDate = addDays(disbursementDate, loanToEdit.numberOfInstalments);
-      
       const daysLate = differenceInDays(new Date(), finalDueDate);
       const validDaysLate = daysLate > 0 ? daysLate : 0;
-      
-      return {
-          dailyRate,
-          daysLate: validDaysLate,
-          suggested: Math.round(validDaysLate * dailyRate)
-      };
+      return { dailyRate, daysLate: validDaysLate, suggested: Math.round(validDaysLate * dailyRate) };
   }, [loanToEdit]);
 
   const authorizeSuggestedPenalty = () => {
@@ -532,98 +469,102 @@ export default function FinancePage() {
                 <DialogTrigger asChild><Button onClick={() => setEditingEntry(null)}><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
                 <DialogContent>
                     <DialogHeader><DialogTitle>{editingEntry ? 'Edit Entry' : 'New Entry'}</DialogTitle></DialogHeader>
-                    <Form {...addForm}>
-                        <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                            <FormField control={addForm.control} name="type" render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Type</FormLabel>
-                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="receipt">Receipt (Income)</SelectItem>
-                                      <SelectItem value="payout">Payout (Outgoing)</SelectItem>
-                                      <SelectItem value="expense">Expense (Operational)</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </FormItem>
-                            )} />
-                            {addFinanceEntryType === 'payout' && (
-                                <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
+                    <ScrollArea className="max-h-[70vh] pr-4">
+                        <Form {...addForm}>
+                            <form id="finance-entry-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
+                                <FormField control={addForm.control} name="type" render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Payout Category</FormLabel>
+                                      <FormLabel>Type</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl>
                                         <SelectContent>
-                                          <SelectItem value="loan_disbursement">Loan Disbursement</SelectItem>
-                                          <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
-                                          <SelectItem value="other">Other Payout</SelectItem>
+                                          <SelectItem value="receipt">Receipt (Income)</SelectItem>
+                                          <SelectItem value="payout">Payout (Outgoing)</SelectItem>
+                                          <SelectItem value="expense">Expense (Operational)</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     </FormItem>
                                 )} />
-                            )}
-                            {addFinanceEntryType === 'receipt' && (
-                                <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Receipt Category</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
-                                          <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
-                                          <SelectItem value="investment">Investor Deposit</SelectItem>
-                                          <SelectItem value="other">Other Income</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </FormItem>
-                                )} />
-                            )}
-                            {addFinanceEntryType === 'expense' && (
-                                <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Expense Category</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                          <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
-                                          <SelectItem value="office_purchase">Office Purchase</SelectItem>
-                                          <SelectItem value="other">Other Expense</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </FormItem>
-                                )} />
-                            )}
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField control={addForm.control} name="amount" render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Amount (Ksh)</FormLabel>
-                                    <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
-                                  </FormItem>
-                                )} />
-                                {addFinanceEntryType !== 'receipt' && (
-                                    <FormField control={addForm.control} name="transactionFee" render={({ field }) => (
+                                {addFinanceEntryType === 'payout' && (
+                                    <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Payout Category</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                              <SelectItem value="loan_disbursement">Loan Disbursement</SelectItem>
+                                              <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
+                                              <SelectItem value="other">Other Payout</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </FormItem>
+                                    )} />
+                                )}
+                                {addFinanceEntryType === 'receipt' && (
+                                    <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Receipt Category</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                              <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
+                                              <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
+                                              <SelectItem value="investment">Investor Deposit</SelectItem>
+                                              <SelectItem value="other">Other Income</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </FormItem>
+                                    )} />
+                                )}
+                                {addFinanceEntryType === 'expense' && (
+                                    <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Expense Category</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                              <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
+                                              <SelectItem value="office_purchase">Office Purchase</SelectItem>
+                                              <SelectItem value="other">Other Expense</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </FormItem>
+                                    )} />
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <FormField control={addForm.control} name="amount" render={({ field }) => (
                                       <FormItem>
-                                        <FormLabel>Tx Fee (Ksh)</FormLabel>
+                                        <FormLabel>Amount (Ksh)</FormLabel>
                                         <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
                                       </FormItem>
                                     )} />
-                                )}
-                            </div>
-                            <FormField control={addForm.control} name="date" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Date</FormLabel>
-                                <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
-                              </FormItem>
-                            )} />
-                            <FormField control={addForm.control} name="description" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Description</FormLabel>
-                                <FormControl><Textarea {...field} value={field.value ?? ''}/></FormControl>
-                              </FormItem>
-                            )} />
-                            <Button type="submit" className="w-full" disabled={isSubmitting}>{editingEntry ? 'Update' : 'Record'}</Button>
-                        </form>
-                    </Form>
+                                    {addFinanceEntryType !== 'receipt' && (
+                                        <FormField control={addForm.control} name="transactionFee" render={({ field }) => (
+                                          <FormItem>
+                                            <FormLabel>Tx Fee (Ksh)</FormLabel>
+                                            <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
+                                          </FormItem>
+                                        )} />
+                                    )}
+                                </div>
+                                <FormField control={addForm.control} name="date" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Date</FormLabel>
+                                    <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                                  </FormItem>
+                                )} />
+                                <FormField control={addForm.control} name="description" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Description</FormLabel>
+                                    <FormControl><Textarea {...field} value={field.value ?? ''}/></FormControl>
+                                  </FormItem>
+                                )} />
+                            </form>
+                        </Form>
+                    </ScrollArea>
+                    <DialogFooter>
+                        <Button type="submit" form="finance-entry-form" className="w-full" disabled={isSubmitting}>{editingEntry ? 'Update' : 'Record'}</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
@@ -718,7 +659,6 @@ export default function FinancePage() {
                             const expInterest = (loan.totalRepayableAmount - (Number(loan.totalPenalties) || 0)) - loan.principalAmount;
                             const expIncome = feesTotal + expInterest;
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
-
                             return (
                                 <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                                   <TableCell className="font-medium">
@@ -728,12 +668,7 @@ export default function FinancePage() {
                                   <TableCell>{loan.customerPhone}</TableCell>
                                   <TableCell>{loan.loanNumber}</TableCell>
                                   <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
-                                  <TableCell>
-                                      <div className="flex items-center gap-1">
-                                          <User className="h-3 w-3 text-muted-foreground" />
-                                          <span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span>
-                                      </div>
-                                  </TableCell>
+                                  <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                   <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{reg.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{proc.toLocaleString()}</TableCell>
@@ -747,11 +682,7 @@ export default function FinancePage() {
                                   <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                   <TableCell className="text-right text-blue-600">{expInterest.toLocaleString()}</TableCell>
                                   <TableCell className="text-right text-orange-600">{expIncome.toLocaleString()}</TableCell>
-                                  <TableCell className="text-center">
-                                      <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
-                                          {loan.status}
-                                      </Badge>
-                                  </TableCell>
+                                  <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
                                 </TableRow>
                             );
                           })}
@@ -764,43 +695,19 @@ export default function FinancePage() {
           </TabsContent>
 
           <TabsContent value="upfront">
-            <EditableFinanceReportTab 
-                title="Upfront Fees" 
-                description="Fees collected directly from loan disbursements." 
-                entries={financialData.allUpfrontFees} 
-                loading={false} 
-            />
+            <EditableFinanceReportTab title="Upfront Fees" description="Fees collected directly from loan disbursements." entries={financialData.allUpfrontFees} loading={false} />
           </TabsContent>
 
           <TabsContent value="receipts">
-            <EditableFinanceReportTab 
-                title="Receipts" 
-                description="Lending income and deposits." 
-                entries={financialData.allReceipts} 
-                loading={false} 
-                onEdit={(e) => !e.id.startsWith('fee-') && handleEditEntry(e)} 
-                onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} 
-            />
+            <EditableFinanceReportTab title="Receipts" description="Lending income and deposits." entries={financialData.allReceipts} loading={false} onEdit={(e) => !e.id.startsWith('fee-') && handleEditEntry(e)} onDelete={(e) => !e.id.startsWith('fee-') && deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
           
           <TabsContent value="payouts">
-            <EditableFinanceReportTab 
-                title="Payouts" 
-                description="Master outflow record (Disbursements & Expenses)." 
-                entries={financialData.allPayouts} 
-                loading={false} 
-                onEdit={handleEditEntry} 
-                onDelete={(e) => deleteFinanceEntry(firestore, e.id)} 
-            />
+            <EditableFinanceReportTab title="Payouts" description="Master outflow record (Disbursements & Expenses)." entries={financialData.allPayouts} loading={false} onEdit={handleEditEntry} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
 
           <TabsContent value="txfees">
-            <EditableFinanceReportTab 
-                title="Transaction Fees" 
-                description="Consolidated record of all fees paid for money-out transactions." 
-                entries={financialData.allTransactionFees} 
-                loading={false} 
-            />
+            <EditableFinanceReportTab title="Transaction Fees" description="Consolidated record of all fees paid for money-out transactions." entries={financialData.allTransactionFees} loading={false} />
           </TabsContent>
           
           <TabsContent value="investors">
@@ -826,13 +733,8 @@ export default function FinancePage() {
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
                                         <div className="space-y-1.5 pt-2 border-t">
                                             <span className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">Follow-up Reassignment:</span>
-                                            <Select 
-                                                value={loanToEdit.assignedStaffId || "unassigned"} 
-                                                onValueChange={handleStaffReassignment}
-                                            >
-                                                <SelectTrigger className="h-8 text-xs">
-                                                    <SelectValue placeholder="Assign Staff" />
-                                                </SelectTrigger>
+                                            <Select value={loanToEdit.assignedStaffId || "unassigned"} onValueChange={handleStaffReassignment}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Assign Staff" /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="unassigned">Unassigned</SelectItem>
                                                     {staffList?.map((s: any) => (
@@ -850,20 +752,8 @@ export default function FinancePage() {
                                 <Card>
                                     <CardHeader className="py-3"><CardTitle className="text-sm">Collection Actions</CardTitle></CardHeader>
                                     <CardContent className="space-y-2">
-                                        <Button 
-                                            variant="outline" 
-                                            className="w-full text-xs" 
-                                            onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Loan Rolled Over' }); setLoanToEdit(null); })}
-                                        >
-                                            Perform Rollover
-                                        </Button>
-                                        <Button 
-                                            variant="secondary" 
-                                            className="w-full text-xs"
-                                            onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked as Paid' }); setLoanToEdit(null); })}
-                                        >
-                                            Mark as Fully Paid
-                                        </Button>
+                                        <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Loan Rolled Over' }); setLoanToEdit(null); })}>Perform Rollover</Button>
+                                        <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked as Paid' }); setLoanToEdit(null); })}>Mark as Fully Paid</Button>
                                     </CardContent>
                                 </Card>
                             </div>
@@ -890,33 +780,16 @@ export default function FinancePage() {
                                                 </div>
                                             </form>
                                         </Form>
-                                        <ScrollArea className="h-64 border rounded-md">
-                                            <Table>
-                                                <TableBody>
-                                                    {loanToEdit.payments?.map((p, i) => (
-                                                        <TableRow key={p.paymentId || i}>
-                                                            <TableCell className="text-xs">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell>
-                                                            <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
-                                                        </TableRow>
-                                                    ))}
-                                                </TableBody>
-                                            </Table>
-                                        </ScrollArea>
+                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                                     </TabsContent>
 
                                     <TabsContent value="followups">
                                         <Form {...noteForm}>
                                             <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-3 mb-4">
                                                 <FormField control={noteForm.control} name="content" render={({field}) => (
-                                                    <FormItem>
-                                                        <FormControl><Textarea placeholder="Add a follow-up note..." className="h-20" {...field} value={field.value ?? ''}/></FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
+                                                    <FormItem><FormControl><Textarea placeholder="Add a follow-up note..." className="h-20" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
                                                 )}/>
-                                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>
-                                                    {isAddingNote ? <Loader2 className="animate-spin h-4 w-4"/> : <Plus className="h-4 w-4 mr-2" />}
-                                                    Add Interaction Note
-                                                </Button>
+                                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>{isAddingNote ? <Loader2 className="animate-spin h-4 w-4"/> : <Plus className="h-4 w-4 mr-2" />}Add Interaction Note</Button>
                                             </form>
                                         </Form>
                                         <ScrollArea className="h-64 border rounded-md p-3">
@@ -941,45 +814,23 @@ export default function FinancePage() {
                                     <TabsContent value="penalties">
                                         {penaltyCalculation.daysLate > 0 && (
                                             <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
-                                                <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase tracking-wider">
-                                                    <AlertCircle className="h-4 w-4" />
-                                                    Overdue Penalty Detected
-                                                </div>
+                                                <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase tracking-wider"><AlertCircle className="h-4 w-4" />Overdue Penalty Detected</div>
                                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                                                     <div>Days Overdue: <span className="font-bold">{penaltyCalculation.daysLate}</span></div>
                                                     <div>Daily Rate: <span className="font-bold">Ksh {penaltyCalculation.dailyRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
-                                                    <div className="col-span-2 pt-1 border-t border-orange-100">
-                                                        Total Suggested Penalty: <span className="text-sm font-bold text-destructive">Ksh {penaltyCalculation.suggested.toLocaleString()}</span>
-                                                    </div>
+                                                    <div className="col-span-2 pt-1 border-t border-orange-100">Total Suggested Penalty: <span className="text-sm font-bold text-destructive">Ksh {penaltyCalculation.suggested.toLocaleString()}</span></div>
                                                 </div>
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="secondary" 
-                                                    className="w-full h-8 text-[11px] bg-orange-100 hover:bg-orange-200 text-orange-900 border-orange-300"
-                                                    onClick={authorizeSuggestedPenalty}
-                                                >
-                                                    <ShieldCheck className="h-3 w-3 mr-2" />
-                                                    Authorize & Fill Form
-                                                </Button>
+                                                <Button size="sm" variant="secondary" className="w-full h-8 text-[11px] bg-orange-100 hover:bg-orange-200 text-orange-900 border-orange-300" onClick={authorizeSuggestedPenalty}><ShieldCheck className="h-3 w-3 mr-2" />Authorize & Fill Form</Button>
                                             </div>
                                         )}
-
                                         <Form {...penaltyForm}>
                                             <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
                                                 <div className="grid grid-cols-2 gap-2">
-                                                    <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (
-                                                      <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
-                                                    )} />
-                                                    <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (
-                                                      <Input type="date" {...field} value={field.value ?? ''}/>
-                                                    )} />
+                                                    <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                    <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
                                                 </div>
-                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (
-                                                  <Input placeholder="Reason" {...field} value={field.value ?? ''}/>
-                                                )} />
-                                                <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>
-                                                    {isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Record Penalty'}
-                                                </Button>
+                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} />
+                                                <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>{isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Record Penalty'}</Button>
                                             </form>
                                         </Form>
                                         <ScrollArea className="h-64 border rounded-md">
@@ -987,10 +838,7 @@ export default function FinancePage() {
                                                 <TableBody>
                                                     {loanToEdit.penalties?.map((p, i) => (
                                                         <TableRow key={p.penaltyId || i}>
-                                                            <TableCell>
-                                                                <div className="text-[10px]">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</div>
-                                                                <div className="font-medium text-xs">{p.description}</div>
-                                                            </TableCell>
+                                                            <TableCell><div className="text-[10px]">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</div><div className="font-medium text-xs">{p.description}</div></TableCell>
                                                             <TableCell className="text-right text-destructive font-bold text-xs">Ksh {p.amount.toLocaleString()}</TableCell>
                                                         </TableRow>
                                                     ))}
