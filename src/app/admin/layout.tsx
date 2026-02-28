@@ -9,17 +9,24 @@ import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/admin/NotificationBell';
+import { cn } from '@/lib/utils';
 
 
 const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, isStaff: boolean, onLinkClick?: () => void }) => {
     const isManager = isSuperAdmin || isFinance;
     const isCustomerService = isManager || isStaff;
+    const pathname = usePathname();
     
+    const linkClass = (path: string) => cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary",
+        pathname === path ? "bg-muted text-primary" : "text-muted-foreground"
+    );
+
     return (
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
             <Link
                 href="/admin"
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className={linkClass("/admin")}
                 onClick={onLinkClick}
             >
                 <LayoutDashboard className="h-4 w-4" />
@@ -29,7 +36,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
             {isCustomerService && (
                 <Link
                     href="/admin/customers"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    className={linkClass("/admin/customers")}
                     onClick={onLinkClick}
                 >
                     <Users className="h-4 w-4" />
@@ -40,7 +47,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
             {isCustomerService && (
                 <Link
                     href="/admin/loans"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    className={linkClass("/admin/loans")}
                     onClick={onLinkClick}
                 >
                     <HandCoins className="h-4 w-4" />
@@ -51,7 +58,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
             {isManager && (
                 <Link
                     href="/admin/finance"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    className={linkClass("/admin/finance")}
                     onClick={onLinkClick}
                 >
                     <FileDown className="h-4 w-4" />
@@ -61,7 +68,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
 
             <Link
                 href="/admin/application-forms"
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                className={linkClass("/admin/application-forms")}
                 onClick={onLinkClick}
             >
                 <FileText className="h-4 w-4" />
@@ -71,7 +78,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
             {isManager && (
                 <Link
                     href="/admin/investors"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    className={linkClass("/admin/investors")}
                     onClick={onLinkClick}
                 >
                     <Briefcase className="h-4 w-4" />
@@ -82,7 +89,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
             {isSuperAdmin && (
                 <Link
                     href="/admin/users"
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
+                    className={linkClass("/admin/users")}
                     onClick={onLinkClick}
                 >
                     <ShieldCheck className="h-4 w-4" />
@@ -107,7 +114,11 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login';
     
-    const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
+    // Explicit role checks including fallback for Simon
+    const isSuperAdmin = user?.email === 'simon@pezeka.com';
+    const isFinance = user?.role === 'finance';
+    const isStaff = user?.role === 'staff';
+    const isAuthorized = user && (isSuperAdmin || isFinance || isStaff);
 
     useEffect(() => {
         if (!loading && !isAuthorized && !isLoginPage) {
@@ -127,15 +138,10 @@ export default function AdminLayout({
         );
     }
 
-
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/admin/login');
     }
-    
-    const isFinance = user?.email === 'simon@pezeka.com' || user?.role === 'finance';
-    const isSuperAdmin = user?.email === 'simon@pezeka.com';
-    const isStaff = user?.role === 'staff';
 
     return (
         <div className="grid h-screen w-full overflow-hidden md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -169,8 +175,8 @@ export default function AdminLayout({
               </SheetTrigger>
               <SheetContent side="left" className="flex flex-col p-0">
                  <SheetHeader className="sr-only">
-                    <SheetTitle>Navigation Menu</SheetTitle>
-                    <SheetDescription>Access different sections of the Pezeka Credit admin portal.</SheetDescription>
+                    <SheetTitle>Pezeka Navigation</SheetTitle>
+                    <SheetDescription>Access management modules.</SheetDescription>
                  </SheetHeader>
                  <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
                   <Link href="/admin" className="flex items-center gap-2 font-semibold" onClick={() => setMobileMenuOpen(false)}>

@@ -86,9 +86,11 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    const isSuperAdmin = currentUser?.email === 'simon@pezeka.com';
-    const isFinance = currentUser?.role === 'finance';
-    const canViewPage = isSuperAdmin || isFinance;
+    // Explicit access for Super Admin and Finance
+    const canViewPage = useMemo(() => {
+        if (!currentUser) return false;
+        return currentUser.email === 'simon@pezeka.com' || currentUser.role === 'finance';
+    }, [currentUser]);
 
     useEffect(() => {
         if (!userLoading && currentUser && !canViewPage) {
