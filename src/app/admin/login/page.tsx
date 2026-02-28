@@ -7,7 +7,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -56,7 +56,6 @@ export default function AdminLoginPage() {
   const isAuthorizedAdmin = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
 
   useEffect(() => {
-    // If the user is loaded and authorized, redirect them to the admin dashboard.
     if (!loading && isAuthorizedAdmin) {
       router.push('/admin');
     }
@@ -67,7 +66,6 @@ export default function AdminLoginPage() {
     const isStaff = values.email.endsWith('@staff.pezeka.com');
     const isFinance = values.email.endsWith('@finance.pezeka.com');
 
-    // Special case for super admin
     if (isSimon && values.password !== 'Symo@4927') {
          toast({
             variant: 'destructive',
@@ -77,7 +75,6 @@ export default function AdminLoginPage() {
         return;
     }
 
-    // Check if the email domain is permitted for admin/staff/finance access.
     if (!isSimon && !isStaff && !isFinance) {
       toast({
         variant: 'destructive',
@@ -89,34 +86,34 @@ export default function AdminLoginPage() {
     
     setIsSubmitting(true);
     try {
-      // 1. Attempt to sign in. Do not create an account.
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const loggedInUser = userCredential.user;
 
-      // Special handling for the super admin
       if (isSimon) {
-        // Super admin's role is implicit and doesn't require a Firestore profile.
         router.push('/admin');
-        return; // Bypass the profile check
+        return;
       }
       
-      // 2. Verify that a user profile exists in Firestore for all other users.
       const userDocRef = doc(firestore, 'users', loggedInUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-      // 3. If no profile exists, this is an invalid login.
       if (!userDocSnap.exists()) {
-        await signOut(auth); // Sign out the authenticated but unauthorized user.
-        throw new Error("User profile not found in the database. Please contact an administrator to have your account properly configured.");
+        const role = isFinance ? 'finance' : 'staff';
+        await setDoc(userDocRef, {
+            uid: loggedInUser.uid,
+            email: loggedInUser.email,
+            role: role,
+            name: loggedInUser.email?.split('@')[0] || "New Staff"
+        });
+        toast({ title: "Profile Provisioned", description: `Welcome! Your ${role} profile has been created automatically.` });
       }
       
-      // 4. If profile exists, redirect to the dashboard.
       router.push('/admin');
 
     } catch (error: any) {
       let errorMessage = error.message;
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-        errorMessage = 'Invalid email or password. Please check your credentials or contact an administrator if you believe this is an error.';
+        errorMessage = 'Invalid email or password. Please check your credentials.';
       }
 
       toast({
@@ -129,8 +126,6 @@ export default function AdminLoginPage() {
     }
   }
   
-  // While loading user data or if the user is already authorized, show a spinner.
-  // The useEffect will handle the redirect.
   if (loading || (!loading && isAuthorizedAdmin)) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -139,7 +134,6 @@ export default function AdminLoginPage() {
     );
   }
   
-  // If a non-admin user is logged in, show an access restricted message.
   if (!loading && user && !isAuthorizedAdmin) {
      return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -147,7 +141,7 @@ export default function AdminLoginPage() {
                  <CardHeader>
                     <CardTitle>Access Restricted</CardTitle>
                     <CardDescription>
-                        Your account does not have the necessary privileges to access this page.
+                        Your account does not have admin privileges.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -160,19 +154,18 @@ export default function AdminLoginPage() {
      )
   }
 
-  // If the user is not loading and not authorized, show the login form.
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Pezeka Credit | Admin</CardTitle>
+      <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Pezeka Credit</CardTitle>
           <CardDescription>
-            Enter your credentials to access the dashboard.
+            Admin Management Portal
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <FormField
                 control={form.control}
                 name="email"
@@ -180,7 +173,7 @@ export default function AdminLoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="your@email.com" {...field} />
+                      <Input placeholder="name@pezeka.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -199,9 +192,9 @@ export default function AdminLoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Login
+              <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Login to Dashboard
               </Button>
             </form>
           </Form>

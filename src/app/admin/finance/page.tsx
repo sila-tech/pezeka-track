@@ -128,7 +128,7 @@ interface Loan {
   idNumber?: string;
   assignedStaffId?: string;
   assignedStaffName?: string;
-  disbursementDate: { seconds: number, nanoseconds: number };
+  disbursementDate: { seconds: number, nanoseconds: number } | Date;
   principalAmount: number;
   interestRate?: number;
   registrationFee: number;
@@ -177,7 +177,7 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
@@ -206,7 +206,7 @@ export default function FinancePage() {
                 receiptCategory: 'upfront_fees', 
                 date: loan.disbursementDate, 
                 amount: totalFees, 
-                description: `Fees Breakdown: Loan #${loan.loanNumber}. Reg: ${loan.registrationFee}, Proc: ${loan.processingFee}, Track: ${loan.carTrackInstallationFee}, Charge: ${loan.chargingCost}`, 
+                description: `Fees Breakdown: Loan #${loan.loanNumber}`, 
                 loanId: loan.id 
             });
         }
@@ -222,16 +222,8 @@ export default function FinancePage() {
         } else {
             payouts.push(entry);
             if (entry.type === 'expense') expenses.push(entry);
-            
             if (entry.transactionFee && Number(entry.transactionFee) > 0) {
-                transactionFees.push({
-                    id: `tx-fee-${entry.id}`,
-                    type: 'expense',
-                    expenseCategory: 'other',
-                    date: entry.date,
-                    amount: entry.transactionFee,
-                    description: `Transaction Fee for: ${entry.description}`
-                });
+                transactionFees.push({ id: `tx-fee-${entry.id}`, type: 'expense', expenseCategory: 'other', date: entry.date, amount: entry.transactionFee, description: `Tx Fee for: ${entry.description}` });
             }
         }
     });
@@ -241,14 +233,8 @@ export default function FinancePage() {
 
   const stats = useMemo(() => {
     const { allReceipts, allUpfrontFees, allPayouts, allTransactionFees } = financialData;
-    const receiptsTotal = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const upfrontTotal = allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const totalMoneyIn = receiptsTotal + upfrontTotal;
-    
-    const payoutTotal = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const txFeeTotal = allTransactionFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const totalMoneyOut = payoutTotal + txFeeTotal;
-
+    const totalMoneyIn = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) + allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
+    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) + allTransactionFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     return { totalReceipts: totalMoneyIn, totalPayouts: totalMoneyOut, cashAtHand: totalMoneyIn - totalMoneyOut };
   }, [financialData]);
 
@@ -263,13 +249,17 @@ export default function FinancePage() {
             loan.customerPhone?.includes(loanBookSearchTerm) ||
             loan.idNumber?.includes(loanBookSearchTerm);
 
-        const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
+        let dDate: Date;
+        if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
+        else if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
+        else dDate = new Date();
+
         let endDate: Date;
         try {
             switch (loan.paymentFrequency) {
-                case 'daily': endDate = addDays(disbursementDate, loan.numberOfInstalments); break;
-                case 'weekly': endDate = addWeeks(disbursementDate, loan.numberOfInstalments); break;
-                case 'monthly': endDate = addMonths(disbursementDate, loan.numberOfInstalments); break;
+                case 'daily': endDate = addDays(dDate, loan.numberOfInstalments); break;
+                case 'weekly': endDate = addWeeks(dDate, loan.numberOfInstalments); break;
+                case 'monthly': endDate = addMonths(dDate, loan.numberOfInstalments); break;
                 default: endDate = new Date(0);
             }
         } catch(e) { endDate = new Date(0); }
@@ -279,32 +269,18 @@ export default function FinancePage() {
         const isCurrentlyDue = daysUntilDue >= 0 && daysUntilDue <= 7 && loan.status !== 'paid';
 
         let statusMatch = false;
-        if (loanBookStatusFilter === 'all') {
-            statusMatch = true;
-        } else if (loanBookStatusFilter === 'due') {
-            statusMatch = loan.status === 'due' || isCurrentlyDue;
-        } else if (loanBookStatusFilter === 'overdue') {
-            statusMatch = loan.status === 'overdue' || isCurrentlyOverdue;
-        } else {
-            statusMatch = loan.status === loanBookStatusFilter;
-        }
+        if (loanBookStatusFilter === 'all') statusMatch = true;
+        else if (loanBookStatusFilter === 'due') statusMatch = isCurrentlyDue;
+        else if (loanBookStatusFilter === 'overdue') statusMatch = isCurrentlyOverdue;
+        else statusMatch = loan.status === loanBookStatusFilter;
+
         return statusMatch && staffMatch && searchMatch;
     });
   }, [disbursedLoans, loanBookSearchTerm, loanBookStatusFilter, loanBookStaffFilter]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
-    defaultValues: { 
-      date: format(new Date(), 'yyyy-MM-dd'), 
-      type: 'receipt', 
-      transactionFee: 0,
-      amount: 0,
-      description: '',
-      loanId: '',
-      expenseCategory: undefined,
-      receiptCategory: undefined,
-      payoutCategory: undefined
-    }
+    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), type: 'receipt', transactionFee: 0, amount: 0, description: '', loanId: '', expenseCategory: undefined, receiptCategory: undefined, payoutCategory: undefined }
   });
 
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
@@ -325,28 +301,15 @@ export default function FinancePage() {
   const addFinanceEntryType = addForm.watch('type');
 
   useEffect(() => {
-    if (addFinanceEntryType === 'receipt') {
-        addForm.setValue('payoutCategory', undefined);
-        addForm.setValue('expenseCategory', undefined);
-    } else if (addFinanceEntryType === 'payout') {
-        addForm.setValue('receiptCategory', undefined);
-        addForm.setValue('expenseCategory', undefined);
-    } else if (addFinanceEntryType === 'expense') {
-        addForm.setValue('receiptCategory', undefined);
-        addForm.setValue('payoutCategory', undefined);
-    }
+    if (addFinanceEntryType === 'receipt') { addForm.setValue('payoutCategory', undefined); addForm.setValue('expenseCategory', undefined); }
+    else if (addFinanceEntryType === 'payout') { addForm.setValue('receiptCategory', undefined); addForm.setValue('expenseCategory', undefined); }
+    else if (addFinanceEntryType === 'expense') { addForm.setValue('receiptCategory', undefined); addForm.setValue('payoutCategory', undefined); }
   }, [addFinanceEntryType, addForm]);
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
     setIsSubmitting(true);
     try {
-      const sanitizedData: any = {
-        type: values.type,
-        date: new Date(values.date),
-        amount: values.amount,
-        transactionFee: values.transactionFee || 0,
-        description: values.description || '',
-      };
+      const sanitizedData: any = { type: values.type, date: new Date(values.date), amount: values.amount, transactionFee: values.transactionFee || 0, description: values.description || '' };
       if (values.loanId) sanitizedData.loanId = values.loanId;
       if (values.type === 'receipt') sanitizedData.receiptCategory = values.receiptCategory;
       else if (values.type === 'payout') sanitizedData.payoutCategory = values.payoutCategory;
@@ -355,18 +318,21 @@ export default function FinancePage() {
       if (editingEntry) await updateFinanceEntry(firestore, editingEntry.id, sanitizedData); 
       else await addFinanceEntry(firestore, sanitizedData); 
       
-      addForm.reset(); 
-      setEditingEntry(null); 
-      setOpen(false);
+      addForm.reset(); setEditingEntry(null); setOpen(false);
       toast({ title: editingEntry ? 'Entry Updated' : 'Entry Recorded' });
     } catch (e: any) { toast({ variant: "destructive", title: "Error", description: e.message }); } finally { setIsSubmitting(false); }
   }
 
   const handleEditEntry = (entry: FinanceEntry) => {
       setEditingEntry(entry);
+      let eDate: Date;
+      if (typeof entry.date === 'string') eDate = new Date(entry.date);
+      else if (entry.date instanceof Date) eDate = entry.date;
+      else eDate = new Date(entry.date.seconds * 1000);
+
       addForm.reset({
           type: entry.type as any,
-          date: format(typeof entry.date === 'string' ? new Date(entry.date) : new Date(entry.date.seconds * 1000), 'yyyy-MM-dd'),
+          date: format(eDate, 'yyyy-MM-dd'),
           amount: entry.amount,
           transactionFee: entry.transactionFee || 0,
           description: entry.description,
@@ -395,11 +361,7 @@ export default function FinancePage() {
     if (!loanToEdit) return;
     setIsAddingPenalty(true);
     try {
-        await addPenaltyToLoan(firestore, loanToEdit.id, { 
-          amount: values.penaltyAmount, 
-          date: new Date(values.penaltyDate), 
-          description: values.penaltyDescription 
-        });
+        await addPenaltyToLoan(firestore, loanToEdit.id, { amount: values.penaltyAmount, date: new Date(values.penaltyDate), description: values.penaltyDescription });
         toast({ title: 'Penalty Added' });
         penaltyForm.reset();
     } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsAddingPenalty(false); }
@@ -409,11 +371,7 @@ export default function FinancePage() {
       if (!loanToEdit || !user) return;
       setIsAddingNote(true);
       try {
-          await addFollowUpNoteToLoan(firestore, loanToEdit.id, {
-              content: values.content,
-              staffName: user.name || user.email?.split('@')[0] || "Staff",
-              staffId: user.uid,
-          });
+          await addFollowUpNoteToLoan(firestore, loanToEdit.id, { content: values.content, staffName: user.name || user.email?.split('@')[0] || "Staff", staffId: user.uid });
           toast({ title: "Note Added" });
           noteForm.reset();
       } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsAddingNote(false); }
@@ -440,11 +398,16 @@ export default function FinancePage() {
       const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
       const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
       const dailyRate = oneInstInterest / daysInFreq;
-      const disbursementDate = new Date(loanToEdit.disbursementDate.seconds * 1000);
+      
+      let dDate: Date;
+      if (loanToEdit.disbursementDate instanceof Date) dDate = loanToEdit.disbursementDate;
+      else dDate = new Date(loanToEdit.disbursementDate.seconds * 1000);
+
       let finalDueDate: Date;
-      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(disbursementDate, loanToEdit.numberOfInstalments);
-      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(disbursementDate, loanToEdit.numberOfInstalments);
-      else finalDueDate = addDays(disbursementDate, loanToEdit.numberOfInstalments);
+      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
+      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments);
+      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments);
+      
       const daysLate = differenceInDays(new Date(), finalDueDate);
       const validDaysLate = daysLate > 0 ? daysLate : 0;
       return { dailyRate, daysLate: validDaysLate, suggested: Math.round(validDaysLate * dailyRate) };
@@ -467,7 +430,7 @@ export default function FinancePage() {
             <h1 className="text-3xl font-bold tracking-tight">Finance Dashboard</h1>
             <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if(!isOpen) setEditingEntry(null); }}>
                 <DialogTrigger asChild><Button onClick={() => setEditingEntry(null)}><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-xl">
                     <DialogHeader><DialogTitle>{editingEntry ? 'Edit Entry' : 'New Entry'}</DialogTitle></DialogHeader>
                     <ScrollArea className="max-h-[70vh] pr-4">
                         <Form {...addForm}>
@@ -475,7 +438,7 @@ export default function FinancePage() {
                                 <FormField control={addForm.control} name="type" render={({ field }) => (
                                     <FormItem>
                                       <FormLabel>Type</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                      <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select type"/></SelectTrigger></FormControl>
                                         <SelectContent>
                                           <SelectItem value="receipt">Receipt (Income)</SelectItem>
@@ -489,7 +452,7 @@ export default function FinancePage() {
                                     <FormField control={addForm.control} name="payoutCategory" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Payout Category</FormLabel>
-                                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                          <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Select payout category"/></SelectTrigger></FormControl>
                                             <SelectContent>
                                               <SelectItem value="loan_disbursement">Loan Disbursement</SelectItem>
@@ -504,7 +467,7 @@ export default function FinancePage() {
                                     <FormField control={addForm.control} name="receiptCategory" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Receipt Category</FormLabel>
-                                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                          <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Select receipt category"/></SelectTrigger></FormControl>
                                             <SelectContent>
                                               <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
@@ -520,7 +483,7 @@ export default function FinancePage() {
                                     <FormField control={addForm.control} name="expenseCategory" render={({ field }) => (
                                         <FormItem>
                                           <FormLabel>Expense Category</FormLabel>
-                                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                          <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Select expense category"/></SelectTrigger></FormControl>
                                             <SelectContent>
                                               <SelectItem value="facilitation_commission">Facilitation Commission</SelectItem>
@@ -592,7 +555,7 @@ export default function FinancePage() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <CardTitle>Internal Ledger</CardTitle>
-                            <CardDescription>Comprehensive record of all disbursed loans and their financial parameters.</CardDescription>
+                            <CardDescription>Comprehensive record of all disbursed loans.</CardDescription>
                         </div>
                         <div className="flex flex-wrap gap-2">
                             <div className="relative">
@@ -659,15 +622,17 @@ export default function FinancePage() {
                             const expInterest = (loan.totalRepayableAmount - (Number(loan.totalPenalties) || 0)) - loan.principalAmount;
                             const expIncome = feesTotal + expInterest;
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
+                            
+                            let dDate: Date;
+                            if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
+                            else dDate = new Date(loan.disbursementDate.seconds * 1000);
+
                             return (
                                 <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
-                                  <TableCell className="font-medium">
-                                    {loan.customerName}
-                                    <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
-                                  </TableCell>
+                                  <TableCell className="font-medium">{loan.customerName}<div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
                                   <TableCell>{loan.customerPhone}</TableCell>
                                   <TableCell>{loan.loanNumber}</TableCell>
-                                  <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                  <TableCell>{format(dDate, 'dd/MM/yy')}</TableCell>
                                   <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                   <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{reg.toLocaleString()}</TableCell>
@@ -695,7 +660,7 @@ export default function FinancePage() {
           </TabsContent>
 
           <TabsContent value="upfront">
-            <EditableFinanceReportTab title="Upfront Fees" description="Fees collected directly from loan disbursements." entries={financialData.allUpfrontFees} loading={false} />
+            <EditableFinanceReportTab title="Upfront Fees" description="Fees collected directly from disbursements." entries={financialData.allUpfrontFees} loading={false} />
           </TabsContent>
 
           <TabsContent value="receipts">
@@ -703,11 +668,11 @@ export default function FinancePage() {
           </TabsContent>
           
           <TabsContent value="payouts">
-            <EditableFinanceReportTab title="Payouts" description="Master outflow record (Disbursements & Expenses)." entries={financialData.allPayouts} loading={false} onEdit={handleEditEntry} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
+            <EditableFinanceReportTab title="Payouts" description="Outgoing funds." entries={financialData.allPayouts} loading={false} onEdit={handleEditEntry} onDelete={(e) => deleteFinanceEntry(firestore, e.id)} />
           </TabsContent>
 
           <TabsContent value="txfees">
-            <EditableFinanceReportTab title="Transaction Fees" description="Consolidated record of all fees paid for money-out transactions." entries={financialData.allTransactionFees} loading={false} />
+            <EditableFinanceReportTab title="Transaction Fees" description="Payment processing costs." entries={financialData.allTransactionFees} loading={false} />
           </TabsContent>
           
           <TabsContent value="investors">
@@ -744,9 +709,7 @@ export default function FinancePage() {
                                             </Select>
                                         </div>
                                         <div className="flex justify-between border-t pt-2"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
-                                        <div className="flex justify-between"><span>Total Repayable:</span><span className="font-medium">Ksh {loanToEdit.totalRepayableAmount.toLocaleString()}</span></div>
-                                        <div className="flex justify-between"><span>Total Paid:</span><span className="font-medium text-green-600">Ksh {loanToEdit.totalPaid.toLocaleString()}</span></div>
-                                        <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
+                                        <div className="flex justify-between"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
                                     </CardContent>
                                 </Card>
                                 <Card>
@@ -770,12 +733,8 @@ export default function FinancePage() {
                                         <Form {...paymentForm}>
                                             <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
                                                 <div className="flex gap-2">
-                                                    <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (
-                                                      <Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>
-                                                    )} />
-                                                    <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (
-                                                      <Input type="date" {...field} value={field.value ?? ''}/>
-                                                    )} />
+                                                    <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                    <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
                                                     <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
                                                 </div>
                                             </form>
@@ -786,17 +745,13 @@ export default function FinancePage() {
                                     <TabsContent value="followups">
                                         <Form {...noteForm}>
                                             <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-3 mb-4">
-                                                <FormField control={noteForm.control} name="content" render={({field}) => (
-                                                    <FormItem><FormControl><Textarea placeholder="Add a follow-up note..." className="h-20" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>
-                                                )}/>
+                                                <FormField control={noteForm.control} name="content" render={({field}) => (<FormItem><FormControl><Textarea placeholder="Add interaction note..." className="h-20" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
                                                 <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>{isAddingNote ? <Loader2 className="animate-spin h-4 w-4"/> : <Plus className="h-4 w-4 mr-2" />}Add Interaction Note</Button>
                                             </form>
                                         </Form>
                                         <ScrollArea className="h-64 border rounded-md p-3">
                                             <div className="space-y-3">
-                                                {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (
-                                                    <p className="text-xs text-muted-foreground text-center py-8">No interaction history recorded.</p>
-                                                ) : (
+                                                {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8">No interaction history recorded.</p>) : (
                                                     [...loanToEdit.followUpNotes].reverse().map((note, index) => (
                                                         <div key={note.noteId || index} className="bg-muted p-2 rounded border text-[11px]">
                                                             <div className="flex justify-between items-center mb-1">
@@ -817,10 +772,9 @@ export default function FinancePage() {
                                                 <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase tracking-wider"><AlertCircle className="h-4 w-4" />Overdue Penalty Detected</div>
                                                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                                                     <div>Days Overdue: <span className="font-bold">{penaltyCalculation.daysLate}</span></div>
-                                                    <div>Daily Rate: <span className="font-bold">Ksh {penaltyCalculation.dailyRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
                                                     <div className="col-span-2 pt-1 border-t border-orange-100">Total Suggested Penalty: <span className="text-sm font-bold text-destructive">Ksh {penaltyCalculation.suggested.toLocaleString()}</span></div>
                                                 </div>
-                                                <Button size="sm" variant="secondary" className="w-full h-8 text-[11px] bg-orange-100 hover:bg-orange-200 text-orange-900 border-orange-300" onClick={authorizeSuggestedPenalty}><ShieldCheck className="h-3 w-3 mr-2" />Authorize & Fill Form</Button>
+                                                <Button size="sm" variant="secondary" className="w-full h-8 text-[11px]" onClick={authorizeSuggestedPenalty}><ShieldCheck className="h-3 w-3 mr-2" />Authorize & Fill Form</Button>
                                             </div>
                                         )}
                                         <Form {...penaltyForm}>
