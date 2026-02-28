@@ -39,10 +39,11 @@ service cloud.firestore {
     // =====================================================================
 
     match /users/{userId} {
-      // allow Simon or the owner to read/write the profile
-      // Owners must be able to read their own profile for role checks to work in other rules
-      allow get: if isOwner(userId) || isSuperAdmin();
-      allow list: if isSuperAdmin();
+      // allow Simon, the owner, or other staff/finance to read profiles (for assignments/notes)
+      allow get: if request.auth != null && (isOwner(userId) || isSuperAdmin() || isStaff() || isFinance());
+      // Allow listing for dropdowns and performance tracking
+      allow list: if isSuperAdmin() || isFinance() || isStaff();
+      // Only Simon can create or edit admin profiles
       allow write: if isSuperAdmin();
     }
 
@@ -60,7 +61,6 @@ service cloud.firestore {
     
     match /financeEntries/{entryId} {
       // Restricted to Finance and Super Admin
-      // Prioritize super admin for speed
       allow list, get, create, update, delete: if isSuperAdmin() || isFinance();
     }
 
