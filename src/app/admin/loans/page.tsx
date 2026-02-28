@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, Plus, AlertCircle, ShieldCheck, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,14 +34,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { addLoan, addCustomer, updateLoan, approveLoanApplication } from '@/lib/firestore';
+import { 
+  addLoan, 
+  addCustomer, 
+  updateLoan, 
+  approveLoanApplication, 
+  addPenaltyToLoan, 
+  addFollowUpNoteToLoan, 
+  rolloverLoan 
+} from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { calculateAmortization } from '@/lib/utils';
+import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
+import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 
 const loanSchema = z.object({
@@ -92,6 +102,20 @@ const approvalSchema = z.object({
     assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
 });
 
+const paymentSchema = z.object({
+    paymentAmount: z.coerce.number().min(0.01, 'Payment amount must be greater than 0.'),
+    paymentDate: z.string().min(1, 'Payment date is required.'),
+});
+
+const penaltySchema = z.object({
+    penaltyAmount: z.coerce.number().min(0.01, 'Penalty amount must be greater than 0.'),
+    penaltyDate: z.string().min(1, 'Penalty date is required.'),
+    penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
+});
+
+const followUpNoteSchema = z.object({
+    content: z.string().min(5, "Note must be at least 5 characters long."),
+});
 
 interface Customer {
   id: string;
@@ -105,6 +129,7 @@ interface Staff {
     uid: string;
     name: string;
     role: string;
+    email?: string;
 }
 
 interface Loan {
@@ -118,7 +143,7 @@ interface Loan {
     assignedStaffId?: string;
     assignedStaffName?: string;
     loanType?: string;
-    disbursementDate: { seconds: number, nanoseconds: number };
+    disbursementDate: { seconds: number, nanoseconds: number } | Date;
     principalAmount: number;
     interestRate?: number;
     status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
@@ -132,6 +157,9 @@ interface Loan {
     carTrackInstallationFee: number;
     chargingCost: number;
     comments?: string;
+    payments?: { paymentId: string; date: any; amount: number; }[];
+    penalties?: { penaltyId: string; date: any; amount: number; description: string; }[];
+    followUpNotes?: { noteId: string; date: any; staffName: string; staffId: string; content: string; }[];
 }
 
 
@@ -142,7 +170,11 @@ export default function LoansPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
   const [viewingApplication, setViewingApplication] = useState<Loan | null>(null);
+  const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isAddingPenalty, setIsAddingPenalty] = useState(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -153,7 +185,7 @@ export default function LoansPage() {
   const isStaff = user?.role === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  const canAdd = isSuperAdmin || isFinance;
+  const canAdd = isAuthorized; // Allow staff to also add loans
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -177,7 +209,7 @@ export default function LoansPage() {
   
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
-    return loans.filter(loan => loan.status === 'application').sort((a, b) => b.disbursementDate.seconds - a.disbursementDate.seconds);
+    return loans.filter(loan => loan.status === 'application').sort((a, b) => (b.disbursementDate as any).seconds - (a.disbursementDate as any).seconds);
   }, [loans]);
 
 
@@ -203,6 +235,21 @@ export default function LoansPage() {
       assignedStaffId: '',
       disbursementDate: format(new Date(), 'yyyy-MM-dd')
     },
+  });
+
+  const paymentForm = useForm<z.infer<typeof paymentSchema>>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: { paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentAmount: 0 }
+  });
+
+  const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
+    resolver: zodResolver(penaltySchema),
+    defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd'), penaltyAmount: 0, penaltyDescription: '' }
+  });
+
+  const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
+      resolver: zodResolver(followUpNoteSchema),
+      defaultValues: { content: '' },
   });
 
   const { watch } = form;
@@ -242,7 +289,7 @@ export default function LoansPage() {
         customerPhone = selectedCustomer.phone;
       }
       
-      const assignedStaff = staffList?.find(s => s.uid === values.assignedStaffId);
+      const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
       
       const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
         values.principalAmount,
@@ -259,7 +306,7 @@ export default function LoansPage() {
         alternativeNumber: values.alternativeNumber || "",
         idNumber: values.idNumber,
         assignedStaffId: values.assignedStaffId,
-        assignedStaffName: assignedStaff?.name || "Unknown",
+        assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
         disbursementDate: new Date(values.disbursementDate),
         totalRepayableAmount,
         instalmentAmount,
@@ -323,11 +370,11 @@ export default function LoansPage() {
     if (!applicationToManage) return;
     setIsUpdatingStatus(true);
     try {
-        const assignedStaff = staffList?.find(s => s.uid === values.assignedStaffId);
+        const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
         const updateData = {
             ...values,
             assignedStaffId: values.assignedStaffId,
-            assignedStaffName: assignedStaff?.name || "Unknown",
+            assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
             disbursementDate: new Date(values.disbursementDate),
         };
         await approveLoanApplication(firestore, applicationToManage, updateData);
@@ -352,6 +399,83 @@ export default function LoansPage() {
       } finally {
           setIsUpdatingStatus(false);
       }
+  };
+
+  async function onRecordPayment(values: z.infer<typeof paymentSchema>) {
+    if (!loanToEdit) return;
+    setIsUpdating(true);
+    try {
+        const paymentId = doc(collection(firestore, 'payments')).id;
+        await updateLoan(firestore, loanToEdit.id, { 
+          totalPaid: increment(values.paymentAmount), 
+          payments: arrayUnion({ paymentId, amount: values.paymentAmount, date: new Date(values.paymentDate) }) 
+        });
+        toast({ title: 'Payment Recorded' });
+        paymentForm.reset();
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsUpdating(false); }
+  }
+
+  async function onAddPenalty(values: z.infer<typeof penaltySchema>) {
+    if (!loanToEdit) return;
+    setIsAddingPenalty(true);
+    try {
+        await addPenaltyToLoan(firestore, loanToEdit.id, { amount: values.penaltyAmount, date: new Date(values.penaltyDate), description: values.penaltyDescription });
+        toast({ title: 'Penalty Added' });
+        penaltyForm.reset();
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsAddingPenalty(false); }
+  }
+
+  async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
+      if (!loanToEdit || !user) return;
+      setIsAddingNote(true);
+      try {
+          await addFollowUpNoteToLoan(firestore, loanToEdit.id, { content: values.content, staffName: user.name || user.email?.split('@')[0] || "Staff", staffId: user.uid });
+          toast({ title: "Note Added" });
+          noteForm.reset();
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsAddingNote(false); }
+  }
+
+  const handleStaffReassignment = async (staffId: string) => {
+      if (!loanToEdit) return;
+      let updateData: any = {};
+      if (staffId === 'unassigned') updateData = { assignedStaffId: "", assignedStaffName: "" };
+      else {
+          const staffMember = staffList?.find((s: any) => (s.id) === staffId);
+          if (!staffMember) return;
+          updateData = { assignedStaffId: staffId, assignedStaffName: staffMember.name || staffMember.email };
+      }
+      try {
+          await updateLoan(firestore, loanToEdit.id, updateData);
+          toast({ title: 'Staff Re-assigned' });
+          setLoanToEdit({ ...loanToEdit, ...updateData });
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); }
+  };
+
+  const penaltyCalculation = useMemo(() => {
+      if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
+      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
+      const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
+      const dailyRate = oneInstInterest / daysInFreq;
+      
+      let dDate: Date;
+      if (loanToEdit.disbursementDate instanceof Date) dDate = loanToEdit.disbursementDate;
+      else dDate = new Date((loanToEdit.disbursementDate as any).seconds * 1000);
+
+      let finalDueDate: Date;
+      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
+      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments);
+      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments);
+      
+      const daysLate = differenceInDays(new Date(), finalDueDate);
+      const validDaysLate = daysLate > 0 ? daysLate : 0;
+      return { dailyRate, daysLate: validDaysLate, suggested: Math.round(validDaysLate * dailyRate) };
+  }, [loanToEdit]);
+
+  const authorizeSuggestedPenalty = () => {
+      if (!penaltyCalculation.suggested) return;
+      penaltyForm.setValue('penaltyAmount', penaltyCalculation.suggested);
+      penaltyForm.setValue('penaltyDate', format(new Date(), 'yyyy-MM-dd'));
+      penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
   };
   
   if (!isAuthorized && !userLoading) {
@@ -380,7 +504,7 @@ export default function LoansPage() {
               </DialogHeader>
               <Form {...form}>
                 <ScrollArea className="max-h-[65vh] pr-4">
-                  <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4">
+                  <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 py-2">
                     <FormField
                       control={form.control}
                       name="customerType"
@@ -421,7 +545,7 @@ export default function LoansPage() {
                           <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
                             <SelectContent>
-                              {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name} ({s.role})</SelectItem>)}
+                              {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email} ({s.role})</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -445,7 +569,7 @@ export default function LoansPage() {
                     )} />
                     <FormField control={form.control} name="disbursementDate" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
                       <FormItem>
@@ -482,7 +606,7 @@ export default function LoansPage() {
         </TabsList>
         <TabsContent value="all">
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle>Portfolio Ledger</CardTitle>
                     <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[250px]" /></div>
                 </CardHeader>
@@ -492,7 +616,7 @@ export default function LoansPage() {
                           <TableHeader><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Staff Assigned</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                           <TableBody>
                               {filteredLoans.map((loan) => (
-                                  <TableRow key={loan.id}>
+                                  <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                                       <TableCell className="font-medium">{loan.loanNumber}</TableCell>
                                       <TableCell>
                                           <div>{loan.customerName}</div>
@@ -504,7 +628,7 @@ export default function LoansPage() {
                                               <span className="text-sm">{loan.assignedStaffName || "Unassigned"}</span>
                                           </div>
                                       </TableCell>
-                                      <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                      <TableCell>{format(new Date((loan.disbursementDate as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
                                       <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
                                       <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
                                   </TableRow>
@@ -569,7 +693,7 @@ export default function LoansPage() {
                           <div className="text-muted-foreground">Requested Amount:</div>
                           <div className="font-bold text-primary">Ksh {viewingApplication.principalAmount.toLocaleString()}</div>
                           <div className="text-muted-foreground">Submitted On:</div>
-                          <div className="font-medium">{format(new Date(viewingApplication.disbursementDate.seconds * 1000), 'PPP')}</div>
+                          <div className="font-medium">{format(new Date((viewingApplication.disbursementDate as any).seconds * 1000), 'PPP')}</div>
                       </div>
                       {viewingApplication.comments && (
                           <div className="pt-4 border-t">
@@ -598,7 +722,7 @@ export default function LoansPage() {
                     <DialogHeader><DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle></DialogHeader>
                     <ScrollArea className="max-h-[65vh] pr-4">
                         <Form {...approvalForm}>
-                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4">
+                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4 py-2">
                                 <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="idNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Verify ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
                                 <FormField control={approvalForm.control} name="alternativeNumber" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Alternative Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
@@ -609,7 +733,7 @@ export default function LoansPage() {
                                       <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
                                         <SelectContent>
-                                          {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name} ({s.role})</SelectItem>)}
+                                          {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email} ({s.role})</SelectItem>)}
                                         </SelectContent>
                                       </Select>
                                       <FormMessage />
@@ -648,6 +772,144 @@ export default function LoansPage() {
                 </>
             )}
         </DialogContent>
+      </Dialog>
+
+      {/* Management Dialog for Existing Loans */}
+      <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
+          <DialogContent className="sm:max-w-5xl">
+              {loanToEdit && (
+                  <>
+                    <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle></DialogHeader>
+                    <ScrollArea className="max-h-[75vh]">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
+                            <div className="space-y-4 md:col-span-1">
+                                <Card>
+                                    <CardHeader className="py-3"><CardTitle className="text-sm">Loan Summary</CardTitle></CardHeader>
+                                    <CardContent className="space-y-4 text-sm">
+                                        <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                        <div className="space-y-1.5 pt-2 border-t">
+                                            <span className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">Follow-up Reassignment:</span>
+                                            <Select value={loanToEdit.assignedStaffId || "unassigned"} onValueChange={handleStaffReassignment}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Assign Staff" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                    {staffList?.map((s: any) => (
+                                                        <SelectItem key={s.id} value={s.id}>{s.name || s.email}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="flex justify-between border-t pt-2"><span>Principal:</span><span className="font-medium">Ksh {loanToEdit.principalAmount.toLocaleString()}</span></div>
+                                        <div className="flex justify-between"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader className="py-3"><CardTitle className="text-sm">Collection Actions</CardTitle></CardHeader>
+                                    <CardContent className="space-y-2">
+                                        <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Loan Rolled Over' }); setLoanToEdit(null); })}>Perform Rollover</Button>
+                                        <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked as Paid' }); setLoanToEdit(null); })}>Mark as Fully Paid</Button>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                            
+                            <div className="md:col-span-2 space-y-6">
+                                <Tabs defaultValue="payments">
+                                    <TabsList className="grid grid-cols-3 w-full">
+                                        <TabsTrigger value="payments">Payments</TabsTrigger>
+                                        <TabsTrigger value="followups">Follow-ups</TabsTrigger>
+                                        <TabsTrigger value="penalties">Penalties</TabsTrigger>
+                                    </TabsList>
+                                    
+                                    <TabsContent value="payments">
+                                        <Form {...paymentForm}>
+                                            <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
+                                                <div className="flex gap-2">
+                                                    <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                    <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                    <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
+                                                </div>
+                                            </form>
+                                        </Form>
+                                        <ScrollArea className="h-64 border rounded-md">
+                                            <Table>
+                                                <TableBody>
+                                                    {loanToEdit.payments?.map((p, i) => (
+                                                        <TableRow key={p.paymentId || i}>
+                                                            <TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell>
+                                                            <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </ScrollArea>
+                                    </TabsContent>
+
+                                    <TabsContent value="followups">
+                                        <Form {...noteForm}>
+                                            <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-3 mb-4">
+                                                <FormField control={noteForm.control} name="content" render={({field}) => (<FormItem><FormControl><Textarea placeholder="Add interaction note..." className="h-20" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>{isAddingNote ? <Loader2 className="animate-spin h-4 w-4"/> : <Plus className="h-4 w-4 mr-2" />}Add Interaction Note</Button>
+                                            </form>
+                                        </Form>
+                                        <ScrollArea className="h-64 border rounded-md p-3">
+                                            <div className="space-y-3">
+                                                {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8">No interaction history recorded.</p>) : (
+                                                    [...loanToEdit.followUpNotes].reverse().map((note, index) => (
+                                                        <div key={note.noteId || index} className="bg-muted p-2 rounded border text-[11px]">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="font-bold flex items-center gap-1"><User className="h-2 w-2" /> {note.staffName}</span>
+                                                                <span className="text-[9px] text-muted-foreground">{format(new Date((note.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</span>
+                                                            </div>
+                                                            <p className="italic">"{note.content}"</p>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </ScrollArea>
+                                    </TabsContent>
+
+                                    <TabsContent value="penalties">
+                                        {penaltyCalculation.daysLate > 0 && (
+                                            <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
+                                                <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase tracking-wider"><AlertCircle className="h-4 w-4" />Overdue Penalty Detected</div>
+                                                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                    <div>Days Overdue: <span className="font-bold">{penaltyCalculation.daysLate}</span></div>
+                                                    <div className="col-span-2 pt-1 border-t border-orange-100">Total Suggested Penalty: <span className="text-sm font-bold text-destructive">Ksh {penaltyCalculation.suggested.toLocaleString()}</span></div>
+                                                </div>
+                                                <Button size="sm" variant="secondary" className="w-full h-8 text-[11px]" onClick={authorizeSuggestedPenalty}><ShieldCheck className="h-3 w-3 mr-2" />Authorize & Fill Form</Button>
+                                            </div>
+                                        )}
+                                        <Form {...penaltyForm}>
+                                            <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                    <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                </div>
+                                                <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} />
+                                                <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>{isAddingPenalty ? <Loader2 className="animate-spin h-4 w-4"/> : 'Record Penalty'}</Button>
+                                            </form>
+                                        </Form>
+                                        <ScrollArea className="h-64 border rounded-md">
+                                            <Table>
+                                                <TableBody>
+                                                    {loanToEdit.penalties?.map((p, i) => (
+                                                        <TableRow key={p.penaltyId || i}>
+                                                            <TableCell><div className="text-[10px]">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy')}</div><div className="font-medium text-xs">{p.description}</div></TableCell>
+                                                            <TableCell className="text-right text-destructive font-bold text-xs">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </ScrollArea>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
+                  </>
+              )}
+          </DialogContent>
       </Dialog>
     </div>
   );

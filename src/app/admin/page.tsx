@@ -73,7 +73,7 @@ export default function Dashboard() {
   const [isAddingNote, setIsAddingNote] = useState(false);
 
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
-  const isStaffMember = user?.role === 'staff' || user?.role === 'finance';
+  const isStaffMember = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com';
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
@@ -216,7 +216,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {user?.role === 'staff' && (
+      {(user?.role === 'staff' || user?.email === 'simon@pezeka.com') && (
           <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary</h3>
               <div className="grid gap-4 md:grid-cols-3">
