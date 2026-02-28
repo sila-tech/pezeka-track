@@ -7,7 +7,7 @@ import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown,
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/admin/NotificationBell';
 
 
@@ -168,6 +168,10 @@ export default function AdminLayout({
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="flex flex-col p-0">
+                 <SheetHeader className="sr-only">
+                    <SheetTitle>Navigation Menu</SheetTitle>
+                    <SheetDescription>Access different sections of the Pezeka Credit admin portal.</SheetDescription>
+                 </SheetHeader>
                  <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
                   <Link href="/admin" className="flex items-center gap-2 font-semibold" onClick={() => setMobileMenuOpen(false)}>
                     <Landmark className="h-6 w-6 text-primary" />
