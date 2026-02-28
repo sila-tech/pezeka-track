@@ -48,14 +48,18 @@ service cloud.firestore {
     }
 
     match /customers/{customerId} {
-      allow list, get: if isSuperAdmin() || isStaff() || isFinance();
-      allow write: if isSuperAdmin() || isStaff() || isFinance();
+      allow list: if isSuperAdmin() || isStaff() || isFinance();
+      allow get: if isSuperAdmin() || isStaff() || isFinance() || isOwner(customerId);
+      // Allow customers to manage their own profile info during application
+      allow write: if isSuperAdmin() || isStaff() || isFinance() || isOwner(customerId);
     }
 
     match /loans/{loanId} {
-      allow list: if isSuperAdmin() || isStaff() || isFinance();
+      // Allow staff to see everything, allow customers to list only their own loans
+      allow list: if isSuperAdmin() || isStaff() || isFinance() || (request.auth != null && resource.data.customerId == request.auth.uid);
       allow get: if isSuperAdmin() || isStaff() || isFinance() || (request.auth != null && resource.data.customerId == request.auth.uid);
       allow write: if isSuperAdmin() || isStaff() || isFinance();
+      // Allow customers to create their own applications
       allow create: if request.auth != null && (isSuperAdmin() || isStaff() || isFinance() || request.resource.data.customerId == request.auth.uid);
     }
     

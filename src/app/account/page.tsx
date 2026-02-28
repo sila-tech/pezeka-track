@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useAuth, useCollection, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { addLoan } from '@/lib/firestore';
+import { addLoan, upsertCustomer } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
@@ -116,6 +115,14 @@ export default function AccountPage() {
     setIsSubmitting(true);
     
     try {
+      // 1. Ensure customer profile exists in database for staff to see
+      await upsertCustomer(firestore, user.uid, {
+        name: user.displayName || user.email || "Customer",
+        phone: values.phone,
+        idNumber: values.idNumber,
+      });
+
+      // 2. Submit the loan application
       const loanApplicationData = {
         customerId: user.uid,
         customerName: user.displayName || user.email || "Customer",

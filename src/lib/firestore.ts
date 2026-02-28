@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -67,6 +66,25 @@ export async function addCustomer(db: Firestore, customerData: CustomerData): Pr
   }
 }
 
+export async function upsertCustomer(db: Firestore, customerId: string, customerData: CustomerData) {
+  const customerRef = doc(db, 'customers', customerId);
+  const data = {
+    ...customerData,
+    updatedAt: serverTimestamp(),
+  };
+  try {
+    await setDoc(customerRef, data, { merge: true });
+  } catch (serverError) {
+    const permissionError = new FirestorePermissionError({
+      path: customerRef.path,
+      operation: 'update',
+      requestResourceData: data,
+    });
+    errorEmitter.emit('permission-error', permissionError);
+    throw serverError;
+  }
+}
+
 type FinanceEntryData = {
     type: 'expense' | 'payout' | 'receipt';
     date: Date;
@@ -103,7 +121,6 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
 
 export async function updateFinanceEntry(db: Firestore, entryId: string, data: { [key: string]: any }) {
     const entryRef = doc(db, 'financeEntries', entryId);
-    // Explicitly handle fields to avoid undefined values in merge
     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null));
     try {
         await updateDoc(entryRef, { ...updateData, updatedAt: serverTimestamp() });
@@ -136,10 +153,19 @@ export async function deleteFinanceEntry(db: Firestore, entryId: string) {
 export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: DocumentReference<DocumentData>, newLoanNumber: string}> {
   const loanCollection = collection(db, 'loans');
   
-  const q = query(loanCollection);
-  const querySnapshot = await getDocs(q);
-  const loanCount = querySnapshot.size;
-  const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
+  // Default fallback for customers who can't list existing loans to count them
+  let newLoanNumber = `APP-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  try {
+    // Only admins/staff/finance can list all loans to count them for sequencing
+    const q = query(loanCollection);
+    const querySnapshot = await getDocs(q);
+    const loanCount = querySnapshot.size;
+    newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
+  } catch (e) {
+    // For customers, the temporary sequence generated above is used
+    newLoanNumber = `APP-${Date.now().toString().slice(-6)}`;
+  }
 
   const newLoan = {
     ...loanData,
@@ -154,6 +180,7 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
   try {
     const docRef = await addDoc(loanCollection, newLoan);
     
+    // Auto-record disbursement if active
     if (loanData.status === 'active') {
         await recordDisbursement(db, { ...newLoan, id: docRef.id });
     }
@@ -192,7 +219,7 @@ async function recordDisbursement(db: Firestore, loan: any) {
         payoutCategory: 'loan_disbursement',
         date: disbursementDate,
         amount: takeHome,
-        transactionFee: 0, // Default for auto-disbursement
+        transactionFee: 0,
         description: `Disbursement for Loan #${loan.loanNumber}. Principal: Ksh ${Number(loan.principalAmount).toLocaleString()}, Retained Fees: Ksh ${totalFees.toLocaleString()}`,
         loanId: loan.id
     });
