@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -131,6 +131,7 @@ interface Loan {
     processingFee: number;
     carTrackInstallationFee: number;
     chargingCost: number;
+    comments?: string;
 }
 
 
@@ -140,6 +141,7 @@ export default function LoansPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
+  const [viewingApplication, setViewingApplication] = useState<Loan | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   const { user, loading: userLoading } = useAppUser();
@@ -159,7 +161,6 @@ export default function LoansPage() {
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
-    // Only show loans that aren't pending applications or rejected in the "All Loans" tab
     return loans.filter(loan => {
         if (loan.status === 'application' || loan.status === 'rejected') return false;
         
@@ -519,17 +520,24 @@ export default function LoansPage() {
                 <CardHeader><CardTitle>Review Applications</CardTitle></CardHeader>
                 <CardContent>
                     <Table>
-                        <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Action</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {applicationLoans.map((loan) => (
-                                <TableRow key={loan.id} className="cursor-pointer" onClick={() => handleManageApplication(loan)}>
+                                <TableRow key={loan.id}>
                                     <TableCell>
                                         <div>{loan.customerName}</div>
                                         <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div>
                                     </TableCell>
                                     <TableCell>{loan.loanType}</TableCell>
                                     <TableCell className="font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
-                                    <TableCell><Button size="sm">Process</Button></TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}>
+                                                <Eye className="h-4 w-4 mr-1" /> View
+                                            </Button>
+                                            <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -539,6 +547,50 @@ export default function LoansPage() {
         </TabsContent>
       </Tabs>
 
+      {/* View Application Dialog */}
+      <Dialog open={!!viewingApplication} onOpenChange={(isOpen) => !isOpen && setViewingApplication(null)}>
+          <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                  <DialogTitle>Application Details</DialogTitle>
+              </DialogHeader>
+              {viewingApplication && (
+                  <div className="space-y-4 py-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-muted-foreground">Customer:</div>
+                          <div className="font-medium">{viewingApplication.customerName}</div>
+                          <div className="text-muted-foreground">Primary Phone:</div>
+                          <div className="font-medium">{viewingApplication.customerPhone}</div>
+                          <div className="text-muted-foreground">Alt. Phone:</div>
+                          <div className="font-medium">{viewingApplication.alternativeNumber || 'None'}</div>
+                          <div className="text-muted-foreground">National ID:</div>
+                          <div className="font-medium">{viewingApplication.idNumber || 'N/A'}</div>
+                          <div className="text-muted-foreground">Loan Product:</div>
+                          <div className="font-medium">{viewingApplication.loanType}</div>
+                          <div className="text-muted-foreground">Requested Amount:</div>
+                          <div className="font-bold text-primary">Ksh {viewingApplication.principalAmount.toLocaleString()}</div>
+                          <div className="text-muted-foreground">Submitted On:</div>
+                          <div className="font-medium">{format(new Date(viewingApplication.disbursementDate.seconds * 1000), 'PPP')}</div>
+                      </div>
+                      {viewingApplication.comments && (
+                          <div className="pt-4 border-t">
+                              <h4 className="text-xs font-bold uppercase text-muted-foreground mb-1">Customer Comments:</h4>
+                              <p className="text-sm italic">"{viewingApplication.comments}"</p>
+                          </div>
+                      )}
+                  </div>
+              )}
+              <DialogFooter>
+                  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                  <Button onClick={() => {
+                      const app = viewingApplication;
+                      setViewingApplication(null);
+                      if (app) handleManageApplication(app);
+                  }}>Process Application</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      {/* Process/Approve Dialog */}
       <Dialog open={!!applicationToManage} onOpenChange={(isOpen) => !isOpen && setApplicationToManage(null)}>
         <DialogContent className="sm:max-w-2xl">
             {applicationToManage && (
@@ -586,7 +638,10 @@ export default function LoansPage() {
                     <DialogFooter className="mt-6">
                         <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleReject}>Reject</Button>
-                        <Button type="submit" form="approval-form">Approve & Disburse</Button>
+                        <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>
+                            {isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Approve & Disburse
+                        </Button>
                     </DialogFooter>
                 </>
             )}

@@ -14,6 +14,11 @@ const forms = [
     description: 'Printable application form for salary-based loans.',
     href: '/admin/application-forms/salary',
   },
+  {
+    title: 'Logbook Loan',
+    description: 'Printable application form for vehicle-secured loans.',
+    href: '/admin/application-forms/logbook',
+  },
 ];
 
 export default function ApplicationFormsPage() {
