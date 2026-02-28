@@ -159,7 +159,10 @@ export default function LoansPage() {
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
+    // Only show loans that aren't pending applications or rejected in the "All Loans" tab
     return loans.filter(loan => {
+        if (loan.status === 'application' || loan.status === 'rejected') return false;
+        
         const statusMatch = statusFilter === 'all' || loan.status === statusFilter;
         const searchMatch = searchTerm === '' ||
             loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -473,13 +476,13 @@ export default function LoansPage() {
       </div>
       <Tabs defaultValue="all" className="w-full">
         <TabsList className="mb-4">
-            <TabsTrigger value="all">All Loans</TabsTrigger>
-            <TabsTrigger value="applications">Applications ({applicationLoans.length})</TabsTrigger>
+            <TabsTrigger value="all">Active Debt ({filteredLoans.length})</TabsTrigger>
+            <TabsTrigger value="applications">Pending Applications ({applicationLoans.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="all">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Loan Book</CardTitle>
+                    <CardTitle>Portfolio Ledger</CardTitle>
                     <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[250px]" /></div>
                 </CardHeader>
                 <CardContent>
@@ -502,7 +505,7 @@ export default function LoansPage() {
                                       </TableCell>
                                       <TableCell>{format(new Date(loan.disbursementDate.seconds * 1000), 'dd/MM/yy')}</TableCell>
                                       <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
-                                      <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue' || loan.status === 'application') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
+                                      <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
                                   </TableRow>
                               ))}
                           </TableBody>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -155,7 +154,7 @@ export default function Dashboard() {
       if (!loans || !user) return [];
       // Only show disbursed loans in the portfolio list
       return loans.filter(loan => 
-        loan.assignedStaffId === user.id && 
+        loan.assignedStaffId === user.uid && 
         loan.status !== 'application' && 
         loan.status !== 'rejected'
       );
@@ -197,7 +196,7 @@ export default function Dashboard() {
     const today = startOfToday();
     
     return loans
-      .filter(loan => loan.status !== 'paid' && loan.status !== 'rollover' && loan.status !== 'application' && loan.status !== 'rejected')
+      .filter(loan => loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected')
       .map(loan => {
         const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
         let endDate: Date;
@@ -214,6 +213,7 @@ export default function Dashboard() {
       .filter(loan => {
         if (!loan.endDate || loan.endDate.toString() === 'Invalid Date') return false;
         const daysUntilDue = differenceInDays(loan.endDate, today);
+        // Identify any loan due within the next 7 days or overdue
         return daysUntilDue <= 7;
       })
       .sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
@@ -555,8 +555,8 @@ export default function Dashboard() {
                                 ) : (
                                     <div className="space-y-3">
                                         {[...selectedLoanForNotes.followUpNotes].sort((a, b) => {
-                                            const dateA = a.date instanceof Date ? a.date.getTime() : a.date.seconds * 1000;
-                                            const dateB = b.date instanceof Date ? b.date.getTime() : b.date.seconds * 1000;
+                                            const dateA = a.date instanceof Date ? a.date.getTime() : (a.date as any).seconds * 1000;
+                                            const dateB = b.date instanceof Date ? b.date.getTime() : (b.date as any).seconds * 1000;
                                             return dateB - dateA;
                                         }).map((note, index) => (
                                             <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs leading-snug">
@@ -565,7 +565,7 @@ export default function Dashboard() {
                                                         <User className="h-2 w-2" /> {note.staffName}
                                                     </span>
                                                     <span className="text-[9px] text-muted-foreground">
-                                                        {format(note.date instanceof Date ? note.date : new Date(note.date.seconds * 1000), 'dd/MM HH:mm')}
+                                                        {format(note.date instanceof Date ? note.date : new Date((note.date as any).seconds * 1000), 'dd/MM HH:mm')}
                                                     </span>
                                                 </div>
                                                 <p className="text-muted-foreground italic">"{note.content}"</p>

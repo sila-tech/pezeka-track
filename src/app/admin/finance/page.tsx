@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -184,7 +183,7 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList, loading: staffLoading } = useCollection<any>(isAuthorized ? 'users' : null);
   
-  // Base disbursed loans for ledgers and portfolios (excludes applications and rejected)
+  // Base disbursed loans for ledgers and portfolios (strictly excludes applications and rejected)
   const disbursedLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => loan.status !== 'application' && loan.status !== 'rejected');
