@@ -811,10 +811,8 @@ export default function FinancePage() {
                         </div>
                     </ScrollArea>
                     <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
-                  </>
-              )}
-          </DialogContent>
-      </Dialog>
+                </DialogContent>
+            </Dialog>
     </div>
   );
 }
