@@ -231,12 +231,10 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
+  // Temporary fix: set summary figures to zero as requested by user
   const stats = useMemo(() => {
-    const { allReceipts, allUpfrontFees, allPayouts, allTransactionFees } = financialData;
-    const totalMoneyIn = allReceipts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) + allUpfrontFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    const totalMoneyOut = allPayouts.reduce((acc, e) => acc + (Number(e.amount) || 0), 0) + allTransactionFees.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
-    return { totalReceipts: totalMoneyIn, totalPayouts: totalMoneyOut, cashAtHand: totalMoneyIn - totalMoneyOut };
-  }, [financialData]);
+    return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
+  }, []);
 
   const filteredLoansList = useMemo(() => {
     if(!disbursedLoans) return [];
@@ -804,9 +802,10 @@ export default function FinancePage() {
                             </div>
                         </div>
                     </ScrollArea>
-                  </>
-              )}
-          </DialogContent>
+                    <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </DialogContent>
       </Dialog>
     </div>
   );
