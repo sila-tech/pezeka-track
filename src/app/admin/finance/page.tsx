@@ -9,13 +9,10 @@ import {
   PlusCircle, 
   Search, 
   Loader2,
-  TrendingUp,
   User,
   Plus,
   AlertCircle,
   ShieldCheck,
-  Briefcase,
-  CalendarDays,
   Pencil
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
@@ -57,7 +54,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/table";
+} from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { 
   addFinanceEntry, 
@@ -189,7 +186,6 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // Robust case-insensitive role checks
   const userRole = user?.role?.toLowerCase();
   const isSuperAdmin = user?.email === 'simon@pezeka.com';
   const isFinance = userRole === 'finance';
@@ -249,7 +245,7 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
-  // Enforced zero summary figures per user request
+  // Hardcoded to zero as requested
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -885,7 +881,6 @@ export default function FinancePage() {
           </DialogContent>
       </Dialog>
 
-      {/* Edit Terms Dialog */}
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
           <DialogContent>
               <DialogHeader>

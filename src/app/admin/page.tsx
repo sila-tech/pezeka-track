@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User, CheckCircle2, Briefcase, CalendarDays } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -42,11 +42,6 @@ interface DashboardLoan {
   totalRepayableAmount: number;
   totalPaid: number;
   principalAmount: number;
-  registrationFee?: number;
-  processingFee?: number;
-  carTrackInstallationFee?: number;
-  chargingCost?: number;
-  loanType?: string;
   idNumber?: string;
   assignedStaffId?: string;
   assignedStaffName?: string;
@@ -178,7 +173,7 @@ export default function Dashboard() {
             else nextDueDate = addMonths(dDate, nextIdx);
         }
 
-        return { ...loan, nextDueDate, isMaturing: paidInstalments >= loan.numberOfInstalments - 1 };
+        return { ...loan, nextDueDate };
       }).filter(loan => {
           const daysUntil = differenceInDays(loan.nextDueDate, today);
           const offset = loan.paymentFrequency === 'monthly' ? 7 : 2;
