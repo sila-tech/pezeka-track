@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User, CheckCircle2, Briefcase } from 'lucide-react';
+import { Bell, Loader2, TrendingUp, HandCoins, UserCheck, Send, MessageSquare, Plus, User, CheckCircle2, Briefcase, CalendarDays } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -37,6 +37,7 @@ interface DashboardLoan {
   disbursementDate: { seconds: number; nanoseconds: number };
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
+  instalmentAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
   principalAmount: number;
@@ -159,19 +160,31 @@ export default function Dashboard() {
   const dueLoans = useMemo(() => {
     if (!loans) return [];
     const today = startOfToday();
+    
     return loans.filter(loan => loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected').map(loan => {
-        const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
-        let endDate: Date;
-        try {
-            switch (loan.paymentFrequency) {
-                case 'daily': endDate = addDays(disbursementDate, loan.numberOfInstalments); break;
-                case 'weekly': endDate = addWeeks(disbursementDate, loan.numberOfInstalments); break;
-                case 'monthly': endDate = addMonths(disbursementDate, loan.numberOfInstalments); break;
-                default: endDate = new Date('invalid');
-            }
-        } catch(e) { endDate = new Date('invalid'); }
-        return { ...loan, endDate };
-      }).filter(loan => loan.endDate && loan.endDate.toString() !== 'Invalid Date' && differenceInDays(loan.endDate, today) <= 7).sort((a, b) => a.endDate.getTime() - b.endDate.getTime());
+        const dDate = new Date(loan.disbursementDate.seconds * 1000);
+        
+        // Calculate based on next specific instalment date
+        const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
+        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || paidInstalments >= loan.numberOfInstalments;
+        
+        let nextDueDate: Date;
+        if (allInstalmentsPaid) {
+            nextDueDate = new Date(8640000000000000); 
+        } else {
+            const nextIdx = paidInstalments + 1;
+            if (loan.paymentFrequency === 'daily') nextDueDate = addDays(dDate, nextIdx);
+            else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(dDate, nextIdx);
+            else nextDueDate = addMonths(dDate, nextIdx);
+        }
+
+        return { ...loan, nextDueDate, isMaturing: paidInstalments >= loan.numberOfInstalments - 1 };
+      }).filter(loan => {
+          const daysUntil = differenceInDays(loan.nextDueDate, today);
+          // Monthly: 7 day window. Daily/Weekly: 2 day window
+          const offset = loan.paymentFrequency === 'monthly' ? 7 : 2;
+          return daysUntil <= offset;
+      }).sort((a, b) => a.nextDueDate.getTime() - b.nextDueDate.getTime());
   }, [loans]);
 
   const newApplications = useMemo(() => {
@@ -236,18 +249,18 @@ export default function Dashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>Due Loans & Follow-ups</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
-              {dueLoans.length === 0 ? (<Alert><AlertTitle>No Due Loans</AlertTitle></Alert>) : (
-                <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Due Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+              {dueLoans.length === 0 ? (<Alert><AlertTitle>No Due Payments</AlertTitle></Alert>) : (
+                <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Next Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
                     <TableBody>{dueLoans.map((loan) => {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
-                            const daysDue = differenceInDays(loan.endDate, startOfToday());
-                            return (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-xs">{format(loan.endDate, 'dd/MM/yy')}</div><Badge variant={daysDue <= 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `Overdue ${Math.abs(daysDue)}d` : 'Due'}</Badge></TableCell><TableCell className="text-right font-bold">Ksh {balance.toLocaleString()}</TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>)
+                            const daysDue = differenceInDays(loan.nextDueDate, startOfToday());
+                            return (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2 w-2"/> {loan.paymentFrequency}</div></TableCell><TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div><Badge variant={daysDue < 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `LATE ${Math.abs(daysDue)}d` : (daysDue === 0 ? 'TODAY' : `In ${daysDue}d`)}</Badge></TableCell><TableCell className="text-right font-bold">Ksh {balance.toLocaleString()}</TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>)
                         })}</TableBody></Table></ScrollArea>
               )}
             </CardContent></Card>
 
         {user?.role === 'staff' ? (
-            <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
+            <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div><div className="text-[9px] text-muted-foreground uppercase">{loan.paymentFrequency}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
         ) : (
             <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>New Applications</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
                     {newApplications.length === 0 ? (<Alert><AlertTitle>No New Applications</AlertTitle></Alert>) : (

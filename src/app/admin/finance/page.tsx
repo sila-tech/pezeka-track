@@ -252,19 +252,25 @@ export default function FinancePage() {
         else if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
         else dDate = new Date();
 
-        let endDate: Date;
-        try {
-            switch (loan.paymentFrequency) {
-                case 'daily': endDate = addDays(dDate, loan.numberOfInstalments); break;
-                case 'weekly': endDate = addWeeks(dDate, loan.numberOfInstalments); break;
-                case 'monthly': endDate = addMonths(dDate, loan.numberOfInstalments); break;
-                default: endDate = new Date(0);
-            }
-        } catch(e) { endDate = new Date(0); }
+        // New Instalment-based calculation for Due/Overdue filters
+        const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
+        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || paidInstalments >= loan.numberOfInstalments;
         
-        const daysUntilDue = differenceInDays(endDate, today);
-        const isCurrentlyOverdue = daysUntilDue < 0 && loan.status !== 'paid';
-        const isCurrentlyDue = daysUntilDue >= 0 && daysUntilDue <= 7 && loan.status !== 'paid';
+        let nextInstalmentDate: Date;
+        if (allInstalmentsPaid) {
+            nextInstalmentDate = new Date(8640000000000000); // Far future
+        } else {
+            const nextIdx = paidInstalments + 1;
+            if (loan.paymentFrequency === 'daily') nextInstalmentDate = addDays(dDate, nextIdx);
+            else if (loan.paymentFrequency === 'weekly') nextInstalmentDate = addWeeks(dDate, nextIdx);
+            else nextInstalmentDate = addMonths(dDate, nextIdx);
+        }
+
+        const daysUntilInstalment = differenceInDays(nextInstalmentDate, today);
+        const isCurrentlyOverdue = daysUntilInstalment < 0 && !allInstalmentsPaid;
+        // Monthly: 7 days. Daily/Weekly: 1-2 days
+        const dueWindow = loan.paymentFrequency === 'monthly' ? 7 : 1;
+        const isCurrentlyDue = daysUntilInstalment >= 0 && daysUntilInstalment <= dueWindow && !allInstalmentsPaid;
 
         let statusMatch = false;
         if (loanBookStatusFilter === 'all') statusMatch = true;
@@ -585,13 +591,14 @@ export default function FinancePage() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-[65vh] w-full">
-                      <Table className="min-w-[3000px]">
+                      <Table className="min-w-[3200px]">
                         <TableHeader className="sticky top-0 bg-card z-10">
                           <TableRow>
                             <TableHead className="w-[250px]">Client Name</TableHead>
                             <TableHead className="w-[150px]">Client Phone</TableHead>
                             <TableHead className="w-[120px]">Loan No.</TableHead>
                             <TableHead className="w-[120px]">Date</TableHead>
+                            <TableHead className="w-[120px]">Frequency</TableHead>
                             <TableHead className="w-[180px]">Follow-up Staff</TableHead>
                             <TableHead className="text-right w-[150px]">Principal</TableHead>
                             <TableHead className="text-right w-[120px]">Reg Fee</TableHead>
@@ -631,6 +638,7 @@ export default function FinancePage() {
                                   <TableCell>{loan.customerPhone}</TableCell>
                                   <TableCell>{loan.loanNumber}</TableCell>
                                   <TableCell>{format(dDate, 'dd/MM/yy')}</TableCell>
+                                  <TableCell><Badge variant="outline" className="text-[10px] uppercase">{loan.paymentFrequency}</Badge></TableCell>
                                   <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                   <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
                                   <TableCell className="text-right">{reg.toLocaleString()}</TableCell>
