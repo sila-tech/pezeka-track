@@ -31,6 +31,7 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
+  DialogDescription
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -233,7 +234,6 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
-  // Summary stats remain hardcoded to zero as requested
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -435,7 +435,10 @@ export default function FinancePage() {
             <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if(!isOpen) setEditingEntry(null); }}>
                 <DialogTrigger asChild><Button onClick={() => setEditingEntry(null)}><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
                 <DialogContent className="sm:max-w-xl">
-                    <DialogHeader><DialogTitle>{editingEntry ? 'Edit Entry' : 'New Entry'}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>{editingEntry ? 'Edit Entry' : 'New Entry'}</DialogTitle>
+                        <DialogDescription>Record or update financial transactions.</DialogDescription>
+                    </DialogHeader>
                     <ScrollArea className="max-h-[70vh] pr-4">
                         <Form {...addForm}>
                             <form id="finance-entry-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
@@ -695,7 +698,10 @@ export default function FinancePage() {
           <DialogContent className="sm:max-w-5xl">
               {loanToEdit && (
                   <>
-                    <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
+                        <DialogDescription>Record payments, add interaction notes, or calculate penalties.</DialogDescription>
+                    </DialogHeader>
                     <ScrollArea className="max-h-[75vh]">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
                             <div className="space-y-4 md:col-span-1">

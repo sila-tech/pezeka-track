@@ -19,6 +19,7 @@ import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { addLoan, addFollowUpNoteToLoan } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface FollowUpNote {
     noteId: string;
@@ -164,7 +165,6 @@ export default function Dashboard() {
     return loans.filter(loan => loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected').map(loan => {
         const dDate = new Date(loan.disbursementDate.seconds * 1000);
         
-        // Calculate based on next specific instalment date
         const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
         const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || paidInstalments >= loan.numberOfInstalments;
         
@@ -181,11 +181,13 @@ export default function Dashboard() {
         return { ...loan, nextDueDate, isMaturing: paidInstalments >= loan.numberOfInstalments - 1 };
       }).filter(loan => {
           const daysUntil = differenceInDays(loan.nextDueDate, today);
-          // Monthly: 7 day window. Daily/Weekly: 2 day window
           const offset = loan.paymentFrequency === 'monthly' ? 7 : 2;
           return daysUntil <= offset;
       }).sort((a, b) => a.nextDueDate.getTime() - b.nextDueDate.getTime());
   }, [loans]);
+
+  const dailyDue = useMemo(() => dueLoans.filter(l => l.paymentFrequency === 'daily'), [dueLoans]);
+  const weeklyDue = useMemo(() => dueLoans.filter(l => l.paymentFrequency === 'weekly'), [dueLoans]);
 
   const newApplications = useMemo(() => {
     if (!loans) return [];
@@ -202,7 +204,10 @@ export default function Dashboard() {
           <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
             <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Staff Loan Application</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Staff Loan Application</DialogTitle>
+                <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
+              </DialogHeader>
               <Form {...staffLoanForm}>
                 <ScrollArea className="max-h-[70vh] pr-4">
                   <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
@@ -222,7 +227,7 @@ export default function Dashboard() {
                     )}/>
                   </form>
                 </ScrollArea>
-                <DialogFooter><DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
+                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
               </Form>
             </DialogContent>
           </Dialog>
@@ -248,16 +253,113 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>Due Loans & Follow-ups</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
-              {dueLoans.length === 0 ? (<Alert><AlertTitle>No Due Payments</AlertTitle></Alert>) : (
-                <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Next Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
-                    <TableBody>{dueLoans.map((loan) => {
-                            const balance = loan.totalRepayableAmount - loan.totalPaid;
-                            const daysDue = differenceInDays(loan.nextDueDate, startOfToday());
-                            return (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2 w-2"/> {loan.paymentFrequency}</div></TableCell><TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div><Badge variant={daysDue < 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `LATE ${Math.abs(daysDue)}d` : (daysDue === 0 ? 'TODAY' : `In ${daysDue}d`)}</Badge></TableCell><TableCell className="text-right font-bold">Ksh {balance.toLocaleString()}</TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>)
-                        })}</TableBody></Table></ScrollArea>
-              )}
-            </CardContent></Card>
+        <Card className="flex flex-col h-[600px]">
+            <CardHeader className="pb-2">
+                <CardTitle>Due Loans & Follow-ups</CardTitle>
+                <CardDescription>Accounts requiring immediate attention based on frequency.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-hidden p-0">
+                <Tabs defaultValue="all" className="h-full flex flex-col">
+                    <div className="px-6 pb-2">
+                        <TabsList className="grid grid-cols-3 w-full">
+                            <TabsTrigger value="all" className="text-xs">All Due ({dueLoans.length})</TabsTrigger>
+                            <TabsTrigger value="daily" className="text-xs">Daily ({dailyDue.length})</TabsTrigger>
+                            <TabsTrigger value="weekly" className="text-xs">Weekly ({weeklyDue.length})</TabsTrigger>
+                        </TabsList>
+                    </div>
+                    
+                    <div className="flex-1 overflow-hidden">
+                        <TabsContent value="all" className="h-full m-0 p-0">
+                            {dueLoans.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Due Payments</AlertTitle></Alert></div>) : (
+                                <ScrollArea className="h-full">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10">
+                                            <TableRow>
+                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Next Due</TableHead>
+                                                <TableHead className="text-right">Due Amt</TableHead>
+                                                <TableHead className="text-center">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {dueLoans.map((loan) => {
+                                                const daysDue = differenceInDays(loan.nextDueDate, startOfToday());
+                                                return (
+                                                    <TableRow key={loan.id}>
+                                                        <TableCell>
+                                                            <div className="font-medium text-xs">{loan.customerName}</div>
+                                                            <div className="text-[10px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2 w-2"/> {loan.paymentFrequency}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div>
+                                                            <Badge variant={daysDue < 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `LATE ${Math.abs(daysDue)}d` : (daysDue === 0 ? 'TODAY' : `In ${daysDue}d`)}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-bold text-xs text-blue-600">Ksh {loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                        <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
+                                                    </TableRow>
+                                                )
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            )}
+                        </TabsContent>
+                        <TabsContent value="daily" className="h-full m-0 p-0">
+                            {dailyDue.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Daily Payments</AlertTitle></Alert></div>) : (
+                                <ScrollArea className="h-full">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10">
+                                            <TableRow>
+                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Next Due</TableHead>
+                                                <TableHead className="text-right">Instalment</TableHead>
+                                                <TableHead className="text-center">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {dailyDue.map((loan) => (
+                                                <TableRow key={loan.id}>
+                                                    <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
+                                                    <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
+                                                    <TableCell className="text-right font-bold text-xs">Ksh {loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            )}
+                        </TabsContent>
+                        <TabsContent value="weekly" className="h-full m-0 p-0">
+                            {weeklyDue.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Weekly Payments</AlertTitle></Alert></div>) : (
+                                <ScrollArea className="h-full">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10">
+                                            <TableRow>
+                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Next Due</TableHead>
+                                                <TableHead className="text-right">Instalment</TableHead>
+                                                <TableHead className="text-center">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {weeklyDue.map((loan) => (
+                                                <TableRow key={loan.id}>
+                                                    <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
+                                                    <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
+                                                    <TableCell className="text-right font-bold text-xs">Ksh {loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            )}
+                        </TabsContent>
+                    </div>
+                </Tabs>
+            </CardContent>
+        </Card>
 
         {user?.role === 'staff' ? (
             <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div><div className="text-[9px] text-muted-foreground uppercase">{loan.paymentFrequency}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
@@ -274,7 +376,10 @@ export default function Dashboard() {
           <DialogContent className="sm:max-w-md">
               {selectedLoanForNotes && (
                   <>
-                    <DialogHeader><DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle>
+                        <DialogDescription>Record customer interactions and check recent history.</DialogDescription>
+                    </DialogHeader>
                     <div className="space-y-4 mt-2">
                         <Form {...noteForm}>
                             <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2">
