@@ -16,7 +16,8 @@ import {
     updateInvestorDepositEntry,
     deleteInvestorDepositEntry,
     updateInvestorWithdrawalEntry,
-    deleteInvestorWithdrawalEntry
+    deleteInvestorWithdrawalEntry,
+    updateInvestor
 } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
@@ -42,7 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Loader2, PenSquare, Trash2, Check, X, Calculator, Pencil, Trash } from 'lucide-react';
+import { Loader2, PenSquare, Trash2, Check, X, Calculator, Pencil, Trash, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +95,10 @@ const editEntrySchema = z.object({
     description: z.string().optional(),
 });
 
+const investorTermsSchema = z.object({
+    interestRate: z.coerce.number().min(0, "Rate must be 0 or greater"),
+});
+
 export function InvestorsPortfolioTab() {
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -113,6 +118,10 @@ export function InvestorsPortfolioTab() {
       resolver: zodResolver(editEntrySchema),
   });
 
+  const termsForm = useForm<z.infer<typeof investorTermsSchema>>({
+      resolver: zodResolver(investorTermsSchema),
+  });
+
   const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
 
   const { data: investors, loading: investorsLoading } = useCollection<Investor>(isAuthorized ? 'investors' : null);
@@ -121,6 +130,7 @@ export function InvestorsPortfolioTab() {
 
   const handleManageClick = (investor: Investor) => {
     setSelectedInvestor(investor);
+    termsForm.reset({ interestRate: investor.interestRate || 0 });
     setManageInvestorOpen(true);
   };
   
@@ -137,6 +147,20 @@ export function InvestorsPortfolioTab() {
         setIsSubmitting(false);
     }
   }
+
+  const onUpdateInvestorRate = async (values: z.infer<typeof investorTermsSchema>) => {
+      if (!selectedInvestor) return;
+      setIsSubmitting(true);
+      try {
+          await updateInvestor(firestore, selectedInvestor.id, { interestRate: values.interestRate });
+          toast({ title: 'Rate Updated', description: `Portfolio interest rate set to ${values.interestRate}%` });
+          setSelectedInvestor({ ...selectedInvestor, interestRate: values.interestRate });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
+  };
 
   const handleProcessWithdrawal = async (withdrawalId: string) => {
     if (!selectedInvestor) return;
@@ -444,13 +468,13 @@ export function InvestorsPortfolioTab() {
                   <>
                     <DialogHeader>
                         <DialogTitle>Manage Portfolio: {selectedInvestor.name}</DialogTitle>
-                        <DialogDescription>Apply pro-rated interest, approve transactions, and review history.</DialogDescription>
+                        <DialogDescription>Apply interest, update terms, and review history.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[75vh] pr-4">
                       <div className="space-y-6 mt-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Card>
-                                <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Calculator className="h-4 w-4"/> Monthly Interest</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-sm flex items-center gap-2"><Calculator className="h-4 w-4"/> Interest & Terms</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                     <div className="space-y-2 rounded-md bg-muted p-4">
                                         <div className="flex justify-between"><span className="text-sm">Rate</span><span className="font-bold">{(selectedInvestor.interestRate || 0)}%</span></div>
@@ -465,6 +489,22 @@ export function InvestorsPortfolioTab() {
                                             Apply for {format(new Date(), 'MMMM')}
                                         </Button>
                                     )}
+
+                                    <div className="pt-4 border-t mt-4">
+                                        <Form {...termsForm}>
+                                            <form onSubmit={termsForm.handleSubmit(onUpdateInvestorRate)} className="flex items-end gap-2">
+                                                <FormField control={termsForm.control} name="interestRate" render={({field}) => (
+                                                    <FormItem className="flex-1">
+                                                        <FormLabel className="text-[10px] uppercase font-bold text-muted-foreground">Change Rate (%)</FormLabel>
+                                                        <FormControl><Input type="number" step="0.01" className="h-8 text-xs" {...field}/></FormControl>
+                                                    </FormItem>
+                                                )}/>
+                                                <Button size="sm" type="submit" disabled={isSubmitting} className="h-8">
+                                                    <RefreshCw className="h-3 w-3 mr-1" /> Update
+                                                </Button>
+                                            </form>
+                                        </Form>
+                                    </div>
                                 </CardContent>
                             </Card>
                             <Card>

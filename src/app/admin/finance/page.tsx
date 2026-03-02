@@ -15,7 +15,8 @@ import {
   AlertCircle,
   ShieldCheck,
   Briefcase,
-  CalendarDays
+  CalendarDays,
+  Pencil
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -73,7 +74,7 @@ import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { calculateInterestForOneInstalment } from '@/lib/utils';
+import { calculateInterestForOneInstalment, calculateAmortization } from '@/lib/utils';
 
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense'], { required_error: 'Please select an entry type.' }),
@@ -111,6 +112,13 @@ const penaltySchema = z.object({
 
 const followUpNoteSchema = z.object({
     content: z.string().min(5, "Note must be at least 5 characters long."),
+});
+
+const editTermsSchema = z.object({
+    interestRate: z.coerce.number().min(0, 'Interest rate is required.'),
+    principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
+    numberOfInstalments: z.coerce.number().int().min(1),
+    paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
 });
 
 interface FollowUpNote {
@@ -172,6 +180,7 @@ export default function FinancePage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [loanBookSearchTerm, setLoanBookSearchTerm] = useState('');
   const [loanBookStatusFilter, setLoanBookStatusFilter] = useState('all');
   const [loanBookStaffFilter, setLoanBookStaffFilter] = useState('all');
@@ -302,6 +311,10 @@ export default function FinancePage() {
       defaultValues: { content: '' },
   });
 
+  const editTermsForm = useForm<z.infer<typeof editTermsSchema>>({
+      resolver: zodResolver(editTermsSchema),
+  });
+
   const addFinanceEntryType = addForm.watch('type');
 
   useEffect(() => {
@@ -381,6 +394,44 @@ export default function FinancePage() {
       } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsAddingNote(false); }
   }
 
+  const handleEditTerms = (loan: Loan) => {
+      editTermsForm.reset({
+          interestRate: loan.interestRate || 0,
+          principalAmount: loan.principalAmount,
+          numberOfInstalments: loan.numberOfInstalments,
+          paymentFrequency: loan.paymentFrequency,
+      });
+      setIsEditingTerms(true);
+  };
+
+  async function onEditTermsSubmit(values: z.infer<typeof editTermsSchema>) {
+      if (!loanToEdit) return;
+      setIsUpdating(true);
+      try {
+          const { instalmentAmount, totalRepayableAmount } = calculateAmortization(
+              values.principalAmount,
+              values.interestRate,
+              values.numberOfInstalments,
+              values.paymentFrequency
+          );
+          
+          const updateData = {
+              ...values,
+              instalmentAmount,
+              totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0),
+          };
+
+          await updateLoan(firestore, loanToEdit.id, updateData);
+          toast({ title: 'Terms Updated' });
+          setLoanToEdit({ ...loanToEdit, ...updateData });
+          setIsEditingTerms(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+      } finally {
+          setIsUpdating(false);
+      }
+  }
+
   const handleStaffReassignment = async (staffId: string) => {
       if (!loanToEdit) return;
       let updateData: any = {};
@@ -405,7 +456,7 @@ export default function FinancePage() {
       
       let dDate: Date;
       if (loanToEdit.disbursementDate instanceof Date) dDate = loanToEdit.disbursementDate;
-      else dDate = new Date(loanToEdit.disbursementDate.seconds * 1000);
+      else dDate = new Date((loanToEdit.disbursementDate as any).seconds * 1000);
 
       let finalDueDate: Date;
       if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
@@ -546,7 +597,7 @@ export default function FinancePage() {
       </div>
 
       <Tabs defaultValue="loanbook" className="w-full">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex flex-wrap h-auto">
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
               <TabsTrigger value="upfront">Upfront Fees</TabsTrigger>
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
@@ -700,15 +751,19 @@ export default function FinancePage() {
                   <>
                     <DialogHeader>
                         <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
-                        <DialogDescription>Record payments, add interaction notes, or calculate penalties.</DialogDescription>
+                        <DialogDescription>Record payments, check interaction history, or adjust terms.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[75vh]">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
                             <div className="space-y-4 md:col-span-1">
                                 <Card>
-                                    <CardHeader className="py-3"><CardTitle className="text-sm">Loan Summary</CardTitle></CardHeader>
+                                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                                        <CardTitle className="text-sm">Loan Summary</CardTitle>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3 w-3" /></Button>
+                                    </CardHeader>
                                     <CardContent className="space-y-4 text-sm">
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                        <div className="flex justify-between"><span>Interest Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
                                         <div className="space-y-1.5 pt-2 border-t">
                                             <span className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">Follow-up Reassignment:</span>
                                             <Select value={loanToEdit.assignedStaffId || "unassigned"} onValueChange={handleStaffReassignment}>
@@ -820,6 +875,31 @@ export default function FinancePage() {
                     <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
+          </DialogContent>
+      </Dialog>
+
+      {/* Edit Terms Dialog */}
+      <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Loan Terms</DialogTitle>
+                  <DialogDescription>Updating interest or principal will trigger an automatic recalculation of instalments.</DialogDescription>
+              </DialogHeader>
+              <Form {...editTermsForm}>
+                  <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="paymentFrequency" render={({field}) => (
+                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                          )}/>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isUpdating}>
+                          {isUpdating && <Loader2 className="mr-2 animate-spin" />} Save & Recalculate
+                      </Button>
+                  </form>
+              </Form>
           </DialogContent>
       </Dialog>
     </div>
