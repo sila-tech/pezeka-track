@@ -6,6 +6,7 @@ import { useAuth, useUser } from '@/firebase';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
 } from 'firebase/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -18,9 +19,11 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
-const emailSchema = z.object({
+const authSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
 });
 
 
@@ -33,9 +36,9 @@ export default function CustomerLoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
 
 
-  const emailForm = useForm<z.infer<typeof emailSchema>>({
-    resolver: zodResolver(emailSchema),
-    defaultValues: { email: '', password: '' },
+  const form = useForm<z.infer<typeof authSchema>>({
+    resolver: zodResolver(authSchema),
+    defaultValues: { email: '', password: '', firstName: '', lastName: '' },
   });
 
   useEffect(() => {
@@ -45,12 +48,20 @@ export default function CustomerLoginPage() {
   }, [user, loading, router]);
   
 
-  async function onEmailSubmit(values: z.infer<typeof emailSchema>) {
+  async function onEmailSubmit(values: z.infer<typeof authSchema>) {
     setIsSubmitting(true);
     if (isSignUp) {
+      if (!values.firstName || !values.lastName) {
+        toast({ variant: 'destructive', title: 'Missing Information', description: 'Please provide both first and last names.' });
+        setIsSubmitting(false);
+        return;
+      }
       // Handle Sign Up
       try {
-        await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        await updateProfile(userCredential.user, {
+          displayName: `${values.firstName} ${values.lastName}`
+        });
         toast({ title: 'Account Created', description: 'Welcome! Redirecting to your account...' });
         router.push('/account');
       } catch (error: any) {
@@ -65,8 +76,8 @@ export default function CustomerLoginPage() {
         toast({ title: 'Login Successful', description: 'Redirecting to your account...' });
         router.push('/account');
       } catch (error: any) {
-         if (error.code === 'auth/user-not-found') {
-            toast({ variant: 'destructive', title: 'Login Failed', description: 'No account found with this email. Please sign up.' });
+         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            toast({ variant: 'destructive', title: 'Login Failed', description: 'Invalid email or password. Please check your credentials.' });
         } else {
             toast({ variant: 'destructive', title: 'Login Failed', description: error.message });
         }
@@ -87,30 +98,48 @@ export default function CustomerLoginPage() {
 
   return (
     <>
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Customer Portal</CardTitle>
+      <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Customer Portal</CardTitle>
           <CardDescription>{isSignUp ? 'Create your account to apply for a loan.' : 'Sign in to your account.'}</CardDescription>
         </CardHeader>
         <CardContent>
-              <Form {...emailForm}>
-                <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-6 pt-4">
-                  <FormField control={emailForm.control} name="email" render={({ field }) => (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
+                  {isSignUp && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField control={form.control} name="firstName" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl><Input placeholder="John" {...field} value={field.value ?? ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="lastName" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl><Input placeholder="Doe" {...field} value={field.value ?? ''} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                  )}
+                  <FormField control={form.control} name="email" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl><Input placeholder="your@email.com" {...field} /></FormControl>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl><Input placeholder="your@email.com" {...field} value={field.value ?? ''} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={emailForm.control} name="password" render={({ field }) => (
+                  <FormField control={form.control} name="password" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Password</FormLabel>
-                      <FormControl><Input type="password" {...field} /></FormControl>
+                      <FormControl><Input type="password" placeholder="••••••••" {...field} value={field.value ?? ''} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <div className="flex flex-col gap-4">
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <div className="flex flex-col gap-4 mt-6">
+                    <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
                       {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       {isSignUp ? 'Create Account' : 'Sign In'}
                     </Button>
@@ -121,7 +150,7 @@ export default function CustomerLoginPage() {
                           <Button
                             type="button"
                             variant="link"
-                            className="p-0 h-auto"
+                            className="p-0 h-auto font-bold"
                             onClick={() => setIsSignUp(false)}
                           >
                             Sign In
@@ -133,7 +162,7 @@ export default function CustomerLoginPage() {
                           <Button
                             type="button"
                             variant="link"
-                            className="p-0 h-auto"
+                            className="p-0 h-auto font-bold"
                             onClick={() => setIsSignUp(true)}
                           >
                             Sign Up

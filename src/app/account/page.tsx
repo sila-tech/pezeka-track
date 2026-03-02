@@ -107,10 +107,12 @@ export default function AccountPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      await upsertCustomer(firestore, user.uid, { name: user.displayName || user.email || "Customer", phone: values.phone, idNumber: values.idNumber });
+      const fullName = user.displayName || user.email || "Customer";
+      await upsertCustomer(firestore, user.uid, { name: fullName, phone: values.phone, idNumber: values.idNumber });
+      
       const loanApplicationData = {
         customerId: user.uid,
-        customerName: user.displayName || user.email || "Customer",
+        customerName: fullName,
         customerPhone: values.phone,
         alternativeNumber: values.alternativeNumber || "",
         idNumber: values.idNumber,
@@ -142,9 +144,9 @@ export default function AccountPage() {
         <div className="flex items-center gap-2 font-semibold"><Landmark className="h-6 w-6 text-primary" /><span>Customer Portal</span></div>
         <div className="ml-auto"><Button onClick={handleLogout} variant="outline"><LogOut className="mr-2 h-4 w-4" />Logout</Button></div>
       </header>
-      <main className="p-4 sm:px-6 sm:py-0">
-          <Card>
-            <CardHeader><CardTitle>Welcome, {user?.displayName || user?.email || user?.phoneNumber}!</CardTitle></CardHeader>
+      <main className="p-4 sm:px-6 sm:py-0 max-w-6xl mx-auto w-full">
+          <Card className="mb-6">
+            <CardHeader><CardTitle>Welcome, {user?.displayName || user?.email}!</CardTitle></CardHeader>
             <CardContent>
                 {loansLoading ? (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>) : (customerLoans && customerLoans.length > 0) ? (
                     <div className="space-y-4">
@@ -152,38 +154,42 @@ export default function AccountPage() {
                         {customerLoans.map(loan => {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
                             return (
-                                <Card key={loan.id}><CardHeader><div className="flex justify-between items-start"><div><CardTitle>Loan #{loan.loanNumber}</CardTitle><CardDescription>{loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}</CardDescription></div><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status}</Badge></div></CardHeader><CardContent><div className="grid gap-4 sm:grid-cols-3"><div><div className="text-sm text-muted-foreground">Principal</div><div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div></div><div><div className="text-sm text-muted-foreground">Total Repayable</div><div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div></div><div><div className="text-sm text-muted-foreground">Balance</div><div className="font-bold text-lg">Ksh {balance.toLocaleString()}</div></div></div></CardContent></Card>
+                                <Card key={loan.id} className="border-l-4 border-l-primary"><CardHeader className="pb-2"><div className="flex justify-between items-start"><div><CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle><CardDescription>{loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}</CardDescription></div><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status.toUpperCase()}</Badge></div></CardHeader><CardContent><div className="grid gap-4 grid-cols-2 sm:grid-cols-3"><div><div className="text-xs text-muted-foreground uppercase font-bold">Principal</div><div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div></div><div><div className="text-xs text-muted-foreground uppercase font-bold">To Repay</div><div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div></div><div className="col-span-2 sm:col-span-1 border-t sm:border-t-0 pt-2 sm:pt-0"><div className="text-xs text-muted-foreground uppercase font-bold">Current Balance</div><div className="font-bold text-xl text-primary">Ksh {balance.toLocaleString()}</div></div></div></CardContent></Card>
                             )
                         })}
                     </div>
-                ) : (<div className="text-center py-8"><p className="text-muted-foreground">No active loans.</p></div>)}
+                ) : (<div className="text-center py-12 border-2 border-dashed rounded-lg"><p className="text-muted-foreground">You don't have any active loans or applications yet.</p></div>)}
             </CardContent>
           </Card>
 
-          <Card className="mt-6">
-            <CardHeader><CardTitle>Apply for a New Loan</CardTitle></CardHeader>
+          <Card>
+            <CardHeader><CardTitle>Apply for a New Loan</CardTitle><CardDescription>Select a product and enter the required details to start your application.</CardDescription></CardHeader>
             <CardContent>
                 <Form {...applicationForm}>
                 <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-4">
                     <FormField control={applicationForm.control} name="loanType" render={({ field }) => (
-                        <FormItem><FormLabel>Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Short-Term Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Individual & Business Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                     )}/>
-                    <FormField control={applicationForm.control} name="loanAmount" render={({ field }) => (
-                        <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={applicationForm.control} name="idNumber" render={({ field }) => (
-                        <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={applicationForm.control} name="phone" render={({ field }) => (
-                        <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={applicationForm.control} name="alternativeNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Alt. Phone (Optional)</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                    )}/>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={applicationForm.control} name="loanAmount" render={({ field }) => (
+                          <FormItem><FormLabel>Requested Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      )}/>
+                      <FormField control={applicationForm.control} name="idNumber" render={({ field }) => (
+                          <FormItem><FormLabel>National ID Number</FormLabel><FormControl><Input placeholder="ID Card Number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      )}/>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={applicationForm.control} name="phone" render={({ field }) => (
+                          <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      )}/>
+                      <FormField control={applicationForm.control} name="alternativeNumber" render={({ field }) => (
+                          <FormItem><FormLabel>Alternative Phone (Optional)</FormLabel><FormControl><Input placeholder="Second contact" {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                      )}/>
+                    </div>
                     <FormField control={applicationForm.control} name="agreeToTerms" render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel>Agree to terms</FormLabel><FormMessage /></div></FormItem>
+                        <FormItem className="flex items-start space-x-3 rounded-md border p-4 bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel>I agree to the terms and conditions of Pezeka Credit Ltd.</FormLabel><FormDescription className="text-[10px]">By submitting this form, you authorize us to verify your creditworthiness.</FormDescription><FormMessage /></div></FormItem>
                     )}/>
-                    <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}Submit Application</Button>
+                    <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <FileUp className="mr-2 h-4 w-4" />}Submit Application</Button>
                 </form>
                 </Form>
             </CardContent>
