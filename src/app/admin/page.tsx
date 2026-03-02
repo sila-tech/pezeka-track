@@ -214,7 +214,7 @@ export default function Dashboard() {
                         <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                       )}/>
                       <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Alt. Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                        <FormItem><FormLabel>Alt. Phone</FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
                       )}/>
                     </div>
                     <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
@@ -250,7 +250,7 @@ export default function Dashboard() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>Due Loans & Follow-ups</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
               {dueLoans.length === 0 ? (<Alert><AlertTitle>No Due Payments</AlertTitle></Alert>) : (
-                <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead>TableHead>Next Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+                <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Next Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
                     <TableBody>{dueLoans.map((loan) => {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
                             const daysDue = differenceInDays(loan.nextDueDate, startOfToday());

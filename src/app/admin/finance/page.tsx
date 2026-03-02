@@ -14,7 +14,8 @@ import {
   Plus,
   AlertCircle,
   ShieldCheck,
-  Briefcase
+  Briefcase,
+  CalendarDays
 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
@@ -232,6 +233,7 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
+  // Summary stats remain hardcoded to zero as requested
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -252,13 +254,12 @@ export default function FinancePage() {
         else if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
         else dDate = new Date();
 
-        // New Instalment-based calculation for Due/Overdue filters
         const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
-        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || paidInstalments >= loan.numberOfInstalments;
+        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || paidInstalments >= loan.numberOfInstalments || loan.status === 'paid';
         
         let nextInstalmentDate: Date;
         if (allInstalmentsPaid) {
-            nextInstalmentDate = new Date(8640000000000000); // Far future
+            nextInstalmentDate = new Date(8640000000000000); 
         } else {
             const nextIdx = paidInstalments + 1;
             if (loan.paymentFrequency === 'daily') nextInstalmentDate = addDays(dDate, nextIdx);
@@ -268,7 +269,6 @@ export default function FinancePage() {
 
         const daysUntilInstalment = differenceInDays(nextInstalmentDate, today);
         const isCurrentlyOverdue = daysUntilInstalment < 0 && !allInstalmentsPaid;
-        // Monthly: 7 days. Daily/Weekly: 1-2 days
         const dueWindow = loan.paymentFrequency === 'monthly' ? 7 : 1;
         const isCurrentlyDue = daysUntilInstalment >= 0 && daysUntilInstalment <= dueWindow && !allInstalmentsPaid;
 
@@ -630,7 +630,8 @@ export default function FinancePage() {
                             
                             let dDate: Date;
                             if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
-                            else dDate = new Date(loan.disbursementDate.seconds * 1000);
+                            else if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
+                            else dDate = new Date();
 
                             return (
                                 <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
@@ -745,7 +746,7 @@ export default function FinancePage() {
                                                 </div>
                                             </form>
                                         </Form>
-                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
+                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                                     </TabsContent>
 
                                     <TabsContent value="followups">
@@ -762,7 +763,7 @@ export default function FinancePage() {
                                                         <div key={note.noteId || index} className="bg-muted p-2 rounded border text-[11px]">
                                                             <div className="flex justify-between items-center mb-1">
                                                                 <span className="font-bold flex items-center gap-1"><User className="h-2 w-2" /> {note.staffName}</span>
-                                                                <span className="text-[9px] text-muted-foreground">{format(new Date(note.date.seconds * 1000), 'dd/MM/yy HH:mm')}</span>
+                                                                <span className="text-[9px] text-muted-foreground">{format(new Date((note.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</span>
                                                             </div>
                                                             <p className="italic">"{note.content}"</p>
                                                         </div>
@@ -798,7 +799,7 @@ export default function FinancePage() {
                                                 <TableBody>
                                                     {loanToEdit.penalties?.map((p, i) => (
                                                         <TableRow key={p.penaltyId || i}>
-                                                            <TableCell><div className="text-[10px]">{format(new Date(p.date.seconds * 1000), 'dd/MM/yy')}</div><div className="font-medium text-xs">{p.description}</div></TableCell>
+                                                            <TableCell><div className="text-[10px]">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy')}</div><div className="font-medium text-xs">{p.description}</div></TableCell>
                                                             <TableCell className="text-right text-destructive font-bold text-xs">Ksh {p.amount.toLocaleString()}</TableCell>
                                                         </TableRow>
                                                     ))}
@@ -811,8 +812,10 @@ export default function FinancePage() {
                         </div>
                     </ScrollArea>
                     <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
-                </DialogContent>
-            </Dialog>
+                  </>
+              )}
+          </DialogContent>
+      </Dialog>
     </div>
   );
 }
