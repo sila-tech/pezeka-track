@@ -89,12 +89,13 @@ export default function InvestorsPage() {
     // Explicit access for Super Admin and Finance
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
-        return currentUser.email === 'simon@pezeka.com' || currentUser.role === 'finance';
+        const role = currentUser.role?.toLowerCase();
+        return currentUser.email === 'simon@pezeka.com' || role === 'finance';
     }, [currentUser]);
 
     useEffect(() => {
         if (!userLoading && currentUser && !canViewPage) {
-            toast({ variant: 'destructive', title: 'Access Denied', description: 'Unauthorized access.' });
+            toast({ variant: 'destructive', title: 'Access Denied', description: 'Unauthorized access to Investors module.' });
             router.push('/admin');
         }
     }, [userLoading, canViewPage, currentUser, router, toast]);

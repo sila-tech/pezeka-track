@@ -114,10 +114,11 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login';
     
-    // Explicit role checks including fallback for Simon
+    // Explicit role checks with robust matching
+    const userRole = user?.role?.toLowerCase();
     const isSuperAdmin = user?.email === 'simon@pezeka.com';
-    const isFinance = user?.role === 'finance';
-    const isStaff = user?.role === 'staff';
+    const isFinance = userRole === 'finance';
+    const isStaff = userRole === 'staff';
     const isAuthorized = user && (isSuperAdmin || isFinance || isStaff);
 
     useEffect(() => {

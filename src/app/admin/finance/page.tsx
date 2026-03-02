@@ -57,7 +57,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "@/components/table";
 import { useToast } from '@/hooks/use-toast';
 import { 
   addFinanceEntry, 
@@ -189,7 +189,13 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
+  // Robust case-insensitive role checks
+  const userRole = user?.role?.toLowerCase();
+  const isSuperAdmin = user?.email === 'simon@pezeka.com';
+  const isFinance = userRole === 'finance';
+  const isStaff = userRole === 'staff';
+  
+  const isAuthorized = isSuperAdmin || isFinance || isStaff;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
@@ -243,6 +249,7 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
+  // Enforced zero summary figures per user request
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -278,7 +285,7 @@ export default function FinancePage() {
 
         const daysUntilInstalment = differenceInDays(nextInstalmentDate, today);
         const isCurrentlyOverdue = daysUntilInstalment < 0 && !allInstalmentsPaid;
-        const dueWindow = loan.paymentFrequency === 'monthly' ? 7 : 1;
+        const dueWindow = loan.paymentFrequency === 'monthly' ? 7 : 2;
         const isCurrentlyDue = daysUntilInstalment >= 0 && daysUntilInstalment <= dueWindow && !allInstalmentsPaid;
 
         let statusMatch = false;
