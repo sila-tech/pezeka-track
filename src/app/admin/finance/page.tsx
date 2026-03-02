@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogClose,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -231,7 +232,6 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
-  // Temporary fix: set summary figures to zero as requested by user
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -803,9 +803,9 @@ export default function FinancePage() {
                         </div>
                     </ScrollArea>
                     <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </DialogContent>
+                  </>
+              )}
+          </DialogContent>
       </Dialog>
     </div>
   );
