@@ -545,6 +545,12 @@ export function InvestorsPortfolioTab() {
                                                                 <TableCell className="text-xs">{format(new Date((e.date as any).seconds * 1000), 'dd/MM')}</TableCell>
                                                                 <TableCell className="text-xs font-bold">{e.amount.toLocaleString()} <span className="text-[8px] opacity-50 uppercase">({e.status})</span></TableCell>
                                                                 <TableCell className="text-right">
+                                                                    {e.status === 'pending' && (
+                                                                        <div className="flex justify-end gap-1">
+                                                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={() => handleApproveDeposit(e.depositId)} disabled={isSubmitting}><Check className="h-3 w-3"/></Button>
+                                                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleRejectDeposit(e.depositId)} disabled={isSubmitting}><X className="h-3 w-3"/></Button>
+                                                                        </div>
+                                                                    )}
                                                                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog(e, 'deposit')}><Pencil className="h-3 w-3"/></Button>
                                                                     <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteEntry(e.depositId, 'deposit')}><Trash className="h-3 w-3"/></Button>
                                                                 </TableCell>
@@ -564,6 +570,12 @@ export function InvestorsPortfolioTab() {
                                                                 <TableCell className="text-xs">{format(new Date((e.date as any).seconds * 1000), 'dd/MM')}</TableCell>
                                                                 <TableCell className="text-xs font-bold">{e.amount.toLocaleString()} <span className="text-[8px] opacity-50 uppercase">({e.status})</span></TableCell>
                                                                 <TableCell className="text-right">
+                                                                    {e.status === 'pending' && (
+                                                                        <div className="flex justify-end gap-1">
+                                                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={() => handleProcessWithdrawal(e.withdrawalId)} disabled={isSubmitting}><Check className="h-3 w-3"/></Button>
+                                                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleRejectWithdrawal(e.withdrawalId)} disabled={isSubmitting}><X className="h-3 w-3"/></Button>
+                                                                        </div>
+                                                                    )}
                                                                     <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openEditDialog(e, 'withdrawal')}><Pencil className="h-3 w-3"/></Button>
                                                                     <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleDeleteEntry(e.withdrawalId, 'withdrawal')}><Trash className="h-3 w-3"/></Button>
                                                                 </TableCell>
@@ -632,7 +644,7 @@ export function InvestorsPortfolioTab() {
 
       <AlertDialog open={deleteInvestorOpen} onOpenChange={setDeleteInvestorOpen}>
           <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Delete Portfolio?</AlertDialogTitle><AlertDialogDescription>This action is irreversible.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action is irreversible.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Delete</AlertDialogAction>
