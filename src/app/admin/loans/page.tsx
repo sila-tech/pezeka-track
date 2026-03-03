@@ -16,6 +16,7 @@ import {
   DialogTrigger,
   DialogFooter,
   DialogClose,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -194,7 +195,7 @@ export default function LoansPage() {
   const isStaff = user?.role === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  const canAdd = isAuthorized; // Allow staff to also add loans
+  const canAdd = isAuthorized;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -552,6 +553,7 @@ export default function LoansPage() {
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Add a New Loan</DialogTitle>
+                <DialogDescription>Input specific terms to disburse a new credit facility.</DialogDescription>
               </DialogHeader>
               <Form {...form}>
                 <ScrollArea className="max-h-[65vh] pr-4">
@@ -727,6 +729,7 @@ export default function LoansPage() {
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
                   <DialogTitle>Application Details</DialogTitle>
+                  <DialogDescription>Full summary of the customer's self-submitted application.</DialogDescription>
               </DialogHeader>
               {viewingApplication && (
                   <div className="space-y-4 py-4">
@@ -770,7 +773,10 @@ export default function LoansPage() {
         <DialogContent className="sm:max-w-2xl">
             {applicationToManage && (
                 <>
-                    <DialogHeader><DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>Process Application #{applicationToManage.loanNumber}</DialogTitle>
+                        <DialogDescription>Finalize terms and assign a follow-up staff member before disbursement.</DialogDescription>
+                    </DialogHeader>
                     <ScrollArea className="max-h-[65vh] pr-4">
                         <Form {...approvalForm}>
                             <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4 py-2">
@@ -830,7 +836,10 @@ export default function LoansPage() {
           <DialogContent className="sm:max-w-5xl">
               {loanToEdit && (
                   <>
-                    <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
+                        <DialogDescription>Review interactions, record payments, and track the recovery history.</DialogDescription>
+                    </DialogHeader>
                     <ScrollArea className="max-h-[75vh]">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
                             <div className="space-y-4 md:col-span-1">
@@ -970,7 +979,10 @@ export default function LoansPage() {
       {/* Edit Terms Dialog */}
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
           <DialogContent>
-              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments.</DialogDescription></DialogHeader>
+              <DialogHeader>
+                  <DialogTitle>Update Loan Terms</DialogTitle>
+                  <DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments.</DialogDescription>
+              </DialogHeader>
               <Form {...editTermsForm}>
                   <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">

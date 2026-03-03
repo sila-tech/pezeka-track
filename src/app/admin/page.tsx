@@ -307,7 +307,7 @@ export default function Dashboard() {
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
                                                 <TableHead>Next Due</TableHead>
-                                                <TableHead className="text-right">Instalment</TableHead>
+                                                <TableHead className="text-right">Due Amt</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -333,7 +333,7 @@ export default function Dashboard() {
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
                                                 <TableHead>Next Due</TableHead>
-                                                <TableHead className="text-right">Instalment</TableHead>
+                                                <TableHead className="text-right">Due Amt</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>

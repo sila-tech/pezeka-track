@@ -245,6 +245,7 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
+  // Hardcoded to zero as per user requirement
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -437,7 +438,7 @@ export default function FinancePage() {
   const handleStaffReassignment = async (staffId: string) => {
       if (!loanToEdit) return;
       let updateData: any = {};
-      if (staffId === 'unassigned') updateData = { assignedStaffId: "", assignedStaffName: "" };
+      if (staffId === 'unassigned') updateData = { assignedStaffId: "" , assignedStaffName: "" };
       else {
           const staffMember = staffList?.find((s: any) => (s.id) === staffId);
           if (!staffMember) return;
@@ -448,33 +449,6 @@ export default function FinancePage() {
           toast({ title: 'Staff Re-assigned' });
           setLoanToEdit({ ...loanToEdit, ...updateData });
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); }
-  };
-
-  const penaltyCalculation = useMemo(() => {
-      if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
-      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
-      const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
-      const dailyRate = oneInstInterest / daysInFreq;
-      
-      let dDate: Date;
-      if (loanToEdit.disbursementDate instanceof Date) dDate = loanToEdit.disbursementDate;
-      else dDate = new Date((loanToEdit.disbursementDate as any).seconds * 1000);
-
-      let finalDueDate: Date;
-      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
-      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments);
-      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments);
-      
-      const daysLate = differenceInDays(new Date(), finalDueDate);
-      const validDaysLate = daysLate > 0 ? daysLate : 0;
-      return { dailyRate, daysLate: validDaysLate, suggested: Math.round(validDaysLate * dailyRate) };
-  }, [loanToEdit]);
-
-  const authorizeSuggestedPenalty = () => {
-      if (!penaltyCalculation.suggested) return;
-      penaltyForm.setValue('penaltyAmount', penaltyCalculation.suggested);
-      penaltyForm.setValue('penaltyDate', format(new Date(), 'yyyy-MM-dd'));
-      penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
   };
 
   if (userLoading || loansLoading || financeEntriesLoading || staffLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
