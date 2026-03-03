@@ -318,6 +318,33 @@ export default function FinancePage() {
       resolver: zodResolver(editTermsSchema),
   });
 
+  const penaltyCalculation = useMemo(() => {
+      if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
+      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
+      const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
+      const dailyRate = oneInstInterest / daysInFreq;
+      
+      let dDate: Date;
+      if (loanToEdit.disbursementDate instanceof Date) dDate = loanToEdit.disbursementDate;
+      else dDate = new Date((loanToEdit.disbursementDate as any).seconds * 1000);
+
+      let finalDueDate: Date;
+      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
+      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments);
+      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments);
+      
+      const daysLate = differenceInDays(new Date(), finalDueDate);
+      const validDaysLate = daysLate > 0 ? daysLate : 0;
+      return { dailyRate, daysLate: validDaysLate, suggested: Math.round(validDaysLate * dailyRate) };
+  }, [loanToEdit]);
+
+  const authorizeSuggestedPenalty = () => {
+      if (!penaltyCalculation.suggested) return;
+      penaltyForm.setValue('penaltyAmount', penaltyCalculation.suggested);
+      penaltyForm.setValue('penaltyDate', format(new Date(), 'yyyy-MM-dd'));
+      penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
+  };
+
   const addFinanceEntryType = addForm.watch('type');
 
   useEffect(() => {
