@@ -657,7 +657,7 @@ export default function LoansPage() {
             <TabsTrigger value="all">Active Debt ({filteredLoans.length})</TabsTrigger>
             <TabsTrigger value="applications">Pending Applications ({applicationLoans.length})</TabsTrigger>
         </TabsList>
-        <TabsContent value="all">
+        <TabsContent value="all" className="m-0">
             <Card>
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle>Portfolio Ledger</CardTitle>
@@ -692,7 +692,7 @@ export default function LoansPage() {
                 </CardContent>
             </Card>
         </TabsContent>
-        <TabsContent value="applications">
+        <TabsContent value="applications" className="m-0">
             <Card>
                 <CardHeader><CardTitle>Review Applications</CardTitle></CardHeader>
                 <CardContent>
@@ -829,6 +829,31 @@ export default function LoansPage() {
                 </>
             )}
         </DialogContent>
+      </Dialog>
+
+      {/* Update Terms Dialog */}
+      <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Update Loan Terms</DialogTitle>
+                  <DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments.</DialogDescription>
+              </DialogHeader>
+              <Form {...editTermsForm}>
+                  <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="paymentFrequency" render={({field}) => (
+                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                          )}/>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isUpdating}>
+                          {isUpdating && <Loader2 className="mr-2 animate-spin" />} Save & Recalculate
+                      </Button>
+                  </form>
+              </Form>
+          </DialogContent>
       </Dialog>
 
       {/* Management Dialog for Existing Loans */}
@@ -973,31 +998,6 @@ export default function LoansPage() {
                     <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
-          </DialogContent>
-      </Dialog>
-
-      {/* Edit Terms Dialog */}
-      <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>Update Loan Terms</DialogTitle>
-                  <DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments.</DialogDescription>
-              </DialogHeader>
-              <Form {...editTermsForm}>
-                  <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                          <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
-                          <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                          <FormField control={editTermsForm.control} name="paymentFrequency" render={({field}) => (
-                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
-                          )}/>
-                      </div>
-                      <Button type="submit" className="w-full" disabled={isUpdating}>
-                          {isUpdating && <Loader2 className="mr-2 animate-spin" />} Save & Recalculate
-                      </Button>
-                  </form>
-              </Form>
           </DialogContent>
       </Dialog>
     </div>

@@ -23,7 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -448,7 +448,8 @@ export function InvestorsPortfolioTab() {
                           )
                       })}
                   </TableBody>
-                   <TableRow className="font-bold bg-muted/50 sticky bottom-0">
+                  <TableFooter>
+                    <TableRow className="font-bold bg-muted/50">
                         <TableCell>Totals</TableCell>
                         <TableCell className="text-right">{(portfolioTotals.initial || 0).toLocaleString()}</TableCell>
                         <TableCell className="text-right text-destructive">{(portfolioTotals.withdrawn || 0).toLocaleString()}</TableCell>
@@ -456,6 +457,7 @@ export function InvestorsPortfolioTab() {
                         <TableCell className="text-right text-green-600">{((portfolioTotals.balance + portfolioTotals.withdrawn - portfolioTotals.initial) || 0).toLocaleString()}</TableCell>
                         <TableCell />
                     </TableRow>
+                  </TableFooter>
               </Table>
             </ScrollArea>
           )}

@@ -5,7 +5,7 @@ import { DateRange } from 'react-day-picker';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfToday, endOfToday, format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, FileDown, Loader2, Search } from 'lucide-react';
@@ -215,11 +215,13 @@ export function FinanceReportTab({ title, description, entries, loading }: Finan
                     <TableCell className="text-right">{entry.amount.toLocaleString()}</TableCell>
                     </TableRow>
                 ))}
+                </TableBody>
+                <TableFooter>
                     <TableRow className="font-bold bg-muted/50">
                         <TableCell colSpan={2} className="text-right">Total</TableCell>
                         <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
                     </TableRow>
-                </TableBody>
+                </TableFooter>
             </Table>
           </ScrollArea>
         )}
