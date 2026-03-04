@@ -13,8 +13,6 @@ import { cn } from '@/lib/utils';
 
 
 const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, isStaff: boolean, onLinkClick?: () => void }) => {
-    const isManager = isSuperAdmin || isFinance;
-    const isCustomerService = isManager || isStaff;
     const pathname = usePathname();
     
     const linkClass = (path: string) => cn(
@@ -24,76 +22,42 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
 
     return (
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
-            <Link
-                href="/admin"
-                className={linkClass("/admin")}
-                onClick={onLinkClick}
-            >
+            <Link href="/admin" className={linkClass("/admin")} onClick={onLinkClick}>
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
             </Link>
             
-            {isCustomerService && (
-                <Link
-                    href="/admin/customers"
-                    className={linkClass("/admin/customers")}
-                    onClick={onLinkClick}
-                >
-                    <Users className="h-4 w-4" />
-                    Customers
-                </Link>
-            )}
+            <Link href="/admin/customers" className={linkClass("/admin/customers")} onClick={onLinkClick}>
+                <Users className="h-4 w-4" />
+                Customers
+            </Link>
 
-            {isCustomerService && (
-                <Link
-                    href="/admin/loans"
-                    className={linkClass("/admin/loans")}
-                    onClick={onLinkClick}
-                >
-                    <HandCoins className="h-4 w-4" />
-                    Loans
-                </Link>
-            )}
+            <Link href="/admin/loans" className={linkClass("/admin/loans")} onClick={onLinkClick}>
+                <HandCoins className="h-4 w-4" />
+                Loans
+            </Link>
             
-            {isManager && (
-                <Link
-                    href="/admin/finance"
-                    className={linkClass("/admin/finance")}
-                    onClick={onLinkClick}
-                >
+            {(isFinance || isSuperAdmin) && (
+                <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
                     <FileDown className="h-4 w-4" />
                     Finance
                 </Link>
             )}
 
-            {isCustomerService && (
-                <Link
-                    href="/admin/application-forms"
-                    className={linkClass("/admin/application-forms")}
-                    onClick={onLinkClick}
-                >
-                    <FileText className="h-4 w-4" />
-                    Application Forms
-                </Link>
-            )}
+            <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
+                <FileText className="h-4 w-4" />
+                Application Forms
+            </Link>
 
             {(isFinance || isSuperAdmin) && (
-                <Link
-                    href="/admin/investors"
-                    className={linkClass("/admin/investors")}
-                    onClick={onLinkClick}
-                >
+                <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
                     <Briefcase className="h-4 w-4" />
                     Investors
                 </Link>
             )}
 
             {isSuperAdmin && (
-                <Link
-                    href="/admin/users"
-                    className={linkClass("/admin/users")}
-                    onClick={onLinkClick}
-                >
+                <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
                     <ShieldCheck className="h-4 w-4" />
                     User Management
                 </Link>
@@ -128,9 +92,7 @@ export default function AdminLayout({
         }
     }, [user, loading, isAuthorized, isLoginPage, router]);
     
-    if (isLoginPage) {
-        return <>{children}</>;
-    }
+    if (isLoginPage) return <>{children}</>;
     
     if (loading || !isAuthorized) {
         return (
@@ -190,10 +152,7 @@ export default function AdminLayout({
                     <NavLinks isFinance={isFinance} isSuperAdmin={isSuperAdmin} isStaff={isStaff} onLinkClick={() => setMobileMenuOpen(false)} />
                 </div>
                  <div className="mt-auto p-4 border-t">
-                  <Button onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }} variant="ghost" className="w-full justify-start">
+                  <Button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} variant="ghost" className="w-full justify-start">
                       <LogOut className="mr-2 h-4 w-4" />
                       Logout
                   </Button>
