@@ -556,8 +556,7 @@ export default function LoansPage() {
                             </form>
                         </Form>
                     </ScrollArea>
-                    <DialogFooter className="mt-6"><Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button><Button variant="destructive" onClick={handleReject}>Reject</Button><Button type="submit" form="approval-form" disabled={isUpdatingStatus}>{isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Approve & Disburse</Button></DialogFooter>
-                </>
+                    <DialogFooter className="mt-6"><Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button><Button variant="destructive" onClick={handleReject}>Reject</Button><Button type="submit" form="approval-form" disabled={isUpdatingStatus}>{isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Approve & Disburse</Button></>
             )}
         </DialogContent>
       </Dialog>
