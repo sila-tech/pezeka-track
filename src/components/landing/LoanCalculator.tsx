@@ -21,31 +21,31 @@ export default function LoanCalculator() {
     const n = Number(period) || 0;
     
     let interest = 0;
-    let appraisalFee = 0;
-    let registrationFee = 0;
+    let appraisalFee = principal * 0.10; // Standard 10% appraisal fee across requested products
     let amountReceived = 0;
     let totalRepayable = 0;
 
     if (loanType === 'Quick Pesa') {
-        // Quick Pesa: 20% interest deducted upfront, 500 reg fee, no appraisal
-        interest = principal * 0.20;
-        registrationFee = 500;
-        appraisalFee = 0;
-        amountReceived = principal - interest - registrationFee;
+        // Quick Pesa: 10% interest deducted upfront, 10% appraisal deducted upfront
+        interest = principal * 0.10;
+        amountReceived = principal - interest - appraisalFee;
         totalRepayable = principal; // Interest already paid upfront
+    } else if (loanType === 'Logbook Loan') {
+        // Logbook: 10% monthly interest, 10% appraisal deducted upfront
+        let numberOfMonths = 0;
+        if (frequency === 'monthly') numberOfMonths = n;
+        else if (frequency === 'weekly') numberOfMonths = n / 4;
+        else if (frequency === 'daily') numberOfMonths = n / 28;
+
+        interest = principal * 0.10 * numberOfMonths;
+        amountReceived = principal - appraisalFee;
+        totalRepayable = principal + interest;
     } else {
         // Business: 5% monthly interest, 10% appraisal fee deducted upfront
-        appraisalFee = principal * 0.10;
-        registrationFee = 0;
-        
         let numberOfMonths = 0;
-        if (frequency === 'monthly') {
-            numberOfMonths = n;
-        } else if (frequency === 'weekly') {
-            numberOfMonths = n / 4;
-        } else if (frequency === 'daily') {
-            numberOfMonths = n / 28;
-        }
+        if (frequency === 'monthly') numberOfMonths = n;
+        else if (frequency === 'weekly') numberOfMonths = n / 4;
+        else if (frequency === 'daily') numberOfMonths = n / 28;
 
         interest = principal * 0.05 * numberOfMonths;
         amountReceived = principal - appraisalFee;
@@ -73,7 +73,6 @@ export default function LoanCalculator() {
     return {
       principal,
       appraisalFee,
-      registrationFee,
       interest,
       totalRepayable,
       amountReceived,
@@ -108,8 +107,9 @@ export default function LoanCalculator() {
             </div>
             
             <div className="text-sm text-muted-foreground bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-1">
-                <p><span className="font-bold text-primary">Quick Pesa:</span> 20% interest (upfront), 500 Ksh Reg fee.</p>
-                <p><span className="font-bold text-primary">Business Loan:</span> 5% monthly interest, 10% appraisal fee.</p>
+                <p><span className="font-bold text-primary">Quick Pesa:</span> 10% Interest (Upfront), 10% Appraisal.</p>
+                <p><span className="font-bold text-primary">Logbook Loan:</span> 10% Monthly Interest, 10% Appraisal.</p>
+                <p><span className="font-bold text-primary">Business Loan:</span> 5% Monthly Interest, 10% Appraisal.</p>
             </div>
 
             <div className="space-y-5 pt-4">
@@ -120,8 +120,9 @@ export default function LoanCalculator() {
                           <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="Quick Pesa">Quick Pesa (Upfront Interest)</SelectItem>
-                          <SelectItem value="Individual & Business Loan">Business Loan (Monthly 5%)</SelectItem>
+                          <SelectItem value="Quick Pesa">Quick Pesa (10% Upfront)</SelectItem>
+                          <SelectItem value="Individual & Business Loan">Business Loan (5% Monthly)</SelectItem>
+                          <SelectItem value="Logbook Loan">Logbook Loan (10% Monthly)</SelectItem>
                       </SelectContent>
                   </Select>
               </div>
@@ -187,9 +188,7 @@ export default function LoanCalculator() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ResultCard label="Amount borrowed" value={`KES ${results.principal.toLocaleString()}`} />
-              {loanType !== 'Quick Pesa' && (
-                  <ResultCard label="Appraisal Fee (10%)" value={`KES ${results.appraisalFee.toLocaleString()}`} />
-              )}
+              <ResultCard label="Appraisal Fee (10%)" value={`KES ${results.appraisalFee.toLocaleString()}`} />
               <ResultCard label="Interest Component" value={`KES ${results.interest.toLocaleString()}`} />
               <ResultCard label="Total to Repay" value={`KES ${results.totalRepayable.toLocaleString()}`} highlight />
               <ResultCard label={`${frequency.charAt(0).toUpperCase() + frequency.slice(1)} Instalment`} value={`KES ${results.instalmentAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
