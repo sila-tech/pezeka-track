@@ -186,8 +186,8 @@ export default function LoansPage() {
   const { toast } = useToast();
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com';
-  const isFinance = user?.role === 'finance';
-  const isStaff = user?.role === 'staff';
+  const isFinance = user?.role?.toLowerCase() === 'finance';
+  const isStaff = user?.role?.toLowerCase() === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
 
@@ -237,19 +237,19 @@ export default function LoansPage() {
   });
 
   const { watch } = form;
-  const principalAmount = watch('principalAmount');
-  const interestRate = watch('interestRate');
-  const numberOfInstalments = watch('numberOfInstalments');
-  const paymentFrequency = watch('paymentFrequency');
-  const customerType = watch('customerType');
+  const principalAmountWatch = watch('principalAmount');
+  const interestRateWatch = watch('interestRate');
+  const numberOfInstalmentsWatch = watch('numberOfInstalments');
+  const paymentFrequencyWatch = watch('paymentFrequency');
+  const customerTypeWatch = watch('customerType');
 
   const calculatedValues = useMemo(() => {
-    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmount || 0, interestRate || 0, numberOfInstalments || 0, paymentFrequency);
+    const { instalmentAmount, totalRepayableAmount } = calculateAmortization(principalAmountWatch || 0, interestRateWatch || 0, numberOfInstalmentsWatch || 0, paymentFrequencyWatch);
     return {
         instalmentAmount: instalmentAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
         totalRepayableAmount: totalRepayableAmount.toLocaleString(undefined, { minimumFractionDigits: 2 }),
     };
-  }, [principalAmount, interestRate, numberOfInstalments, paymentFrequency]);
+  }, [principalAmountWatch, interestRateWatch, numberOfInstalmentsWatch, paymentFrequencyWatch]);
 
 
   async function onSubmit(values: z.infer<typeof loanSchema>) {
@@ -409,7 +409,7 @@ export default function LoansPage() {
                           </RadioGroup>
                         </FormItem>
                     )} />
-                    {customerType === 'existing' ? (
+                    {customerTypeWatch === 'existing' ? (
                       <FormField control={form.control} name="customerId" render={({ field }) => (
                           <FormItem className="col-span-2">
                             <FormLabel>Customer</FormLabel>
@@ -473,7 +473,7 @@ export default function LoansPage() {
                 <CardContent>
                     <ScrollArea className="h-[60vh]">
                       <Table>
-                          <TableHeader><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Staff Assigned</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
+                          <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Staff Assigned</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                           <TableBody>
                               {filteredLoans.map((loan) => (
                                   <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>

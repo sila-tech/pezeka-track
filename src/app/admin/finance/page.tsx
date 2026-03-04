@@ -5,14 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { PlusCircle, Loader2 } from "lucide-react";
+import { PlusCircle, Loader2, AlertCircle } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -56,8 +56,8 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com';
-  const isFinance = user?.role === 'finance';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isFinance = user?.role?.toLowerCase() === 'finance';
   const isAuthorized = isSuperAdmin || isFinance;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);

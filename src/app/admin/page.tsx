@@ -69,8 +69,8 @@ export default function Dashboard() {
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
-  const isStaffMember = user?.role === 'staff' || user?.role === 'finance' || user?.email?.toLowerCase() === 'simon@pezeka.com';
+  const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'staff' || user.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') : false;
+  const isStaffMember = user?.role?.toLowerCase() === 'staff' || user?.role?.toLowerCase() === 'finance' || user?.email?.toLowerCase() === 'simon@pezeka.com';
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
@@ -229,7 +229,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {(user?.role === 'staff' || user?.email?.toLowerCase() === 'simon@pezeka.com') && (
+      {(user?.role?.toLowerCase() === 'staff' || user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') && (
           <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary</h3>
               <div className="grid gap-4 md:grid-cols-3">
@@ -241,7 +241,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-         {(user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.role === 'finance') && (
+         {(user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') && (
            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Realized Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh 0</div></CardContent></Card>
          )}
          <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Loans Disbursed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.disbursedCount || 0}</div></CardContent></Card>
@@ -356,11 +356,11 @@ export default function Dashboard() {
             </CardContent>
         </Card>
 
-        {user?.role === 'staff' ? (
+        {user?.role?.toLowerCase() === 'staff' ? (
             <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div><div className="text-[9px] text-muted-foreground uppercase">{loan.paymentFrequency}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
         ) : (
             <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>New Applications</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
-                    {newApplications.length === 0 ? (<Alert><AlertTitle>No New Applications</AlertTitle></Alert>) : (
+                    {newApplications.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No New Applications</AlertTitle></Alert></div>) : (
                         <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{newApplications.map((loan) => (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div></TableCell><TableCell>{loan.loanType}</TableCell><TableCell className="text-right font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                     )}
                 </CardContent></Card>

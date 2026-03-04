@@ -90,7 +90,7 @@ export default function InvestorsPage() {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase();
         const role = currentUser.role?.toLowerCase();
-        return email === 'simon@pezeka.com' || role === 'finance';
+        return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
 
     useEffect(() => {

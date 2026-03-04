@@ -1,25 +1,21 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { 
-    applyInterestToPortfolio, processWithdrawal, rejectWithdrawal, deleteInvestor, approveDeposit, rejectDeposit, updateInvestorInterestEntry, deleteInvestorInterestEntry, updateInvestorDepositEntry, deleteInvestorDepositEntry, updateInvestorWithdrawalEntry, deleteInvestorWithdrawalEntry, updateInvestor
+    applyInterestToPortfolio, approveDeposit, rejectDeposit, deleteInvestor
 } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, PenSquare, Trash2, Check, X, Calculator, Pencil, Trash, RefreshCw } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, PenSquare, Check, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,7 +26,6 @@ interface Withdrawal { withdrawalId: string; date: any; amount: number; status: 
 interface Deposit { depositId: string; date: any; amount: number; status: 'pending' | 'approved' | 'rejected'; }
 interface Investor { id: string; uid: string; name: string; email: string; totalInvestment: number; totalWithdrawn: number; currentBalance: number; interestRate?: number; createdAt: any; interestEntries?: InterestEntry[]; withdrawals?: Withdrawal[]; deposits?: Deposit[]; }
 
-const editEntrySchema = z.object({ amount: z.coerce.number().min(0.01), description: z.string().optional() });
 const investorTermsSchema = z.object({ interestRate: z.coerce.number().min(0) });
 
 export function InvestorsPortfolioTab() {
@@ -42,13 +37,10 @@ export function InvestorsPortfolioTab() {
   const [selectedInvestor, setSelectedInvestor] = useState<Investor | null>(null);
   const [investorToDelete, setInvestorToDelete] = useState<Investor | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editEntryOpen, setEditEntryOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<{ id: string, type: 'interest' | 'deposit' | 'withdrawal' } | null>(null);
 
-  const editForm = useForm<z.infer<typeof editEntrySchema>>({ resolver: zodResolver(editEntrySchema) });
   const termsForm = useForm<z.infer<typeof investorTermsSchema>>({ resolver: zodResolver(investorTermsSchema) });
 
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'finance') : false;
+  const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'finance') : false;
   const { data: investors, loading } = useCollection<Investor>(isAuthorized ? 'investors' : null);
 
   const monthlyInterest = useMemo(() => {
