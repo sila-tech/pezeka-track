@@ -245,7 +245,7 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
-  // Hardcoded to zero as per user requirement
+  // Hardcoded zero-stats summary
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
@@ -606,8 +606,8 @@ export default function FinancePage() {
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts</TabsTrigger>
               <TabsTrigger value="txfees">Transaction Fees</TabsTrigger>
-              <TabsTrigger value="investors">Investors</TabsTrigger>
-              <TabsTrigger value="staff-portfolios">Staff Portfolios</TabsTrigger>
+              {(isSuperAdmin || isFinance) && <TabsTrigger value="investors">Investors</TabsTrigger>}
+              {(isSuperAdmin || isFinance) && <TabsTrigger value="staff-portfolios">Staff Portfolios</TabsTrigger>}
           </TabsList>
           
           <TabsContent value="loanbook">
@@ -739,13 +739,17 @@ export default function FinancePage() {
             <EditableFinanceReportTab title="Transaction Fees" description="Payment processing costs." entries={financialData.allTransactionFees} loading={false} />
           </TabsContent>
           
-          <TabsContent value="investors">
-            <InvestorsPortfolioTab />
-          </TabsContent>
+          {(isSuperAdmin || isFinance) && (
+            <TabsContent value="investors">
+              <InvestorsPortfolioTab />
+            </TabsContent>
+          )}
 
-          <TabsContent value="staff-portfolios">
-            <StaffPortfoliosTab loans={disbursedLoans} staffList={staffList} />
-          </TabsContent>
+          {(isSuperAdmin || isFinance) && (
+            <TabsContent value="staff-portfolios">
+              <StaffPortfoliosTab loans={disbursedLoans} staffList={staffList} />
+            </TabsContent>
+          )}
       </Tabs>
 
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
@@ -810,7 +814,13 @@ export default function FinancePage() {
                                                 </div>
                                             </form>
                                         </Form>
-                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
+                                        <ScrollArea className="h-64 border rounded-md">
+                                            <Table>
+                                                <TableBody>
+                                                    {loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}
+                                                </TableBody>
+                                            </Table>
+                                        </ScrollArea>
                                     </TabsContent>
 
                                     <TabsContent value="followups">

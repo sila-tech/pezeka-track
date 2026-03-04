@@ -1,7 +1,10 @@
+'use client';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useAppUser } from '@/firebase';
 
 const forms = [
   {
@@ -22,6 +25,14 @@ const forms = [
 ];
 
 export default function ApplicationFormsPage() {
+  const { user, loading } = useAppUser();
+  
+  const userRole = user?.role?.toLowerCase();
+  const isAuthorized = user && (user.email === 'simon@pezeka.com' || userRole === 'finance' || userRole === 'staff');
+
+  if (loading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!isAuthorized) return <div className="p-12 text-center">Access Denied</div>;
+
   return (
     <div>
       <h1 className="text-3xl font-bold tracking-tight mb-4">Application Forms</h1>
