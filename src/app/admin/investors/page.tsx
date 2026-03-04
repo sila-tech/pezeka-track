@@ -88,8 +88,9 @@ export default function InvestorsPage() {
     
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
+        const email = currentUser.email?.toLowerCase();
         const role = currentUser.role?.toLowerCase();
-        return currentUser.email === 'simon@pezeka.com' || role === 'finance';
+        return email === 'simon@pezeka.com' || role === 'finance';
     }, [currentUser]);
 
     useEffect(() => {
@@ -185,7 +186,8 @@ export default function InvestorsPage() {
           {investorsLoading && (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>)}
           {!investorsLoading && (!investors || investors.length === 0) ? (<Alert><AlertTitle>No Investors Found</AlertTitle></Alert>) : !investorsLoading && (
             <ScrollArea className="h-[60vh]">
-              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
+              <Table>
+                  <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>{investors?.map((investor) => (
                           <TableRow key={investor.id}><TableCell className="font-medium">{investor.name}</TableCell><TableCell>{investor.email}</TableCell><TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell><TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(investor)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(investor)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
                         ))}</TableBody>

@@ -69,8 +69,8 @@ export default function Dashboard() {
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  const isAuthorized = user ? (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
-  const isStaffMember = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com';
+  const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance') : false;
+  const isStaffMember = user?.role === 'staff' || user?.role === 'finance' || user?.email?.toLowerCase() === 'simon@pezeka.com';
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
@@ -133,17 +133,14 @@ export default function Dashboard() {
   }, [loans, user]);
 
   const stats = useMemo(() => {
-    if (!loans) return { realizedRevenue: 0, disbursedCount: 0 };
-    let realizedRevenue = 0;
+    if (!loans) return { disbursedCount: 0 };
     let disbursedCount = 0;
     loans.forEach(loan => {
         if (loan.status !== 'application' && loan.status !== 'rejected') {
             disbursedCount++;
-            realizedRevenue += (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
-            if (loan.totalPaid > loan.principalAmount) realizedRevenue += (loan.totalPaid - loan.principalAmount);
         }
     });
-    return { realizedRevenue, disbursedCount };
+    return { disbursedCount };
   }, [loans]);
 
   const myPortfolioStats = useMemo(() => {
@@ -161,7 +158,7 @@ export default function Dashboard() {
         const dDate = new Date(loan.disbursementDate.seconds * 1000);
         
         const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
-        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || paidInstalments >= loan.numberOfInstalments;
+        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || (loan.numberOfInstalments > 0 && paidInstalments >= loan.numberOfInstalments);
         
         let nextDueDate: Date;
         if (allInstalmentsPaid) {
@@ -232,7 +229,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {(user?.role === 'staff' || user?.email === 'simon@pezeka.com') && (
+      {(user?.role === 'staff' || user?.email?.toLowerCase() === 'simon@pezeka.com') && (
           <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary</h3>
               <div className="grid gap-4 md:grid-cols-3">
@@ -244,8 +241,8 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-         {(user?.email === 'simon@pezeka.com' || user?.role === 'finance') && (
-           <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Realized Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh {(stats?.realizedRevenue || 0).toLocaleString()}</div></CardContent></Card>
+         {(user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.role === 'finance') && (
+           <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Realized Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh 0</div></CardContent></Card>
          )}
          <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Loans Disbursed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.disbursedCount || 0}</div></CardContent></Card>
       </div>

@@ -1,25 +1,24 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format, addDays, addWeeks, addMonths, differenceInDays, startOfToday } from "date-fns";
-import { PlusCircle, Search, Loader2, User, Plus, AlertCircle, ShieldCheck, Pencil } from "lucide-react";
+import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
+import { PlusCircle, Loader2 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, deleteFinanceEntry, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, addFollowUpNoteToLoan } from '@/lib/firestore';
-import { Textarea } from '@/components/ui/textarea';
+import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry } from '@/lib/firestore';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
@@ -52,16 +51,12 @@ export default function FinancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isAddingPenalty, setIsAddingPenalty] = useState(false);
-  const [isEditingTerms, setIsEditingTerms] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email === 'simon@pezeka.com';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance';
   const isAuthorized = isSuperAdmin || isFinance;
 
@@ -69,31 +64,20 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList } = useCollection<any>(isAuthorized ? 'users' : null);
 
-  const stats = { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
-
   const financialData = useMemo(() => {
     const receipts: any[] = [];
-    const upfront: any[] = [];
     const payouts: any[] = [];
-    const expenses: any[] = [];
-    const txFees: any[] = [];
-    if (!loans || !financeEntries) return { allReceipts: [], allUpfrontFees: [], allPayouts: [], allExpenses: [], allTransactionFees: [] };
+    if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [] };
     
     loans.filter(l => l.status !== 'application').forEach(loan => {
-        const fees = (loan.registrationFee || 0) + (loan.processingFee || 0) + (loan.carTrackInstallationFee || 0) + (loan.chargingCost || 0);
-        if (fees > 0) upfront.push({ id: `fee-${loan.id}`, date: loan.disbursementDate, amount: fees, description: `Upfront Fees: Loan #${loan.loanNumber}` });
         (loan.payments || []).forEach(p => receipts.push({ id: p.paymentId, date: p.date, amount: p.amount, description: `Repayment: Loan #${loan.loanNumber}`, receiptCategory: 'loan_repayment' }));
     });
 
     financeEntries.forEach(e => {
         if (e.type === 'receipt') receipts.push(e);
-        else {
-            payouts.push(e);
-            if (e.type === 'expense') expenses.push(e);
-            if (e.transactionFee) txFees.push({ id: `tx-${e.id}`, date: e.date, amount: e.transactionFee, description: `Fee for: ${e.description}` });
-        }
+        else payouts.push(e);
     });
-    return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: txFees };
+    return { allReceipts: receipts, allPayouts: payouts };
   }, [loans, financeEntries]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
@@ -116,8 +100,8 @@ export default function FinancePage() {
   }, [loanToEdit]);
 
   const authorizeSuggestedPenalty = () => {
-      if (penaltyCalculation.suggested > 0) {
-          addPenaltyToLoan(firestore, loanToEdit!.id, { amount: penaltyCalculation.suggested, date: new Date(), description: "Late payment penalty" }).then(() => toast({ title: "Penalty Applied" }));
+      if (penaltyCalculation.suggested > 0 && loanToEdit) {
+          addPenaltyToLoan(firestore, loanToEdit.id, { amount: penaltyCalculation.suggested, date: new Date(), description: "Late payment penalty" }).then(() => toast({ title: "Penalty Applied" }));
       }
   };
 
@@ -163,9 +147,9 @@ export default function FinancePage() {
           <TabsContent value="loanbook">
               <Card><CardHeader><CardTitle>Internal Ledger</CardTitle></CardHeader>
                   <CardContent className="p-0">
-                      <ScrollArea className="h-[65vh] w-full"><Table className="min-w-[2000px]">
+                      <ScrollArea className="h-[65vh] w-full"><Table className="min-w-[1200px]">
                           <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Loan No.</TableHead><TableHead className="text-right">Principal</TableHead><TableHead className="text-right">Instalment</TableHead><TableHead className="text-right">Total Paid</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
-                          <TableBody>{loans?.filter(l => l.status !== 'application').map(loan => (
+                          <TableBody>{loans?.filter(l => l.status !== 'application' && l.status !== 'rejected').map(loan => (
                               <TableRow key={loan.id} className="cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                                   <TableCell>{loan.customerName}</TableCell><TableCell>{loan.loanNumber}</TableCell><TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell><TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell><TableCell className="text-right">{loan.totalPaid.toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge>{loan.status}</Badge></TableCell>
                               </TableRow>
@@ -183,7 +167,7 @@ export default function FinancePage() {
       <Dialog open={!!loanToEdit} onOpenChange={(open) => !open && setLoanToEdit(null)}>
           <DialogContent className="sm:max-w-4xl">{loanToEdit && (
               <>
-                <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><DialogDescription>Adjust terms or record payments.</DialogDescription></DialogHeader>
+                <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><DialogDescription>Adjust terms or record late penalties.</DialogDescription></DialogHeader>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                     <Card><CardHeader><CardTitle className="text-sm">Late Penalty</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
@@ -191,8 +175,11 @@ export default function FinancePage() {
                             <Button className="w-full" disabled={penaltyCalculation.suggested <= 0} onClick={authorizeSuggestedPenalty}>Apply Penalty</Button>
                         </CardContent>
                     </Card>
-                    <Card><CardHeader><CardTitle className="text-sm">Staff Follow-up</CardTitle></CardHeader>
-                        <CardContent><Select onValueChange={(val) => handleStaffReassignment(val)} value={loanToEdit.assignedStaffId || 'unassigned'}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="unassigned">Unassigned</SelectItem>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent></Select></CardContent>
+                    <Card><CardHeader><CardTitle className="text-sm">Staff Assignment</CardTitle></CardHeader>
+                        <CardContent>
+                            <div className="text-sm mb-2">Assigned: {loanToEdit.assignedStaffName || 'None'}</div>
+                            <Badge variant="outline">Update via Loans page</Badge>
+                        </CardContent>
                     </Card>
                 </div>
                 <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, Plus, AlertCircle, ShieldCheck, MessageSquare, Pencil, RefreshCw } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, Plus, AlertCircle, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -179,14 +179,13 @@ export default function LoansPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
-  const [isAddingNote, setIsAddingNote] = useState(false);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email === 'simon@pezeka.com';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com';
   const isFinance = user?.role === 'finance';
   const isStaff = user?.role === 'staff';
   
@@ -231,11 +230,6 @@ export default function LoansPage() {
   const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
     resolver: zodResolver(penaltySchema),
     defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd'), penaltyAmount: 0, penaltyDescription: '' }
-  });
-
-  const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
-      resolver: zodResolver(followUpNoteSchema),
-      defaultValues: { content: '' },
   });
 
   const editTermsForm = useForm<z.infer<typeof editTermsSchema>>({
@@ -351,16 +345,6 @@ export default function LoansPage() {
     } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsAddingPenalty(false); }
   }
 
-  async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
-      if (!loanToEdit || !user) return;
-      setIsAddingNote(true);
-      try {
-          await addFollowUpNoteToLoan(firestore, loanToEdit.id, { content: values.content, staffName: user.name || user.email?.split('@')[0] || "Staff", staffId: user.uid });
-          toast({ title: "Note Added" });
-          noteForm.reset();
-      } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsAddingNote(false); }
-  }
-
   const handleEditTerms = (loan: Loan) => {
       editTermsForm.reset({
           interestRate: loan.interestRate || 0, principalAmount: loan.principalAmount, numberOfInstalments: loan.numberOfInstalments, paymentFrequency: loan.paymentFrequency,
@@ -380,22 +364,6 @@ export default function LoansPage() {
           setIsEditingTerms(false);
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); } finally { setIsUpdating(false); }
   }
-
-  const handleStaffReassignment = async (staffId: string) => {
-      if (!loanToEdit) return;
-      let updateData: any = {};
-      if (staffId === 'unassigned') updateData = { assignedStaffId: "", assignedStaffName: "" };
-      else {
-          const staffMember = staffList?.find((s: any) => (s.uid || s.id) === staffId);
-          if (!staffMember) return;
-          updateData = { assignedStaffId: staffId, assignedStaffName: staffMember.name || staffMember.email };
-      }
-      try {
-          await updateLoan(firestore, loanToEdit.id, updateData);
-          toast({ title: 'Staff Re-assigned' });
-          setLoanToEdit({ ...loanToEdit, ...updateData });
-      } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); }
-  };
 
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
@@ -565,7 +533,10 @@ export default function LoansPage() {
         <DialogContent className="sm:max-w-2xl">
             {applicationToManage && (
                 <>
-                    <DialogHeader><DialogTitle>Process Application</DialogTitle><DialogDescription>Finalize terms and assign a follow-up staff member.</DialogDescription></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>Process Application</DialogTitle>
+                        <DialogDescription>Finalize terms and assign a follow-up staff member.</DialogDescription>
+                    </DialogHeader>
                     <ScrollArea className="max-h-[65vh] pr-4">
                         <Form {...approvalForm}>
                             <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4 py-2">
@@ -593,7 +564,7 @@ export default function LoansPage() {
 
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
           <DialogContent>
-              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate or principal will trigger an automatic recalculation.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments.</DialogDescription></DialogHeader>
               <Form {...editTermsForm}>
                   <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
