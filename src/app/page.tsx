@@ -4,6 +4,7 @@ import Products from '@/components/landing/Products';
 import About from '@/components/landing/About';
 import Contact from '@/components/landing/Contact';
 import Footer from '@/components/landing/Footer';
+import LoanCalculator from '@/components/landing/LoanCalculator';
 
 export default function LandingPage() {
   return (
@@ -11,6 +12,7 @@ export default function LandingPage() {
       <Header />
       <main className="flex-1">
         <Hero />
+        <LoanCalculator />
         <Products />
         <About />
         <Contact />
