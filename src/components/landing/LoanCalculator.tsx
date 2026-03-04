@@ -43,11 +43,11 @@ export default function LoanCalculator() {
   return (
     <section id="calculator" className="w-full py-12 md:py-24 bg-white">
       <div className="container px-4 md:px-6">
-        <div className="grid gap-0 lg:grid-cols-2 items-stretch bg-white rounded-3xl overflow-hidden shadow-2xl border border-blue-100">
+        <div className="grid gap-0 lg:grid-cols-2 items-stretch bg-white rounded-3xl overflow-hidden shadow-2xl border border-primary/10">
           {/* Left Side: Inputs */}
-          <div className="p-8 md:p-12 space-y-6 flex flex-col justify-center border-r border-blue-50">
+          <div className="p-8 md:p-12 space-y-6 flex flex-col justify-center border-r border-muted">
             <div className="space-y-4">
-              <h2 className="text-4xl font-extrabold tracking-tighter text-blue-900">
+              <h2 className="text-4xl font-extrabold tracking-tighter text-primary">
                 Pezeka Loan Calculator <br/>Kenya 2025
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed">
@@ -56,50 +56,43 @@ export default function LoanCalculator() {
               </p>
             </div>
             
-            <div className="flex flex-wrap gap-2 pt-2">
-                <Button size="sm" variant="default" className="rounded-full px-8 bg-blue-600 hover:bg-blue-700">Pezeka</Button>
-                <Button size="sm" variant="outline" className="rounded-full px-8 opacity-40 grayscale pointer-events-none">Bank</Button>
-                <Button size="sm" variant="outline" className="rounded-full px-8 opacity-40 grayscale pointer-events-none">M-Pesa</Button>
-                <Button size="sm" variant="outline" className="rounded-full px-8 opacity-40 grayscale pointer-events-none">Tala</Button>
-            </div>
-
-            <div className="text-sm text-muted-foreground bg-blue-50 p-4 rounded-lg border border-blue-100">
-                <span className="font-bold text-blue-800">Pezeka Policy:</span> 30-day term. 10% interest rate. 10% appraisal fee (deducted from disbursement).
+            <div className="text-sm text-muted-foreground bg-primary/5 p-4 rounded-lg border border-primary/10">
+                <span className="font-bold text-primary">Pezeka Policy:</span> 30-day term. 10% interest rate. 10% appraisal fee (deducted from disbursement).
             </div>
 
             <div className="space-y-5 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="loan-amount" className="text-sm font-bold uppercase text-blue-900 tracking-wide">Loan amount (KSH)</Label>
+                <Label htmlFor="loan-amount" className="text-sm font-bold uppercase text-primary tracking-wide">Loan amount (KSH)</Label>
                 <Input
                   id="loan-amount"
                   type="number"
                   placeholder="e.g. 5,000"
                   value={amount || ''}
                   onChange={(e) => setAmount(Number(e.target.value))}
-                  className="h-14 text-xl border-2 focus:ring-blue-500 rounded-xl"
+                  className="h-14 text-xl border-2 focus:ring-primary rounded-xl"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="loan-date" className="text-sm font-bold uppercase text-blue-900 tracking-wide">Loan date</Label>
+                <Label htmlFor="loan-date" className="text-sm font-bold uppercase text-primary tracking-wide">Loan date</Label>
                 <Input
                   id="loan-date"
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="h-14 text-xl border-2 focus:ring-blue-500 rounded-xl"
+                  className="h-14 text-xl border-2 focus:ring-primary rounded-xl"
                 />
               </div>
-              <Button className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-[0.98]">
+              <Button className="w-full h-14 text-lg font-bold shadow-lg transition-all active:scale-[0.98]">
                 Calculate Pezeka Loan
               </Button>
             </div>
           </div>
 
           {/* Right Side: Results */}
-          <div className="p-8 md:p-12 space-y-8 bg-blue-600 text-white flex flex-col justify-center">
+          <div className="p-8 md:p-12 space-y-8 bg-primary text-primary-foreground flex flex-col justify-center">
             <div className="text-center space-y-2">
               <h2 className="text-5xl font-black tracking-tight">Loan Results</h2>
-              <p className="text-blue-100 text-xl font-medium tracking-wide uppercase">Pezeka Loan (30 Days)</p>
+              <p className="text-primary-foreground/80 text-xl font-medium tracking-wide uppercase">Pezeka Loan (30 Days)</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -115,13 +108,13 @@ export default function LoanCalculator() {
             </div>
 
             <div className="text-center space-y-6 pt-6">
-                <p className="text-xs text-blue-100 font-medium">
+                <p className="text-xs text-primary-foreground/70 font-medium">
                     Total fees = appraisal fee + interest. Effective fee rate = total fees ÷ amount borrowed.
                 </p>
-                <Button variant="secondary" className="w-full h-16 rounded-full text-blue-700 font-extrabold text-xl hover:bg-white shadow-xl transition-all">
+                <Button variant="secondary" className="w-full h-16 rounded-full font-extrabold text-xl shadow-xl transition-all">
                     Email Me This Loan Summary
                 </Button>
-                <p className="text-xs text-blue-100 opacity-80">
+                <p className="text-xs text-primary-foreground/60 opacity-80">
                     We'll send a simple summary of your loan calculation to your email address.
                 </p>
             </div>
@@ -134,8 +127,8 @@ export default function LoanCalculator() {
 
 function ResultCard({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`p-5 rounded-2xl border-2 ${highlight ? 'bg-blue-700 border-blue-300 shadow-inner' : 'bg-blue-800/40 border-blue-500/50'} transition-all hover:scale-[1.02]`}>
-      <p className="text-[11px] uppercase font-black text-blue-200 mb-2 tracking-widest">{label}</p>
+    <div className={`p-5 rounded-2xl border-2 ${highlight ? 'bg-primary-foreground/10 border-primary-foreground/20 shadow-inner' : 'bg-black/10 border-white/10'} transition-all hover:scale-[1.02]`}>
+      <p className="text-[11px] uppercase font-black text-primary-foreground/60 mb-2 tracking-widest">{label}</p>
       <p className="text-2xl font-black tabular-nums">{value}</p>
     </div>
   );
