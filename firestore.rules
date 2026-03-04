@@ -69,14 +69,17 @@ service cloud.firestore {
     }
 
     match /investors/{investorId} {
+      // Only Finance and Admin can list or manage all investors
       allow list: if isSuperAdmin() || isFinance();
       allow get: if isOwner(investorId) || isSuperAdmin() || isFinance();
+      allow create, delete: if isSuperAdmin() || isFinance();
+      
+      // Update rule allowing owners to update specific keys (deposits/withdrawals)
       allow update: if isSuperAdmin() || isFinance() || (isOwner(investorId) && 
                     (
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['withdrawals', 'updatedAt']) ||
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deposits', 'updatedAt'])
                     ));
-      allow create, delete: if isSuperAdmin() || isFinance();
     }
   }
 }

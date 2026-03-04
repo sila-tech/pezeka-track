@@ -938,7 +938,7 @@ export default function LoansPage() {
                                         </Form>
                                         <ScrollArea className="h-64 border rounded-md p-3">
                                             <div className="space-y-3">
-                                                {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8">No interaction history recorded.</p>) : (
+                                                {(!loanToEdit.followUpNotes || loanToEdit.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interaction history recorded.</p>) : (
                                                     [...loanToEdit.followUpNotes].reverse().map((note, index) => (
                                                         <div key={note.noteId || index} className="bg-muted p-2 rounded border text-[11px]">
                                                             <div className="flex justify-between items-center mb-1">

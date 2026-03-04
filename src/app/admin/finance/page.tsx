@@ -54,7 +54,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  TableFooter
 } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -246,10 +245,8 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
-  const stats = useMemo(() => {
-    // Hardcoded to zero as requested
-    return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
-  }, []);
+  // Hardcoded to zero as requested
+  const stats = { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
 
   const filteredLoansList = useMemo(() => {
     if(!disbursedLoans) return [];
