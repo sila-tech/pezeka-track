@@ -41,7 +41,6 @@ import {
   updateLoan, 
   approveLoanApplication, 
   addPenaltyToLoan, 
-  addFollowUpNoteToLoan, 
   rolloverLoan 
 } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -51,7 +50,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 
@@ -115,10 +113,6 @@ const penaltySchema = z.object({
     penaltyAmount: z.coerce.number().min(0.01, 'Penalty amount must be greater than 0.'),
     penaltyDate: z.string().min(1, 'Penalty date is required.'),
     penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
-});
-
-const followUpNoteSchema = z.object({
-    content: z.string().min(5, "Note must be at least 5 characters long."),
 });
 
 interface Customer {
@@ -556,7 +550,12 @@ export default function LoansPage() {
                             </form>
                         </Form>
                     </ScrollArea>
-                    <DialogFooter className="mt-6"><Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button><Button variant="destructive" onClick={handleReject}>Reject</Button><Button type="submit" form="approval-form" disabled={isUpdatingStatus}>{isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Approve & Disburse</Button></>
+                    <DialogFooter className="mt-6">
+                        <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleReject}>Reject</Button>
+                        <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>{isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Approve & Disburse</Button>
+                    </DialogFooter>
+                </>
             )}
         </DialogContent>
       </Dialog>

@@ -28,7 +28,7 @@ export default function ApplicationFormsPage() {
   const { user, loading } = useAppUser();
   
   const userRole = user?.role?.toLowerCase();
-  const isAuthorized = user && (user.email === 'simon@pezeka.com' || userRole === 'finance' || userRole === 'staff');
+  const isAuthorized = user && (user.email?.toLowerCase() === 'simon@pezeka.com' || userRole === 'finance' || userRole === 'staff');
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!isAuthorized) return <div className="p-12 text-center">Access Denied</div>;
@@ -37,20 +37,20 @@ export default function ApplicationFormsPage() {
     <div>
       <h1 className="text-3xl font-bold tracking-tight mb-4">Application Forms</h1>
       <p className="text-muted-foreground mb-6">
-        Here you can find all the printable loan application forms for your customers. Click "View Form" to see the document and then use the Print button to Save as PDF.
+        Download printable forms for offline customer registration. Click "View & Download" to open the form, then use the <strong>Print / Save as PDF</strong> button inside.
       </p>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {forms.map((form) => (
-          <Card key={form.title}>
+          <Card key={form.title} className="hover:shadow-md transition-shadow">
             <CardHeader>
-              <CardTitle>{form.title}</CardTitle>
+              <CardTitle className="text-lg">{form.title}</CardTitle>
               <CardDescription>{form.description}</CardDescription>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Button asChild className="flex-1">
+              <Button asChild className="flex-1" variant="outline">
                 <Link href={form.href} target="_blank">
                   <FileText className="mr-2 h-4 w-4" />
-                  View & Print
+                  View & Download (PDF)
                 </Link>
               </Button>
             </CardContent>
