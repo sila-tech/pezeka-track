@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { addDays, addWeeks, addMonths, format } from 'date-fns';
 
 export default function LoanCalculator() {
+  const router = useRouter();
   const [amount, setAmount] = useState<number>(5000);
   const [period, setPeriod] = useState<number>(1);
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
@@ -17,17 +19,15 @@ export default function LoanCalculator() {
     const principal = Number(amount) || 0;
     const n = Number(period) || 0;
     
-    // Appraisal fee is always 10% of principal upfront
     const appraisalFee = principal * 0.10;
     
-    // 10% Monthly Interest logic
     let numberOfMonths = 0;
     if (frequency === 'monthly') {
         numberOfMonths = n;
     } else if (frequency === 'weekly') {
         numberOfMonths = n / 4;
     } else if (frequency === 'daily') {
-        numberOfMonths = n / 28; // Standard business month normalization
+        numberOfMonths = n / 28;
     }
 
     const interest = principal * 0.10 * numberOfMonths;
@@ -59,15 +59,23 @@ export default function LoanCalculator() {
       amountReceived,
       dueDate,
       instalmentAmount,
-      effectiveRate: principal > 0 ? ((appraisalFee + interest) / principal) * 100 : 0
     };
   }, [amount, period, frequency, date]);
+
+  const handleApply = () => {
+    const pendingApplication = {
+      amount: results.principal,
+      period: period,
+      frequency: frequency
+    };
+    sessionStorage.setItem('pendingLoanApplication', JSON.stringify(pendingApplication));
+    router.push('/customer-login');
+  };
 
   return (
     <section id="calculator" className="w-full py-12 md:py-24 bg-white">
       <div className="container px-4 md:px-6">
         <div className="grid gap-0 lg:grid-cols-2 items-stretch bg-white rounded-3xl overflow-hidden shadow-2xl border border-primary/10">
-          {/* Left Side: Inputs */}
           <div className="p-8 md:p-12 space-y-6 flex flex-col justify-center border-r border-muted">
             <div className="space-y-4">
               <h2 className="text-4xl font-extrabold tracking-tighter text-primary">
@@ -136,7 +144,6 @@ export default function LoanCalculator() {
             </div>
           </div>
 
-          {/* Right Side: Results */}
           <div className="p-8 md:p-12 space-y-8 bg-primary text-primary-foreground flex flex-col justify-center">
             <div className="text-center space-y-2">
               <h2 className="text-5xl font-black tracking-tight">Loan Results</h2>
@@ -159,7 +166,7 @@ export default function LoanCalculator() {
                 <p className="text-xs text-primary-foreground/70 font-medium">
                     Calculations are based on a 10% monthly interest rate pro-rated to your selected frequency.
                 </p>
-                <Button variant="secondary" className="w-full h-16 rounded-full font-extrabold text-xl shadow-xl transition-all">
+                <Button onClick={handleApply} variant="secondary" className="w-full h-16 rounded-full font-extrabold text-xl shadow-xl transition-all">
                     Apply for this Loan
                 </Button>
             </div>

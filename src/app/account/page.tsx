@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Landmark, LogOut, Loader2, FileUp } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -60,10 +60,11 @@ interface Loan {
 const applicationSchema = z.object({
   loanType: z.string({ required_error: 'Please select a loan type.' }),
   loanAmount: z.coerce.number().min(1, 'Please enter a valid loan amount.'),
+  numberOfInstalments: z.coerce.number().min(1, 'Please enter number of instalments.'),
+  paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   idNumber: z.string().min(5, 'Please enter a valid ID number.'),
   phone: z.string().min(10, 'Please enter a valid phone number.'),
   alternativeNumber: z.string().optional(),
-  statement: z.any().optional(),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the terms and conditions.' }),
   }),
@@ -88,15 +89,31 @@ export default function AccountPage() {
   const applicationForm = useForm<z.infer<typeof applicationSchema>>({
     resolver: zodResolver(applicationSchema),
     defaultValues: {
-      loanType: '',
+      loanType: 'Quick Pesa',
       loanAmount: 0,
+      numberOfInstalments: 1,
+      paymentFrequency: 'monthly',
       idNumber: '',
       phone: user?.phoneNumber || '',
       alternativeNumber: '',
-      statement: undefined,
       agreeToTerms: false as any,
     },
   });
+
+  useEffect(() => {
+    const pendingData = sessionStorage.getItem('pendingLoanApplication');
+    if (pendingData) {
+      try {
+        const data = JSON.parse(pendingData);
+        applicationForm.setValue('loanAmount', data.amount);
+        applicationForm.setValue('numberOfInstalments', data.period);
+        applicationForm.setValue('paymentFrequency', data.frequency);
+        sessionStorage.removeItem('pendingLoanApplication');
+      } catch (e) {
+        console.error("Failed to parse pending loan data", e);
+      }
+    }
+  }, [applicationForm]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -118,19 +135,19 @@ export default function AccountPage() {
         idNumber: values.idNumber,
         disbursementDate: new Date(),
         principalAmount: values.loanAmount,
-        interestRate: 0, 
+        interestRate: 10, 
         registrationFee: 0,
         processingFee: 0,
         carTrackInstallationFee: 0,
         chargingCost: 0,
-        numberOfInstalments: 1, 
-        paymentFrequency: 'monthly' as const,
+        numberOfInstalments: values.numberOfInstalments, 
+        paymentFrequency: values.paymentFrequency,
         status: 'application' as const,
         loanType: values.loanType,
-        instalmentAmount: values.loanAmount,
+        instalmentAmount: values.loanAmount, 
         totalRepayableAmount: values.loanAmount, 
         totalPaid: 0,
-        comments: `Application for ${values.loanType}.`,
+        comments: `Application for ${values.loanType} from web calculator.`,
       };
       await addLoan(firestore, loanApplicationData);
       toast({ title: "Application Submitted" });
@@ -176,6 +193,14 @@ export default function AccountPage() {
                       )}/>
                       <FormField control={applicationForm.control} name="idNumber" render={({ field }) => (
                           <FormItem><FormLabel>National ID Number</FormLabel><FormControl><Input placeholder="ID Card Number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      )}/>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={applicationForm.control} name="numberOfInstalments" render={({ field }) => (
+                          <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      )}/>
+                      <FormField control={applicationForm.control} name="paymentFrequency" render={({ field }) => (
+                          <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                       )}/>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
