@@ -108,6 +108,7 @@ export default function AccountPage() {
         applicationForm.setValue('loanAmount', data.amount);
         applicationForm.setValue('numberOfInstalments', data.period);
         applicationForm.setValue('paymentFrequency', data.frequency);
+        if (data.loanType) applicationForm.setValue('loanType', data.loanType);
         sessionStorage.removeItem('pendingLoanApplication');
       } catch (e) {
         console.error("Failed to parse pending loan data", e);
@@ -135,8 +136,8 @@ export default function AccountPage() {
         idNumber: values.idNumber,
         disbursementDate: new Date(),
         principalAmount: values.loanAmount,
-        interestRate: 10, 
-        registrationFee: 0,
+        interestRate: values.loanType === 'Quick Pesa' ? 20 : 5, 
+        registrationFee: values.loanType === 'Quick Pesa' ? 500 : 0,
         processingFee: 0,
         carTrackInstallationFee: 0,
         chargingCost: 0,
