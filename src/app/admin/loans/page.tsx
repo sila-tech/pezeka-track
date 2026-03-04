@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, Plus, AlertCircle, Pencil } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,

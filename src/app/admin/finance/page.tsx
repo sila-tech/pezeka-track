@@ -171,7 +171,10 @@ export default function FinancePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
                     <Card><CardHeader><CardTitle className="text-sm">Late Penalty</CardTitle></CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="bg-orange-50 p-4 rounded text-sm"><p>Days Late: {penaltyCalculation.daysLate}</p><p className="font-bold">Suggested: Ksh {penaltyCalculation.suggested}</p></div>
+                            <div className="bg-orange-50 p-4 rounded text-sm">
+                                <p>Days Late: {penaltyCalculation.daysLate}</p>
+                                <p className="font-bold">Suggested: Ksh {penaltyCalculation.suggested}</p>
+                            </div>
                             <Button className="w-full" disabled={penaltyCalculation.suggested <= 0} onClick={authorizeSuggestedPenalty}>Apply Penalty</Button>
                         </CardContent>
                     </Card>

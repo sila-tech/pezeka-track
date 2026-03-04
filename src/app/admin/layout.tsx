@@ -44,10 +44,12 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                 </Link>
             )}
 
-            <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
-                <FileText className="h-4 w-4" />
-                Application Forms
-            </Link>
+            {(isStaff || isFinance || isSuperAdmin) && (
+                <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
+                    <FileText className="h-4 w-4" />
+                    Application Forms
+                </Link>
+            )}
 
             {(isFinance || isSuperAdmin) && (
                 <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
