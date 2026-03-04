@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Landmark, Menu } from 'lucide-react';
+import { Landmark, Menu, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
@@ -20,6 +20,10 @@ export default function Header() {
       <nav className="ml-auto hidden md:flex items-center gap-4 sm:gap-6">
         <Link href="#products" className="text-sm font-medium hover:underline underline-offset-4">
           Products
+        </Link>
+        <Link href="#calculator" className="text-sm font-medium hover:underline underline-offset-4 flex items-center gap-1">
+          <Calculator className="h-4 w-4" />
+          Calculator
         </Link>
         <Link href="#about" className="text-sm font-medium hover:underline underline-offset-4">
           About Us
@@ -46,6 +50,10 @@ export default function Header() {
               </Link>
               <Link href="#products" className="text-lg font-medium" onClick={closeMenu}>
                 Products
+              </Link>
+              <Link href="#calculator" className="text-lg font-medium flex items-center gap-2" onClick={closeMenu}>
+                <Calculator className="h-5 w-5" />
+                Calculator
               </Link>
               <Link href="#about" className="text-lg font-medium" onClick={closeMenu}>
                 About Us

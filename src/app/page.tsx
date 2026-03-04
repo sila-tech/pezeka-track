@@ -12,8 +12,8 @@ export default function LandingPage() {
       <Header />
       <main className="flex-1">
         <Hero />
-        <LoanCalculator />
         <Products />
+        <LoanCalculator />
         <About />
         <Contact />
       </main>
