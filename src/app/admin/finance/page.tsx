@@ -247,6 +247,7 @@ export default function FinancePage() {
   }, [disbursedLoans, financeEntries]);
 
   const stats = useMemo(() => {
+    // Hardcoded to zero as requested
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
 

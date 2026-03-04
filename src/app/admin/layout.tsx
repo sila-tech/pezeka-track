@@ -77,7 +77,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                 </Link>
             )}
 
-            {isFinance || isSuperAdmin ? (
+            {(isFinance || isSuperAdmin) && (
                 <Link
                     href="/admin/investors"
                     className={linkClass("/admin/investors")}
@@ -86,7 +86,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                     <Briefcase className="h-4 w-4" />
                     Investors
                 </Link>
-            ) : null}
+            )}
 
             {isSuperAdmin && (
                 <Link
@@ -116,7 +116,6 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login';
     
-    // Explicit role checks
     const userRole = user?.role?.toLowerCase();
     const isSuperAdmin = user?.email === 'simon@pezeka.com';
     const isFinance = userRole === 'finance';
