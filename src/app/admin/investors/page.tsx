@@ -46,7 +46,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -86,7 +86,6 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // Explicit access for Super Admin and Finance
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
         const role = currentUser.role?.toLowerCase();
@@ -151,6 +150,12 @@ export default function InvestorsPage() {
     if (userLoading || investorsLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     if (!canViewPage) return null;
 
+    const portfolioTotals = investors ? investors.reduce((acc, inv) => {
+        acc.investment += (inv.totalInvestment || 0);
+        acc.balance += (inv.currentBalance || 0);
+        return acc;
+    }, { investment: 0, balance: 0 }) : { investment: 0, balance: 0 };
+
     return (
     <>
       <div className="flex items-center justify-between mb-4">
@@ -182,7 +187,16 @@ export default function InvestorsPage() {
               <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
                   <TableBody>{investors.map((investor) => (
                           <TableRow key={investor.id}><TableCell className="font-medium">{investor.name}</TableCell><TableCell>{investor.email}</TableCell><TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell><TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(investor)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(investor)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
-                        ))}</TableBody></Table>
+                        ))}</TableBody>
+                  <TableFooter>
+                      <TableRow className="font-bold bg-muted/50">
+                          <TableCell colSpan={3}>Grand Totals</TableCell>
+                          <TableCell className="text-right">{portfolioTotals.investment.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{portfolioTotals.balance.toLocaleString()}</TableCell>
+                          <TableCell />
+                      </TableRow>
+                  </TableFooter>
+              </Table>
             </ScrollArea>
           )}
         </CardContent>

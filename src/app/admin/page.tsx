@@ -214,7 +214,10 @@ export default function Dashboard() {
                         <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                       )}/>
                       <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Alt. Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                        <FormItem>
+                          <FormLabel>Alt. Phone</FormLabel>
+                          <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                        </FormItem>
                       )}/>
                     </div>
                     <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
