@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { addLoan, upsertCustomer } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { calculateAmortization } from '@/lib/utils';
 
 
 interface Payment {
@@ -128,6 +129,9 @@ export default function AccountPage() {
       const fullName = user.displayName || user.email || "Customer";
       await upsertCustomer(firestore, user.uid, { name: fullName, phone: values.phone, idNumber: values.idNumber });
       
+      const interestRate = (values.loanType === 'Individual & Business Loan') ? 5 : 10;
+      const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.loanAmount, interestRate, values.numberOfInstalments, values.paymentFrequency);
+
       const loanApplicationData = {
         customerId: user.uid,
         customerName: fullName,
@@ -136,7 +140,7 @@ export default function AccountPage() {
         idNumber: values.idNumber,
         disbursementDate: new Date(),
         principalAmount: values.loanAmount,
-        interestRate: (values.loanType === 'Quick Pesa' || values.loanType === 'Salary Advance Loan') ? 10 : (values.loanType === 'Logbook Loan' ? 10 : 5), 
+        interestRate: interestRate, 
         registrationFee: 0,
         processingFee: 0,
         carTrackInstallationFee: 0,
@@ -145,8 +149,8 @@ export default function AccountPage() {
         paymentFrequency: values.paymentFrequency,
         status: 'application' as const,
         loanType: values.loanType,
-        instalmentAmount: values.loanAmount / values.numberOfInstalments, 
-        totalRepayableAmount: values.loanAmount, 
+        instalmentAmount: instalmentAmount, 
+        totalRepayableAmount: totalRepayableAmount, 
         totalPaid: 0,
         comments: `Application for ${values.loanType} from web calculator.`,
       };
@@ -172,7 +176,7 @@ export default function AccountPage() {
                         {customerLoans.map(loan => {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
                             return (
-                                <Card key={loan.id} className="border-l-4 border-l-primary"><CardHeader className="pb-2"><div className="flex justify-between items-start"><div><CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle><CardDescription>{loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}</CardDescription></div><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status.toUpperCase()}</Badge></div></CardHeader><CardContent><div className="grid gap-4 grid-cols-2 sm:grid-cols-3"><div><div className="text-xs text-muted-foreground uppercase font-bold">Principal</div><div className="font-semibold">Ksh {loan.principalAmount.toLocaleString()}</div></div><div><div className="text-xs text-muted-foreground uppercase font-bold">To Repay</div><div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div></div><div className="col-span-2 sm:col-span-1 border-t sm:border-t-0 pt-2 sm:pt-0"><div className="text-xs text-muted-foreground uppercase font-bold">Current Balance</div><div className="font-bold text-xl text-primary">Ksh {balance.toLocaleString()}</div></div></div></CardContent></Card>
+                                <Card key={loan.id} className="border-l-4 border-l-primary"><CardHeader className="pb-2"><div className="flex justify-between items-start"><div><CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle><CardDescription>{loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}</CardDescription></div><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status.toUpperCase()}</Badge></div></CardHeader><CardContent><div className="grid gap-4 grid-cols-2 sm:grid-cols-3"><div><div className="text-xs text-muted-foreground uppercase font-bold">Principal</div><div className="font-semibold">Ksh {loan.principalAmount.toLocaleString() }</div></div><div><div className="text-xs text-muted-foreground uppercase font-bold">To Repay</div><div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div></div><div className="col-span-2 sm:col-span-1 border-t sm:border-t-0 pt-2 sm:pt-0"><div className="text-xs text-muted-foreground uppercase font-bold">Current Balance</div><div className="font-bold text-xl text-primary">Ksh {balance.toLocaleString()}</div></div></div></CardContent></Card>
                             )
                         })}
                     </div>

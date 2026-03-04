@@ -25,32 +25,24 @@ export default function LoanCalculator() {
     let amountReceived = 0;
     let totalRepayable = 0;
 
-    if (loanType === 'Quick Pesa' || loanType === 'Salary Advance Loan') {
-        // Upfront Deduction: 10% interest + 10% appraisal deducted upfront
-        interest = principal * 0.10;
-        amountReceived = principal - interest - appraisalFee;
-        totalRepayable = principal; // Interest already paid upfront via deduction
-    } else if (loanType === 'Logbook Loan') {
-        // Logbook: 10% monthly interest, 10% appraisal deducted upfront
-        let numberOfMonths = 0;
-        if (frequency === 'monthly') numberOfMonths = n;
-        else if (frequency === 'weekly') numberOfMonths = n / 4;
-        else if (frequency === 'daily') numberOfMonths = n / 28;
-
-        interest = principal * 0.10 * numberOfMonths;
-        amountReceived = principal - appraisalFee;
-        totalRepayable = principal + interest;
-    } else {
-        // Business: 5% monthly interest, 10% appraisal fee deducted upfront
-        let numberOfMonths = 0;
-        if (frequency === 'monthly') numberOfMonths = n;
-        else if (frequency === 'weekly') numberOfMonths = n / 4;
-        else if (frequency === 'daily') numberOfMonths = n / 28;
-
-        interest = principal * 0.05 * numberOfMonths;
-        amountReceived = principal - appraisalFee;
-        totalRepayable = principal + interest;
+    // Determine Monthly Rate
+    let monthlyRate = 0.10; // Default 10%
+    if (loanType === 'Individual & Business Loan') {
+        monthlyRate = 0.05; // Business is 5%
     }
+
+    // Pro-rate interest based on frequency and period
+    let numberOfMonths = 0;
+    if (frequency === 'monthly') numberOfMonths = n;
+    else if (frequency === 'weekly') numberOfMonths = n / 4;
+    else if (frequency === 'daily') numberOfMonths = n / 28;
+
+    interest = principal * monthlyRate * numberOfMonths;
+    
+    // Per user instruction: Only appraisal is deducted upfront for Salary and QuickPesa.
+    // In fact, standard logic for the others (Business/Logbook) also usually only deducts fees.
+    amountReceived = principal - appraisalFee;
+    totalRepayable = principal + interest;
 
     const instalmentAmount = n > 0 ? totalRepayable / n : 0;
     
@@ -107,9 +99,9 @@ export default function LoanCalculator() {
             </div>
             
             <div className="text-sm text-muted-foreground bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-1">
-                <p><span className="font-bold text-primary">Quick Pesa / Salary Advance:</span> 10% Interest (Upfront), 10% Appraisal.</p>
-                <p><span className="font-bold text-primary">Logbook Loan:</span> 10% Monthly Interest, 10% Appraisal.</p>
-                <p><span className="font-bold text-primary">Business Loan:</span> 5% Monthly Interest, 10% Appraisal.</p>
+                <p><span className="font-bold text-primary">Quick Pesa / Salary Advance:</span> 10% Monthly Interest, 10% Appraisal (Upfront).</p>
+                <p><span className="font-bold text-primary">Logbook Loan:</span> 10% Monthly Interest, 10% Appraisal (Upfront).</p>
+                <p><span className="font-bold text-primary">Business Loan:</span> 5% Monthly Interest, 10% Appraisal (Upfront).</p>
             </div>
 
             <div className="space-y-5 pt-4">
@@ -120,10 +112,10 @@ export default function LoanCalculator() {
                           <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="Quick Pesa">Quick Pesa (10% Upfront)</SelectItem>
-                          <SelectItem value="Salary Advance Loan">Salary Advance (10% Upfront)</SelectItem>
-                          <SelectItem value="Individual & Business Loan">Business Loan (5% Monthly)</SelectItem>
-                          <SelectItem value="Logbook Loan">Logbook Loan (10% Monthly)</SelectItem>
+                          <SelectItem value="Quick Pesa">Quick Pesa (10% Interest)</SelectItem>
+                          <SelectItem value="Salary Advance Loan">Salary Advance (10% Interest)</SelectItem>
+                          <SelectItem value="Individual & Business Loan">Business Loan (5% Interest)</SelectItem>
+                          <SelectItem value="Logbook Loan">Logbook Loan (10% Interest)</SelectItem>
                       </SelectContent>
                   </Select>
               </div>
