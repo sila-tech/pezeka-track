@@ -147,7 +147,7 @@ export default function InvestorsPage() {
         try { await deleteInvestor(firestore, investorToDelete.id); toast({ title: 'Deleted' }); setDeleteDialogOpen(false); setInvestorToDelete(null); } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    if (userLoading || investorsLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    if (userLoading || (currentUser && !canViewPage)) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     if (!canViewPage) return null;
 
     const portfolioTotals = investors ? investors.reduce((acc, inv) => {
@@ -182,10 +182,11 @@ export default function InvestorsPage() {
       <Card>
         <CardHeader><CardTitle>Investor Portfolios</CardTitle></CardHeader>
         <CardContent>
-          {!investors || investors.length === 0 ? (<Alert><AlertTitle>No Investors Found</AlertTitle></Alert>) : (
+          {investorsLoading && (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>)}
+          {!investorsLoading && (!investors || investors.length === 0) ? (<Alert><AlertTitle>No Investors Found</AlertTitle></Alert>) : !investorsLoading && (
             <ScrollArea className="h-[60vh]">
               <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
-                  <TableBody>{investors.map((investor) => (
+                  <TableBody>{investors?.map((investor) => (
                           <TableRow key={investor.id}><TableCell className="font-medium">{investor.name}</TableCell><TableCell>{investor.email}</TableCell><TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell><TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(investor)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(investor)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
                         ))}</TableBody>
                   <TableFooter>

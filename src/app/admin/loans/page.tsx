@@ -724,7 +724,6 @@ export default function LoansPage() {
         </TabsContent>
       </Tabs>
 
-      {/* View Application Dialog */}
       <Dialog open={!!viewingApplication} onOpenChange={(isOpen) => !isOpen && setViewingApplication(null)}>
           <DialogContent className="sm:max-w-md">
               <DialogHeader>
@@ -768,7 +767,6 @@ export default function LoansPage() {
           </DialogContent>
       </Dialog>
 
-      {/* Process/Approve Dialog */}
       <Dialog open={!!applicationToManage} onOpenChange={(isOpen) => !isOpen && setApplicationToManage(null)}>
         <DialogContent className="sm:max-w-2xl">
             {applicationToManage && (
@@ -831,7 +829,6 @@ export default function LoansPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Update Terms Dialog */}
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
           <DialogContent>
               <DialogHeader>
@@ -856,7 +853,6 @@ export default function LoansPage() {
           </DialogContent>
       </Dialog>
 
-      {/* Management Dialog for Existing Loans */}
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
           <DialogContent className="sm:max-w-5xl">
               {loanToEdit && (

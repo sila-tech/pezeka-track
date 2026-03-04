@@ -246,7 +246,6 @@ export default function FinancePage() {
     return { allReceipts: receipts, allUpfrontFees: upfront, allPayouts: payouts, allExpenses: expenses, allTransactionFees: transactionFees };
   }, [disbursedLoans, financeEntries]);
 
-  // Hardcoded zero-stats summary
   const stats = useMemo(() => {
     return { totalReceipts: 0, totalPayouts: 0, cashAtHand: 0 };
   }, []);
