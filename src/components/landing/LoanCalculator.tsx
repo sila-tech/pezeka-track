@@ -187,9 +187,7 @@ export default function LoanCalculator() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <ResultCard label="Amount borrowed" value={`KES ${results.principal.toLocaleString()}`} />
-              {loanType === 'Quick Pesa' ? (
-                  <ResultCard label="Registration Fee" value={`KES ${results.registrationFee.toLocaleString()}`} />
-              ) : (
+              {loanType !== 'Quick Pesa' && (
                   <ResultCard label="Appraisal Fee (10%)" value={`KES ${results.appraisalFee.toLocaleString()}`} />
               )}
               <ResultCard label="Interest Component" value={`KES ${results.interest.toLocaleString()}`} />
