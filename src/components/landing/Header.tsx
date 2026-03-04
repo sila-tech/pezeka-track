@@ -3,11 +3,16 @@
 import Link from 'next/link';
 import { Landmark, Menu, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useState } from 'react';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { useState, useEffect } from 'react';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const closeMenu = () => setIsMobileMenuOpen(false);
 
@@ -35,39 +40,45 @@ export default function Header() {
             <Link href="/customer-login">Customer Portal</Link>
         </Button>
       </nav>
-      <div className="md:hidden ml-auto">
-        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <Menu className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right">
-            <div className="grid gap-4 py-6">
-               <Link href="/" className="flex items-center justify-center" onClick={closeMenu}>
-                <Landmark className="h-6 w-6 text-primary" />
-                <span className="ml-2 font-semibold text-lg">Pezeka Credit</span>
-              </Link>
-              <Link href="#products" className="text-lg font-medium" onClick={closeMenu}>
-                Products
-              </Link>
-              <Link href="#calculator" className="text-lg font-medium flex items-center gap-2" onClick={closeMenu}>
-                <Calculator className="h-5 w-5" />
-                Calculator
-              </Link>
-              <Link href="#about" className="text-lg font-medium" onClick={closeMenu}>
-                About Us
-              </Link>
-              <Link href="#contact" className="text-lg font-medium" onClick={closeMenu}>
-                Contact
-              </Link>
-              <Button asChild className="w-full">
-                  <Link href="/customer-login" onClick={closeMenu}>Customer Portal</Link>
+      {mounted && (
+        <div className="md:hidden ml-auto">
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Menu className="h-6 w-6" />
               </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
+            </SheetTrigger>
+            <SheetContent side="right">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Navigation Menu</SheetTitle>
+                <SheetDescription>Access Pezeka products and portal</SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-4 py-6">
+                 <Link href="/" className="flex items-center justify-center" onClick={closeMenu}>
+                  <Landmark className="h-6 w-6 text-primary" />
+                  <span className="ml-2 font-semibold text-lg">Pezeka Credit</span>
+                </Link>
+                <Link href="#products" className="text-lg font-medium" onClick={closeMenu}>
+                  Products
+                </Link>
+                <Link href="#calculator" className="text-lg font-medium flex items-center gap-2" onClick={closeMenu}>
+                  <Calculator className="h-5 w-5" />
+                  Calculator
+                </Link>
+                <Link href="#about" className="text-lg font-medium" onClick={closeMenu}>
+                  About Us
+                </Link>
+                <Link href="#contact" className="text-lg font-medium" onClick={closeMenu}>
+                  Contact
+                </Link>
+                <Button asChild className="w-full">
+                    <Link href="/customer-login" onClick={closeMenu}>Customer Portal</Link>
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      )}
     </header>
   );
 }

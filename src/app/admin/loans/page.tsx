@@ -612,6 +612,25 @@ export default function LoansPage() {
                                         </Form>
                                         <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                                     </TabsContent>
+                                    <TabsContent value="followups">
+                                        <ScrollArea className="h-[300px]">
+                                            <div className="space-y-4">
+                                                {loanToEdit.followUpNotes?.length === 0 ? (
+                                                    <p className="text-sm text-muted-foreground text-center py-8">No follow-up notes recorded.</p>
+                                                ) : (
+                                                    loanToEdit.followUpNotes?.map((note, i) => (
+                                                        <div key={note.noteId || i} className="border p-3 rounded-lg bg-muted/30">
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <span className="text-xs font-bold">{note.staffName}</span>
+                                                                <span className="text-[10px] text-muted-foreground">{format(new Date((note.date as any).seconds * 1000), 'PPP p')}</span>
+                                                            </div>
+                                                            <p className="text-sm italic">"{note.content}"</p>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </ScrollArea>
+                                    </TabsContent>
                                     <TabsContent value="penalties">
                                         {penaltyCalculation.daysLate > 0 && (
                                             <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
