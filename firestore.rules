@@ -43,8 +43,8 @@ service cloud.firestore {
       allow get: if request.auth != null && (isOwner(userId) || isSuperAdmin() || isStaff() || isFinance());
       // Allow listing for dropdowns and performance tracking
       allow list: if isSuperAdmin() || isFinance() || isStaff();
-      // Only Simon can create or edit admin profiles
-      allow write: if isSuperAdmin();
+      // Only Simon and Finance can create or edit admin profiles
+      allow write: if isSuperAdmin() || isFinance();
     }
 
     match /customers/{customerId} {
