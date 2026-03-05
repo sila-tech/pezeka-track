@@ -179,9 +179,10 @@ export default function LoansPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com';
-  const isFinance = user?.role?.toLowerCase() === 'finance';
-  const isStaff = user?.role?.toLowerCase() === 'staff';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const userRole = user?.role?.toLowerCase();
+  const isFinance = userRole === 'finance';
+  const isStaff = userRole === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
   const canEdit = isSuperAdmin || isFinance; // ONLY FINANCE AND ADMIN CAN EDIT FINANCIALS
@@ -450,7 +451,10 @@ export default function LoansPage() {
                     </div>
                   </form>
                 </ScrollArea>
-                <DialogFooter className="mt-4"><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button></DialogFooter>
+                <DialogFooter className="mt-4">
+                    <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                    <Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button>
+                </DialogFooter>
               </Form>
             </DialogContent>
           </Dialog>
@@ -564,7 +568,7 @@ export default function LoansPage() {
                     <DialogFooter className="mt-6">
                         <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleReject}>Reject</Button>
-                        <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>{isUpdatingStatus && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Approve & Disburse</Button>
+                        <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>Approve & Disburse</Button>
                     </DialogFooter>
                 </>
             )}
@@ -584,7 +588,7 @@ export default function LoansPage() {
                               <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                           )}/>
                       </div>
-                      <Button type="submit" className="w-full" disabled={isUpdating}>{isUpdating && <Loader2 className="mr-2 animate-spin" />} Save & Recalculate</Button>
+                      <Button type="submit" className="w-full" disabled={isUpdating}>Save & Recalculate</Button>
                   </form>
               </Form>
           </DialogContent>

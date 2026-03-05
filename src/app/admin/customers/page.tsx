@@ -65,6 +65,7 @@ interface Customer {
   name: string;
   phone: string;
   idNumber?: string;
+  createdAt?: { seconds: number; nanoseconds: number };
 }
 
 interface Loan {
@@ -108,12 +109,14 @@ export default function CustomersPage() {
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
 
-  const filteredCustomers = useMemo(() => {
+  const sortedAndFilteredCustomers = useMemo(() => {
     if (!customers) return [];
-    return customers.filter(customer =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone.includes(searchTerm)
-    );
+    return customers
+      .filter(customer =>
+        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.phone.includes(searchTerm)
+      )
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   }, [customers, searchTerm]);
 
   const addForm = useForm<z.infer<typeof customerSchema>>({
@@ -245,7 +248,7 @@ export default function CustomersPage() {
                     <FormField control={addForm.control} name="phone" render={({ field }) => (
                         <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
-                    <FormField control={addForm.control} name="idNumber" render={({ field }) => (
+                    <FormField control={customerSchema.shape.idNumber ? addForm.control : addForm.control} name="idNumber" render={({ field }) => (
                         <FormItem><FormLabel>ID Number (Optional)</FormLabel><FormControl><Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                   </form>
@@ -262,19 +265,19 @@ export default function CustomersPage() {
       <Card>
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div><CardTitle>Customer List</CardTitle><CardDescription>A list of all customers in the system.</CardDescription></div>
+                <div><CardTitle>Customer List</CardTitle><CardDescription>Showing all registered customers, newest first.</CardDescription></div>
                 <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-full sm:w-[300px]" /></div>
             </div>
         </CardHeader>
         <CardContent>
           {customersLoading && (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>)}
-          {!customersLoading && (!filteredCustomers || filteredCustomers.length === 0) && (<Alert><AlertTitle>No Customers Found</AlertTitle><AlertDescription>{searchTerm ? "No customers match your search." : "There are no customers yet."}</AlertDescription></Alert>)}
-          {!customersLoading && filteredCustomers && filteredCustomers.length > 0 && (
+          {!customersLoading && (!sortedAndFilteredCustomers || sortedAndFilteredCustomers.length === 0) && (<Alert><AlertTitle>No Customers Found</AlertTitle><AlertDescription>{searchTerm ? "No customers match your search." : "There are no customers yet."}</AlertDescription></Alert>)}
+          {!customersLoading && sortedAndFilteredCustomers && sortedAndFilteredCustomers.length > 0 && (
             <ScrollArea className="h-[60vh]">
               <Table>
                   <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className="w-[50px]">#</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>ID Number</TableHead>{canEditDelete && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
                   <TableBody>
-                      {filteredCustomers.map((customer, index) => (
+                      {sortedAndFilteredCustomers.map((customer, index) => (
                           <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
                               <TableCell>{index + 1}</TableCell>
                               <TableCell className="font-medium">{customer.name}</TableCell>
