@@ -387,8 +387,10 @@ export default function LoansPage() {
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); } finally { setIsUpdating(false); }
   }
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     if (!loanToEdit || !canEdit) return;
+    
     setIsDeleting(true);
     try {
       await deleteLoan(firestore, loanToEdit.id);
