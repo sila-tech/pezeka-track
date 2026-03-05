@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { User, BarChart2, Calendar as CalendarIcon, HandCoins, TrendingUp, Wallet } from 'lucide-react';
+import { User, BarChart2, Calendar as CalendarIcon, HandCoins, TrendingUp, Wallet, ReceiptText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { DateRange } from 'react-day-picker';
@@ -22,6 +22,7 @@ interface Payment {
 
 interface Loan {
   id: string;
+  customerName: string; // Added customerName
   assignedStaffId?: string;
   assignedStaffName?: string;
   principalAmount: number;
@@ -51,8 +52,8 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
     to: endOfMonth(new Date()),
   });
 
-  const staffPerformance = useMemo(() => {
-    if (!staffList || !loans) return [];
+  const processedData = useMemo(() => {
+    if (!staffList || !loans) return { performance: [], collectionLog: [] };
 
     const fromDate = date?.from;
     const toDate = date?.to || date?.from;
@@ -62,11 +63,10 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
         end: new Date(toDate!).setHours(23, 59, 59, 999) 
     } : null;
 
-    // Filter out applications and rejected for performance metrics
-    const disbursedLoans = loans.filter(l => l.status !== 'application' && l.status !== 'rejected');
+    const collectionLog: any[] = [];
 
-    return staffList.map(staff => {
-      const staffLoans = disbursedLoans.filter(l => l.assignedStaffId === (staff.id));
+    const performance = staffList.map(staff => {
+      const staffLoans = loans.filter(l => l.assignedStaffId === (staff.id) && l.status !== 'application' && l.status !== 'rejected');
       
       let periodDisbursed = 0;
       let periodCollected = 0;
@@ -76,12 +76,10 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
               ? loan.disbursementDate 
               : new Date((loan.disbursementDate as any).seconds * 1000);
 
-          // If no interval, show all-time
           if (!interval || isWithinInterval(dDate, interval)) {
               periodDisbursed += Number(loan.principalAmount) || 0;
           }
 
-          // Check payments in interval
           (loan.payments || []).forEach(payment => {
               const pDate = payment.date instanceof Date 
                   ? payment.date 
@@ -89,6 +87,14 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
 
               if (!interval || isWithinInterval(pDate, interval)) {
                   periodCollected += Number(payment.amount) || 0;
+                  collectionLog.push({
+                      id: payment.paymentId,
+                      date: pDate,
+                      customer: loan.customerName,
+                      amount: payment.amount,
+                      staff: staff.name || staff.email,
+                      loanId: loan.id
+                  });
               }
           });
       });
@@ -108,15 +114,20 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
         efficiency
       };
     }).sort((a, b) => b.periodDisbursed - a.periodDisbursed);
+
+    return { 
+        performance, 
+        collectionLog: collectionLog.sort((a, b) => b.date.getTime() - a.date.getTime()) 
+    };
   }, [loans, staffList, date]);
 
   const totals = useMemo(() => {
-      return staffPerformance.reduce((acc, s) => {
+      return processedData.performance.reduce((acc, s) => {
           acc.disbursed += s.periodDisbursed;
           acc.collected += s.periodCollected;
           return acc;
       }, { disbursed: 0, collected: 0 });
-  }, [staffPerformance]);
+  }, [processedData.performance]);
 
   const setDatePreset = (preset: 'today' | 'weekly' | 'monthly' | 'all') => {
       const today = new Date();
@@ -152,7 +163,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">Ksh {totals.disbursed.toLocaleString()}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Total capital advanced in selected period</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Total capital advanced in period</p>
               </CardContent>
           </Card>
           <Card>
@@ -163,20 +174,20 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold text-green-600">Ksh {totals.collected.toLocaleString()}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Total payments received in selected period</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Total payments received in period</p>
               </CardContent>
           </Card>
           <Card>
               <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                      <Wallet className="h-3 w-3" /> Avg. Collection Efficiency
+                      <Wallet className="h-3 w-3" /> Avg. Team Efficiency
                   </CardTitle>
               </CardHeader>
               <CardContent>
                   <div className="text-2xl font-bold">
-                      {staffPerformance.length > 0 ? (staffPerformance.reduce((acc, s) => acc + s.efficiency, 0) / staffPerformance.length).toFixed(1) : 0}%
+                      {processedData.performance.length > 0 ? (processedData.performance.reduce((acc, s) => acc + s.efficiency, 0) / processedData.performance.length).toFixed(1) : 0}%
                   </div>
-                  <Progress value={staffPerformance.length > 0 ? (staffPerformance.reduce((acc, s) => acc + s.efficiency, 0) / staffPerformance.length) : 0} className="mt-2" />
+                  <Progress value={processedData.performance.length > 0 ? (processedData.performance.reduce((acc, s) => acc + s.efficiency, 0) / processedData.performance.length) : 0} className="mt-2" />
               </CardContent>
           </Card>
       </div>
@@ -185,53 +196,52 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
         <CardHeader>
           <CardTitle>Staff Performance Ledger</CardTitle>
           <CardDescription>
-            Performance metrics for the period: {date?.from ? format(date.from, 'PP') : 'All Time'} - {date?.to ? format(date.to, 'PP') : (date?.from ? format(date.from, 'PP') : 'All Time')}
+            Metrics for: {date?.from ? format(date.from, 'PP') : 'All Time'} - {date?.to ? format(date.to, 'PP') : (date?.from ? format(date.from, 'PP') : 'All Time')}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[60vh]">
+          <ScrollArea className="h-[40vh]">
             <Table>
               <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
-                  <TableHead className="w-[250px]">Staff Member</TableHead>
-                  <TableHead className="text-center">Active Loans</TableHead>
+                  <TableHead className="w-[200px]">Staff Member</TableHead>
+                  <TableHead className="text-center">Active</TableHead>
                   <TableHead className="text-right">Period Disbursed</TableHead>
                   <TableHead className="text-right">Period Collected</TableHead>
-                  <TableHead className="w-[150px]">All-Time Efficiency</TableHead>
+                  <TableHead className="w-[120px]">Efficiency</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {staffPerformance.map((staff) => (
+                {processedData.performance.map((staff) => (
                   <TableRow key={staff.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4 text-muted-foreground" />
-                        {staff.name}
+                        <span className="truncate">{staff.name}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
                         <Badge variant="outline">{staff.activeCount}</Badge>
                     </TableCell>
-                    <TableCell className="text-right font-semibold">
+                    <TableCell className="text-right text-xs">
                       Ksh {staff.periodDisbursed.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right text-green-600 font-bold">
+                    <TableCell className="text-right text-green-600 font-bold text-xs">
                       Ksh {staff.periodCollected.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex items-center justify-between text-[9px]">
                           <span>{staff.efficiency.toFixed(1)}%</span>
                         </div>
-                        <Progress value={staff.efficiency} className="h-1.5" />
+                        <Progress value={staff.efficiency} className="h-1" />
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="ghost" size="sm" asChild>
                             <Link href={`/admin/finance/staff/${staff.uid}`}>
-                                <BarChart2 className="mr-2 h-4 w-4" />
-                                Details
+                                <BarChart2 className="h-4 w-4" />
                             </Link>
                         </Button>
                     </TableCell>
@@ -241,14 +251,66 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
               <TableFooter>
                   <TableRow className="font-bold bg-muted/50">
                       <TableCell colSpan={2} className="text-right">Team Totals</TableCell>
-                      <TableCell className="text-right text-primary">Ksh {totals.disbursed.toLocaleString()}</TableCell>
-                      <TableCell className="text-right text-green-600">Ksh {totals.collected.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-primary text-xs">Ksh {totals.disbursed.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-green-600 text-xs">Ksh {totals.collected.toLocaleString()}</TableCell>
                       <TableCell colSpan={2} />
                   </TableRow>
               </TableFooter>
             </Table>
           </ScrollArea>
         </CardContent>
+      </Card>
+
+      <Card>
+          <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                  <ReceiptText className="h-5 w-5 text-primary" />
+                  Team Collection Breakdown
+              </CardTitle>
+              <CardDescription>Where the money came from during this period.</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <ScrollArea className="h-[40vh]">
+                  <Table>
+                      <TableHeader className="sticky top-0 bg-card z-10">
+                          <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Staff Responsible</TableHead>
+                              <TableHead>Customer (Source)</TableHead>
+                              <TableHead className="text-right">Amount Received</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {processedData.collectionLog.length === 0 ? (
+                              <TableRow>
+                                  <TableCell colSpan={4} className="text-center py-12 text-muted-foreground italic">
+                                      No collections recorded in this period.
+                                  </TableCell>
+                              </TableRow>
+                          ) : (
+                              processedData.collectionLog.map((log, i) => (
+                                  <TableRow key={log.id || i}>
+                                      <TableCell className="text-xs">{format(log.date, 'dd/MM/yyyy HH:mm')}</TableCell>
+                                      <TableCell className="text-xs font-medium">{log.staff}</TableCell>
+                                      <TableCell className="text-xs">{log.customer}</TableCell>
+                                      <TableCell className="text-right font-bold text-green-600 text-xs">
+                                          Ksh {log.amount.toLocaleString()}
+                                      </TableCell>
+                                  </TableRow>
+                              ))
+                          )}
+                      </TableBody>
+                      {processedData.collectionLog.length > 0 && (
+                          <TableFooter>
+                              <TableRow className="bg-muted/50 font-bold">
+                                  <TableCell colSpan={3} className="text-right">Total Collection</TableCell>
+                                  <TableCell className="text-right text-green-600">Ksh {totals.collected.toLocaleString()}</TableCell>
+                              </TableRow>
+                          </TableFooter>
+                      )}
+                  </Table>
+              </ScrollArea>
+          </CardContent>
       </Card>
     </div>
   );

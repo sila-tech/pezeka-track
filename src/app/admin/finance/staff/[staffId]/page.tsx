@@ -6,10 +6,10 @@ import { useMemo, useState } from 'react';
 import { useCollection, useDoc, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ChevronLeft, Calendar as CalendarIcon, TrendingUp, Wallet, HandCoins } from 'lucide-react';
+import { Loader2, ChevronLeft, Calendar as CalendarIcon, TrendingUp, Wallet, HandCoins, ReceiptText } from 'lucide-react';
 import { format, startOfToday, endOfToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '../../components/editable-finance-report-tab';
@@ -64,17 +64,16 @@ export default function StaffPerformancePage() {
             periodDisbursements: 0, 
             periodCollections: 0, 
             periodLoans: [],
+            periodCollectionsList: [],
             allTimePortfolio: [] 
         };
 
-        // Filter out applications and rejected
         const disbursedLoans = loans.filter(l => l.status !== 'application' && l.status !== 'rejected');
         const staffLoans = disbursedLoans.filter(l => l.assignedStaffId === staffId);
         
         const fromDate = date.from;
         const toDate = date.to || date.from;
         
-        // Normalize range to full days
         const interval = { 
             start: new Date(fromDate).setHours(0, 0, 0, 0), 
             end: new Date(toDate).setHours(23, 59, 59, 999) 
@@ -83,19 +82,18 @@ export default function StaffPerformancePage() {
         let periodDisbursements = 0;
         let periodCollections = 0;
         const periodLoanEntries: any[] = [];
+        const periodCollectionsList: any[] = [];
 
         staffLoans.forEach(loan => {
             const dDate = loan.disbursementDate instanceof Date 
                 ? loan.disbursementDate 
                 : new Date((loan.disbursementDate as any).seconds * 1000);
 
-            // Track disbursements in period
             if (isWithinInterval(dDate, interval)) {
                 periodDisbursements += Number(loan.principalAmount) || 0;
                 periodLoanEntries.push({ ...loan, type: 'disbursement', date: dDate });
             }
 
-            // Track collections in period
             (loan.payments || []).forEach(payment => {
                 const pDate = payment.date instanceof Date 
                     ? payment.date 
@@ -103,6 +101,13 @@ export default function StaffPerformancePage() {
 
                 if (isWithinInterval(pDate, interval)) {
                     periodCollections += Number(payment.amount) || 0;
+                    periodCollectionsList.push({
+                        id: payment.paymentId,
+                        date: pDate,
+                        customer: loan.customerName,
+                        amount: payment.amount,
+                        loanNumber: loan.loanNumber
+                    });
                 }
             });
         });
@@ -110,7 +115,8 @@ export default function StaffPerformancePage() {
         return { 
             periodDisbursements, 
             periodCollections, 
-            periodLoans: periodLoanEntries,
+            periodLoans: periodLoanEntries.sort((a,b) => b.date.getTime() - a.date.getTime()),
+            periodCollectionsList: periodCollectionsList.sort((a,b) => b.date.getTime() - a.date.getTime()),
             allTimePortfolio: staffLoans 
         };
     }, [loans, staffId, date]);
@@ -183,7 +189,7 @@ export default function StaffPerformancePage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">Ksh {performance.periodCollections.toLocaleString()}</div>
-                        <p className="text-[10px] text-muted-foreground mt-1">Total payments processed in selected window</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Total payments processed in window</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -204,8 +210,8 @@ export default function StaffPerformancePage() {
             <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Period Activity</CardTitle>
-                        <CardDescription>Loans disbursed between {date?.from ? format(date.from, 'PP') : 'Start'} and {date?.to ? format(date.to, 'PP') : 'End'}</CardDescription>
+                        <CardTitle>Period Disbursements</CardTitle>
+                        <CardDescription>Loans disbursed in this period.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-[400px]">
@@ -219,7 +225,7 @@ export default function StaffPerformancePage() {
                                 </TableHeader>
                                 <TableBody>
                                     {performance.periodLoans.length === 0 ? (
-                                        <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No disbursements in this period.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground italic">No disbursements in this period.</TableCell></TableRow>
                                     ) : (
                                         performance.periodLoans.map((loan, i) => (
                                             <TableRow key={i}>
@@ -237,40 +243,89 @@ export default function StaffPerformancePage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Portfolio Inventory</CardTitle>
-                        <CardDescription>Full list of all active loans currently assigned to this staff member.</CardDescription>
+                        <CardTitle className="flex items-center gap-2">
+                            <ReceiptText className="h-5 w-5 text-green-600" />
+                            Period Collections
+                        </CardTitle>
+                        <CardDescription>Detailed payment sources for this period.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-[400px]">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead>Date</TableHead>
                                         <TableHead>Customer</TableHead>
-                                        <TableHead className="text-right">Balance</TableHead>
-                                        <TableHead className="text-center">Status</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {performance.allTimePortfolio.map((loan) => (
-                                        <TableRow key={loan.id}>
-                                            <TableCell>
-                                                <div className="font-medium text-xs">{loan.customerName}</div>
-                                                <div className="text-[10px] text-muted-foreground">#{loan.loanNumber}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-bold text-xs tabular-nums">
-                                                Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge variant="outline" className="text-[9px] uppercase">{loan.status}</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {performance.periodCollectionsList.length === 0 ? (
+                                        <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground italic">No collections in this period.</TableCell></TableRow>
+                                    ) : (
+                                        performance.periodCollectionsList.map((pay, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell className="text-[10px]">{format(pay.date, 'dd/MM/yy HH:mm')}</TableCell>
+                                                <TableCell>
+                                                    <div className="font-medium text-xs">{pay.customer}</div>
+                                                    <div className="text-[9px] text-muted-foreground">Loan #{pay.loanNumber}</div>
+                                                </TableCell>
+                                                <TableCell className="text-right font-bold text-xs text-green-600">
+                                                    Ksh {pay.amount.toLocaleString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
                                 </TableBody>
+                                {performance.periodCollectionsList.length > 0 && (
+                                    <TableFooter>
+                                        <TableRow className="font-bold bg-muted/50">
+                                            <TableCell colSpan={2} className="text-right">Total</TableCell>
+                                            <TableCell className="text-right text-green-600">Ksh {performance.periodCollections.toLocaleString()}</TableCell>
+                                        </TableRow>
+                                    </TableFooter>
+                                )}
                             </Table>
                         </ScrollArea>
                     </CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Portfolio Inventory</CardTitle>
+                    <CardDescription>Full list of all active loans currently assigned to this staff member.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-[400px]">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead className="text-right">Balance</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {performance.allTimePortfolio.map((loan) => (
+                                    <TableRow key={loan.id}>
+                                        <TableCell>
+                                            <div className="font-medium text-xs">{loan.customerName}</div>
+                                            <div className="text-[10px] text-muted-foreground">#{loan.loanNumber}</div>
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold text-xs tabular-nums">
+                                            Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant="outline" className="text-[9px] uppercase">{loan.status}</Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
         </div>
     );
 }
