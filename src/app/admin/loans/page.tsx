@@ -102,6 +102,7 @@ const editTermsSchema = z.object({
     principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
     numberOfInstalments: z.coerce.number().int().min(1),
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+    assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
 });
 
 const paymentSchema = z.object({
@@ -345,7 +346,11 @@ export default function LoansPage() {
   const handleEditTerms = (loan: Loan) => {
       if (!canEdit) return;
       editTermsForm.reset({
-          interestRate: loan.interestRate || 0, principalAmount: loan.principalAmount, numberOfInstalments: loan.numberOfInstalments, paymentFrequency: loan.paymentFrequency,
+          interestRate: loan.interestRate || 0,
+          principalAmount: loan.principalAmount,
+          numberOfInstalments: loan.numberOfInstalments,
+          paymentFrequency: loan.paymentFrequency,
+          assignedStaffId: loan.assignedStaffId || '',
       });
       setIsEditingTerms(true);
   };
@@ -354,8 +359,14 @@ export default function LoansPage() {
       if (!loanToEdit || !canEdit) return;
       setIsUpdating(true);
       try {
+          const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
           const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
-          const updateData = { ...values, instalmentAmount, totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0), };
+          const updateData = {
+              ...values,
+              assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
+              instalmentAmount,
+              totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0),
+          };
           await updateLoan(firestore, loanToEdit.id, updateData);
           toast({ title: 'Terms Updated' });
           setLoanToEdit({ ...loanToEdit, ...updateData });
@@ -586,10 +597,19 @@ export default function LoansPage() {
 
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
           <DialogContent>
-              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments. You can also reassign the staff member here.</DialogDescription></DialogHeader>
               <Form {...editTermsForm}>
                   <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editTermsForm.control} name="assignedStaffId" render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormLabel>Assign Staff</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                  <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                  <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </FormItem>
+                          )} />
                           <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
@@ -618,6 +638,7 @@ export default function LoansPage() {
                                     </CardHeader>
                                     <CardContent className="space-y-4 text-sm">
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                        <div className="flex justify-between"><span>Assigned:</span><span className="font-medium">{loanToEdit.assignedStaffName || 'Unassigned'}</span></div>
                                         <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
                                         <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
                                     </CardContent>
