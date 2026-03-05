@@ -20,6 +20,9 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
         pathname === path ? "bg-muted text-primary" : "text-muted-foreground"
     );
 
+    // Finance can now access everything Super Admin can
+    const isAdmin = isSuperAdmin || isFinance;
+
     return (
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
             <Link href="/admin" className={linkClass("/admin")} onClick={onLinkClick}>
@@ -37,28 +40,28 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                 Loans
             </Link>
             
-            {(isFinance || isSuperAdmin) && (
+            {isAdmin && (
                 <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
                     <FileDown className="h-4 w-4" />
                     Finance
                 </Link>
             )}
 
-            {(isStaff || isFinance || isSuperAdmin) && (
+            {(isStaff || isAdmin) && (
                 <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
                     <FileText className="h-4 w-4" />
                     Application Forms
                 </Link>
             )}
 
-            {(isFinance || isSuperAdmin) && (
+            {isAdmin && (
                 <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
                     <Briefcase className="h-4 w-4" />
                     Investors
                 </Link>
             )}
 
-            {isSuperAdmin && (
+            {isAdmin && (
                 <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
                     <ShieldCheck className="h-4 w-4" />
                     User Management

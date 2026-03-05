@@ -102,9 +102,11 @@ export default function CustomersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const isAuthorized = user && (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.role === 'staff');
-  const canAdd = isAuthorized;
-  const canEditDelete = isAuthorized;
+  // Finance can now do everything Super Admin does
+  const isAuthorizedAdmin = user && (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2');
+  const isAuthorized = isAuthorizedAdmin || user?.role === 'staff';
+  
+  const canEditDelete = isAuthorizedAdmin;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -234,7 +236,7 @@ export default function CustomersPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-        {canAdd && (
+        {canEditDelete && (
           <Dialog open={addCustomerOpen} onOpenChange={setAddCustomerOpen}>
             <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Customer</Button></DialogTrigger>
             <DialogContent>
@@ -248,7 +250,7 @@ export default function CustomersPage() {
                     <FormField control={addForm.control} name="phone" render={({ field }) => (
                         <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="e.g. 0712345678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
-                    <FormField control={customerSchema.shape.idNumber ? addForm.control : addForm.control} name="idNumber" render={({ field }) => (
+                    <FormField control={addForm.control} name="idNumber" render={({ field }) => (
                         <FormItem><FormLabel>ID Number (Optional)</FormLabel><FormControl><Input placeholder="e.g. 12345678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
                   </form>

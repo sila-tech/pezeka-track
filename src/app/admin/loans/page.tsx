@@ -185,7 +185,8 @@ export default function LoansPage() {
   const isStaff = userRole === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  const canEdit = isSuperAdmin || isFinance; // ONLY FINANCE AND ADMIN CAN EDIT FINANCIALS
+  // Finance can now do everything Super Admin does
+  const canEdit = isSuperAdmin || isFinance; 
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -665,7 +666,7 @@ export default function LoansPage() {
                                                 <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4"><div className="grid grid-cols-2 gap-2"><FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /></div><FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} /><Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button></form>
                                             </Form>
                                         ) : (
-                                            <p className="text-sm text-muted-foreground text-center py-8">Penalties can only be managed by Finance.</p>
+                                            <p className="text-sm text-muted-foreground text-center py-8">Penalties can only be managed by Finance/Admin.</p>
                                         )}
                                         <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => (<TableRow key={p.penaltyId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell><TableCell className="text-xs">{p.description}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                                     </TabsContent>

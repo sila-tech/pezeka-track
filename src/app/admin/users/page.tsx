@@ -87,16 +87,22 @@ export default function UserManagementPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    const isSuperAdmin = useMemo(() => currentUser?.email === 'simon@pezeka.com', [currentUser]);
+    // Grant Finance users the same permissions as Super Admin
+    const isAuthorizedAdmin = useMemo(() => {
+        if (!currentUser) return false;
+        const email = currentUser.email?.toLowerCase();
+        const role = currentUser.role?.toLowerCase();
+        return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+    }, [currentUser]);
     
     useEffect(() => {
-        if (!userLoading && !isSuperAdmin) {
+        if (!userLoading && !isAuthorizedAdmin) {
             toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
             router.push('/admin');
         }
-    }, [userLoading, isSuperAdmin, router, toast]);
+    }, [userLoading, isAuthorizedAdmin, router, toast]);
 
-    const { data: users, loading: usersLoading } = useCollection<UserProfile>(isSuperAdmin ? 'users' : null);
+    const { data: users, loading: usersLoading } = useCollection<UserProfile>(isAuthorizedAdmin ? 'users' : null);
 
     const addForm = useForm<z.infer<typeof userProfileSchema>>({
         resolver: zodResolver(userProfileSchema),
@@ -150,7 +156,7 @@ export default function UserManagementPage() {
         } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    if (userLoading || !isSuperAdmin) {
+    if (userLoading || (currentUser && !isAuthorizedAdmin)) {
         return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 

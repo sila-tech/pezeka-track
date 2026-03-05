@@ -86,6 +86,7 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
+    // Grant Finance users the same permissions as Super Admin
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase();
