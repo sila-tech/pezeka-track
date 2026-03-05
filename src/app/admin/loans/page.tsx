@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +34,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { 
   addLoan, 
@@ -41,7 +51,8 @@ import {
   updateLoan, 
   approveLoanApplication, 
   addPenaltyToLoan, 
-  rolloverLoan 
+  rolloverLoan,
+  deleteLoan
 } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
@@ -175,6 +186,8 @@ export default function LoansPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -373,6 +386,21 @@ export default function LoansPage() {
           setIsEditingTerms(false);
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); } finally { setIsUpdating(false); }
   }
+
+  const handleConfirmDelete = async () => {
+    if (!loanToEdit || !canEdit) return;
+    setIsDeleting(true);
+    try {
+      await deleteLoan(firestore, loanToEdit.id);
+      toast({ title: 'Loan Deleted', description: `Loan #${loanToEdit.loanNumber} has been permanently removed.` });
+      setLoanToEdit(null);
+      setDeleteConfirmOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
@@ -649,6 +677,7 @@ export default function LoansPage() {
                                         <CardContent className="space-y-2">
                                             <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Rolled Over' }); setLoanToEdit(null); })}>Rollover</Button>
                                             <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked Paid' }); setLoanToEdit(null); })}>Mark Paid</Button>
+                                            <Button variant="destructive" className="w-full text-xs mt-4" onClick={() => setDeleteConfirmOpen(true)}>Delete Loan</Button>
                                         </CardContent>
                                     </Card>
                                 )}
@@ -708,6 +737,28 @@ export default function LoansPage() {
               )}
           </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Loan Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete Loan #{loanToEdit?.loanNumber} and all its associated history (payments, penalties, notes). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete} 
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+              Permanently Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
