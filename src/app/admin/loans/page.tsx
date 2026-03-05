@@ -184,6 +184,7 @@ export default function LoansPage() {
   const isStaff = user?.role?.toLowerCase() === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  const canEdit = isSuperAdmin || isFinance; // ONLY FINANCE AND ADMIN CAN EDIT FINANCIALS
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -247,6 +248,7 @@ export default function LoansPage() {
 
 
   async function onSubmit(values: z.infer<typeof loanSchema>) {
+    if (!canEdit) return;
     setIsSubmitting(true);
     try {
       let customerId = values.customerId;
@@ -297,7 +299,7 @@ export default function LoansPage() {
   };
 
   const onApproveSubmit = async (values: z.infer<typeof approvalSchema>) => {
-    if (!applicationToManage) return;
+    if (!applicationToManage || !canEdit) return;
     setIsUpdatingStatus(true);
     try {
         const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
@@ -309,7 +311,7 @@ export default function LoansPage() {
   };
 
   const handleReject = async () => {
-      if (!applicationToManage) return;
+      if (!applicationToManage || !canEdit) return;
       setIsUpdatingStatus(true);
       try {
           await updateLoan(firestore, applicationToManage.id, { status: 'rejected' });
@@ -319,7 +321,7 @@ export default function LoansPage() {
   };
 
   async function onRecordPayment(values: z.infer<typeof paymentSchema>) {
-    if (!loanToEdit) return;
+    if (!loanToEdit || !canEdit) return;
     setIsUpdating(true);
     try {
         const paymentId = doc(collection(firestore, 'payments')).id;
@@ -330,7 +332,7 @@ export default function LoansPage() {
   }
 
   async function onAddPenalty(values: z.infer<typeof penaltySchema>) {
-    if (!loanToEdit) return;
+    if (!loanToEdit || !canEdit) return;
     setIsAddingPenalty(true);
     try {
         await addPenaltyToLoan(firestore, loanToEdit.id, { amount: values.penaltyAmount, date: new Date(values.penaltyDate), description: values.penaltyDescription });
@@ -340,6 +342,7 @@ export default function LoansPage() {
   }
 
   const handleEditTerms = (loan: Loan) => {
+      if (!canEdit) return;
       editTermsForm.reset({
           interestRate: loan.interestRate || 0, principalAmount: loan.principalAmount, numberOfInstalments: loan.numberOfInstalments, paymentFrequency: loan.paymentFrequency,
       });
@@ -347,7 +350,7 @@ export default function LoansPage() {
   };
 
   async function onEditTermsSubmit(values: z.infer<typeof editTermsSchema>) {
-      if (!loanToEdit) return;
+      if (!loanToEdit || !canEdit) return;
       setIsUpdating(true);
       try {
           const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
@@ -374,7 +377,7 @@ export default function LoansPage() {
   }, [loanToEdit]);
 
   const authorizeSuggestedPenalty = () => {
-      if (!penaltyCalculation.suggested) return;
+      if (!penaltyCalculation.suggested || !canEdit) return;
       penaltyForm.setValue('penaltyAmount', penaltyCalculation.suggested);
       penaltyForm.setValue('penaltyDate', format(new Date(), 'yyyy-MM-dd'));
       penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
@@ -386,7 +389,7 @@ export default function LoansPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Loans</h1>
-        {isAuthorized && (
+        {canEdit && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Loan</Button></DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
@@ -497,7 +500,12 @@ export default function LoansPage() {
                                     <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
                                     <TableCell>{loan.loanType}</TableCell>
                                     <TableCell className="font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
-                                    <TableCell><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button><Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button></div></TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
+                                            {canEdit && <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>}
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -519,7 +527,10 @@ export default function LoansPage() {
                       </div>
                   </div>
               )}
-              <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose><Button onClick={() => { const app = viewingApplication; setViewingApplication(null); if (app) handleManageApplication(app); }}>Process Application</Button></DialogFooter>
+              <DialogFooter>
+                  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                  {canEdit && <Button onClick={() => { const app = viewingApplication; setViewingApplication(null); if (app) handleManageApplication(app); }}>Process Application</Button>}
+              </DialogFooter>
           </DialogContent>
       </Dialog>
 
@@ -588,28 +599,35 @@ export default function LoansPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
                             <div className="space-y-4 md:col-span-1">
                                 <Card>
-                                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0"><CardTitle className="text-sm">Summary</CardTitle><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3 w-3" /></Button></CardHeader>
+                                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                                        <CardTitle className="text-sm">Summary</CardTitle>
+                                        {canEdit && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3 w-3" /></Button>}
+                                    </CardHeader>
                                     <CardContent className="space-y-4 text-sm">
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
                                         <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
                                         <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
                                     </CardContent>
                                 </Card>
-                                <Card>
-                                    <CardHeader className="py-3"><CardTitle className="text-sm">Actions</CardTitle></CardHeader>
-                                    <CardContent className="space-y-2">
-                                        <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Rolled Over' }); setLoanToEdit(null); })}>Rollover</Button>
-                                        <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked Paid' }); setLoanToEdit(null); })}>Mark Paid</Button>
-                                    </CardContent>
-                                </Card>
+                                {canEdit && (
+                                    <Card>
+                                        <CardHeader className="py-3"><CardTitle className="text-sm">Actions</CardTitle></CardHeader>
+                                        <CardContent className="space-y-2">
+                                            <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Rolled Over' }); setLoanToEdit(null); })}>Rollover</Button>
+                                            <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked Paid' }); setLoanToEdit(null); })}>Mark Paid</Button>
+                                        </CardContent>
+                                    </Card>
+                                )}
                             </div>
                             <div className="md:col-span-2 space-y-6">
                                 <Tabs defaultValue="payments">
                                     <TabsList className="grid grid-cols-3 w-full"><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="followups">Follow-ups</TabsTrigger><TabsTrigger value="penalties">Penalties</TabsTrigger></TabsList>
                                     <TabsContent value="payments">
-                                        <Form {...paymentForm}>
-                                            <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4"><div className="flex gap-2"><FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /><Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button></div></form>
-                                        </Form>
+                                        {canEdit && (
+                                            <Form {...paymentForm}>
+                                                <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4"><div className="flex gap-2"><FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /><Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button></div></form>
+                                            </Form>
+                                        )}
                                         <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                                     </TabsContent>
                                     <TabsContent value="followups">
@@ -632,15 +650,20 @@ export default function LoansPage() {
                                         </ScrollArea>
                                     </TabsContent>
                                     <TabsContent value="penalties">
-                                        {penaltyCalculation.daysLate > 0 && (
+                                        {canEdit && penaltyCalculation.daysLate > 0 && (
                                             <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
                                                 <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase"><AlertCircle className="h-4 w-4" />Overdue</div>
                                                 <Button size="sm" variant="secondary" className="w-full" onClick={authorizeSuggestedPenalty}>Apply Penalty (Ksh {penaltyCalculation.suggested})</Button>
                                             </div>
                                         )}
-                                        <Form {...penaltyForm}>
-                                            <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4"><div className="grid grid-cols-2 gap-2"><FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /></div><FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} /><Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button></form>
-                                        </Form>
+                                        {canEdit ? (
+                                            <Form {...penaltyForm}>
+                                                <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4"><div className="grid grid-cols-2 gap-2"><FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /></div><FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} /><Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button></form>
+                                            </Form>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground text-center py-8">Penalties can only be managed by Finance.</p>
+                                        )}
+                                        <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => (<TableRow key={p.penaltyId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell><TableCell className="text-xs">{p.description}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                                     </TabsContent>
                                 </Tabs>
                             </div>
