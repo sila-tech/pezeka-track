@@ -185,7 +185,6 @@ export default function LoansPage() {
   const isStaff = userRole === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  // Finance can now do everything Super Admin does
   const canEdit = isSuperAdmin || isFinance; 
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
@@ -441,7 +440,7 @@ export default function LoansPage() {
                       <FormItem>
                         <FormLabel>Frequency</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
                           <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
                         </Select>
                       </FormItem>
@@ -555,7 +554,7 @@ export default function LoansPage() {
                                     <FormItem className="col-span-2">
                                       <FormLabel>Assign Staff</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select staff"/></SelectTrigger></FormControl>
                                         <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
                                       </Select>
                                     </FormItem>
@@ -563,6 +562,15 @@ export default function LoansPage() {
                                 <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Frequency</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
+                                        <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
+                                      </Select>
+                                    </FormItem>
+                                )} />
                             </form>
                         </Form>
                     </ScrollArea>
@@ -586,7 +594,7 @@ export default function LoansPage() {
                           <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="paymentFrequency" render={({field}) => (
-                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                           )}/>
                       </div>
                       <Button type="submit" className="w-full" disabled={isUpdating}>Save & Recalculate</Button>
