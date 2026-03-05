@@ -114,6 +114,7 @@ const editTermsSchema = z.object({
     numberOfInstalments: z.coerce.number().int().min(1),
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
     assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
+    disbursementDate: z.string().min(1, 'Disbursement date is required.'),
 });
 
 const paymentSchema = z.object({
@@ -358,12 +359,17 @@ export default function LoansPage() {
 
   const handleEditTerms = (loan: Loan) => {
       if (!canEdit) return;
+      const dDate = loan.disbursementDate instanceof Date 
+          ? loan.disbursementDate 
+          : new Date((loan.disbursementDate as any).seconds * 1000);
+
       editTermsForm.reset({
           interestRate: loan.interestRate || 0,
           principalAmount: loan.principalAmount,
           numberOfInstalments: loan.numberOfInstalments,
           paymentFrequency: loan.paymentFrequency,
           assignedStaffId: loan.assignedStaffId || '',
+          disbursementDate: format(dDate, 'yyyy-MM-dd'),
       });
       setIsEditingTerms(true);
   };
@@ -376,6 +382,7 @@ export default function LoansPage() {
           const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
           const updateData = {
               ...values,
+              disbursementDate: new Date(values.disbursementDate),
               assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
               instalmentAmount,
               totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0),
@@ -627,7 +634,7 @@ export default function LoansPage() {
 
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
           <DialogContent>
-              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate or principal will trigger an automatic recalculation of instalments. You can also reassign the staff member here.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate, principal, or dates will trigger an automatic recalculation of instalments.</DialogDescription></DialogHeader>
               <Form {...editTermsForm}>
                   <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
@@ -640,6 +647,12 @@ export default function LoansPage() {
                                 </Select>
                               </FormItem>
                           )} />
+                          <FormField control={editTermsForm.control} name="disbursementDate" render={({field}) => (
+                              <FormItem className="col-span-2">
+                                  <FormLabel>Disbursement Date</FormLabel>
+                                  <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                              </FormItem>
+                          )}/>
                           <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
