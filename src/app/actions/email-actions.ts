@@ -1,44 +1,44 @@
-
 'use server';
 
 /**
- * @fileOverview Server actions for handling automated email delivery.
+ * @fileOverview Server actions for handling automated email delivery via Resend.
  */
 
 import { generateEmailContent, type EmailEventInput } from '@/ai/flows/email-generation-flow';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
  * Sends an automated email to a customer using AI-generated content.
- * In a production environment, this would call a service like Resend, SendGrid, or Mailgun.
+ * This function triggers the Resend API to deliver the personalized message.
  */
 export async function sendAutomatedEmail(input: EmailEventInput & { recipientEmail: string }) {
   try {
-    // 1. Generate personalized content using Genkit
+    // 1. Generate personalized content using Genkit AI
     const emailContent = await generateEmailContent({
       type: input.type,
       data: input.data
     });
 
-    // 2. Log for automation tracking (Placeholder for real SMTP/API call)
-    console.log(`[AUTOMATION] Email Triggered: ${input.type}`);
-    console.log(`[RECIPIENT] ${input.recipientEmail}`);
-    console.log(`[SUBJECT] ${emailContent.subject}`);
-    console.log(`[CONTENT] \n${emailContent.body}`);
+    // 2. Deliver the email via Resend
+    // IMPORTANT: Ensure 'pezeka.com' is verified in the Resend dashboard.
+    const { data, error } = await resend.emails.send({
+      from: 'Pezeka Credit <notifications@pezeka.com>',
+      to: input.recipientEmail,
+      subject: emailContent.subject,
+      text: emailContent.body,
+    });
 
-    /**
-     * NOTE TO DEVELOPER: To enable real delivery, install 'resend' and use:
-     * const resend = new Resend(process.env.RESEND_API_KEY);
-     * await resend.emails.send({
-     *   from: 'Pezeka Credit <notifications@pezeka.com>',
-     *   to: input.recipientEmail,
-     *   subject: emailContent.subject,
-     *   text: emailContent.body
-     * });
-     */
+    if (error) {
+      console.error(`[RESEND ERROR] Failed to send ${input.type} email:`, error);
+      return { success: false, error };
+    }
 
-    return { success: true };
+    console.log(`[AUTOMATION SUCCESS] ${input.type} email sent to ${input.recipientEmail}. ID: ${data?.id}`);
+    return { success: true, data };
   } catch (error) {
-    console.error('Failed to send automated email:', error);
+    console.error('Critical failure in automated email flow:', error);
     return { success: false, error };
   }
 }
