@@ -20,6 +20,7 @@
       "properties": {
         "name": { "type": "string" },
         "phone": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
         "idNumber": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
@@ -35,6 +36,7 @@
         "customerId": { "type": "string" },
         "customerName": { "type": "string" },
         "customerPhone": { "type": "string" },
+        "customerEmail": { "type": "string", "format": "email" },
         "alternativeNumber": { "type": "string", "description": "Secondary contact number." },
         "idNumber": { "type": "string", "description": "Customer's national ID number." },
         "assignedStaffId": { "type": "string", "description": "UID of the staff member assigned to follow up on this loan." },

@@ -1,13 +1,16 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { calculateInterestForOneInstalment, calculateAmortization } from './utils';
+import { sendAutomatedEmail } from '@/app/actions/email-actions';
 
 type CustomerData = {
   name: string;
   phone: string;
+  email?: string;
   idNumber?: string;
 }
 
@@ -17,6 +20,7 @@ interface Loan {
   customerId: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   alternativeNumber?: string;
   idNumber?: string;
   loanType?: string;
@@ -54,6 +58,16 @@ export async function addCustomer(db: Firestore, customerData: CustomerData): Pr
 
   try {
     const docRef = await addDoc(customerCollection, newCustomer);
+    
+    // Trigger Welcome Email
+    if (customerData.email) {
+        sendAutomatedEmail({
+            type: 'welcome',
+            recipientEmail: customerData.email,
+            data: { customerName: customerData.name }
+        });
+    }
+
     return docRef;
   } catch (serverError) {
     const permissionError = new FirestorePermissionError({
@@ -73,7 +87,17 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
     updatedAt: serverTimestamp(),
   };
   try {
+    const existingSnap = await getDoc(customerRef);
     await setDoc(customerRef, data, { merge: true });
+    
+    // Trigger Welcome Email only for new customers
+    if (!existingSnap.exists() && customerData.email) {
+        sendAutomatedEmail({
+            type: 'welcome',
+            recipientEmail: customerData.email,
+            data: { customerName: customerData.name }
+        });
+    }
   } catch (serverError) {
     const permissionError = new FirestorePermissionError({
       path: customerRef.path,
@@ -153,17 +177,14 @@ export async function deleteFinanceEntry(db: Firestore, entryId: string) {
 export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: DocumentReference<DocumentData>, newLoanNumber: string}> {
   const loanCollection = collection(db, 'loans');
   
-  // Default fallback for customers who can't list existing loans to count them
   let newLoanNumber = `APP-${Math.floor(1000 + Math.random() * 9000)}`;
 
   try {
-    // Only admins/staff/finance can list all loans to count them for sequencing
     const q = query(loanCollection);
     const querySnapshot = await getDocs(q);
     const loanCount = querySnapshot.size;
     newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
   } catch (e) {
-    // For customers, the temporary sequence generated above is used
     newLoanNumber = `APP-${Date.now().toString().slice(-6)}`;
   }
 
@@ -180,7 +201,6 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
   try {
     const docRef = await addDoc(loanCollection, newLoan);
     
-    // Auto-record disbursement if active
     if (loanData.status === 'active') {
         await recordDisbursement(db, { ...newLoan, id: docRef.id });
     }
@@ -225,6 +245,21 @@ async function recordDisbursement(db: Firestore, loan: any) {
     });
 
     await updateDoc(loanRef, { disbursementRecorded: true });
+
+    // Trigger Disbursement Email
+    if (loan.customerEmail || loan.email) {
+        sendAutomatedEmail({
+            type: 'loan_approved',
+            recipientEmail: loan.customerEmail || loan.email,
+            data: {
+                customerName: loan.customerName,
+                loanNumber: loan.loanNumber,
+                amount: takeHome,
+                balance: loan.totalRepayableAmount,
+                dueDate: 'refer to portal'
+            }
+        });
+    }
 }
 
 export async function approveLoanApplication(db: Firestore, loan: Loan, updateData: any) {
@@ -266,7 +301,24 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null));
 
     try {
+        const loanSnap = await getDoc(loanRef);
+        const oldData = loanSnap.data() as Loan;
         await updateDoc(loanRef, { ...updateData, updatedAt: serverTimestamp() });
+
+        // Trigger Payment Email if totalPaid increased
+        if (updateData.totalPaid && updateData.totalPaid > (oldData.totalPaid || 0) && (oldData.customerEmail)) {
+            const paymentAmount = updateData.totalPaid - (oldData.totalPaid || 0);
+            sendAutomatedEmail({
+                type: 'payment_received',
+                recipientEmail: oldData.customerEmail,
+                data: {
+                    customerName: oldData.customerName,
+                    loanNumber: oldData.loanNumber,
+                    amount: paymentAmount,
+                    balance: (oldData.totalRepayableAmount - updateData.totalPaid)
+                }
+            });
+        }
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: loanRef.path,
@@ -282,6 +334,7 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
 type CustomerUpdateData = {
   name: string;
   phone: string;
+  email?: string;
   idNumber?: string;
 }
 
@@ -363,6 +416,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         customerId: originalLoan.customerId,
         customerName: originalLoan.customerName,
         customerPhone: originalLoan.customerPhone,
+        customerEmail: originalLoan.customerEmail || "",
         alternativeNumber: originalLoan.alternativeNumber || "",
         idNumber: originalLoan.idNumber || "",
         assignedStaffId: originalLoan.assignedStaffId || "",
@@ -416,29 +470,39 @@ export async function deleteLoan(db: Firestore, loanId: string) {
 
 export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: { amount: number; date: Date; description: string }) {
     const loanRef = doc(db, 'loans', loanId);
-    
     const penaltyId = doc(collection(db, 'temp')).id;
 
-    const penaltyWithId = {
-        ...penalty,
-        penaltyId: penaltyId,
-    };
+    const penaltyWithId = { ...penalty, penaltyId };
 
     try {
+        const loanSnap = await getDoc(loanRef);
+        const loanData = loanSnap.data() as Loan;
+
         await updateDoc(loanRef, {
             penalties: arrayUnion(penaltyWithId),
             totalPenalties: increment(penalty.amount),
             totalRepayableAmount: increment(penalty.amount)
         });
+
+        // Trigger Penalty Email
+        if (loanData.customerEmail) {
+            sendAutomatedEmail({
+                type: 'penalty_applied',
+                recipientEmail: loanData.customerEmail,
+                data: {
+                    customerName: loanData.customerName,
+                    loanNumber: loanData.loanNumber,
+                    amount: penalty.amount,
+                    description: penalty.description,
+                    balance: (loanData.totalRepayableAmount + penalty.amount - loanData.totalPaid)
+                }
+            });
+        }
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: loanRef.path,
             operation: 'update',
-            requestResourceData: {
-                penalties: 'ADD_PENALTY_DATA',
-                totalPenalties: `increment by ${penalty.amount}`,
-                totalRepayableAmount: `increment by ${penalty.amount}`
-            },
+            requestResourceData: { penalties: 'ADD_PENALTY' },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;

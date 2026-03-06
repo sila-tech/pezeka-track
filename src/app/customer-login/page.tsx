@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,10 +24,7 @@ const authSchema = z.object({
   lastName: z.string().optional(),
   phone: z.string().min(10, { message: 'Please enter a valid phone number.' }).optional(),
 }).superRefine((data, ctx) => {
-    // Phone is required for signup
-    if (ctx.path.length === 0 && !data.phone && !data.firstName) {
-        // Just a placeholder for refined logic if needed
-    }
+    // Basic structural refinement
 });
 
 export default function CustomerLoginPage() {
@@ -59,10 +57,11 @@ export default function CustomerLoginPage() {
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
-        // Create customer record in Firestore immediately
+        // Create customer record in Firestore immediately with email
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
+            email: values.email
         });
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
