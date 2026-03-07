@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -7,7 +8,7 @@
 import { generateEmailContent, type EmailEventInput } from '@/ai/flows/email-generation-flow';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY || 're_RGjGEBJf_JL8dayzB1Ji86iZbZ3CtrBFA');
 
 /**
  * Sends an automated email to a customer using AI-generated content.
