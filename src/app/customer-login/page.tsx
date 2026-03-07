@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, useUser, useFirestore } from '@/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -19,7 +18,7 @@ import { upsertCustomer } from '@/lib/firestore';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }).optional().or(z.literal('')),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   phone: z.string().optional(),
@@ -32,6 +31,7 @@ export default function CustomerLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
   const form = useForm<z.infer<typeof authSchema>>({
@@ -47,12 +47,11 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
-        // Manual validation for Sign Up fields since they are optional in schema to allow Sign In
-        if (!values.firstName || !values.lastName || !values.phone || values.phone.length < 10) {
+        if (!values.firstName || !values.lastName || !values.phone || values.phone.length < 10 || !values.password) {
           toast({ 
             variant: 'destructive', 
             title: 'Missing Information', 
-            description: 'Name and a valid 10-digit Phone number are required for registration.' 
+            description: 'Name, valid Phone number, and Password are required for registration.' 
           });
           setIsSubmitting(false); 
           return;
@@ -62,7 +61,6 @@ export default function CustomerLoginPage() {
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
-        // Create customer record in Firestore immediately
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
@@ -71,6 +69,11 @@ export default function CustomerLoginPage() {
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
       } else {
+        if (!values.password) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please enter your password.' });
+            setIsSubmitting(false);
+            return;
+        }
         await signInWithEmailAndPassword(auth, values.email, values.password);
         toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
       }
@@ -85,6 +88,24 @@ export default function CustomerLoginPage() {
       setIsSubmitting(false); 
     }
   }
+
+  const handleForgotPassword = async () => {
+    const email = form.getValues('email');
+    if (!email || !z.string().email().safeParse(email).success) {
+      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter a valid email address first.' });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({ title: 'Email Sent', description: `A password reset link has been sent to ${email}.` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Reset Failed', description: error.message });
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   if (loading || user) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
@@ -116,7 +137,18 @@ export default function CustomerLoginPage() {
               <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="email@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="password" render={({ field }) => (
-              <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+              <FormItem>
+                <div className="flex items-center justify-between">
+                    <FormLabel>Password</FormLabel>
+                    {!isSignUp && (
+                        <Button type="button" variant="link" className="px-0 font-normal h-auto text-xs" onClick={handleForgotPassword} disabled={isResetting}>
+                            {isResetting ? 'Sending...' : 'Forgot Password?'}
+                        </Button>
+                    )}
+                </div>
+                <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
+                <FormMessage />
+              </FormItem>
             )} />
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

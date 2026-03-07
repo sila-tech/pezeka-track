@@ -6,6 +6,7 @@ import { useAuth, useUser } from '@/firebase';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -20,7 +21,7 @@ import { Loader2 } from 'lucide-react';
 
 const emailSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
+  password: z.string().min(1, { message: 'Password is required.' }),
 });
 
 
@@ -30,6 +31,7 @@ export default function InvestorLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const form = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
@@ -38,8 +40,6 @@ export default function InvestorLoginPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      // Assuming a logged in user is an investor here.
-      // A more robust check might look for an investor doc in Firestore.
       router.push('/investor');
     }
   }, [user, loading, router]);
@@ -52,7 +52,7 @@ export default function InvestorLoginPage() {
         router.push('/investor');
       } catch (error: any) {
          if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            toast({ variant: 'destructive', title: 'Login Failed', description: 'Invalid email or password. Please contact support if you believe this is an error.' });
+            toast({ variant: 'destructive', title: 'Login Failed', description: 'Invalid email or password.' });
         } else {
             toast({ variant: 'destructive', title: 'Login Failed', description: error.message });
         }
@@ -60,6 +60,24 @@ export default function InvestorLoginPage() {
         setIsSubmitting(false);
       }
   }
+
+  const handleForgotPassword = async () => {
+    const email = form.getValues('email');
+    if (!email || !z.string().email().safeParse(email).success) {
+      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter a valid email address.' });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({ title: 'Email Sent', description: `A reset link has been sent to ${email}.` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Reset Failed', description: error.message });
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   if (loading || user) {
     return (
@@ -88,7 +106,12 @@ export default function InvestorLoginPage() {
                   )} />
                   <FormField control={form.control} name="password" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <Button type="button" variant="link" className="px-0 font-normal h-auto text-xs" onClick={handleForgotPassword} disabled={isResetting}>
+                            {isResetting ? 'Sending...' : 'Forgot Password?'}
+                        </Button>
+                      </div>
                       <FormControl><Input type="password" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>

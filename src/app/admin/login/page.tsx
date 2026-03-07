@@ -6,6 +6,7 @@ import * as z from 'zod';
 import {
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
@@ -34,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 
 const formSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6, 'Password must be at least 6 characters.'),
+  password: z.string().min(1, 'Password is required.'),
 });
 
 export default function AdminLoginPage() {
@@ -44,6 +45,7 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -125,6 +127,24 @@ export default function AdminLoginPage() {
       setIsSubmitting(false);
     }
   }
+
+  const handleForgotPassword = async () => {
+    const email = form.getValues('email');
+    if (!email || !z.string().email().safeParse(email).success) {
+      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter a valid admin email.' });
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast({ title: 'Email Sent', description: `A reset link has been sent to ${email}.` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Reset Failed', description: error.message });
+    } finally {
+      setIsResetting(false);
+    }
+  };
   
   if (loading || (!loading && isAuthorizedAdmin)) {
     return (
@@ -184,7 +204,12 @@ export default function AdminLoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <Button type="button" variant="link" className="px-0 font-normal h-auto text-xs" onClick={handleForgotPassword} disabled={isResetting}>
+                            {isResetting ? 'Sending...' : 'Forgot Password?'}
+                        </Button>
+                    </div>
                     <FormControl>
                       <Input type="password" {...field} />
                     </FormControl>
