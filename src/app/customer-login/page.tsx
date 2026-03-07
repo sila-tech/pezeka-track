@@ -22,9 +22,7 @@ const authSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  phone: z.string().min(10, { message: 'Please enter a valid phone number.' }).optional(),
-}).superRefine((data, ctx) => {
-    // Basic structural refinement
+  phone: z.string().optional(),
 });
 
 export default function CustomerLoginPage() {
@@ -49,15 +47,22 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
-        if (!values.firstName || !values.lastName || !values.phone) {
-          toast({ variant: 'destructive', title: 'Missing Information', description: 'Name and Phone are required for registration.' });
-          setIsSubmitting(false); return;
+        // Manual validation for Sign Up fields since they are optional in schema to allow Sign In
+        if (!values.firstName || !values.lastName || !values.phone || values.phone.length < 10) {
+          toast({ 
+            variant: 'destructive', 
+            title: 'Missing Information', 
+            description: 'Name and a valid 10-digit Phone number are required for registration.' 
+          });
+          setIsSubmitting(false); 
+          return;
         }
+        
         const cred = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
-        // Create customer record in Firestore immediately with email
+        // Create customer record in Firestore immediately
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
@@ -67,10 +72,18 @@ export default function CustomerLoginPage() {
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
       } else {
         await signInWithEmailAndPassword(auth, values.email, values.password);
-        toast({ title: 'Logged in' });
+        toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
       }
       router.push('/account');
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Authentication Failed', description: e.message }); } finally { setIsSubmitting(false); }
+    } catch (e: any) { 
+      toast({ 
+        variant: 'destructive', 
+        title: 'Authentication Failed', 
+        description: e.message || 'Check your credentials and try again.' 
+      }); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   }
 
   if (loading || user) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
