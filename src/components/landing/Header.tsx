@@ -5,6 +5,7 @@ import { Landmark, Menu, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
+import { PWAInstallButton } from '@/components/PWAInstallButton';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -36,12 +37,14 @@ export default function Header() {
         <Link href="#contact" className="text-sm font-medium hover:underline underline-offset-4">
           Contact
         </Link>
+        <PWAInstallButton variant="ghost" className="text-sm font-medium h-auto py-0 hover:bg-transparent" />
         <Button asChild>
             <Link href="/customer-login">Customer Portal</Link>
         </Button>
       </nav>
       {mounted && (
-        <div className="md:hidden ml-auto">
+        <div className="md:hidden ml-auto flex items-center gap-2">
+          <PWAInstallButton showIconOnly variant="ghost" className="h-9 w-9" />
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
@@ -71,9 +74,12 @@ export default function Header() {
                 <Link href="#contact" className="text-lg font-medium" onClick={closeMenu}>
                   Contact
                 </Link>
-                <Button asChild className="w-full">
-                    <Link href="/customer-login" onClick={closeMenu}>Customer Portal</Link>
-                </Button>
+                <div className="pt-2 border-t mt-2">
+                   <PWAInstallButton className="w-full justify-start mb-4" variant="outline" />
+                   <Button asChild className="w-full">
+                      <Link href="/customer-login" onClick={closeMenu}>Customer Portal</Link>
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
