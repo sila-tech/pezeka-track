@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfi
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { query, collection, where, getDocs } from 'firebase/firestore';
+import { query, collection, where, getDocs, doc, writeBatch } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,24 +59,30 @@ export default function CustomerLoginPage() {
           return;
         }
 
-        // Check if phone number already exists
-        const q = query(collection(firestore, 'customers'), where('phone', '==', values.phone));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          toast({ 
-            variant: 'destructive', 
-            title: 'Phone Number In Use', 
-            description: 'This phone number is already associated with an account.' 
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        
+        // 1. Create the Auth Account
         const cred = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
+        // 2. Link existing loans if any
+        // We look for loans that were added by admin using this phone number
+        const loansQuery = query(collection(firestore, 'loans'), where('customerPhone', '==', values.phone));
+        const loansSnapshot = await getDocs(loansQuery);
+        
+        if (!loansSnapshot.empty) {
+            const batch = writeBatch(firestore);
+            loansSnapshot.docs.forEach((loanDoc) => {
+                batch.update(doc(firestore, 'loans', loanDoc.id), {
+                    customerId: cred.user.uid,
+                    customerEmail: values.email,
+                    updatedAt: new Date()
+                });
+            });
+            await batch.commit();
+            toast({ title: 'Profile Synced', description: 'We found and linked your existing loan history!' });
+        }
+
+        // 3. Create/Update Customer Document
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
