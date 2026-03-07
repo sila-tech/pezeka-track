@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfi
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { query, collection, where, getDocs } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +55,20 @@ export default function CustomerLoginPage() {
             description: 'Name, valid Phone number, and Password are required for registration.' 
           });
           setIsSubmitting(false); 
+          return;
+        }
+
+        // Check if phone number already exists
+        const q = query(collection(firestore, 'customers'), where('phone', '==', values.phone));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          toast({ 
+            variant: 'destructive', 
+            title: 'Phone Number In Use', 
+            description: 'This phone number is already associated with an account.' 
+          });
+          setIsSubmitting(false);
           return;
         }
         
