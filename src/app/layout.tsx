@@ -8,7 +8,6 @@ import ClientOverlays from '@/components/ClientOverlays';
 export const metadata: Metadata = {
   title: 'Pezeka Credit Ltd',
   description: 'In-house credit management system',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
