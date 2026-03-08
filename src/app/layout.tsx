@@ -3,8 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
-import WhatsAppButton from '@/components/landing/WhatsAppButton';
-import { PWARegister } from '@/components/PWARegister';
+import ClientOverlays from '@/components/ClientOverlays';
 
 export const metadata: Metadata = {
   title: 'Pezeka Credit Ltd',
@@ -37,8 +36,7 @@ export default function RootLayout({
           {children}
         </FirebaseClientProvider>
         <Toaster />
-        <WhatsAppButton />
-        <PWARegister />
+        <ClientOverlays />
       </body>
     </html>
   );
