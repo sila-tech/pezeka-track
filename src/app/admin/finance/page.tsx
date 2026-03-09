@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { PlusCircle, Loader2, AlertCircle, History, Info } from "lucide-react";
+import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -13,25 +13,36 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, deleteFinanceEntry } from '@/lib/firestore';
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateInterestForOneInstalment, calculateAmortization } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense']),
-  date: z.string().min(1),
-  amount: z.coerce.number().min(0.01),
+  date: z.string().min(1, "Date is required"),
+  amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
   transactionFee: z.coerce.number().optional(),
-  description: z.string().optional(),
+  description: z.string().min(1, "Purpose/Description is required"),
   loanId: z.string().optional(),
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
   receiptCategory: z.enum(['loan_repayment', 'upfront_fees', 'investment', 'other']).optional(),
@@ -66,7 +77,7 @@ interface Loan {
 
 interface FinanceEntry {
   id: string;
-  type: string;
+  type: 'receipt' | 'payout' | 'expense';
   date: any;
   amount: number;
   transactionFee?: number;
@@ -83,6 +94,7 @@ export default function FinancePage() {
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [loanHistoryToShow, setLoanHistoryToShow] = useState<Loan | null>(null);
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
+  const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -101,21 +113,91 @@ export default function FinancePage() {
     const payouts: any[] = [];
     if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [] };
     
+    // Auto-generated receipts from loan payments
     loans.filter(l => l.status !== 'application' && l.status !== 'rejected').forEach(loan => {
-        (loan.payments || []).forEach(p => receipts.push({ id: p.paymentId, date: p.date, amount: p.amount, description: `Repayment: Loan #${loan.loanNumber}`, receiptCategory: 'loan_repayment' }));
+        (loan.payments || []).forEach(p => receipts.push({ 
+            id: p.paymentId, 
+            date: p.date, 
+            amount: p.amount, 
+            description: `Repayment: Loan #${loan.loanNumber}`, 
+            receiptCategory: 'loan_repayment',
+            type: 'receipt',
+            isSystemGenerated: true
+        }));
     });
 
+    // Manual entries
     financeEntries.forEach(e => {
         if (e.type === 'receipt') receipts.push(e);
         else payouts.push(e);
     });
-    return { allReceipts: receipts, allPayouts: payouts };
+
+    const sortByDate = (a: any, b: any) => {
+        const d1 = a.date?.seconds ? a.date.seconds : new Date(a.date).getTime() / 1000;
+        const d2 = b.date?.seconds ? b.date.seconds : new Date(b.date).getTime() / 1000;
+        return d2 - d1;
+    };
+
+    return { 
+        allReceipts: receipts.sort(sortByDate), 
+        allPayouts: payouts.sort(sortByDate) 
+    };
   }, [loans, financeEntries]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
-    defaultValues: { date: format(new Date(), 'yyyy-MM-dd'), amount: 0, type: 'receipt' }
+    defaultValues: { 
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        amount: 0, 
+        type: 'receipt', 
+        description: '', 
+        transactionFee: 0 
+    }
   });
+
+  const typeWatch = addForm.watch('type');
+
+  const handleEditEntry = (entry: FinanceEntry) => {
+      if ((entry as any).isSystemGenerated) {
+          toast({ variant: 'destructive', title: 'System Entry', description: 'Loan repayments must be edited from the Loans page.' });
+          return;
+      }
+      setEditingEntry(entry);
+      let dateStr = format(new Date(), 'yyyy-MM-dd');
+      if (entry.date?.seconds) dateStr = format(new Date(entry.date.seconds * 1000), 'yyyy-MM-dd');
+      else if (entry.date) dateStr = format(new Date(entry.date), 'yyyy-MM-dd');
+
+      addForm.reset({
+          type: entry.type,
+          amount: entry.amount,
+          date: dateStr,
+          description: entry.description || '',
+          transactionFee: entry.transactionFee || 0,
+          expenseCategory: entry.expenseCategory as any,
+          receiptCategory: entry.receiptCategory as any,
+          payoutCategory: entry.payoutCategory as any,
+      });
+      setOpen(true);
+  };
+
+  const handleDeleteEntry = (entry: FinanceEntry) => {
+      if ((entry as any).isSystemGenerated) {
+          toast({ variant: 'destructive', title: 'System Entry', description: 'Loan repayments must be deleted from the Loans page.' });
+          return;
+      }
+      setEntryToDelete(entry);
+  };
+
+  const confirmDeleteEntry = async () => {
+      if (!entryToDelete) return;
+      try {
+          await deleteFinanceEntry(firestore, entryToDelete.id);
+          toast({ title: 'Entry Deleted' });
+          setEntryToDelete(null);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Error', description: e.message });
+      }
+  };
 
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
@@ -143,7 +225,7 @@ export default function FinancePage() {
       const data = { ...values, date: new Date(values.date) };
       if (editingEntry) await updateFinanceEntry(firestore, editingEntry.id, data);
       else await addFinanceEntry(firestore, data as any);
-      setOpen(false); setEditingEntry(null); addForm.reset();
+      setOpen(false); setEditingEntry(null); addForm.reset({ type: 'receipt', date: format(new Date(), 'yyyy-MM-dd'), amount: 0, description: '', transactionFee: 0 });
       toast({ title: editingEntry ? 'Entry Updated' : 'Entry Recorded' });
     } catch (e: any) { toast({ variant: "destructive", title: "Error", description: e.message }); } finally { setIsSubmitting(false); }
   }
@@ -155,15 +237,56 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Finance</h1>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(isOpen) => {
+              setOpen(isOpen);
+              if (!isOpen) { setEditingEntry(null); addForm.reset({ type: 'receipt', date: format(new Date(), 'yyyy-MM-dd'), amount: 0, description: '', transactionFee: 0 }); }
+          }}>
               <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" /> Add Entry</Button></DialogTrigger>
-              <DialogContent><DialogHeader><DialogTitle>New Finance Entry</DialogTitle></DialogHeader>
+              <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                      <DialogTitle>{editingEntry ? 'Edit Finance Entry' : 'New Finance Entry'}</DialogTitle>
+                      <DialogDescription>Record cash movements not tied directly to loan repayments.</DialogDescription>
+                  </DialogHeader>
                   <Form {...addForm}>
-                      <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                          <FormField control={addForm.control} name="type" render={({field}) => (<FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt</SelectItem><SelectItem value="payout">Payout</SelectItem><SelectItem value="expense">Expense</SelectItem></SelectContent></Select></FormItem>)}/>
-                          <FormField control={addForm.control} name="amount" render={({field}) => (<FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
-                          <FormField control={addForm.control} name="date" render={({field}) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
-                          <Button type="submit" className="w-full" disabled={isSubmitting}>Record</Button>
+                      <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 pt-4">
+                          <div className="grid grid-cols-2 gap-4">
+                              <FormField control={addForm.control} name="type" render={({field}) => (
+                                  <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="receipt">Receipt (In)</SelectItem><SelectItem value="payout">Payout (Out)</SelectItem><SelectItem value="expense">Expense (Out)</SelectItem></SelectContent></Select></FormItem>
+                              )}/>
+                              <FormField control={addForm.control} name="date" render={({field}) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                          </div>
+
+                          {typeWatch === 'expense' && (
+                              <FormField control={addForm.control} name="expenseCategory" render={({field}) => (
+                                  <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select purpose"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
+                              )}/>
+                          )}
+
+                          {typeWatch === 'receipt' && (
+                              <FormField control={addForm.control} name="receiptCategory" render={({field}) => (
+                                  <FormItem><FormLabel>Receipt Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select source"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_repayment">Loan Repayment</SelectItem><SelectItem value="upfront_fees">Upfront Fees</SelectItem><SelectItem value="investment">Investor Deposit</SelectItem><SelectItem value="other">Other Receipt</SelectItem></SelectContent></Select></FormItem>
+                              )}/>
+                          )}
+
+                          {typeWatch === 'payout' && (
+                              <FormField control={addForm.control} name="payoutCategory" render={({field}) => (
+                                  <FormItem><FormLabel>Payout Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select destination"/></SelectTrigger></FormControl><SelectContent><SelectItem value="loan_disbursement">Loan Disbursement</SelectItem><SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem><SelectItem value="other">Other Payout</SelectItem></SelectContent></Select></FormItem>
+                              )}/>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-4">
+                              <FormField control={addForm.control} name="amount" render={({field}) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                              <FormField control={addForm.control} name="transactionFee" render={({field}) => (<FormItem><FormLabel>Trans. Fee</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                          </div>
+
+                          <FormField control={addForm.control} name="description" render={({field}) => (
+                              <FormItem><FormLabel>Purpose / Description</FormLabel><FormControl><Textarea placeholder="What is this for?" className="h-20" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>
+                          )}/>
+
+                          <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
+                              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                              {editingEntry ? 'Update Entry' : 'Record Transaction'}
+                          </Button>
                       </form>
                   </Form>
               </DialogContent>
@@ -174,7 +297,7 @@ export default function FinancePage() {
           <TabsList className="mb-4">
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
-              <TabsTrigger value="payouts">Payouts</TabsTrigger>
+              <TabsTrigger value="payouts">Payouts & Expenses</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
               <TabsTrigger value="staff">Staff Performance</TabsTrigger>
           </TabsList>
@@ -254,8 +377,26 @@ export default function FinancePage() {
                   </CardContent>
               </Card>
           </TabsContent>
-          <TabsContent value="receipts"><EditableFinanceReportTab title="Receipts" description="Income transactions" entries={financialData.allReceipts} loading={false}/></TabsContent>
-          <TabsContent value="payouts"><EditableFinanceReportTab title="Payouts" description="Outgoing transactions" entries={financialData.allPayouts} loading={false}/></TabsContent>
+          <TabsContent value="receipts">
+              <EditableFinanceReportTab 
+                title="Receipts" 
+                description="Income transactions including loan repayments and manual receipts." 
+                entries={financialData.allReceipts} 
+                loading={financeEntriesLoading}
+                onEdit={handleEditEntry}
+                onDelete={handleDeleteEntry}
+              />
+          </TabsContent>
+          <TabsContent value="payouts">
+              <EditableFinanceReportTab 
+                title="Payouts & Expenses" 
+                description="Outgoing transactions including loan disbursements and operating expenses." 
+                entries={financialData.allPayouts} 
+                loading={financeEntriesLoading}
+                onEdit={handleEditEntry}
+                onDelete={handleDeleteEntry}
+              />
+          </TabsContent>
           <TabsContent value="investors"><InvestorsPortfolioTab/></TabsContent>
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
@@ -294,31 +435,18 @@ export default function FinancePage() {
           </DialogContent>
       </Dialog>
 
-      <Dialog open={!!loanToEdit} onOpenChange={(open) => !open && setLoanToEdit(null)}>
-          <DialogContent className="sm:max-w-4xl">{loanToEdit && (
-              <>
-                <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><DialogDescription>Adjust terms or record late penalties.</DialogDescription></DialogHeader>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                    <Card><CardHeader><CardTitle className="text-sm">Late Penalty</CardTitle></CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="bg-orange-50 p-4 rounded text-sm">
-                                <p>Days Late: {penaltyCalculation.daysLate}</p>
-                                <p className="font-bold">Suggested: Ksh {penaltyCalculation.suggested}</p>
-                            </div>
-                            <Button className="w-full" disabled={penaltyCalculation.suggested <= 0} onClick={authorizeSuggestedPenalty}>Apply Penalty</Button>
-                        </CardContent>
-                    </Card>
-                    <Card><CardHeader><CardTitle className="text-sm">Staff Assignment</CardTitle></CardHeader>
-                        <CardContent>
-                            <div className="text-sm mb-2">Assigned: {loanToEdit.assignedStaffName || 'None'}</div>
-                            <Badge variant="outline">Update via Loans page</Badge>
-                        </CardContent>
-                    </Card>
-                </div>
-                <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
-              </>
-          )}</DialogContent>
-      </Dialog>
+      <AlertDialog open={!!entryToDelete} onOpenChange={(open) => !open && setEntryToDelete(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Finance Entry?</AlertDialogTitle>
+                  <AlertDialogDescription>This will permanently remove this financial record. This action cannot be undone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDeleteEntry} className="bg-destructive hover:bg-destructive/90">Delete Permanently</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
