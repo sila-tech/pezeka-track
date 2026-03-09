@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2 } from "lucide-react";
+import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -22,6 +22,7 @@ import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFina
 import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
+import { PortfolioReportsTab } from './components/portfolio-reports-tab';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateInterestForOneInstalment, calculateAmortization } from '@/lib/utils';
@@ -73,6 +74,7 @@ interface Loan {
   assignedStaffName?: string;
   payments?: { paymentId: string; date: any; amount: number; }[];
   penalties?: any[];
+  comments?: string;
 }
 
 interface FinanceEntry {
@@ -258,7 +260,7 @@ export default function FinancePage() {
 
                           {typeWatch === 'expense' && (
                               <FormField control={addForm.control} name="expenseCategory" render={({field}) => (
-                                  <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select purpose"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
+                                  <FormItem><FormLabel>Expense Category</CardLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select purpose"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
                               )}/>
                           )}
 
@@ -296,6 +298,10 @@ export default function FinancePage() {
       <Tabs defaultValue="loanbook" className="w-full">
           <TabsList className="mb-4">
               <TabsTrigger value="loanbook">Loan Book</TabsTrigger>
+              <TabsTrigger value="reports" className="gap-2">
+                <FileBarChart className="h-4 w-4" />
+                Reports
+              </TabsTrigger>
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts & Expenses</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
@@ -376,6 +382,9 @@ export default function FinancePage() {
                       </ScrollArea>
                   </CardContent>
               </Card>
+          </TabsContent>
+          <TabsContent value="reports">
+              <PortfolioReportsTab loans={loans} />
           </TabsContent>
           <TabsContent value="receipts">
               <EditableFinanceReportTab 
