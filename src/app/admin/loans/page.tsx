@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -7,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, BrainCircuit, TrendingUp, TrendingDown, ShieldAlert } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,8 @@ import {
   approveLoanApplication, 
   addPenaltyToLoan, 
   rolloverLoan,
-  deleteLoan
+  deleteLoan,
+  type Loan
 } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
@@ -141,37 +143,6 @@ interface Staff {
     name: string;
     role: string;
     email?: string;
-}
-
-interface Loan {
-    id: string;
-    customerId: string;
-    loanNumber: string;
-    customerName: string;
-    customerPhone: string;
-    alternativeNumber?: string;
-    idNumber?: string;
-    assignedStaffId?: string;
-    assignedStaffName?: string;
-    loanType?: string;
-    disbursementDate: { seconds: number, nanoseconds: number } | Date;
-    principalAmount: number;
-    interestRate?: number;
-    status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
-    totalRepayableAmount: number;
-    totalPaid: number;
-    totalPenalties?: number;
-    instalmentAmount: number;
-    paymentFrequency: 'daily' | 'weekly' | 'monthly';
-    numberOfInstalments: number;
-    registrationFee: number;
-    processingFee: number;
-    carTrackInstallationFee: number;
-    chargingCost: number;
-    comments?: string;
-    payments?: { paymentId: string; date: any; amount: number; }[];
-    penalties?: { penaltyId: string; date: any; amount: number; description: string; }[];
-    followUpNotes?: { noteId: string; date: any; staffName: string; staffId: string; content: string; }[];
 }
 
 
@@ -545,13 +516,20 @@ export default function LoansPage() {
                 <CardHeader><CardTitle>Review Applications</CardTitle></CardHeader>
                 <CardContent>
                     <Table>
-                        <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>AI Report</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {applicationLoans.map((loan) => (
                                 <TableRow key={loan.id}>
                                     <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
                                     <TableCell>{loan.loanType}</TableCell>
                                     <TableCell className="font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        {loan.aiCreditReport ? (
+                                            <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1 w-fit"><BrainCircuit className="h-3 w-3"/> Analyzed</Badge>
+                                        ) : (
+                                            <Badge variant="outline" className="text-muted-foreground">No Statement</Badge>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
@@ -568,15 +546,44 @@ export default function LoansPage() {
       </Tabs>
 
       <Dialog open={!!viewingApplication} onOpenChange={(isOpen) => !isOpen && setViewingApplication(null)}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-3xl">
               <DialogHeader><DialogTitle>Application Details</DialogTitle><DialogDescription>Full summary of the customer's self-submitted application.</DialogDescription></DialogHeader>
               {viewingApplication && (
-                  <div className="space-y-4 py-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-6 py-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
                           <div className="text-muted-foreground">Customer:</div><div className="font-medium">{viewingApplication.customerName}</div>
                           <div className="text-muted-foreground">National ID:</div><div className="font-medium">{viewingApplication.idNumber || 'N/A'}</div>
                           <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {viewingApplication.principalAmount.toLocaleString()}</div>
                       </div>
+
+                      {viewingApplication.aiCreditReport && (
+                          <div className="space-y-4">
+                              <div className="flex items-center gap-2 font-bold text-primary"><BrainCircuit className="h-5 w-5" /> AI Statement Analysis</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <Card className="border-green-200 bg-green-50/30">
+                                      <CardHeader className="py-3"><CardTitle className="text-xs uppercase text-green-700 flex items-center gap-1"><TrendingUp className="h-3 w-3"/> Income Sources</CardTitle></CardHeader>
+                                      <CardContent className="text-xs">
+                                          <ul className="list-disc pl-4 space-y-1">
+                                              {viewingApplication.aiCreditReport.incomeSources.map((s, i) => <li key={i}>{s}</li>)}
+                                          </ul>
+                                      </CardContent>
+                                  </Card>
+                                  <Card className="border-orange-200 bg-orange-50/30">
+                                      <CardHeader className="py-3"><CardTitle className="text-xs uppercase text-orange-700 flex items-center gap-1"><TrendingDown className="h-3 w-3"/> Spending Habits</CardTitle></CardHeader>
+                                      <CardContent className="text-xs">
+                                          <p>{viewingApplication.aiCreditReport.spendingHabits}</p>
+                                      </CardContent>
+                                  </Card>
+                              </div>
+                              <Card className="border-blue-200 bg-blue-50/30">
+                                  <CardHeader className="py-3"><CardTitle className="text-xs uppercase text-blue-700 flex items-center gap-1"><ShieldAlert className="h-3 w-3"/> Risk & Recommendation</CardTitle></CardHeader>
+                                  <CardContent className="text-xs space-y-2">
+                                      <div className="flex justify-between font-bold"><span>Risk Level:</span><Badge className={viewingApplication.aiCreditReport.riskLevel === 'low' ? 'bg-green-600' : 'bg-red-600'}>{viewingApplication.aiCreditReport.riskLevel.toUpperCase()}</Badge></div>
+                                      <p className="italic">"{viewingApplication.aiCreditReport.recommendation}"</p>
+                                  </CardContent>
+                              </Card>
+                          </div>
+                      )}
                   </div>
               )}
               <DialogFooter>

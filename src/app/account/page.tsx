@@ -1,16 +1,14 @@
+
 'use client';
 import { useUser, useAuth, useCollection, useFirestore } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
-import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Landmark, LogOut, Loader2, FileUp } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Landmark, LogOut, Loader2, FileUp, ShieldCheck, Lock } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { collection, query, where } from 'firebase/firestore';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,8 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { addLoan, upsertCustomer } from '@/lib/firestore';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
+import { submitLoanWithAnalysis } from '@/app/actions/loan-actions';
 
 
 interface Payment {
@@ -66,6 +64,7 @@ const applicationSchema = z.object({
   idNumber: z.string().min(5, 'Please enter a valid ID number.'),
   phone: z.string().min(10, 'Please enter a valid phone number.'),
   alternativeNumber: z.string().optional(),
+  statementPassword: z.string().optional(),
   agreeToTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the terms and conditions.' }),
   }),
@@ -79,6 +78,7 @@ export default function AccountPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statementFile, setStatementFile] = useState<File | null>(null);
 
   const customerLoansQuery = useMemo(() => {
     if (userLoading || !firestore || !user?.uid) return null;
@@ -97,6 +97,7 @@ export default function AccountPage() {
       idNumber: '',
       phone: user?.phoneNumber || '',
       alternativeNumber: '',
+      statementPassword: '',
       agreeToTerms: false as any,
     },
   });
@@ -122,6 +123,15 @@ export default function AccountPage() {
     router.push('/');
   };
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result?.toString().split(',')[1] || '');
+      reader.onerror = error => reject(error);
+    });
+  };
+
   async function onApplicationSubmit(values: z.infer<typeof applicationSchema>) {
     if (!user) return;
     setIsSubmitting(true);
@@ -131,6 +141,24 @@ export default function AccountPage() {
       
       const interestRate = (values.loanType === 'Individual & Business Loan') ? 5 : 10;
       const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.loanAmount, interestRate, values.numberOfInstalments, values.paymentFrequency);
+
+      // Handle AI Analysis if file provided
+      let aiAnalysis = null;
+      if (statementFile) {
+        const base64 = await fileToBase64(statementFile);
+        const result = await submitLoanWithAnalysis({
+            ...values,
+            customerId: user.uid,
+            customerName: fullName,
+            customerPhone: values.phone,
+            principalAmount: values.loanAmount,
+            interestRate,
+            statementPdfBase64: base64,
+        });
+        if (result.success) {
+            aiAnalysis = result.aiReport;
+        }
+      }
 
       const loanApplicationData = {
         customerId: user.uid,
@@ -152,12 +180,19 @@ export default function AccountPage() {
         instalmentAmount: instalmentAmount, 
         totalRepayableAmount: totalRepayableAmount, 
         totalPaid: 0,
-        comments: `Application for ${values.loanType} from web calculator.`,
+        comments: `Application for ${values.loanType} from web portal. AI analyzed: ${!!aiAnalysis}`,
+        aiCreditReport: aiAnalysis
       };
+      
       await addLoan(firestore, loanApplicationData);
-      toast({ title: "Application Submitted" });
+      toast({ title: "Application Submitted", description: "Our team will review your statement and get back to you." });
       applicationForm.reset();
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Failed', description: e.message }); } finally { setIsSubmitting(false); }
+      setStatementFile(null);
+    } catch (e: any) { 
+        toast({ variant: 'destructive', title: 'Failed', description: e.message }); 
+    } finally { 
+        setIsSubmitting(false); 
+    }
   }
 
   return (
@@ -185,13 +220,14 @@ export default function AccountPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Apply for a New Loan</CardTitle><CardDescription>Select a product and enter the required details to start your application.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Apply for a New Loan</CardTitle><CardDescription>Select a product and provide your M-Pesa statement for instant AI credit appraisal.</CardDescription></CardHeader>
             <CardContent>
                 <Form {...applicationForm}>
-                <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-4">
+                <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-6">
                     <FormField control={applicationForm.control} name="loanType" render={({ field }) => (
                         <FormItem><FormLabel>Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Individual & Business Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                     )}/>
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField control={applicationForm.control} name="loanAmount" render={({ field }) => (
                           <FormItem><FormLabel>Requested Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
@@ -200,6 +236,32 @@ export default function AccountPage() {
                           <FormItem><FormLabel>National ID Number</FormLabel><FormControl><Input placeholder="ID Card Number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                       )}/>
                     </div>
+
+                    <div className="space-y-4 rounded-xl border-2 border-dashed p-6 bg-muted/20">
+                        <div className="flex items-center gap-2 text-primary font-bold"><ShieldCheck className="h-5 w-5" /> AI Credit Verification (Required)</div>
+                        <p className="text-xs text-muted-foreground">Upload your latest 1-month M-Pesa statement (PDF) for instant automated processing.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormItem>
+                                <FormLabel>M-Pesa Statement (PDF)</FormLabel>
+                                <FormControl>
+                                    <Input 
+                                        type="file" 
+                                        accept=".pdf" 
+                                        onChange={(e) => setStatementFile(e.target.files?.[0] || null)}
+                                        className="cursor-pointer"
+                                    />
+                                </FormControl>
+                            </FormItem>
+                            <FormField control={applicationForm.control} name="statementPassword" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-1">Statement Password <Lock className="h-3 w-3"/></FormLabel>
+                                    <FormControl><Input placeholder="Usually your ID No." {...field} value={field.value ?? ''} /></FormControl>
+                                    <FormDescription className="text-[10px]">Required to unlock your encrypted PDF.</FormDescription>
+                                </FormItem>
+                            )}/>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField control={applicationForm.control} name="numberOfInstalments" render={({ field }) => (
                           <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
@@ -217,9 +279,12 @@ export default function AccountPage() {
                       )}/>
                     </div>
                     <FormField control={applicationForm.control} name="agreeToTerms" render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 rounded-md border p-4 bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel>I agree to the terms and conditions of Pezeka Credit Ltd.</FormLabel><FormDescription className="text-[10px]">By submitting this form, you authorize us to verify your creditworthiness.</FormDescription><FormMessage /></div></FormItem>
+                        <FormItem className="flex items-start space-x-3 rounded-md border p-4 bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel>I agree to the terms and conditions of Pezeka Credit Ltd.</FormLabel><FormDescription className="text-[10px]">By submitting this form, you authorize our AI to verify your statement for creditworthiness.</FormDescription><FormMessage /></div></FormItem>
                     )}/>
-                    <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <FileUp className="mr-2 h-4 w-4" />}Submit Application</Button>
+                    <Button type="submit" size="lg" className="w-full h-14 text-lg font-bold" disabled={isSubmitting || !statementFile}>
+                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <FileUp className="mr-2 h-5 w-5" />}
+                        Submit Secure Application
+                    </Button>
                 </form>
                 </Form>
             </CardContent>

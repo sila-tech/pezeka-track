@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -13,7 +14,7 @@ type CustomerData = {
   idNumber?: string;
 }
 
-interface Loan {
+export interface Loan {
   id: string;
   loanNumber: string;
   customerId: string;
@@ -44,6 +45,13 @@ interface Loan {
   comments?: string;
   status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
   disbursementRecorded?: boolean;
+  aiCreditReport?: {
+    incomeSources: string[];
+    spendingHabits: string;
+    riskAssessment: string;
+    recommendation: string;
+    analysisDate: string;
+  };
 }
 
 
