@@ -43,14 +43,11 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
-      console.log('User accepted the PWA install prompt');
       setDeferredPrompt(null);
       setIsInstalled(true);
     }
   };
 
-  // If installed, show a "Installed" status button instead of returning null
-  // This satisfies the user's request to see the icon/button on the landing page
   if (isInstalled) {
     return (
       <Button
@@ -65,20 +62,19 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
     );
   }
 
-  // If prompt not available (e.g. on Desktop Safari or already rejected), 
-  // show a "Get Android App" button that links to info
   if (!deferredPrompt) {
+    // If no prompt, we still show the button but it's a generic link to the section (which we removed)
+    // or just an icon that does nothing if we want to be very minimal.
+    // Let's keep it functional as a visual placeholder for support.
     return (
       <Button
         variant={variant}
         size={showIconOnly ? 'icon' : 'default'}
-        className={cn("gap-2", className)}
-        asChild
+        className={cn("gap-2 opacity-50", className)}
+        title="Mobile App Available"
       >
-        <a href="#app">
-          <Smartphone className="h-4 w-4" />
-          {!showIconOnly && <span>Get Mobile App</span>}
-        </a>
+        <Smartphone className="h-4 w-4" />
+        {!showIconOnly && <span>Mobile App</span>}
       </Button>
     );
   }

@@ -31,17 +31,13 @@ export default function Header() {
           <Calculator className="h-4 w-4" />
           Calculator
         </Link>
-        <Link href="#app" className="text-sm font-medium hover:underline underline-offset-4 flex items-center gap-1">
-          <Smartphone className="h-4 w-4" />
-          Mobile App
-        </Link>
         <Link href="#about" className="text-sm font-medium hover:underline underline-offset-4">
           About Us
         </Link>
         <Link href="#contact" className="text-sm font-medium hover:underline underline-offset-4">
           Contact
         </Link>
-        <PWAInstallButton variant="ghost" className="text-sm font-medium h-auto py-0 hover:bg-transparent" />
+        <PWAInstallButton showIconOnly variant="ghost" className="h-9 w-9" />
         <Button asChild variant="default" size="sm">
             <Link href="/customer-login">Customer Portal</Link>
         </Button>
@@ -72,10 +68,6 @@ export default function Header() {
                   <Calculator className="h-5 w-5" />
                   Calculator
                 </Link>
-                <Link href="#app" className="text-lg font-medium flex items-center gap-2" onClick={closeMenu}>
-                  <Smartphone className="h-5 w-5" />
-                  Mobile App
-                </Link>
                 <Link href="#about" className="text-lg font-medium" onClick={closeMenu}>
                   About Us
                 </Link>
@@ -83,7 +75,6 @@ export default function Header() {
                   Contact
                 </Link>
                 <div className="pt-2 border-t mt-2">
-                   <PWAInstallButton className="w-full justify-start mb-4" variant="outline" />
                    <Button asChild className="w-full">
                       <Link href="/customer-login" onClick={closeMenu}>Customer Portal</Link>
                   </Button>
