@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,11 +10,16 @@ import { addDays, addWeeks, addMonths, format } from 'date-fns';
 
 export default function LoanCalculator() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [amount, setAmount] = useState<number>(5000);
   const [period, setPeriod] = useState<number>(1);
   const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [loanType, setLoanType] = useState<string>('Quick Pesa');
   const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const results = useMemo(() => {
     const principal = Number(amount) || 0;
@@ -39,8 +44,6 @@ export default function LoanCalculator() {
 
     interest = principal * monthlyRate * numberOfMonths;
     
-    // Per user instruction: Only appraisal is deducted upfront for Salary and QuickPesa.
-    // In fact, standard logic for the others (Business/Logbook) also usually only deducts fees.
     amountReceived = principal - appraisalFee;
     totalRepayable = principal + interest;
 
@@ -83,6 +86,16 @@ export default function LoanCalculator() {
     sessionStorage.setItem('pendingLoanApplication', JSON.stringify(pendingApplication));
     router.push('/customer-login');
   };
+
+  if (!mounted) {
+    return (
+      <section id="calculator" className="w-full py-12 md:py-24 bg-white">
+        <div className="container px-4 md:px-6">
+          <div className="h-[600px] w-full animate-pulse bg-muted rounded-3xl" />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="calculator" className="w-full py-12 md:py-24 bg-white">
