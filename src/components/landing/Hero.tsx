@@ -41,16 +41,6 @@ export default function Hero() {
               </Button>
               <PWAInstallButton variant="outline" className="rounded-full h-12 px-8" />
             </div>
-            <div className="flex items-center gap-4 pt-4 text-sm font-medium text-muted-foreground">
-                <div className="flex -space-x-2">
-                    {[1,2,3].map(i => (
-                        <div key={i} className="h-8 w-8 rounded-full border-2 border-white bg-muted flex items-center justify-center overflow-hidden">
-                            <Image src={`https://picsum.photos/seed/user-${i}/32/32`} width={32} height={32} alt="User" />
-                        </div>
-                    ))}
-                </div>
-                <span>Trusted by 5,000+ Kenyans</span>
-            </div>
           </div>
         </div>
       </div>
