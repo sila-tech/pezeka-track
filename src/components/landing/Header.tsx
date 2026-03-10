@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Landmark, Menu, Calculator } from 'lucide-react';
+import { Landmark, Menu, Calculator, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
@@ -21,7 +21,7 @@ export default function Header() {
     <header className="px-4 lg:px-6 h-14 flex items-center bg-card border-b sticky top-0 z-50">
       <Link href="/" className="flex items-center justify-center" onClick={closeMenu}>
         <Landmark className="h-6 w-6 text-primary" />
-        <span className="ml-2 font-semibold text-lg">Pezeka Credit</span>
+        <span className="ml-2 font-semibold text-lg tracking-tight">Pezeka Credit</span>
       </Link>
       <nav className="ml-auto hidden md:flex items-center gap-4 sm:gap-6">
         <Link href="#products" className="text-sm font-medium hover:underline underline-offset-4">
@@ -31,6 +31,10 @@ export default function Header() {
           <Calculator className="h-4 w-4" />
           Calculator
         </Link>
+        <Link href="#app" className="text-sm font-medium hover:underline underline-offset-4 flex items-center gap-1">
+          <Smartphone className="h-4 w-4" />
+          Mobile App
+        </Link>
         <Link href="#about" className="text-sm font-medium hover:underline underline-offset-4">
           About Us
         </Link>
@@ -38,7 +42,7 @@ export default function Header() {
           Contact
         </Link>
         <PWAInstallButton variant="ghost" className="text-sm font-medium h-auto py-0 hover:bg-transparent" />
-        <Button asChild>
+        <Button asChild variant="default" size="sm">
             <Link href="/customer-login">Customer Portal</Link>
         </Button>
       </nav>
@@ -67,6 +71,10 @@ export default function Header() {
                 <Link href="#calculator" className="text-lg font-medium flex items-center gap-2" onClick={closeMenu}>
                   <Calculator className="h-5 w-5" />
                   Calculator
+                </Link>
+                <Link href="#app" className="text-lg font-medium flex items-center gap-2" onClick={closeMenu}>
+                  <Smartphone className="h-5 w-5" />
+                  Mobile App
                 </Link>
                 <Link href="#about" className="text-lg font-medium" onClick={closeMenu}>
                   About Us

@@ -260,7 +260,7 @@ export default function FinancePage() {
 
                           {typeWatch === 'expense' && (
                               <FormField control={addForm.control} name="expenseCategory" render={({field}) => (
-                                  <FormItem><FormLabel>Expense Category</CardLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select purpose"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
+                                  <FormItem><FormLabel>Expense Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select purpose"/></SelectTrigger></FormControl><SelectContent><SelectItem value="facilitation_commission">Facilitation Commission</SelectItem><SelectItem value="office_purchase">Office Purchase</SelectItem><SelectItem value="other">Other Expense</SelectItem></SelectContent></Select></FormItem>
                               )}/>
                           )}
 
@@ -393,7 +393,7 @@ export default function FinancePage() {
                 entries={financialData.allReceipts} 
                 loading={financeEntriesLoading}
                 onEdit={handleEditEntry}
-                onDelete={handleDeleteEntry}
+                onDelete={handleEditEntry}
               />
           </TabsContent>
           <TabsContent value="payouts">

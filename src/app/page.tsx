@@ -5,6 +5,7 @@ import About from '@/components/landing/About';
 import Contact from '@/components/landing/Contact';
 import Footer from '@/components/landing/Footer';
 import LoanCalculator from '@/components/landing/LoanCalculator';
+import MobileApp from '@/components/landing/MobileApp';
 
 export default function LandingPage() {
   return (
@@ -14,6 +15,7 @@ export default function LandingPage() {
         <Hero />
         <Products />
         <LoanCalculator />
+        <MobileApp />
         <About />
         <Contact />
       </main>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Smartphone } from 'lucide-react';
+import { Download, Smartphone, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PWAInstallButtonProps {
@@ -45,14 +45,42 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
     if (outcome === 'accepted') {
       console.log('User accepted the PWA install prompt');
       setDeferredPrompt(null);
-    } else {
-      console.log('User dismissed the PWA install prompt');
+      setIsInstalled(true);
     }
   };
 
-  // If already installed or prompt not available, don't show the button
-  if (isInstalled || !deferredPrompt) {
-    return null;
+  // If installed, show a "Installed" status button instead of returning null
+  // This satisfies the user's request to see the icon/button on the landing page
+  if (isInstalled) {
+    return (
+      <Button
+        variant={variant}
+        size={showIconOnly ? 'icon' : 'default'}
+        className={cn("gap-2 text-primary border-primary/20 bg-primary/5", className)}
+        disabled
+      >
+        <CheckCircle className="h-4 w-4" />
+        {!showIconOnly && <span>App Installed</span>}
+      </Button>
+    );
+  }
+
+  // If prompt not available (e.g. on Desktop Safari or already rejected), 
+  // show a "Get Android App" button that links to info
+  if (!deferredPrompt) {
+    return (
+      <Button
+        variant={variant}
+        size={showIconOnly ? 'icon' : 'default'}
+        className={cn("gap-2", className)}
+        asChild
+      >
+        <a href="#app">
+          <Smartphone className="h-4 w-4" />
+          {!showIconOnly && <span>Get Mobile App</span>}
+        </a>
+      </Button>
+    );
   }
 
   return (
@@ -64,7 +92,7 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
       title="Install Pezeka App"
     >
       <Download className="h-4 w-4" />
-      {!showIconOnly && <span>Install App</span>}
+      {!showIconOnly && <span>Download App</span>}
     </Button>
   );
 }
