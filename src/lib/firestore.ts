@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -11,6 +12,7 @@ type CustomerData = {
   phone: string;
   email?: string;
   idNumber?: string;
+  accountNumber?: string;
 }
 
 export interface Loan {
@@ -47,11 +49,27 @@ export interface Loan {
 }
 
 
+async function generateAccountNumber(db: Firestore): Promise<string> {
+  const customerCollection = collection(db, 'customers');
+  let accNo = `PZ-${Math.floor(10000 + Math.random() * 90000)}`;
+  try {
+    const q = query(customerCollection);
+    const snap = await getDocs(q);
+    accNo = `PZ-${String(snap.size + 1).padStart(5, '0')}`;
+  } catch (e) {
+    console.error("Error generating account number", e);
+  }
+  return accNo;
+}
+
 export async function addCustomer(db: Firestore, customerData: CustomerData): Promise<DocumentReference<DocumentData>> {
   const customerCollection = collection(db, 'customers');
   
+  const accountNumber = await generateAccountNumber(db);
+
   const newCustomer = {
     ...customerData,
+    accountNumber,
     createdAt: serverTimestamp(),
   };
 
@@ -81,27 +99,30 @@ export async function addCustomer(db: Firestore, customerData: CustomerData): Pr
 
 export async function upsertCustomer(db: Firestore, customerId: string, customerData: CustomerData) {
   const customerRef = doc(db, 'customers', customerId);
-  const data = {
-    ...customerData,
-    updatedAt: serverTimestamp(),
-  };
   try {
     const existingSnap = await getDoc(customerRef);
-    await setDoc(customerRef, data, { merge: true });
-    
-    // Trigger Welcome Email only for new customers
-    if (!existingSnap.exists() && customerData.email) {
-        sendAutomatedEmail({
-            type: 'welcome',
-            recipientEmail: customerData.email,
-            data: { customerName: customerData.name }
-        });
+    let finalData = { ...customerData, updatedAt: serverTimestamp() };
+
+    if (!existingSnap.exists()) {
+        const accountNumber = await generateAccountNumber(db);
+        finalData = { ...finalData, ...({ accountNumber } as any) };
+        
+        // Trigger Welcome Email only for new customers
+        if (customerData.email) {
+            sendAutomatedEmail({
+                type: 'welcome',
+                recipientEmail: customerData.email,
+                data: { customerName: customerData.name }
+            });
+        }
     }
+
+    await setDoc(customerRef, finalData, { merge: true });
   } catch (serverError) {
     const permissionError = new FirestorePermissionError({
       path: customerRef.path,
       operation: 'update',
-      requestResourceData: data,
+      requestResourceData: customerData,
     });
     errorEmitter.emit('permission-error', permissionError);
     throw serverError;

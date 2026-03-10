@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -7,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal, Search } from 'lucide-react';
+import { Loader2, PlusCircle, FileDown, MessageSquare, Copy, MoreHorizontal, Search, User } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -62,6 +63,7 @@ const customerSchema = z.object({
 
 interface Customer {
   id: string;
+  accountNumber?: string;
   name: string;
   phone: string;
   idNumber?: string;
@@ -102,7 +104,6 @@ export default function CustomersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  // Finance can now do everything Super Admin does
   const isAuthorizedAdmin = user && (user.email === 'simon@pezeka.com' || user.role === 'finance' || user.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2');
   const isAuthorized = isAuthorizedAdmin || user?.role === 'staff';
   
@@ -116,7 +117,8 @@ export default function CustomersPage() {
     return customers
       .filter(customer =>
         customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer.phone.includes(searchTerm)
+        customer.phone.includes(searchTerm) ||
+        customer.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase())
       )
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   }, [customers, searchTerm]);
@@ -187,7 +189,7 @@ export default function CustomersPage() {
 
   const handleDownloadReport = () => {
     if (!selectedCustomer) return;
-    const customerData = [{ 'Customer Name': selectedCustomer.name, 'Phone': selectedCustomer.phone, 'ID Number': selectedCustomer.idNumber || 'N/A' }, {}, 
+    const customerData = [{ 'Acc Number': selectedCustomer.accountNumber || 'N/A', 'Customer Name': selectedCustomer.name, 'Phone': selectedCustomer.phone, 'ID Number': selectedCustomer.idNumber || 'N/A' }, {}, 
     { 'Loan Number': 'Loan Number', 'Principal': 'Principal', 'Total Repayable': 'Total Repayable', 'Total Paid': 'Total Paid', 'Balance': 'Balance', 'Status': 'Status' },
     ...customerLoans.map(loan => {
         const balance = loan.totalRepayableAmount - loan.totalPaid;
@@ -268,7 +270,7 @@ export default function CustomersPage() {
         <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div><CardTitle>Customer List</CardTitle><CardDescription>Showing all registered customers, newest first.</CardDescription></div>
-                <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-full sm:w-[300px]" /></div>
+                <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone, or account..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-full sm:w-[300px]" /></div>
             </div>
         </CardHeader>
         <CardContent>
@@ -277,11 +279,12 @@ export default function CustomersPage() {
           {!customersLoading && sortedAndFilteredCustomers && sortedAndFilteredCustomers.length > 0 && (
             <ScrollArea className="h-[60vh]">
               <Table>
-                  <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className="w-[50px]">#</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>ID Number</TableHead>{canEditDelete && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
+                  <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead className="w-[50px]">#</TableHead><TableHead>Acc No.</TableHead><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>ID Number</TableHead>{canEditDelete && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
                   <TableBody>
                       {sortedAndFilteredCustomers.map((customer, index) => (
                           <TableRow key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer">
                               <TableCell>{index + 1}</TableCell>
+                              <TableCell className="font-mono text-xs text-primary font-bold">{customer.accountNumber || 'N/A'}</TableCell>
                               <TableCell className="font-medium">{customer.name}</TableCell>
                               <TableCell>{customer.phone}</TableCell>
                               <TableCell>{customer.idNumber || 'N/A'}</TableCell>
@@ -309,7 +312,13 @@ export default function CustomersPage() {
         <DialogContent className="sm:max-w-3xl">
           {selectedCustomer && (
             <>
-              <DialogHeader><DialogTitle>{selectedCustomer.name}'s Dashboard</DialogTitle><DialogDescription>Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}</DialogDescription></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>{selectedCustomer.name}'s Dashboard</DialogTitle>
+                <DialogDescription>
+                    <span className="font-mono font-bold text-primary mr-2">{selectedCustomer.accountNumber}</span>
+                    | Phone: {selectedCustomer.phone} | ID: {selectedCustomer.idNumber || 'N/A'}
+                </DialogDescription>
+              </DialogHeader>
               <ScrollArea className="mt-4 max-h-[70vh]">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between"><CardTitle>Loan History</CardTitle><Button onClick={handleDownloadReport} variant="outline" size="sm"><FileDown className="mr-2 h-4 w-4" />Report</Button></CardHeader>

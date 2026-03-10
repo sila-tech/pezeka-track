@@ -1,10 +1,11 @@
+
 'use client';
-import { useUser, useAuth, useCollection, useFirestore } from '@/firebase';
+import { useUser, useAuth, useCollection, useFirestore, useDoc } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Landmark, LogOut, Loader2, FileUp } from 'lucide-react';
+import { Landmark, LogOut, Loader2, FileUp, User as UserIcon } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -54,6 +55,14 @@ interface Loan {
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
 }
 
+interface Customer {
+    id: string;
+    accountNumber?: string;
+    name: string;
+    phone: string;
+    email?: string;
+}
+
 const applicationSchema = z.object({
   loanType: z.string({ required_error: 'Please select a loan type.' }),
   loanAmount: z.coerce.number().min(1, 'Please enter a valid loan amount.'),
@@ -75,6 +84,8 @@ export default function AccountPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
   const customerLoansQuery = useMemo(() => {
     if (userLoading || !firestore || !user?.uid) return null;
@@ -169,7 +180,20 @@ export default function AccountPage() {
       </header>
       <main className="p-4 sm:px-6 sm:py-0 max-w-6xl mx-auto w-full">
           <Card className="mb-6">
-            <CardHeader><CardTitle>Welcome, {user?.displayName || user?.email}!</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>Welcome, {user?.displayName || user?.email}!</CardTitle>
+                    <CardDescription>Manage your account and applications.</CardDescription>
+                </div>
+                {customerProfile?.accountNumber && (
+                    <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Account Number</span>
+                        <Badge variant="outline" className="text-sm font-mono py-1 px-3 border-primary/30 text-primary">
+                            {customerProfile.accountNumber}
+                        </Badge>
+                    </div>
+                )}
+            </CardHeader>
             <CardContent>
                 {loansLoading ? (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>) : (customerLoans && customerLoans.length > 0) ? (
                     <div className="space-y-4">
