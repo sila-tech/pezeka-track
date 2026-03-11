@@ -9,38 +9,41 @@ This guide outlines how the Android application should interact with the Firebas
 ## 2. Customer Profile (`/customers/{uid}`)
 * **Read**: The app can read the document at `/customers/YOUR_UID`.
 * **Write**: The app can create or update this document.
-* **Disbursement Data**: When the user enters their M-Pesa number, you can save it to this document.
 * **Important Fields**:
     * `name`: Full name.
     * `phone`: Primary contact.
     * `idNumber`: National ID.
     * `accountNumber`: (Read-only) Assigned by Admin.
 
-## 3. Loan Applications (`/loans`)
+## 3. Loan Applications (`/loans` or `/loan_applications`)
 The Android app is restricted to **Creating Applications** and **Reading Own Loans**.
 
-### Creating a Loan Application
-When pushing a new loan to Firestore, the following rules apply:
-* **Collection**: `/loans`
-* **Required Fields Checklist** (If any of these are wrong, you get "Insufficient Permissions"):
-    1. `customerId`: String. MUST match exactly `FirebaseAuth.getInstance().getCurrentUser().getUid()`.
-    2. `status`: String. MUST be exactly `"application"` (lowercase).
-    3. `principalAmount`: Number. (e.g., 5000).
-    4. `customerName`: String.
-    5. `customerPhone`: String.
-    6. `disbursementDate`: Timestamp. (Server date).
+### Allowed Fields Whitelist (STRICT)
+To prevent "Insufficient Permissions," you must **ONLY** send these fields. Injecting other fields (like `interestRate` or `totalPaid`) will cause a crash.
+
+1. `customerId`: String (Must match Auth UID).
+2. `status`: String (Must be exactly `"application"`).
+3. `amount`: Number (Must be a number, e.g., `5000`).
+4. `tenureMonths`: Number.
+5. `idNumber`: String.
+6. `nextOfKinName`: String.
+7. `nextOfKinPhone`: String.
+8. `paymentMethod`: String.
+9. `accountNumber`: String (Customer's bank/M-Pesa account).
+10. `createdAt`: Timestamp.
+11. `customerName`: String (Optional).
+12. `customerPhone`: String (Optional).
 
 ### Fetching Loan History
 * **Query Requirement**: You **cannot** call `get()` on the whole collection. You MUST use a filter:
   `db.collection("loans").whereEqualTo("customerId", currentUid).get()`
 
 ## 4. Common Permission Errors (403)
-* **Wrong UID**: If `customerId` in the loan object does not match the `UID` of the logged-in user.
-* **Unauthorized Status**: Attempting to set `status` to `"active"` or `"paid"` during creation.
-* **Listing**: Attempting to fetch all loans without the `customerId` filter.
-* **Case Sensitivity**: Ensure `customerId` is lowercase 'c' and uppercase 'I' (CamelCase).
+* **Extra Fields**: Attempting to send `principalAmount` or `interestRate` in the initial application. These are calculated by the Finance team during approval.
+* **Invalid Type**: Sending `amount` as a String instead of a Number.
+* **Wrong UID**: If `customerId` does not match the logged-in user.
+* **Privacy Violation**: Attempting to read the `/users` collection (Reserved for Staff).
 
 ## 5. Shared Terms (Enums)
 * **Status**: `application`, `active`, `due`, `overdue`, `paid`, `rollover`, `rejected`.
 * **Frequency**: `daily`, `weekly`, `monthly`.
-* **Finance Entry Types**: `receipt` (In), `payout` (Out), `expense` (Out). (Android app cannot access these).
