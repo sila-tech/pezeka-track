@@ -7,7 +7,6 @@ service cloud.firestore {
     // Helper Functions
     // =====================================================================
     
-    // Check if the user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -20,21 +19,24 @@ service cloud.firestore {
       );
     }
 
-    // Safely get the user's role from their profile
-    function getUserRole() {
-      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : '';
+    // Check if the user has a specific role in their profile
+    function hasRole(roleName) {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == roleName;
     }
 
-    function isStaff() {
-      return getUserRole() == 'staff';
-    }
-
+    // Finance Role: Includes Simon and designated Finance users
     function isFinance() {
-      return getUserRole() == 'finance';
+      return isSuperAdmin() || hasRole('finance');
+    }
+
+    // Staff Role: Includes Simon, Finance, and designated Staff users
+    function isStaff() {
+      return isFinance() || hasRole('staff');
     }
     
+    // Check if the user is the owner of the document
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -43,20 +45,40 @@ service cloud.firestore {
     // Collection Rules
     // =====================================================================
 
-    // Specific rule for user profiles - ensures owners can always manage their data
+    // User Profiles
     match /users/{userId} {
-      allow read, write: if isOwner(userId) || isSuperAdmin() || isFinance() || isStaff();
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) || isFinance();
     }
 
-    // =====================================================================
-    // Global Access (Requested for Android App Development)
-    // =====================================================================
-    
-    // This allows any authenticated user to manage any document.
-    // This is required for your Android app to interact with loans, customers, 
-    // and finance entries without complex role-based blocking during development.
-    match /{document=**} {
-      allow read, write: if isAuthenticated();
+    // Customers
+    match /customers/{customerId} {
+      // Customers can manage their own profile; Staff/Finance can manage all customers
+      allow read, write: if isOwner(customerId) || isStaff();
+    }
+
+    // Loans
+    match /loans/{loanId} {
+      // Read: Staff/Finance see all. Customers see only their own loans.
+      allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
+      
+      // Create: Allowed for any authenticated user (to support applications from App and Web)
+      allow create: if isAuthenticated();
+      
+      // Update/Delete: Staff/Finance manage all. Customers can only update their own applications.
+      allow update, delete: if isStaff() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
+    }
+
+    // Finance Entries
+    match /financeEntries/{entryId} {
+      // ONLY Super Admin and Finance users can access or edit the financial ledger
+      allow read, write: if isFinance();
+    }
+
+    // Investors
+    match /investors/{investorId} {
+      // Investors can manage their own portfolios; Finance users manage all
+      allow read, write: if isOwner(investorId) || isFinance();
     }
   }
 }
