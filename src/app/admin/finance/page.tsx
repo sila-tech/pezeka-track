@@ -542,34 +542,44 @@ export default function FinancePage() {
                   <DialogDescription>Modify primary financial terms. Installments will be recalculated automatically.</DialogDescription>
               </DialogHeader>
               <Form {...ledgerForm}>
-                  <form onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="space-y-6 pt-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-1 md:col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="assignedStaffId" render={({ field }) => (
-                              <FormItem className="col-span-1 md:col-span-2">
-                                <FormLabel>Assigned Staff</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                                  <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
-                                </Select>
-                              </FormItem>
-                          )} />
-                          <FormField control={ledgerForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest Rate %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg. Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc. Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                          <FormField control={ledgerForm.control} name="paymentFrequency" render={({ field }) => (
-                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
-                          )}/>
-                      </div>
-                      <Button type="submit" className="w-full h-12 text-lg font-bold" disabled={isSubmitting}>
-                          {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin"/>}
-                          Update Ledger Record
-                      </Button>
-                  </form>
+                  <ScrollArea className="max-h-[70vh] pr-4">
+                    <form id="edit-ledger-form" onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="space-y-6 pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-1 md:col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="assignedStaffId" render={({ field }) => (
+                                <FormItem className="col-span-1 md:col-span-2">
+                                    <FormLabel>Assigned Staff</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                    <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )} />
+                            <FormField control={ledgerForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest Rate %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg. Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc. Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                            <FormField control={ledgerForm.control} name="paymentFrequency" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Frequency</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
+                                        <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}/>
+                        </div>
+                    </form>
+                  </ScrollArea>
+                  <DialogFooter className="mt-6">
+                    <Button type="submit" form="edit-ledger-form" className="w-full h-12 text-lg font-bold" disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin"/>}
+                        Update Ledger Record
+                    </Button>
+                  </DialogFooter>
               </Form>
           </DialogContent>
       </Dialog>
