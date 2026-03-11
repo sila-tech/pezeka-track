@@ -1,6 +1,6 @@
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { calculateInterestForOneInstalment, calculateAmortization } from './utils';
@@ -234,6 +234,36 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     errorEmitter.emit('permission-error', permissionError);
     throw serverError;
   }
+}
+
+/**
+ * Specifically for Android/Customer side applications to avoid listing permission errors.
+ */
+export async function submitCustomerApplication(db: Firestore, customerId: string, loanData: any) {
+    const loanCollection = collection(db, 'loans');
+    const applicationData = {
+        ...loanData,
+        customerId,
+        status: 'application',
+        loanNumber: `APP-${Date.now().toString().slice(-6)}`,
+        createdAt: serverTimestamp(),
+        payments: [],
+        followUpNotes: [],
+        totalPaid: 0,
+        disbursementRecorded: false
+    };
+
+    try {
+        return await addDoc(loanCollection, applicationData);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loanCollection.path,
+            operation: 'create',
+            requestResourceData: applicationData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
 }
 
 async function recordDisbursement(db: Firestore, loan: any) {
