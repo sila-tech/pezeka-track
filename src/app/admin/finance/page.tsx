@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart } from "lucide-react";
+import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart, Search, X } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, deleteFinanceEntry } from '@/lib/firestore';
-import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
+import { EditableFinanceReportTab, DatePickerWithRange } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
 import { PortfolioReportsTab } from './components/portfolio-reports-tab';
@@ -38,6 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { DateRange } from 'react-day-picker';
 
 const addFinanceEntrySchema = z.object({
   type: z.enum(['receipt', 'payout', 'expense']),
@@ -49,6 +50,19 @@ const addFinanceEntrySchema = z.object({
   expenseCategory: z.enum(['facilitation_commission', 'office_purchase', 'other']).optional(),
   receiptCategory: z.enum(['loan_repayment', 'upfront_fees', 'investment', 'other']).optional(),
   payoutCategory: z.enum(['loan_disbursement', 'investor_withdrawal', 'other']).optional(),
+});
+
+const editLedgerSchema = z.object({
+    principalAmount: z.coerce.number().min(1, 'Principal is required'),
+    registrationFee: z.coerce.number().min(0),
+    processingFee: z.coerce.number().min(0),
+    carTrackInstallationFee: z.coerce.number().min(0),
+    chargingCost: z.coerce.number().min(0),
+    interestRate: z.coerce.number().min(0),
+    numberOfInstalments: z.coerce.number().int().min(1),
+    paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+    assignedStaffId: z.string().min(1, 'Staff member is required'),
+    disbursementDate: z.string().min(1, 'Date is required'),
 });
 
 interface Loan {
@@ -95,10 +109,18 @@ interface FinanceEntry {
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
   const [loanHistoryToShow, setLoanHistoryToShow] = useState<Loan | null>(null);
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
+  
+  // Loan Book Filters
+  const [lbSearch, setLbSearch] = useState('');
+  const [lbStatus, setLbStatus] = useState('all');
+  const [lbStaff, setLbStaff] = useState('all');
+  const [lbDate, setLbDate] = useState<DateRange | undefined>();
+  
+  // Loan Ledger Edit
+  const [loanToEditLedger, setLoanToEditLedger] = useState<Loan | null>(null);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -112,12 +134,15 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList } = useCollection<any>(isAuthorized ? 'users' : null);
 
+  const ledgerForm = useForm<z.infer<typeof editLedgerSchema>>({
+      resolver: zodResolver(editLedgerSchema),
+  });
+
   const financialData = useMemo(() => {
     const receipts: any[] = [];
     const payouts: any[] = [];
     if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [] };
     
-    // Auto-generated receipts from loan payments
     loans.filter(l => l.status !== 'application' && l.status !== 'rejected').forEach(loan => {
         (loan.payments || []).forEach(p => receipts.push({ 
             id: p.paymentId, 
@@ -131,7 +156,6 @@ export default function FinancePage() {
         }));
     });
 
-    // Manual entries
     financeEntries.forEach(e => {
         if (e.type === 'receipt') receipts.push(e);
         else payouts.push(e);
@@ -148,6 +172,33 @@ export default function FinancePage() {
         allPayouts: payouts.sort(sortByDate) 
     };
   }, [loans, financeEntries]);
+
+  const filteredLoanBook = useMemo(() => {
+      if (!loans) return [];
+      return loans.filter(loan => {
+          if (loan.status === 'application' || loan.status === 'rejected') return false;
+          
+          const searchMatch = !lbSearch || 
+              loan.customerName.toLowerCase().includes(lbSearch.toLowerCase()) ||
+              loan.loanNumber.toLowerCase().includes(lbSearch.toLowerCase()) ||
+              loan.customerPhone.includes(lbSearch);
+              
+          const statusMatch = lbStatus === 'all' || loan.status === lbStatus;
+          const staffMatch = lbStaff === 'all' || loan.assignedStaffId === lbStaff;
+          
+          let dateMatch = true;
+          if (lbDate?.from) {
+              const dDate = new Date((loan.disbursementDate as any).seconds * 1000);
+              const start = new Date(lbDate.from);
+              start.setHours(0,0,0,0);
+              const end = lbDate.to ? new Date(lbDate.to) : new Date(lbDate.from);
+              end.setHours(23,59,59,999);
+              dateMatch = dDate >= start && dDate <= end;
+          }
+          
+          return searchMatch && statusMatch && staffMatch && dateMatch;
+      });
+  }, [loans, lbSearch, lbStatus, lbStaff, lbDate]);
 
   const addForm = useForm<z.infer<typeof addFinanceEntrySchema>>({
     resolver: zodResolver(addFinanceEntrySchema),
@@ -185,6 +236,48 @@ export default function FinancePage() {
       setOpen(true);
   };
 
+  const handleEditLedger = (loan: Loan) => {
+      setLoanToEditLedger(loan);
+      const dDate = loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date((loan.disbursementDate as any).seconds * 1000);
+      ledgerForm.reset({
+          principalAmount: loan.principalAmount,
+          registrationFee: loan.registrationFee || 0,
+          processingFee: loan.processingFee || 0,
+          carTrackInstallationFee: loan.carTrackInstallationFee || 0,
+          chargingCost: loan.chargingCost || 0,
+          interestRate: loan.interestRate || 0,
+          numberOfInstalments: loan.numberOfInstalments || 1,
+          paymentFrequency: loan.paymentFrequency || 'monthly',
+          assignedStaffId: loan.assignedStaffId || '',
+          disbursementDate: format(dDate, 'yyyy-MM-dd'),
+      });
+  };
+
+  async function onLedgerSubmit(values: z.infer<typeof editLedgerSchema>) {
+      if (!loanToEditLedger) return;
+      setIsSubmitting(true);
+      try {
+          const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
+          const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
+          
+          const updateData = {
+              ...values,
+              disbursementDate: new Date(values.disbursementDate),
+              assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
+              instalmentAmount,
+              totalRepayableAmount: totalRepayableAmount + (loanToEditLedger.totalPenalties || 0),
+          };
+          
+          await updateLoan(firestore, loanToEditLedger.id, updateData);
+          toast({ title: 'Ledger Entry Updated' });
+          setLoanToEditLedger(null);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Error', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
+  }
+
   const handleDeleteEntry = (entry: FinanceEntry) => {
       if ((entry as any).isSystemGenerated) {
           toast({ variant: 'destructive', title: 'System Entry', description: 'Loan repayments must be deleted from the Loans page.' });
@@ -201,26 +294,6 @@ export default function FinancePage() {
           setEntryToDelete(null);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Error', description: e.message });
-      }
-  };
-
-  const penaltyCalculation = useMemo(() => {
-      if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
-      const oneInst = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
-      const days = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
-      const dailyRate = oneInst / days;
-      let dDate = loanToEdit.disbursementDate instanceof Date ? loanToEdit.disbursementDate : new Date((loanToEdit.disbursementDate as any).seconds * 1000);
-      let due: Date;
-      if (loanToEdit.paymentFrequency === 'monthly') due = addMonths(dDate, loanToEdit.numberOfInstalments);
-      else if (loanToEdit.paymentFrequency === 'weekly') due = addWeeks(dDate, loanToEdit.numberOfInstalments);
-      else due = addDays(dDate, loanToEdit.numberOfInstalments);
-      const diff = differenceInDays(new Date(), due);
-      return { daysLate: diff > 0 ? diff : 0, suggested: Math.round((diff > 0 ? diff : 0) * dailyRate) };
-  }, [loanToEdit]);
-
-  const authorizeSuggestedPenalty = () => {
-      if (penaltyCalculation.suggested > 0 && loanToEdit) {
-          addPenaltyToLoan(firestore, loanToEdit.id, { amount: penaltyCalculation.suggested, date: new Date(), description: "Late payment penalty" }).then(() => toast({ title: "Penalty Applied" }));
       }
   };
 
@@ -319,12 +392,51 @@ export default function FinancePage() {
           <TabsContent value="loanbook">
               <Card>
                   <CardHeader>
-                      <CardTitle>Internal Ledger (Loan Book)</CardTitle>
-                      <CardDescription>Comprehensive tracking of all credit facilities, fees, and income.</CardDescription>
+                      <div className="flex flex-col gap-4">
+                          <div>
+                              <CardTitle>Internal Ledger (Loan Book)</CardTitle>
+                              <CardDescription>Comprehensive tracking of all credit facilities, fees, and income.</CardDescription>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                              <div className="relative">
+                                  <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                                  <Input 
+                                      placeholder="Search name, loan #..." 
+                                      value={lbSearch} 
+                                      onChange={(e) => setLbSearch(e.target.value)} 
+                                      className="pl-8 w-full sm:w-[200px]" 
+                                  />
+                              </div>
+                              <Select value={lbStatus} onValueChange={setLbStatus}>
+                                  <SelectTrigger className="w-full sm:w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="all">All Status</SelectItem>
+                                      <SelectItem value="active">Active</SelectItem>
+                                      <SelectItem value="due">Due</SelectItem>
+                                      <SelectItem value="overdue">Overdue</SelectItem>
+                                      <SelectItem value="paid">Paid</SelectItem>
+                                      <SelectItem value="rollover">Rollover</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                              <Select value={lbStaff} onValueChange={setLbStaff}>
+                                  <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Staff" /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="all">All Staff</SelectItem>
+                                      {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
+                                  </SelectContent>
+                              </Select>
+                              <DatePickerWithRange date={lbDate} setDate={setLbDate} className="w-full sm:w-[260px]" />
+                              {(lbSearch || lbStatus !== 'all' || lbStaff !== 'all' || lbDate) && (
+                                  <Button variant="ghost" size="icon" onClick={() => { setLbSearch(''); setLbStatus('all'); setLbStaff('all'); setLbDate(undefined); }}>
+                                      <X className="h-4 w-4" />
+                                  </Button>
+                              )}
+                          </div>
+                      </div>
                   </CardHeader>
                   <CardContent className="p-0">
                       <ScrollArea className="h-[65vh] w-full">
-                          <Table className="min-w-[2200px]">
+                          <Table className="min-w-[2300px]">
                               <TableHeader>
                                   <TableRow>
                                       <TableHead className="w-[150px]">Client Name</TableHead>
@@ -345,11 +457,11 @@ export default function FinancePage() {
                                       <TableHead className="text-right text-destructive">Penalties</TableHead>
                                       <TableHead className="text-right">Exp. Interest</TableHead>
                                       <TableHead className="text-right font-bold">Exp. Income</TableHead>
-                                      <TableHead className="text-center">History</TableHead>
+                                      <TableHead className="text-center">Actions</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
-                                  {loans?.filter(l => l.status !== 'application' && l.status !== 'rejected').map(loan => {
+                                  {filteredLoanBook.map(loan => {
                                       const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
                                       const takeHome = loan.principalAmount - totalFees;
                                       const balance = loan.totalRepayableAmount - loan.totalPaid;
@@ -377,9 +489,14 @@ export default function FinancePage() {
                                               <TableCell className="text-right">{expectedInterest.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{expectedIncome.toLocaleString()}</TableCell>
                                               <TableCell className="text-center">
-                                                  <Button variant="ghost" size="icon" onClick={() => setLoanHistoryToShow(loan)}>
-                                                      <History className="h-4 w-4" />
-                                                  </Button>
+                                                  <div className="flex items-center gap-1 justify-center">
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditLedger(loan)}>
+                                                          <Pencil className="h-3.5 w-3.5" />
+                                                      </Button>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLoanHistoryToShow(loan)}>
+                                                          <History className="h-3.5 w-3.5" />
+                                                      </Button>
+                                                  </div>
                                               </TableCell>
                                           </TableRow>
                                       );
@@ -417,6 +534,46 @@ export default function FinancePage() {
           <TabsContent value="investors"><InvestorsPortfolioTab/></TabsContent>
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
+
+      {/* Edit Loan Ledger Dialog */}
+      <Dialog open={!!loanToEditLedger} onOpenChange={(open) => !open && setLoanToEditLedger(null)}>
+          <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                  <DialogTitle>Edit Internal Ledger Record</DialogTitle>
+                  <DialogDescription>Modify primary financial terms. Installments will be recalculated automatically.</DialogDescription>
+              </DialogHeader>
+              <Form {...ledgerForm}>
+                  <form onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="space-y-4 pt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="assignedStaffId" render={({ field }) => (
+                              <FormItem className="col-span-2">
+                                <FormLabel>Assigned Staff</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                  <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </FormItem>
+                          )} />
+                          <FormField control={ledgerForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal (Ksh)</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest Rate %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg. Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc. Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={ledgerForm.control} name="paymentFrequency" render={({ field }) => (
+                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                          )}/>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={isSubmitting}>
+                          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                          Update Ledger Record
+                      </Button>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
 
       <Dialog open={!!loanHistoryToShow} onOpenChange={(open) => !open && setLoanHistoryToShow(null)}>
           <DialogContent className="sm:max-w-md">
