@@ -43,31 +43,18 @@ service cloud.firestore {
     // Collection Rules
     // =====================================================================
 
+    // Specific rule for user profiles - ensures owners can always manage their data
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isSuperAdmin() || isFinance() || isStaff();
     }
 
-    match /customers/{customerId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /loans/{loanId} {
-      allow read, write: if isAuthenticated();
-    }
-    
-    match /financeEntries/{entryId} {
-      // Allow all authenticated staff and finance to manage entries
-      allow read, write: if isAuthenticated() && (isSuperAdmin() || isFinance() || isStaff());
-    }
-
-    match /investors/{investorId} {
-      allow read, write: if isAuthenticated();
-    }
-
     // =====================================================================
-    // Global Fallback (Requested for Android App Development)
+    // Global Access (Requested for Android App Development)
     // =====================================================================
     
+    // This allows any authenticated user to manage any document.
+    // This is required for your Android app to interact with loans, customers, 
+    // and finance entries without complex role-based blocking during development.
     match /{document=**} {
       allow read, write: if isAuthenticated();
     }
