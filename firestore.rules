@@ -54,7 +54,7 @@ service cloud.firestore {
 
     // Customers
     match /customers/{customerId} {
-      // Customers manage their own; Staff/Finance manage all
+      // Customers manage their own record; Staff/Finance manage all
       allow read, write: if isStaff() || isOwner(customerId);
     }
 
