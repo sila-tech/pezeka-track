@@ -45,14 +45,16 @@ service cloud.firestore {
     // Ensures integrity: customers cannot inject rates, balances, or arbitrary fields.
     function isValidCustomerApplication() {
       let allowedFields = [
-        'amount', 'tenureMonths', 'idNumber', 'nextOfKinName', 
+        'amount', 'principalAmount', 'tenureMonths', 'idNumber', 'nextOfKinName', 
         'nextOfKinPhone', 'paymentMethod', 'accountNumber', 
-        'customerId', 'status', 'createdAt', 'loanType', 'customerName', 'customerPhone'
+        'customerId', 'status', 'createdAt', 'loanType', 'customerName', 
+        'customerPhone', 'alternativeNumber', 'paymentFrequency', 'numberOfInstalments',
+        'comments'
       ];
       return isAuthenticated() && 
              request.resource.data.customerId == request.auth.uid &&
              request.resource.data.status == 'application' &&
-             request.resource.data.amount is number &&
+             (request.resource.data.get('amount', 0) is number || request.resource.data.get('principalAmount', 0) is number) &&
              request.resource.data.keys().hasOnly(allowedFields);
     }
 
@@ -85,6 +87,7 @@ service cloud.firestore {
       allow create: if isFinance() || isValidCustomerApplication();
       
       // Update: Finance manages all. Staff can ONLY add followUpNotes.
+      // NOTE: Customers can NEVER update a loan once submitted.
       allow update: if isFinance() || (
         isStaff() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
