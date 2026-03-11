@@ -12,9 +12,10 @@ service cloud.firestore {
     }
 
     // Check if the user is the Super Admin (Simon)
+    // Using both UID and case-insensitive email for redundancy
     function isSuperAdmin() {
       return isAuthenticated() && (
-        request.auth.token.email == 'simon@pezeka.com' || 
+        request.auth.token.get('email', '').lower() == 'simon@pezeka.com' || 
         request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
       );
     }
@@ -45,6 +46,11 @@ service cloud.firestore {
     // Collection Rules
     // =====================================================================
 
+    // Super Admin Catch-all: Simon has absolute access to everything
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
     // User Profiles
     match /users/{userId} {
       allow read: if isAuthenticated();
@@ -54,13 +60,13 @@ service cloud.firestore {
 
     // Customers
     match /customers/{customerId} {
-      // Customers manage their own record; Staff/Finance manage all
+      // Staff/Finance manage all; Customers (Android/Web) manage only their own profile
       allow read, write: if isStaff() || isOwner(customerId);
     }
 
     // Loans
     match /loans/{loanId} {
-      // Read: Staff/Finance see all. Customers see only their own loans.
+      // Read: Staff/Finance see all. Customers (Android/Web) see only their own loans.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
       // Create: Allowed for any authenticated user (to support applications from Android and Web)
@@ -70,10 +76,10 @@ service cloud.firestore {
       allow update, delete: if isStaff() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
     }
 
-    // Finance Entries
+    // Finance Entries (Sensitive Ledger)
     match /financeEntries/{entryId} {
       // STRICT: ONLY Simon and Finance users can access or edit the financial ledger
-      // Staff members and customers are strictly denied
+      // Staff members and customers are strictly denied access here
       allow read, write: if isFinance();
     }
 
