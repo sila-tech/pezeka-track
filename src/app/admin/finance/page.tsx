@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -537,17 +536,17 @@ export default function FinancePage() {
 
       {/* Edit Loan Ledger Dialog */}
       <Dialog open={!!loanToEditLedger} onOpenChange={(open) => !open && setLoanToEditLedger(null)}>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-3xl">
               <DialogHeader>
                   <DialogTitle>Edit Internal Ledger Record</DialogTitle>
                   <DialogDescription>Modify primary financial terms. Installments will be recalculated automatically.</DialogDescription>
               </DialogHeader>
               <Form {...ledgerForm}>
-                  <form onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="space-y-4 pt-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
+                  <form onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="space-y-6 pt-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-1 md:col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                           <FormField control={ledgerForm.control} name="assignedStaffId" render={({ field }) => (
-                              <FormItem className="col-span-2">
+                              <FormItem className="col-span-1 md:col-span-2">
                                 <FormLabel>Assigned Staff</FormLabel>
                                 <Select onValueChange={field.onChange} value={field.value}>
                                   <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
@@ -566,8 +565,8 @@ export default function FinancePage() {
                               <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                           )}/>
                       </div>
-                      <Button type="submit" className="w-full" disabled={isSubmitting}>
-                          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                      <Button type="submit" className="w-full h-12 text-lg font-bold" disabled={isSubmitting}>
+                          {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin"/>}
                           Update Ledger Record
                       </Button>
                   </form>
