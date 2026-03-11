@@ -21,7 +21,6 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
         pathname === path ? "bg-muted text-primary" : "text-muted-foreground"
     );
 
-    // Finance can now access everything Super Admin can
     const isAdmin = isSuperAdmin || isFinance;
 
     return (
@@ -62,7 +61,7 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                 </Link>
             )}
 
-            {isAdmin && (
+            {isSuperAdmin && (
                 <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
                     <ShieldCheck className="h-4 w-4" />
                     User Management

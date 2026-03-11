@@ -48,7 +48,8 @@ service cloud.firestore {
     // User Profiles (Admin Staff/Finance)
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isFinance();
+      // Only Super Admin can manage system user profiles
+      allow write: if isSuperAdmin();
     }
 
     // Customers

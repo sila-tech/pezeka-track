@@ -580,7 +580,8 @@ export default function FinancePage() {
                         Update Ledger Record
                     </Button>
                   </DialogFooter>
-              </DialogContent>
+              </Form>
+          </DialogContent>
       </Dialog>
 
       <Dialog open={!!loanHistoryToShow} onOpenChange={(open) => !open && setLoanHistoryToShow(null)}>
