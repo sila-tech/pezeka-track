@@ -131,6 +131,7 @@
         "transactionFee": { "type": "number", "default": 0, "description": "Transaction fee associated with money out." },
         "description": { "type": "string" },
         "loanId": { "type": "string", "description": "The ID of the associated loan, if applicable." },
+        "recordedBy": { "type": "string", "description": "The name of the user who recorded this entry." },
         "expenseCategory": {
           "type": "string",
           "enum": ["facilitation_commission", "office_purchase", "other"],

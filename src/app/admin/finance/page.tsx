@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -85,6 +86,7 @@ interface FinanceEntry {
   transactionFee?: number;
   description: string;
   loanId?: string;
+  recordedBy?: string;
   expenseCategory?: string;
   receiptCategory?: string;
   payoutCategory?: string;
@@ -124,6 +126,7 @@ export default function FinancePage() {
             description: `Repayment: Loan #${loan.loanNumber}`, 
             receiptCategory: 'loan_repayment',
             type: 'receipt',
+            recordedBy: 'System (Payment)',
             isSystemGenerated: true
         }));
     });
@@ -222,9 +225,14 @@ export default function FinancePage() {
   };
 
   async function onAddSubmit(values: z.infer<typeof addFinanceEntrySchema>) {
+    if (!user) return;
     setIsSubmitting(true);
     try {
-      const data = { ...values, date: new Date(values.date) };
+      const data = { 
+          ...values, 
+          date: new Date(values.date),
+          recordedBy: user.name || user.email || 'Admin'
+      };
       if (editingEntry) await updateFinanceEntry(firestore, editingEntry.id, data);
       else await addFinanceEntry(firestore, data as any);
       setOpen(false); setEditingEntry(null); addForm.reset({ type: 'receipt', date: format(new Date(), 'yyyy-MM-dd'), amount: 0, description: '', transactionFee: 0 });
@@ -393,7 +401,7 @@ export default function FinancePage() {
                 entries={financialData.allReceipts} 
                 loading={financeEntriesLoading}
                 onEdit={handleEditEntry}
-                onDelete={handleEditEntry}
+                onDelete={handleDeleteEntry}
               />
           </TabsContent>
           <TabsContent value="payouts">

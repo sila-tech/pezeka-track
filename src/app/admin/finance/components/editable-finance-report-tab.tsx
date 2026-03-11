@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -23,6 +24,7 @@ interface FinanceEntry {
   amount: number;
   description: string;
   loanId?: string;
+  recordedBy?: string;
   expenseCategory?: string;
   receiptCategory?: string;
   payoutCategory?: string;
@@ -127,7 +129,8 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             (entry.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (entry.expenseCategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (entry.receiptCategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (entry.payoutCategory || '').toLowerCase().includes(searchTerm.toLowerCase())
+            (entry.payoutCategory || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (entry.recordedBy || '').toLowerCase().includes(searchTerm.toLowerCase())
         );
     }
 
@@ -157,6 +160,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
             'Date': format(entryDate, 'PPP'),
             'Description': entry.description,
             'Amount (Ksh)': entry.amount,
+            'Recorded By': entry.recordedBy || 'System'
         };
         const category = entry.expenseCategory || entry.receiptCategory || entry.payoutCategory;
         if (category) record['Category'] = category.replace(/_/g, ' ').toUpperCase();
@@ -239,6 +243,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Recorded By</TableHead>
                     <TableHead className="text-right">Amount (Ksh)</TableHead>
                     {isEditable && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
@@ -267,6 +272,9 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                             {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
                             {entry.payoutCategory && <Badge variant="destructive" className="bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
                         </TableCell>
+                        <TableCell>
+                            <span className="text-xs italic text-muted-foreground">{entry.recordedBy || 'System'}</span>
+                        </TableCell>
                         <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
                         {isEditable && onEdit && onDelete && (
                             <TableCell className="text-right">
@@ -284,7 +292,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 </TableBody>
                 <TableFooter>
                     <TableRow className="font-bold bg-muted/50">
-                        <TableCell colSpan={3} className="text-right">Total</TableCell>
+                        <TableCell colSpan={4} className="text-right">Total</TableCell>
                         <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
                         {isEditable && <TableCell />}
                     </TableRow>

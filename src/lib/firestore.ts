@@ -136,6 +136,7 @@ type FinanceEntryData = {
     transactionFee?: number;
     description?: string;
     loanId?: string;
+    recordedBy?: string;
     expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
     receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'investment' | 'other';
     payoutCategory?: 'loan_disbursement' | 'investor_withdrawal' | 'other';
@@ -147,6 +148,7 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
   const newEntry = {
     ...entryData,
     transactionFee: entryData.transactionFee || 0,
+    createdAt: serverTimestamp(),
   };
 
   try {
@@ -261,7 +263,8 @@ async function recordDisbursement(db: Firestore, loan: any) {
         amount: takeHome,
         transactionFee: 0,
         description: `Disbursement for Loan #${loan.loanNumber}. Principal: Ksh ${Number(loan.principalAmount).toLocaleString()}, Retained Fees: Ksh ${totalFees.toLocaleString()}`,
-        loanId: loan.id
+        loanId: loan.id,
+        recordedBy: 'System (Approval)'
     });
 
     await updateDoc(loanRef, { disbursementRecorded: true });
@@ -408,7 +411,8 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         amount: interestAmount,
         transactionFee: 0,
         description: receiptDescription,
-        loanId: originalLoan.id
+        loanId: originalLoan.id,
+        recordedBy: 'System (Rollover)'
     };
     const receiptDocRef = await addFinanceEntry(db, receiptData);
 
@@ -860,6 +864,7 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
         amount: withdrawal.amount,
         transactionFee: 0,
         description: `Investor withdrawal for ${investorData.name}`,
+        recordedBy: 'System (Withdrawal)'
     });
 
     try {
@@ -946,6 +951,7 @@ export async function approveDeposit(db: Firestore, investorId: string, depositI
         amount: deposit.amount,
         transactionFee: 0,
         description: `Investor deposit from ${investorData.name}`,
+        recordedBy: 'System (Deposit)'
     });
 
     try {
