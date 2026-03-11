@@ -45,20 +45,21 @@ service cloud.firestore {
     // Collection Rules
     // =====================================================================
 
-    // User Profiles
+    // User Profiles (Admin Staff/Finance)
     match /users/{userId} {
       allow read: if isAuthenticated();
-      // Only Simon, Finance, or the Owner can modify profiles
-      allow write: if isSuperAdmin() || isFinance() || isOwner(userId);
+      allow write: if isSuperAdmin() || isFinance();
     }
 
     // Customers
     match /customers/{customerId} {
-      allow read: if isStaff();
-      // Staff can create (register) but NOT update or delete
-      allow create: if isStaff();
-      // Only Finance/Admin can edit or delete customers
-      allow update, delete: if isFinance();
+      // Owners can read their own profile. Staff/Finance see all.
+      allow read: if isStaff() || isOwner(customerId);
+      // Staff can register new customers. Owners can create their profile on signup.
+      allow create: if isStaff() || isOwner(customerId);
+      // Only Finance/Admin or the Owner can update contact info
+      allow update: if isFinance() || isOwner(customerId);
+      allow delete: if isFinance();
     }
 
     // Loans
@@ -66,8 +67,7 @@ service cloud.firestore {
       // Read: Staff/Finance see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Only Finance/Admin can add loan records. 
-      // Authenticated customers can create applications (status is checked in UI logic)
+      // Create: Only Finance/Admin can add records. Customers can create 'application' status loans.
       allow create: if isFinance() || (isAuthenticated() && request.resource.data.status == 'application');
       
       // Update: Finance manages all. Staff can ONLY add followUpNotes.

@@ -1,14 +1,13 @@
-
 'use client';
 import { useUser, useAuth, useCollection, useFirestore, useDoc } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Landmark, LogOut, Loader2, FileUp, User as UserIcon } from 'lucide-react';
+import { Landmark, LogOut, Loader2, FileUp, History, CalendarDays } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, addDays, addWeeks, addMonths } from 'date-fns';
 import { collection, query, where } from 'firebase/firestore';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,6 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { addLoan, upsertCustomer } from '@/lib/firestore';
 import { calculateAmortization } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 interface Payment {
@@ -84,6 +86,7 @@ export default function AccountPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLoanForHistory, setSelectedLoanForHistory] = useState<Loan | null>(null);
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
@@ -172,6 +175,20 @@ export default function AccountPage() {
     }
   }
 
+  const getNextDueDate = (loan: Loan) => {
+      try {
+          const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
+          const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
+          const nextIdx = paidInstalments + 1;
+          
+          if (loan.paymentFrequency === 'daily') return addDays(disbursementDate, nextIdx);
+          if (loan.paymentFrequency === 'weekly') return addWeeks(disbursementDate, nextIdx);
+          return addMonths(disbursementDate, nextIdx);
+      } catch (e) {
+          return null;
+      }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
@@ -200,8 +217,50 @@ export default function AccountPage() {
                         <h3 className="text-lg font-semibold">Your Loans</h3>
                         {customerLoans.map(loan => {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
+                            const nextDue = getNextDueDate(loan);
+                            
                             return (
-                                <Card key={loan.id} className="border-l-4 border-l-primary"><CardHeader className="pb-2"><div className="flex justify-between items-start"><div><CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle><CardDescription>{loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}</CardDescription></div><Badge variant={loan.status === 'paid' ? 'default' : 'secondary'}>{loan.status.toUpperCase()}</Badge></div></CardHeader><CardContent><div className="grid gap-4 grid-cols-2 sm:grid-cols-3"><div><div className="text-xs text-muted-foreground uppercase font-bold">Principal</div><div className="font-semibold">Ksh {loan.principalAmount.toLocaleString() }</div></div><div><div className="text-xs text-muted-foreground uppercase font-bold">To Repay</div><div className="font-semibold">Ksh {loan.totalRepayableAmount.toLocaleString()}</div></div><div className="col-span-2 sm:col-span-1 border-t sm:border-t-0 pt-2 sm:pt-0"><div className="text-xs text-muted-foreground uppercase font-bold">Current Balance</div><div className="font-bold text-xl text-primary">Ksh {balance.toLocaleString()}</div></div></div></CardContent></Card>
+                                <Card key={loan.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-2">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle>
+                                                <CardDescription>
+                                                    {loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}
+                                                </CardDescription>
+                                            </div>
+                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
+                                                {loan.status.toUpperCase()}
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+                                            <div>
+                                                <div className="text-[10px] text-muted-foreground uppercase font-bold">To Repay</div>
+                                                <div className="font-semibold text-sm">Ksh {loan.totalRepayableAmount.toLocaleString()}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-muted-foreground uppercase font-bold">Remaining</div>
+                                                <div className="font-bold text-lg text-primary">Ksh {balance.toLocaleString()}</div>
+                                            </div>
+                                            <div>
+                                                {loan.status !== 'paid' && loan.status !== 'application' && nextDue && (
+                                                    <>
+                                                        <div className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Next Due</div>
+                                                        <div className="font-medium text-sm">{format(nextDue, 'dd/MM/yyyy')}</div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center justify-end">
+                                                <Button variant="ghost" size="sm" onClick={() => setSelectedLoanForHistory(loan)}>
+                                                    <History className="mr-2 h-4 w-4" />
+                                                    Payments
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             )
                         })}
                     </div>
@@ -255,6 +314,41 @@ export default function AccountPage() {
             </CardContent>
           </Card>
       </main>
+
+      {/* Payment History Dialog */}
+      <Dialog open={!!selectedLoanForHistory} onOpenChange={(open) => !open && setSelectedLoanForHistory(null)}>
+          <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                  <DialogTitle>Repayment History: #{selectedLoanForHistory?.loanNumber}</DialogTitle>
+                  <DialogDescription>List of all verified payments made for this loan.</DialogDescription>
+              </DialogHeader>
+              <ScrollArea className="h-80 border rounded-md p-2">
+                  {(!selectedLoanForHistory?.payments || selectedLoanForHistory.payments.length === 0) ? (
+                      <p className="text-center py-12 text-muted-foreground text-sm italic">No payments recorded yet.</p>
+                  ) : (
+                      <Table>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                              {selectedLoanForHistory.payments.map((p, i) => (
+                                  <TableRow key={p.paymentId || i}>
+                                      <TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'PPP')}</TableCell>
+                                      <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
+                                  </TableRow>
+                              ))}
+                          </TableBody>
+                      </Table>
+                  )}
+              </ScrollArea>
+              <DialogFooter>
+                  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </>
   );
 }
