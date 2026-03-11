@@ -12,7 +12,6 @@ service cloud.firestore {
     }
 
     // Check if the user is the Super Admin (Simon)
-    // Using both UID and case-insensitive email for redundancy
     function isSuperAdmin() {
       return isAuthenticated() && (
         request.auth.token.get('email', '').lower() == 'simon@pezeka.com' || 
@@ -37,7 +36,7 @@ service cloud.firestore {
       return isFinance() || hasRole('staff');
     }
     
-    // Check if the user is the owner of the document
+    // Check if the user is the owner of the document (Customer UID)
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -45,11 +44,6 @@ service cloud.firestore {
     // =====================================================================
     // Collection Rules
     // =====================================================================
-
-    // Super Admin Catch-all: Simon has absolute access to everything
-    match /{document=**} {
-      allow read, write: if isSuperAdmin();
-    }
 
     // User Profiles
     match /users/{userId} {
@@ -60,32 +54,39 @@ service cloud.firestore {
 
     // Customers
     match /customers/{customerId} {
-      // Staff/Finance manage all; Customers (Android/Web) manage only their own profile
-      allow read, write: if isStaff() || isOwner(customerId);
+      allow read: if isStaff();
+      // Staff can create (register) but NOT update or delete
+      allow create: if isStaff();
+      // Only Finance/Admin can edit or delete customers
+      allow update, delete: if isFinance();
     }
 
     // Loans
     match /loans/{loanId} {
-      // Read: Staff/Finance see all. Customers (Android/Web) see only their own loans.
+      // Read: Staff/Finance see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Allowed for any authenticated user (to support applications from Android and Web)
-      allow create: if isAuthenticated();
+      // Create: Only Finance/Admin can add loan records. 
+      // Authenticated customers can create applications (status is checked in UI logic)
+      allow create: if isFinance() || (isAuthenticated() && request.resource.data.status == 'application');
       
-      // Update/Delete: Staff/Finance manage all. Customers can only update their own applications.
-      allow update, delete: if isStaff() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
+      // Update: Finance manages all. Staff can ONLY add followUpNotes.
+      allow update: if isFinance() || (
+        isStaff() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
+      );
+
+      // Delete: Strictly Finance/Admin
+      allow delete: if isFinance();
     }
 
     // Finance Entries (Sensitive Ledger)
     match /financeEntries/{entryId} {
-      // STRICT: ONLY Simon and Finance users can access or edit the financial ledger
-      // Staff members and customers are strictly denied access here
       allow read, write: if isFinance();
     }
 
     // Investors
     match /investors/{investorId} {
-      // Investors can view their own portfolios; Finance/Simon manage all
       allow read: if isFinance() || isOwner(investorId);
       allow write: if isFinance();
     }

@@ -170,6 +170,7 @@ export default function LoansPage() {
   const isStaff = userRole === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  // ONLY Finance/Admin can add loans, record payments, apply penalties, or approve applications.
   const canEdit = isSuperAdmin || isFinance; 
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
