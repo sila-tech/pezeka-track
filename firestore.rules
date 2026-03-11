@@ -7,9 +7,14 @@ service cloud.firestore {
     // Helper Functions
     // =====================================================================
     
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
     // Check if the user is the Super Admin (Simon)
     function isSuperAdmin() {
-      return request.auth != null && (
+      return isAuthenticated() && (
         request.auth.token.email == 'simon@pezeka.com' || 
         request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
       );
@@ -17,7 +22,7 @@ service cloud.firestore {
 
     // Safely get the user's role from their profile
     function getUserRole() {
-      return request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
         : '';
     }
@@ -31,7 +36,7 @@ service cloud.firestore {
     }
     
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
     // =====================================================================
@@ -39,59 +44,32 @@ service cloud.firestore {
     // =====================================================================
 
     match /users/{userId} {
-      // Allow users to read and write only their own profile (requested)
-      allow read, write: if isOwner(userId);
-      
-      // Allow Simon and staff to access profiles for management
-      allow get: if request.auth != null && (isSuperAdmin() || isStaff() || isFinance());
-      allow list: if isSuperAdmin() || isFinance() || isStaff();
-      // Simon and Finance can edit any admin profile
-      allow write: if isSuperAdmin() || isFinance();
+      allow read, write: if isOwner(userId) || isSuperAdmin() || isFinance() || isStaff();
     }
 
     match /customers/{customerId} {
-      allow list: if isSuperAdmin() || isStaff() || isFinance();
-      allow get: if isSuperAdmin() || isStaff() || isFinance() || isOwner(customerId);
-      // Allow customers to manage their own profile info
-      allow write: if isSuperAdmin() || isStaff() || isFinance() || isOwner(customerId);
+      allow read, write: if isAuthenticated();
     }
 
     match /loans/{loanId} {
-      // Allow staff to see everything, allow customers to list only their own loans
-      allow list: if isSuperAdmin() || isStaff() || isFinance() || (request.auth != null && resource.data.customerId == request.auth.uid);
-      allow get: if isSuperAdmin() || isStaff() || isFinance() || (request.auth != null && resource.data.customerId == request.auth.uid);
-      allow write: if isSuperAdmin() || isStaff() || isFinance();
-      // Allow customers to create their own applications
-      allow create: if request.auth != null && (isSuperAdmin() || isStaff() || isFinance() || request.resource.data.customerId == request.auth.uid);
+      allow read, write: if isAuthenticated();
     }
     
     match /financeEntries/{entryId} {
-      // Restricted to Finance and Super Admin
-      allow list, get, create, update, delete: if isSuperAdmin() || isFinance();
+      // Allow all authenticated staff and finance to manage entries
+      allow read, write: if isAuthenticated() && (isSuperAdmin() || isFinance() || isStaff());
     }
 
     match /investors/{investorId} {
-      // Only Finance and Admin can list or manage all investors
-      allow list: if isSuperAdmin() || isFinance();
-      allow get: if isOwner(investorId) || isSuperAdmin() || isFinance();
-      allow create, delete: if isSuperAdmin() || isFinance();
-      
-      // Update rule allowing owners to update specific keys (deposits/withdrawals)
-      allow update: if isSuperAdmin() || isFinance() || (isOwner(investorId) && 
-                    (
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['withdrawals', 'updatedAt']) ||
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deposits', 'updatedAt'])
-                    ));
+      allow read, write: if isAuthenticated();
     }
 
     // =====================================================================
     // Global Fallback (Requested for Android App Development)
     // =====================================================================
     
-    // Allow authenticated users to see loan products and manage their own loans
-    // WARNING: This is very permissive and should be hardened for production.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isAuthenticated();
     }
   }
 }
