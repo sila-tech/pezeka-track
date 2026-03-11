@@ -19,11 +19,11 @@ service cloud.firestore {
       );
     }
 
-    // Check if the user has a specific role in their profile
+    // Safely check for a specific role in the user's profile document
     function hasRole(roleName) {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == roleName;
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'none') == roleName;
     }
 
     // Finance Role: Includes Simon and designated Finance users
@@ -48,13 +48,14 @@ service cloud.firestore {
     // User Profiles
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow write: if isOwner(userId) || isFinance();
+      // Only Simon, Finance, or the Owner can modify profiles
+      allow write: if isSuperAdmin() || isFinance() || isOwner(userId);
     }
 
     // Customers
     match /customers/{customerId} {
-      // Customers can manage their own profile; Staff/Finance can manage all customers
-      allow read, write: if isOwner(customerId) || isStaff();
+      // Customers manage their own; Staff/Finance manage all
+      allow read, write: if isStaff() || isOwner(customerId);
     }
 
     // Loans
@@ -62,7 +63,7 @@ service cloud.firestore {
       // Read: Staff/Finance see all. Customers see only their own loans.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Allowed for any authenticated user (to support applications from App and Web)
+      // Create: Allowed for any authenticated user (to support applications from Android and Web)
       allow create: if isAuthenticated();
       
       // Update/Delete: Staff/Finance manage all. Customers can only update their own applications.
@@ -71,14 +72,16 @@ service cloud.firestore {
 
     // Finance Entries
     match /financeEntries/{entryId} {
-      // ONLY Super Admin and Finance users can access or edit the financial ledger
+      // STRICT: ONLY Simon and Finance users can access or edit the financial ledger
+      // Staff members and customers are strictly denied
       allow read, write: if isFinance();
     }
 
     // Investors
     match /investors/{investorId} {
-      // Investors can manage their own portfolios; Finance users manage all
-      allow read, write: if isOwner(investorId) || isFinance();
+      // Investors can view their own portfolios; Finance/Simon manage all
+      allow read: if isFinance() || isOwner(investorId);
+      allow write: if isFinance();
     }
   }
 }
