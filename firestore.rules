@@ -31,12 +31,12 @@ service cloud.firestore {
       return isSuperAdmin() || hasRole('finance');
     }
 
-    // Staff Role: Includes Simon, Finance, and designated Staff users
+    // Staff Role: Includes Finance and designated Staff users
     function isStaff() {
       return isFinance() || hasRole('staff');
     }
     
-    // Check if the user is the owner of the document (Customer UID)
+    // Check if the user is the owner of the document
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
@@ -57,8 +57,9 @@ service cloud.firestore {
       allow read: if isStaff() || isOwner(customerId);
       // Staff can register new customers. Owners can create their profile on signup.
       allow create: if isStaff() || isOwner(customerId);
-      // Only Finance/Admin or the Owner can update contact info
+      // Only Finance/Admin or the Owner can update info (Staff cannot edit)
       allow update: if isFinance() || isOwner(customerId);
+      // Strictly Finance/Admin deletion
       allow delete: if isFinance();
     }
 
@@ -67,8 +68,13 @@ service cloud.firestore {
       // Read: Staff/Finance see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Only Finance/Admin can add records. Customers can create 'application' status loans.
-      allow create: if isFinance() || (isAuthenticated() && request.resource.data.status == 'application');
+      // Create: Only Finance/Admin can add direct active records. 
+      // Customers/Staff can only create 'application' status loans for themselves.
+      allow create: if isFinance() || (
+        isAuthenticated() && 
+        request.resource.data.status == 'application' &&
+        request.resource.data.customerId == request.auth.uid
+      );
       
       // Update: Finance manages all. Staff can ONLY add followUpNotes.
       allow update: if isFinance() || (

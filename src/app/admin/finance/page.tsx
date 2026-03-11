@@ -86,7 +86,7 @@ interface Loan {
   status: string;
   assignedStaffId?: string;
   assignedStaffName?: string;
-  payments?: { paymentId: string; date: any; amount: number; }[];
+  payments?: { paymentId: string; date: any; amount: number; recordedBy?: string; }[];
   penalties?: any[];
   comments?: string;
 }
@@ -150,7 +150,7 @@ export default function FinancePage() {
             description: `Repayment: Loan #${loan.loanNumber}`, 
             receiptCategory: 'loan_repayment',
             type: 'receipt',
-            recordedBy: 'System (Payment)',
+            recordedBy: p.recordedBy || 'System (Payment)',
             isSystemGenerated: true
         }));
     });
@@ -548,7 +548,7 @@ export default function FinancePage() {
                             <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-1 md:col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                             <FormField control={ledgerForm.control} name="assignedStaffId" render={({ field }) => (
                                 <FormItem className="col-span-1 md:col-span-2">
-                                    <FormLabel>Assigned Staff</FormLabel>
+                                    <FormLabel>Assigned Staff (Reassignment)</FormLabel>
                                     <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
                                     <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
@@ -580,8 +580,7 @@ export default function FinancePage() {
                         Update Ledger Record
                     </Button>
                   </DialogFooter>
-              </Form>
-          </DialogContent>
+              </DialogContent>
       </Dialog>
 
       <Dialog open={!!loanHistoryToShow} onOpenChange={(open) => !open && setLoanHistoryToShow(null)}>

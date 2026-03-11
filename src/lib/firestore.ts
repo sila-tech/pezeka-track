@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc } from 'firebase/firestore';
@@ -40,8 +39,8 @@ export interface Loan {
   totalPaid: number;
   totalPenalties?: number;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
-  payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; }[];
-  penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; }[];
+  payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; recordedBy?: string; }[];
+  penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; recordedBy?: string; }[];
   followUpNotes?: { noteId: string; date: { seconds: number; nanoseconds: number } | Date; staffName: string; staffId: string; content: string; }[];
   comments?: string;
   status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
@@ -76,7 +75,6 @@ export async function addCustomer(db: Firestore, customerData: CustomerData): Pr
   try {
     const docRef = await addDoc(customerCollection, newCustomer);
     
-    // Trigger Welcome Email
     if (customerData.email) {
         sendAutomatedEmail({
             type: 'welcome',
@@ -107,7 +105,6 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
         const accountNumber = await generateAccountNumber(db);
         finalData = { ...finalData, ...({ accountNumber } as any) };
         
-        // Trigger Welcome Email only for new customers
         if (customerData.email) {
             sendAutomatedEmail({
                 type: 'welcome',
@@ -269,7 +266,6 @@ async function recordDisbursement(db: Firestore, loan: any) {
 
     await updateDoc(loanRef, { disbursementRecorded: true });
 
-    // Trigger Disbursement Email
     if (loan.customerEmail || loan.email) {
         sendAutomatedEmail({
             type: 'loan_approved',
@@ -328,7 +324,6 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
         const oldData = loanSnap.data() as Loan;
         await updateDoc(loanRef, { ...updateData, updatedAt: serverTimestamp() });
 
-        // Trigger Payment Email if totalPaid increased
         if (updateData.totalPaid && updateData.totalPaid > (oldData.totalPaid || 0) && (oldData.customerEmail)) {
             const paymentAmount = updateData.totalPaid - (oldData.totalPaid || 0);
             sendAutomatedEmail({
@@ -338,7 +333,7 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
                     customerName: oldData.customerName,
                     loanNumber: oldData.loanNumber,
                     amount: paymentAmount,
-                    balance: (oldData.totalRepayableAmount - updateData.totalPaid)
+                    balance: (oldData.totalRepayableAmount - (updateData.totalPaid || oldData.totalPaid))
                 }
             });
         }
@@ -420,6 +415,7 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         paymentId: receiptDocRef.id,
         amount: interestAmount,
         date: rolloverDate,
+        recordedBy: 'System (Rollover)'
     };
 
     await updateLoan(db, originalLoan.id, {
@@ -492,7 +488,7 @@ export async function deleteLoan(db: Firestore, loanId: string) {
     }
 }
 
-export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: { amount: number; date: Date; description: string }) {
+export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: { amount: number; date: Date; description: string; recordedBy?: string }) {
     const loanRef = doc(db, 'loans', loanId);
     const penaltyId = doc(collection(db, 'temp')).id;
 
@@ -508,7 +504,6 @@ export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: {
             totalRepayableAmount: increment(penalty.amount)
         });
 
-        // Trigger Penalty Email
         if (loanData.customerEmail) {
             sendAutomatedEmail({
                 type: 'penalty_applied',
