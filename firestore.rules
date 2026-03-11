@@ -58,7 +58,7 @@ service cloud.firestore {
       allow read: if isStaff() || isOwner(customerId);
       // Staff can register new customers. Owners can create their profile on signup.
       allow create: if isStaff() || isOwner(customerId);
-      // Only Finance/Admin or the Owner can update info (Staff cannot edit)
+      // Finance/Admin or the Owner can update info (e.g., adding disbursement phone)
       allow update: if isFinance() || isOwner(customerId);
       // Strictly Finance/Admin deletion
       allow delete: if isFinance();
@@ -69,11 +69,11 @@ service cloud.firestore {
       // Read: Staff/Finance see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Only Finance/Admin can add direct active records. 
-      // Customers/Staff can only create 'application' status loans for themselves.
+      // Create: Finance/Admin can add direct active records. 
+      // Customers can create 'application' status loans ONLY for themselves.
       allow create: if isFinance() || (
         isAuthenticated() && 
-        request.resource.data.status == 'application' &&
+        (request.resource.data.status == 'application' || request.resource.data.status == 'Application') &&
         request.resource.data.customerId == request.auth.uid
       );
       
