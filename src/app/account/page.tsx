@@ -177,13 +177,18 @@ export default function AccountPage() {
 
   const getNextDueDate = (loan: Loan) => {
       try {
-          const disbursementDate = new Date(loan.disbursementDate.seconds * 1000);
+          const dDate = loan.disbursementDate?.seconds 
+            ? new Date(loan.disbursementDate.seconds * 1000) 
+            : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+          
+          if (isNaN(dDate.getTime())) return null;
+
           const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
           const nextIdx = paidInstalments + 1;
           
-          if (loan.paymentFrequency === 'daily') return addDays(disbursementDate, nextIdx);
-          if (loan.paymentFrequency === 'weekly') return addWeeks(disbursementDate, nextIdx);
-          return addMonths(disbursementDate, nextIdx);
+          if (loan.paymentFrequency === 'daily') return addDays(dDate, nextIdx);
+          if (loan.paymentFrequency === 'weekly') return addWeeks(dDate, nextIdx);
+          return addMonths(dDate, nextIdx);
       } catch (e) {
           return null;
       }
@@ -219,6 +224,13 @@ export default function AccountPage() {
                             const balance = loan.totalRepayableAmount - loan.totalPaid;
                             const nextDue = getNextDueDate(loan);
                             
+                            const dDate = loan.disbursementDate?.seconds 
+                                ? new Date(loan.disbursementDate.seconds * 1000) 
+                                : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+                            
+                            const dateLabel = loan.status === 'application' ? 'Applied on' : 'Disbursed on';
+                            const dateValue = isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'PPP');
+
                             return (
                                 <Card key={loan.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
                                     <CardHeader className="pb-2">
@@ -226,7 +238,7 @@ export default function AccountPage() {
                                             <div>
                                                 <CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle>
                                                 <CardDescription>
-                                                    {loan.status === 'application' ? `Applied on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}` : `Disbursed on: ${format(new Date(loan.disbursementDate.seconds * 1000), 'PPP')}`}
+                                                    {dateLabel}: {dateValue}
                                                 </CardDescription>
                                             </div>
                                             <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
@@ -334,12 +346,18 @@ export default function AccountPage() {
                               </TableRow>
                           </TableHeader>
                           <TableBody>
-                              {selectedLoanForHistory.payments.map((p, i) => (
-                                  <TableRow key={p.paymentId || i}>
-                                      <TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                      <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
-                                  </TableRow>
-                              ))}
+                              {selectedLoanForHistory.payments.map((p, i) => {
+                                  const payDate = (p.date as any)?.seconds 
+                                    ? new Date((p.date as any).seconds * 1000) 
+                                    : (p.date instanceof Date ? p.date : new Date());
+                                  
+                                  return (
+                                    <TableRow key={p.paymentId || i}>
+                                        <TableCell className="text-xs">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PPP')}</TableCell>
+                                        <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                  );
+                              })}
                           </TableBody>
                       </Table>
                   )}

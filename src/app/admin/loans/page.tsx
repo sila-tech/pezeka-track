@@ -195,7 +195,11 @@ export default function LoansPage() {
   
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
-    return loans.filter(loan => loan.status === 'application').sort((a, b) => (b.disbursementDate as any).seconds - (a.disbursementDate as any).seconds);
+    return loans.filter(loan => loan.status === 'application').sort((a, b) => {
+        const d1 = a.disbursementDate?.seconds ? a.disbursementDate.seconds : 0;
+        const d2 = b.disbursementDate?.seconds ? b.disbursementDate.seconds : 0;
+        return d2 - d1;
+    });
   }, [loans]);
 
 
@@ -332,9 +336,9 @@ export default function LoansPage() {
 
   const handleEditTerms = (loan: Loan) => {
       if (!canEdit) return;
-      const dDate = loan.disbursementDate instanceof Date 
-          ? loan.disbursementDate 
-          : new Date((loan.disbursementDate as any).seconds * 1000);
+      const dDate = loan.disbursementDate?.seconds 
+          ? new Date(loan.disbursementDate.seconds * 1000) 
+          : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
 
       editTermsForm.reset({
           interestRate: loan.interestRate || 0,
@@ -342,7 +346,7 @@ export default function LoansPage() {
           numberOfInstalments: loan.numberOfInstalments,
           paymentFrequency: loan.paymentFrequency,
           assignedStaffId: loan.assignedStaffId || '',
-          disbursementDate: format(dDate, 'yyyy-MM-dd'),
+          disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
           totalRepayableAmount: loan.totalRepayableAmount,
       });
       setIsEditingTerms(true);
@@ -393,11 +397,18 @@ export default function LoansPage() {
       const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
       const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
       const dailyRate = oneInstInterest / daysInFreq;
-      let dDate = loanToEdit.disbursementDate instanceof Date ? loanToEdit.disbursementDate : new Date((loanToEdit.disbursementDate as any).seconds * 1000);
+      
+      let dDate = loanToEdit.disbursementDate?.seconds 
+        ? new Date(loanToEdit.disbursementDate.seconds * 1000) 
+        : (loanToEdit.disbursementDate ? new Date(loanToEdit.disbursementDate as any) : new Date());
+      
+      if (isNaN(dDate.getTime())) return { dailyRate: 0, daysLate: 0, suggested: 0 };
+
       let finalDueDate: Date;
       if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
       else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments);
       else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments);
+      
       const daysLate = differenceInDays(new Date(), finalDueDate);
       return { dailyRate, daysLate: daysLate > 0 ? daysLate : 0, suggested: Math.round((daysLate > 0 ? daysLate : 0) * dailyRate) };
   }, [loanToEdit]);
@@ -501,16 +512,22 @@ export default function LoansPage() {
                       <Table>
                           <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Staff Assigned</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
                           <TableBody>
-                              {filteredLoans.map((loan) => (
-                                  <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
-                                      <TableCell className="font-medium">{loan.loanNumber}</TableCell>
-                                      <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
-                                      <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-sm">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
-                                      <TableCell>{format(new Date((loan.disbursementDate as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
-                                      <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
-                                      <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
-                                  </TableRow>
-                              ))}
+                              {filteredLoans.map((loan) => {
+                                  const dDate = loan.disbursementDate?.seconds 
+                                    ? new Date(loan.disbursementDate.seconds * 1000) 
+                                    : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+                                  
+                                  return (
+                                    <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
+                                        <TableCell className="font-medium">{loan.loanNumber}</TableCell>
+                                        <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
+                                        <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-sm">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
+                                        <TableCell>{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
+                                        <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
+                                        <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
+                                    </TableRow>
+                                  );
+                              })}
                           </TableBody>
                       </Table>
                     </ScrollArea>
@@ -694,7 +711,18 @@ export default function LoansPage() {
                                                 <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4"><div className="flex gap-2"><FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /><Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button></div></form>
                                             </Form>
                                         )}
-                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (<TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
+                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => {
+                                            const payDate = (p.date as any)?.seconds 
+                                                ? new Date((p.date as any).seconds * 1000) 
+                                                : (p.date instanceof Date ? p.date : new Date());
+                                            
+                                            return (
+                                                <TableRow key={p.paymentId || i}>
+                                                    <TableCell className="text-xs">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'dd/MM/yy HH:mm')}</TableCell>
+                                                    <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                </TableRow>
+                                            )
+                                        })}</TableBody></Table></ScrollArea>
                                     </TabsContent>
                                     <TabsContent value="followups">
                                         <ScrollArea className="h-[300px]">
@@ -702,15 +730,21 @@ export default function LoansPage() {
                                                 {loanToEdit.followUpNotes?.length === 0 ? (
                                                     <p className="text-sm text-muted-foreground text-center py-8">No follow-up notes recorded.</p>
                                                 ) : (
-                                                    loanToEdit.followUpNotes?.map((note, i) => (
-                                                        <div key={note.noteId || i} className="border p-3 rounded-lg bg-muted/30">
-                                                            <div className="flex justify-between items-center mb-2">
-                                                                <span className="text-xs font-bold">{note.staffName}</span>
-                                                                <span className="text-[10px] text-muted-foreground">{format(new Date((note.date as any).seconds * 1000), 'PPP p')}</span>
+                                                    loanToEdit.followUpNotes?.map((note, i) => {
+                                                        const noteDate = (note.date as any)?.seconds 
+                                                            ? new Date((note.date as any).seconds * 1000) 
+                                                            : (note.date instanceof Date ? note.date : new Date());
+                                                        
+                                                        return (
+                                                            <div key={note.noteId || i} className="border p-3 rounded-lg bg-muted/30">
+                                                                <div className="flex justify-between items-center mb-2">
+                                                                    <span className="text-xs font-bold">{note.staffName}</span>
+                                                                    <span className="text-[10px] text-muted-foreground">{isNaN(noteDate.getTime()) ? 'N/A' : format(noteDate, 'PPP p')}</span>
+                                                                </div>
+                                                                <p className="text-sm italic">"{note.content}"</p>
                                                             </div>
-                                                            <p className="text-sm italic">"{note.content}"</p>
-                                                        </div>
-                                                    ))
+                                                        )
+                                                    })
                                                 )}
                                             </div>
                                         </ScrollArea>
@@ -729,7 +763,19 @@ export default function LoansPage() {
                                         ) : (
                                             <p className="text-sm text-muted-foreground text-center py-8">Penalties can only be managed by Finance/Admin.</p>
                                         )}
-                                        <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => (<TableRow key={p.penaltyId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy')}</TableCell><TableCell className="text-xs">{p.description}</TableCell><TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
+                                        <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => {
+                                            const penaltyDate = (p.date as any)?.seconds 
+                                                ? new Date((p.date as any).seconds * 1000) 
+                                                : (p.date instanceof Date ? p.date : new Date());
+                                            
+                                            return (
+                                                <TableRow key={p.penaltyId || i}>
+                                                    <TableCell className="text-xs">{isNaN(penaltyDate.getTime()) ? 'N/A' : format(penaltyDate, 'dd/MM/yy')}</TableCell>
+                                                    <TableCell className="text-xs">{p.description}</TableCell>
+                                                    <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                </TableRow>
+                                            )
+                                        })}</TableBody></Table></ScrollArea>
                                     </TabsContent>
                                 </Tabs>
                             </div>

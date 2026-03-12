@@ -162,9 +162,9 @@ export default function FinancePage() {
     });
 
     const sortByDate = (a: any, b: any) => {
-        const d1 = a.date?.seconds ? a.date.seconds : new Date(a.date).getTime() / 1000;
-        const d2 = b.date?.seconds ? b.date.seconds : new Date(b.date).getTime() / 1000;
-        return d2 - d1;
+        const d1 = a.date?.seconds ? a.date.seconds : (a.date instanceof Date ? a.date.getTime() / 1000 : new Date(a.date).getTime() / 1000);
+        const d2 = b.date?.seconds ? b.date.seconds : (b.date instanceof Date ? b.date.getTime() / 1000 : new Date(b.date).getTime() / 1000);
+        return (d2 || 0) - (d1 || 0);
     };
 
     return { 
@@ -188,12 +188,19 @@ export default function FinancePage() {
           
           let dateMatch = true;
           if (lbDate?.from) {
-              const dDate = new Date((loan.disbursementDate as any).seconds * 1000);
-              const start = new Date(lbDate.from);
-              start.setHours(0,0,0,0);
-              const end = lbDate.to ? new Date(lbDate.to) : new Date(lbDate.from);
-              end.setHours(23,59,59,999);
-              dateMatch = dDate >= start && dDate <= end;
+              const dDate = loan.disbursementDate?.seconds 
+                ? new Date(loan.disbursementDate.seconds * 1000) 
+                : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
+              
+              if (isNaN(dDate.getTime())) {
+                  dateMatch = false;
+              } else {
+                  const start = new Date(lbDate.from);
+                  start.setHours(0,0,0,0);
+                  const end = lbDate.to ? new Date(lbDate.to) : new Date(lbDate.from);
+                  end.setHours(23,59,59,999);
+                  dateMatch = dDate >= start && dDate <= end;
+              }
           }
           
           return searchMatch && statusMatch && staffMatch && dateMatch;
@@ -221,6 +228,7 @@ export default function FinancePage() {
       setEditingEntry(entry);
       let dateStr = format(new Date(), 'yyyy-MM-dd');
       if (entry.date?.seconds) dateStr = format(new Date(entry.date.seconds * 1000), 'yyyy-MM-dd');
+      else if (entry.date instanceof Date) dateStr = format(entry.date, 'yyyy-MM-dd');
       else if (entry.date) dateStr = format(new Date(entry.date), 'yyyy-MM-dd');
 
       addForm.reset({
@@ -238,7 +246,10 @@ export default function FinancePage() {
 
   const handleEditLedger = (loan: Loan) => {
       setLoanToEditLedger(loan);
-      const dDate = loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date((loan.disbursementDate as any).seconds * 1000);
+      const dDate = loan.disbursementDate?.seconds 
+        ? new Date(loan.disbursementDate.seconds * 1000) 
+        : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
+      
       ledgerForm.reset({
           principalAmount: loan.principalAmount,
           registrationFee: loan.registrationFee || 0,
@@ -249,7 +260,7 @@ export default function FinancePage() {
           numberOfInstalments: loan.numberOfInstalments || 1,
           paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
-          disbursementDate: format(dDate, 'yyyy-MM-dd'),
+          disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
           totalRepayableAmount: loan.totalRepayableAmount,
       });
   };
@@ -471,12 +482,16 @@ export default function FinancePage() {
                                       const expectedInterest = loan.totalRepayableAmount - (loan.totalPenalties || 0) - loan.principalAmount;
                                       const expectedIncome = expectedInterest + (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0);
                                       
+                                      const dDate = loan.disbursementDate?.seconds 
+                                        ? new Date(loan.disbursementDate.seconds * 1000) 
+                                        : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+
                                       return (
                                           <TableRow key={loan.id} className="group">
                                               <TableCell className="font-medium">{loan.customerName}</TableCell>
                                               <TableCell>{loan.customerPhone}</TableCell>
                                               <TableCell>{loan.loanNumber}</TableCell>
-                                              <TableCell>{format(new Date((loan.disbursementDate as any).seconds * 1000), 'dd/MM/yy')}</TableCell>
+                                              <TableCell>{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
                                               <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.registrationFee || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.processingFee || 0).toLocaleString()}</TableCell>
@@ -613,12 +628,18 @@ export default function FinancePage() {
                               </TableRow>
                           </TableHeader>
                           <TableBody>
-                              {loanHistoryToShow.payments.map((p, i) => (
-                                  <TableRow key={p.paymentId || i}>
-                                      <TableCell>{format(new Date((p.date as any).seconds * 1000), 'PPP')}</TableCell>
-                                      <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
-                                  </TableRow>
-                              ))}
+                              {loanHistoryToShow.payments.map((p, i) => {
+                                  const payDate = (p.date as any)?.seconds 
+                                    ? new Date((p.date as any).seconds * 1000) 
+                                    : (p.date instanceof Date ? p.date : new Date());
+                                  
+                                  return (
+                                    <TableRow key={p.paymentId || i}>
+                                        <TableCell>{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PPP')}</TableCell>
+                                        <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
+                                    </TableRow>
+                                  )
+                              })}
                           </TableBody>
                       </Table>
                   )}
