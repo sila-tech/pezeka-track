@@ -91,21 +91,16 @@ export default function AdminLoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       const loggedInUser = userCredential.user;
 
-      if (isSimon) {
-        router.push('/admin');
-        return;
-      }
-      
       const userDocRef = doc(firestore, 'users', loggedInUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
-        const role = isFinance ? 'finance' : 'staff';
+        const role = isSimon ? 'finance' : (isFinance ? 'finance' : 'staff');
         await setDoc(userDocRef, {
             uid: loggedInUser.uid,
             email: loggedInUser.email,
             role: role,
-            name: loggedInUser.email?.split('@')[0] || "New Staff"
+            name: isSimon ? 'Simon Admin' : (loggedInUser.email?.split('@')[0] || "New Staff")
         });
         toast({ title: "Profile Provisioned", description: `Welcome! Your ${role} profile has been created automatically.` });
       }

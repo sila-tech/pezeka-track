@@ -42,7 +42,6 @@ service cloud.firestore {
     }
 
     // Simplified validation for loan applications (Customer Side)
-    // Relaxed to allow Android app flexibility while enforcing status and ownership
     function isValidCustomerApplication() {
       return isAuthenticated() && 
              request.resource.data.get('customerId', '') == request.auth.uid &&
@@ -69,31 +68,26 @@ service cloud.firestore {
 
     // Loans
     match /loans/{loanId} {
-      // Read: Staff see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
-      
-      // Create: Finance/Admin can add records. Customers use application logic.
       allow create: if isFinance() || isValidCustomerApplication();
-      
-      // Update: Finance manages all. Staff add notes. Customers cannot update submitted loans.
       allow update: if isFinance() || (
         isStaff() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
       );
-
       allow delete: if isFinance();
     }
 
-    // Loan Applications (Mirrors the loans collection policy)
+    // Loan Applications
     match /loan_applications/{appId} {
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       allow create: if isFinance() || isValidCustomerApplication();
       allow update, delete: if isFinance();
     }
 
-    // Finance Entries
+    // Finance Entries (Receipts, Payouts, Expenses)
     match /financeEntries/{entryId} {
-      allow read, write: if isFinance();
+      allow read: if isStaff();
+      allow write: if isFinance();
     }
 
     // Investors
@@ -102,7 +96,7 @@ service cloud.firestore {
       allow write: if isFinance();
     }
 
-    // System Config (Publicly readable for app metadata/version checks)
+    // System Config
     match /system_config/{configId} {
       allow read: if true;
       allow write: if isSuperAdmin();
