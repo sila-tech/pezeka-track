@@ -212,6 +212,8 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     loanNumber: newLoanNumber,
     createdAt: serverTimestamp(),
     payments: [],
+    penalties: [],
+    totalPenalties: 0,
     followUpNotes: [],
     comments: loanData.comments || "",
     disbursementRecorded: false 
@@ -248,6 +250,8 @@ export async function submitCustomerApplication(db: Firestore, customerId: strin
         loanNumber: `APP-${Date.now().toString().slice(-6)}`,
         createdAt: serverTimestamp(),
         payments: [],
+        penalties: [],
+        totalPenalties: 0,
         followUpNotes: [],
         totalPaid: 0,
         disbursementRecorded: false
@@ -325,7 +329,7 @@ export async function approveLoanApplication(db: Firestore, loan: Loan, updateDa
         ...updateData,
         status: 'active',
         instalmentAmount,
-        totalRepayableAmount,
+        totalRepayableAmount: totalRepayableAmount + (loan.totalPenalties || 0),
         updatedAt: serverTimestamp()
     };
 
@@ -485,6 +489,8 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         status: 'active',
         totalPaid: 0,
         payments: [],
+        penalties: [],
+        totalPenalties: 0,
         followUpNotes: [],
         comments: `Rollover from Loan #${originalLoan.loanNumber}`,
         createdAt: serverTimestamp(),

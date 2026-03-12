@@ -43,7 +43,7 @@ To ensure the Android app matches the Admin Dashboard, use these definitions:
 
 *   **Principal Amount (`principalAmount`)**: The gross loan amount before any deductions.
 *   **Disbursed Amount (Take-home)**: `principalAmount - (all upfront fees)`. This is the cash the customer actually receives.
-*   **Total Repayable (`totalRepayableAmount`)**: `principalAmount + interestAmount + totalPenalties`. This is the total amount the customer owes back.
+*   **Total Repayable (Amount to Pay)**: `principalAmount + interestAmount + totalPenalties`. This is the total amount the customer owes back.
 *   **Outstanding Balance**: `totalRepayableAmount - totalPaid`.
 
 ## 5. Common Permission Errors (403)

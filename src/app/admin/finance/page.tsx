@@ -450,7 +450,7 @@ export default function FinancePage() {
                                       <TableHead className="text-right">Charging Cost</TableHead>
                                       <TableHead className="text-center">Instalments</TableHead>
                                       <TableHead className="text-right">Inst. Amount</TableHead>
-                                      <TableHead className="text-right font-bold">Total Repayable</TableHead>
+                                      <TableHead className="text-right font-bold">Total Repayable (Amt to Pay)</TableHead>
                                       <TableHead className="text-right text-green-600">Paid Amount</TableHead>
                                       <TableHead className="text-right font-bold">Balance</TableHead>
                                       <TableHead className="text-right text-destructive">Penalties</TableHead>
@@ -517,7 +517,7 @@ export default function FinancePage() {
                 entries={financialData.allReceipts} 
                 loading={financeEntriesLoading}
                 onEdit={handleEditEntry}
-                onDelete={handleDeleteEntry}
+                onDelete={handleEditEntry}
               />
           </TabsContent>
           <TabsContent value="payouts">
@@ -527,7 +527,7 @@ export default function FinancePage() {
                 entries={financialData.allPayouts} 
                 loading={financeEntriesLoading}
                 onEdit={handleEditEntry}
-                onDelete={handleDeleteEntry}
+                onDelete={handleEditEntry}
               />
           </TabsContent>
           <TabsContent value="investors"><InvestorsPortfolioTab/></TabsContent>
