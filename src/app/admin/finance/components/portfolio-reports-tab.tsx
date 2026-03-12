@@ -31,8 +31,14 @@ export function PortfolioReportsTab({ loans }: PortfolioReportsTabProps) {
   
   const getNextDueDate = (loan: Loan) => {
     try {
-        const dDate = new Date((loan.disbursementDate as any).seconds * 1000);
-        const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
+        let dDate: Date;
+        if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
+        else if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
+        else dDate = loan.disbursementDate ? new Date(loan.disbursementDate) : new Date();
+
+        if (isNaN(dDate.getTime())) return new Date();
+
+        const paidInstalments = Math.floor((loan.totalPaid || 0) / (loan.instalmentAmount || 1));
         const nextIdx = paidInstalments + 1;
         
         if (loan.paymentFrequency === 'daily') return addDays(dDate, nextIdx);
@@ -46,19 +52,24 @@ export function PortfolioReportsTab({ loans }: PortfolioReportsTabProps) {
   const generateReportData = (filteredLoans: Loan[]) => {
     return filteredLoans.map(loan => {
       const nextDue = getNextDueDate(loan);
-      const balance = loan.totalRepayableAmount - loan.totalPaid;
+      const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
       
+      let dDate: Date;
+      if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
+      else if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
+      else dDate = loan.disbursementDate ? new Date(loan.disbursementDate) : new Date();
+
       return {
         'Loan Number': loan.loanNumber,
         'Customer Name': loan.customerName,
         'Phone': loan.customerPhone,
-        'Status': loan.status.toUpperCase(),
-        'Principal': loan.principalAmount,
-        'Total Repayable': loan.totalRepayableAmount,
-        'Total Paid': loan.totalPaid,
+        'Status': (loan.status || '').toUpperCase(),
+        'Principal': loan.principalAmount || 0,
+        'Total Repayable': loan.totalRepayableAmount || 0,
+        'Total Paid': loan.totalPaid || 0,
         'Outstanding Balance': balance,
         'Frequency': loan.paymentFrequency,
-        'Disbursement Date': format(new Date((loan.disbursementDate as any).seconds * 1000), 'yyyy-MM-dd'),
+        'Disbursement Date': isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'yyyy-MM-dd'),
         'Next Due Date': loan.status === 'paid' ? 'N/A' : format(nextDue, 'yyyy-MM-dd'),
         'Comments / Rollover Info': loan.comments || ''
       };

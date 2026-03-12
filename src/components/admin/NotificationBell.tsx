@@ -19,18 +19,29 @@ interface Loan {
   customerName: string;
   principalAmount: number;
   status: string;
-  disbursementDate: { seconds: number; nanoseconds: number };
+  disbursementDate: { seconds: number; nanoseconds: number } | any;
 }
 
 interface Customer {
     id: string;
     name: string;
-    createdAt: { seconds: number; nanoseconds: number };
+    createdAt: { seconds: number; nanoseconds: number } | any;
 }
 
 export function NotificationBell() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
   const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
+
+  const getTimestamp = (date: any) => {
+    if (!date) return 0;
+    if (typeof date.seconds === 'number') return date.seconds;
+    if (date instanceof Date) return Math.floor(date.getTime() / 1000);
+    if (typeof date === 'string') {
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? 0 : Math.floor(d.getTime() / 1000);
+    }
+    return 0;
+  };
 
   const notifications = useMemo(() => {
     const list: any[] = [];
@@ -41,7 +52,7 @@ export function NotificationBell() {
                 id: `loan-${l.id}`,
                 type: 'loan',
                 title: 'New Loan Application',
-                description: `${l.customerName} requested Ksh ${l.principalAmount.toLocaleString()}`,
+                description: `${l.customerName || 'Customer'} requested Ksh ${(l.principalAmount || 0).toLocaleString()}`,
                 date: l.disbursementDate,
                 href: '/admin/loans',
                 icon: <HandCoins className="h-3 w-3 text-blue-600" />,
@@ -52,14 +63,14 @@ export function NotificationBell() {
 
     if (customers) {
         customers.forEach(c => {
-            // Only show customers created in the last 7 days as "new" notifications
             const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-            if (c.createdAt && c.createdAt.seconds * 1000 > sevenDaysAgo) {
+            const ts = getTimestamp(c.createdAt);
+            if (ts > 0 && ts * 1000 > sevenDaysAgo) {
                 list.push({
                     id: `cust-${c.id}`,
                     type: 'customer',
                     title: 'New Customer Joined',
-                    description: `${c.name} just created an account`,
+                    description: `${c.name || 'Anonymous'} just created an account`,
                     date: c.createdAt,
                     href: '/admin/customers',
                     icon: <UserPlus className="h-3 w-3 text-green-600" />,
@@ -69,7 +80,7 @@ export function NotificationBell() {
         });
     }
 
-    return list.sort((a, b) => b.date.seconds - a.date.seconds);
+    return list.sort((a, b) => getTimestamp(b.date) - getTimestamp(a.date));
   }, [loans, customers]);
 
   const count = notifications.length;
@@ -106,26 +117,29 @@ export function NotificationBell() {
             </div>
           ) : (
             <div className="grid">
-              {notifications.map((notif) => (
-                <Link
-                  key={notif.id}
-                  href={notif.href}
-                  className="flex flex-col gap-1 border-b p-4 transition-colors hover:bg-muted/50"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`rounded-full p-1.5 ${notif.bg}`}>
-                      {notif.icon}
+              {notifications.map((notif) => {
+                const ts = getTimestamp(notif.date);
+                return (
+                  <Link
+                    key={notif.id}
+                    href={notif.href}
+                    className="flex flex-col gap-1 border-b p-4 transition-colors hover:bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`rounded-full p-1.5 ${notif.bg}`}>
+                        {notif.icon}
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-tight">{notif.title}</span>
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-tight">{notif.title}</span>
-                  </div>
-                  <p className="text-sm">
-                    {notif.description}
-                  </p>
-                  <span className="text-[10px] text-muted-foreground">
-                    {format(new Date(notif.date.seconds * 1000), 'PPP p')}
-                  </span>
-                </Link>
-              ))}
+                    <p className="text-sm">
+                      {notif.description}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {ts > 0 ? format(new Date(ts * 1000), 'PPP p') : 'N/A'}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </ScrollArea>

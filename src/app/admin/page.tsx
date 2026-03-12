@@ -35,7 +35,7 @@ interface DashboardLoan {
   customerName: string;
   customerPhone: string;
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
-  disbursementDate: { seconds: number; nanoseconds: number };
+  disbursementDate: { seconds: number; nanoseconds: number } | any;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
   instalmentAmount: number;
@@ -70,8 +70,7 @@ export default function Dashboard() {
   const [isAddingNote, setIsAddingNote] = useState(false);
 
   const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'staff' || user.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') : false;
-  const isStaffMember = user?.role?.toLowerCase() === 'staff' || user?.role?.toLowerCase() === 'finance' || user?.email?.toLowerCase() === 'simon@pezeka.com';
-
+  
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
 
   const staffLoanForm = useForm<z.infer<typeof staffLoanSchema>>({
@@ -155,10 +154,15 @@ export default function Dashboard() {
     const today = startOfToday();
     
     return loans.filter(loan => loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected').map(loan => {
-        const dDate = new Date(loan.disbursementDate.seconds * 1000);
+        let dDate: Date;
+        if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
+        else if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
+        else dDate = loan.disbursementDate ? new Date(loan.disbursementDate) : new Date();
+
+        if (isNaN(dDate.getTime())) dDate = new Date();
         
-        const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
-        const allInstalmentsPaid = loan.totalPaid >= loan.totalRepayableAmount || (loan.numberOfInstalments > 0 && paidInstalments >= loan.numberOfInstalments);
+        const paidInstalments = Math.floor((loan.totalPaid || 0) / (loan.instalmentAmount || 1));
+        const allInstalmentsPaid = (loan.totalPaid || 0) >= (loan.totalRepayableAmount || 0) || (loan.numberOfInstalments > 0 && paidInstalments >= loan.numberOfInstalments);
         
         let nextDueDate: Date;
         if (allInstalmentsPaid) {
@@ -183,7 +187,11 @@ export default function Dashboard() {
 
   const newApplications = useMemo(() => {
     if (!loans) return [];
-    return loans.filter(loan => loan.status === 'application').sort((a, b) => b.disbursementDate.seconds - a.disbursementDate.seconds);
+    return loans.filter(loan => loan.status === 'application').sort((a, b) => {
+        const tsA = a.disbursementDate?.seconds || 0;
+        const tsB = b.disbursementDate?.seconds || 0;
+        return tsB - tsA;
+    });
   }, [loans]);
   
   if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
@@ -192,41 +200,39 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
-        {isStaffMember && (
-          <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
-            <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Staff Loan Application</DialogTitle>
-                <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
-              </DialogHeader>
-              <Form {...staffLoanForm}>
-                <ScrollArea className="max-h-[70vh] pr-4">
-                  <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
-                    <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
-                      <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+        <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
+          <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Staff Loan Application</DialogTitle>
+              <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
+            </DialogHeader>
+            <Form {...staffLoanForm}>
+              <ScrollArea className="max-h-[70vh] pr-4">
+                <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
+                  <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
+                    <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
+                      <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
-                        <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                      )}/>
-                      <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Alt. Phone</FormLabel>
-                          <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                        </FormItem>
-                      )}/>
-                    </div>
-                    <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
-                      <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Alt. Phone</FormLabel>
+                        <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                      </FormItem>
                     )}/>
-                  </form>
-                </ScrollArea>
-                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        )}
+                  </div>
+                  <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
+                    <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                </form>
+              </ScrollArea>
+              <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {(user?.role?.toLowerCase() === 'staff' || user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') && (
@@ -289,7 +295,7 @@ export default function Dashboard() {
                                                             <div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div>
                                                             <Badge variant={daysDue < 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `LATE ${Math.abs(daysDue)}d` : (daysDue === 0 ? 'TODAY' : `In ${daysDue}d`)}</Badge>
                                                         </TableCell>
-                                                        <TableCell className="text-right font-bold text-xs text-blue-600">Ksh {loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                        <TableCell className="text-right font-bold text-xs text-blue-600">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
                                                         <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                     </TableRow>
                                                 )
@@ -316,7 +322,7 @@ export default function Dashboard() {
                                                 <TableRow key={loan.id}>
                                                     <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
-                                                    <TableCell className="text-right font-bold text-xs">Ksh {loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                 </TableRow>
                                             ))}
@@ -342,7 +348,7 @@ export default function Dashboard() {
                                                 <TableRow key={loan.id}>
                                                     <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
-                                                    <TableCell className="text-right font-bold text-xs">Ksh {loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                 </TableRow>
                                             ))}
@@ -357,11 +363,11 @@ export default function Dashboard() {
         </Card>
 
         {user?.role?.toLowerCase() === 'staff' ? (
-            <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div><div className="text-[9px] text-muted-foreground uppercase">{loan.paymentFrequency}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
+            <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div><div className="text-[9px] text-muted-foreground uppercase">{loan.paymentFrequency}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
         ) : (
             <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>New Applications</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
                     {newApplications.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No New Applications</AlertTitle></Alert></div>) : (
-                        <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{newApplications.map((loan) => (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div></TableCell><TableCell>{loan.loanType}</TableCell><TableCell className="text-right font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
+                        <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{newApplications.map((loan) => (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div></TableCell><TableCell>{loan.loanType}</TableCell><TableCell className="text-right font-bold">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
                     )}
                 </CardContent></Card>
         )}
@@ -384,9 +390,16 @@ export default function Dashboard() {
                         </Form>
                         <ScrollArea className="h-48 border rounded-md p-3">
                             {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions.</p>) : (
-                                <div className="space-y-3">{[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => (
-                                        <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold">{note.staffName}</span><span className="text-[9px]">{format(note.date instanceof Date ? note.date : new Date((note.date as any).seconds * 1000), 'dd/MM HH:mm')}</span></div><p className="italic">"{note.content}"</p></div>
-                                    ))}</div>
+                                <div className="space-y-3">{[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => {
+                                        let nDate: Date;
+                                        if ((note.date as any)?.seconds) nDate = new Date((note.date as any).seconds * 1000);
+                                        else if (note.date instanceof Date) nDate = note.date;
+                                        else nDate = note.date ? new Date(note.date) : new Date();
+
+                                        return (
+                                            <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold">{note.staffName}</span><span className="text-[9px]">{isNaN(nDate.getTime()) ? 'N/A' : format(nDate, 'dd/MM HH:mm')}</span></div><p className="italic">"{note.content}"</p></div>
+                                        );
+                                    })}</div>
                             )}
                         </ScrollArea>
                     </div>
