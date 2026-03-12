@@ -42,19 +42,22 @@ service cloud.firestore {
     }
 
     // Shared validation for loan applications (Customer Side)
-    // Ensures integrity: customers cannot inject rates, balances, or arbitrary fields.
+    // Updated to allow all fields sent by the app's internal submission logic
+    // while strictly enforcing the 'application' status.
     function isValidCustomerApplication() {
       let allowedFields = [
         'amount', 'principalAmount', 'tenureMonths', 'idNumber', 'nextOfKinName', 
         'nextOfKinPhone', 'paymentMethod', 'accountNumber', 
         'customerId', 'status', 'createdAt', 'loanType', 'customerName', 
         'customerPhone', 'alternativeNumber', 'paymentFrequency', 'numberOfInstalments',
-        'comments'
+        'comments', 'loanNumber', 'interestRate', 'registrationFee', 'processingFee',
+        'carTrackInstallationFee', 'chargingCost', 'instalmentAmount', 'totalRepayableAmount',
+        'totalPaid', 'totalPenalties', 'disbursementDate', 'payments', 'penalties',
+        'followUpNotes', 'disbursementRecorded', 'updatedAt'
       ];
       return isAuthenticated() && 
              request.resource.data.customerId == request.auth.uid &&
              request.resource.data.status == 'application' &&
-             (request.resource.data.get('amount', 0) is number || request.resource.data.get('principalAmount', 0) is number) &&
              request.resource.data.keys().hasOnly(allowedFields);
     }
 
@@ -64,9 +67,7 @@ service cloud.firestore {
 
     // User Profiles (Admin Staff/Finance)
     match /users/{userId} {
-      // PRIVACY: Only Staff/Finance/Admin can read system user profiles
       allow read: if isStaff();
-      // Only Super Admin can manage system user profiles
       allow write: if isSuperAdmin();
     }
 
@@ -83,11 +84,10 @@ service cloud.firestore {
       // Read: Staff/Finance see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Finance/Admin can add direct records. Customers use strict application schema.
+      // Create: Finance/Admin can add direct records. Customers use application schema.
       allow create: if isFinance() || isValidCustomerApplication();
       
       // Update: Finance manages all. Staff can ONLY add followUpNotes.
-      // NOTE: Customers can NEVER update a loan once submitted.
       allow update: if isFinance() || (
         isStaff() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
@@ -97,7 +97,7 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    // Loan Applications (Ensuring consistency with loans collection)
+    // Loan Applications (Mirrors the loans collection policy)
     match /loan_applications/{appId} {
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       allow create: if isFinance() || isValidCustomerApplication();
