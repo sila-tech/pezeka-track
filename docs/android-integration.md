@@ -1,74 +1,49 @@
 # Pezeka Credit: Android Integration Guide
 
-This guide outlines how the Android application should interact with the Firebase backend to ensure compliance with Security Rules and provide a seamless user experience.
+This guide outlines how the Android application should interact with the Firebase backend to avoid "Insufficient Permissions" errors.
 
-## 1. Authentication (CRITICAL)
-*   **Method**: Use Firebase Authentication (Email/Password or Phone).
-*   **Identity**: The user's `UID` is the primary key used to secure data.
-*   **Check**: You **MUST** ensure `FirebaseAuth.getInstance().getCurrentUser() != null` before writing to Firestore.
+## 1. Authentication (MANDATORY)
+*   **Method**: Users MUST be logged in via Firebase Auth.
+*   **Check**: Verify `FirebaseAuth.getInstance().getCurrentUser() != null` before calling Firestore.
+*   **Rules**: The database blocks any write where `request.auth` is null.
 
-## 2. Recommended Seamless Application Flow
-To provide the best user experience, follow this 5-step process:
+## 2. The Loan Submission "Contract"
+To prevent `PERMISSION_DENIED`, your `collection("loans").add()` call MUST include:
 
-1.  **Product Selection**: Show cards for "Quick Pesa," "Business Loan," etc.
-2.  **Repayment Calculator**: Allow users to toggle amount/tenure and see the estimated installment.
-3.  **Profile Auto-Fill**: Fetch the document at `/customers/{UID}`. If it exists, pre-fill the name and phone fields.
-4.  **Application Form**: Collect the `idNumber`, `nextOfKinName`, and `accountNumber` (Destination for funds).
-5.  **Status Tracking**: After submission, redirect the user to a list view of their loans filtered by their `customerId`.
-
-## 3. Loan Applications (`/loans`)
-The Android app is restricted to **Creating Applications** and **Reading Own Loans**.
-
-### Allowed Fields Whitelist (STRICT)
-To prevent "Insufficient Permissions," your Firestore `set()` or `add()` call **MUST ONLY** include these fields. Sending others (like `interestRate`) will result in a permission error.
-
-| Field | Type | Description |
+| Field | Type | Required Value |
 | :--- | :--- | :--- |
 | `customerId` | String | Must match `Firebase.auth.currentUser.uid` |
 | `status` | String | Must be exactly `"application"` |
 | `principalAmount`| Number | The requested loan amount |
-| `tenureMonths` | Number | Duration of the loan |
-| `idNumber` | String | National ID of the customer |
-| `customerName` | String | Full name |
-| `customerPhone` | String | Primary contact |
-| `nextOfKinName` | String | Emergency contact name |
-| `nextOfKinPhone` | String | Emergency contact phone |
-| `paymentMethod` | String | e.g., "MPESA" or "BANK" |
-| `accountNumber` | String | Where the user wants to receive funds |
 | `createdAt` | Timestamp | `FieldValue.serverTimestamp()` |
 
-### Kotlin Example: Submitting an Application
+### Kotlin Example
 ```kotlin
 val loanApp = hashMapOf(
     "customerId" to Firebase.auth.currentUser?.uid,
     "status" to "application",
-    "principalAmount" to 5000,
+    "principalAmount" to 2000,
     "tenureMonths" to 1,
-    "idNumber" to "12345678",
+    "idNumber" to "37106875",
     "customerName" to "John Doe",
-    "customerPhone" to "0712345678",
-    "nextOfKinName" to "Jane Doe",
-    "nextOfKinPhone" to "0787654321",
+    "customerPhone" to "0741557960",
     "paymentMethod" to "MPESA",
-    "accountNumber" to "0712345678",
+    "accountNumber" to "0741557960",
     "createdAt" to FieldValue.serverTimestamp()
 )
 
 db.collection("loans").add(loanApp)
-    .addOnSuccessListener { /* Show Success UI */ }
-    .addOnFailureListener { e -> /* Log Error */ }
+    .addOnSuccessListener { /* Success */ }
+    .addOnFailureListener { e -> Log.e("Pezeka", "Error: ${e.message}") }
 ```
 
-## 4. Querying Loan History
-You **cannot** call `.get()` on the whole collection. You MUST use a filter to prove ownership:
+## 3. Querying Data
+You cannot download the entire `loans` collection. You MUST filter by your own ID:
 `db.collection("loans").whereEqualTo("customerId", currentUid).get()`
 
-## 5. System Metadata (`/system_config/app_metadata`)
-This document is publicly readable. Use it to store:
-*   `min_version`: To force app updates.
-*   `maintenance_mode`: Boolean to disable the app during server work.
-
-## 6. Financial Definitions
-*   **Total Repayable (Amt to Pay)**: `Principal + Interest + Penalties`.
-*   **Outstanding Balance**: `Total Repayable - Total Paid`.
-*   **Disbursed Amt**: `Principal - Upfront Fees`. (Calculated by Finance during approval).
+## 4. Troubleshooting Permission Denied
+If you still see "Missing or insufficient permissions":
+1. **Login State**: Ensure the user didn't get logged out.
+2. **Field Names**: Check that `customerId` is spelled correctly (case-sensitive).
+3. **Status Value**: Ensure `status` is exactly `"application"`.
+4. **Collection Name**: Ensure you are writing to `"loans"` (plural).

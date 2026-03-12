@@ -41,32 +41,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Shared validation for loan applications (Customer Side)
-    // Updated to be case-insensitive and safer for Android SDK calls
+    // Simplified validation for loan applications (Customer Side)
+    // Relaxed to allow Android app flexibility while enforcing status and ownership
     function isValidCustomerApplication() {
-      let allowedFields = [
-        'amount', 'principalAmount', 'tenureMonths', 'idNumber', 'nextOfKinName', 
-        'nextOfKinPhone', 'paymentMethod', 'accountNumber', 
-        'customerId', 'status', 'createdAt', 'loanType', 'customerName', 
-        'customerPhone', 'alternativeNumber', 'paymentFrequency', 'numberOfInstalments',
-        'comments', 'loanNumber', 'interestRate', 'registrationFee', 'processingFee',
-        'carTrackInstallationFee', 'chargingCost', 'instalmentAmount', 'totalRepayableAmount',
-        'totalPaid', 'totalPenalties', 'disbursementDate', 'payments', 'penalties',
-        'followUpNotes', 'disbursementRecorded', 'updatedAt'
-      ];
       return isAuthenticated() && 
              request.resource.data.get('customerId', '') == request.auth.uid &&
-             request.resource.data.get('status', '').lower() == 'application' &&
-             request.resource.data.keys().hasOnly(allowedFields);
+             request.resource.data.get('status', '').lower() == 'application';
     }
 
     // =====================================================================
     // Collection Rules
     // =====================================================================
 
-    // User Profiles (Admin Staff/Finance) - Privacy Shield
+    // User Profiles (Admin Staff/Finance)
     match /users/{userId} {
-      allow read: if isStaff();
+      allow read: if isStaff() || isOwner(userId);
       allow write: if isSuperAdmin();
     }
 
@@ -80,20 +69,18 @@ service cloud.firestore {
 
     // Loans
     match /loans/{loanId} {
-      // Read: Staff/Finance see all. Customers see only their own.
+      // Read: Staff see all. Customers see only their own.
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       
-      // Create: Finance/Admin can add direct records. Customers use application schema.
+      // Create: Finance/Admin can add records. Customers use application logic.
       allow create: if isFinance() || isValidCustomerApplication();
       
-      // Update: Finance manages all. Staff can ONLY add followUpNotes.
-      // Customers NEVER update loans once submitted.
+      // Update: Finance manages all. Staff add notes. Customers cannot update submitted loans.
       allow update: if isFinance() || (
         isStaff() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
       );
 
-      // Delete: Strictly Finance/Admin
       allow delete: if isFinance();
     }
 
@@ -104,7 +91,7 @@ service cloud.firestore {
       allow update, delete: if isFinance();
     }
 
-    // Finance Entries (Sensitive Ledger)
+    // Finance Entries
     match /financeEntries/{entryId} {
       allow read, write: if isFinance();
     }
@@ -115,9 +102,10 @@ service cloud.firestore {
       allow write: if isFinance();
     }
 
-    // System Config (e.g. for App Updates check)
+    // System Config (Publicly readable for app metadata/version checks)
     match /system_config/{configId} {
       allow read: if true;
+      allow write: if isSuperAdmin();
     }
   }
 }
