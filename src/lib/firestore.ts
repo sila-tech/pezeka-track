@@ -207,8 +207,20 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
     newLoanNumber = `APP-${Date.now().toString().slice(-6)}`;
   }
 
+  // Ensure we capture customer email for notifications
+  let customerEmail = loanData.customerEmail || "";
+  if (!customerEmail && loanData.customerId) {
+      try {
+          const cSnap = await getDoc(doc(db, 'customers', loanData.customerId));
+          if (cSnap.exists()) customerEmail = cSnap.data().email || "";
+      } catch (e) {
+          console.error("Failed to pre-fetch customer email", e);
+      }
+  }
+
   const newLoan = {
     ...loanData,
+    customerEmail,
     loanNumber: newLoanNumber,
     createdAt: serverTimestamp(),
     payments: [],
@@ -239,13 +251,21 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
 }
 
 /**
- * Specifically for Android/Customer side applications to avoid listing permission errors.
+ * Specifically for Android/Customer side applications.
  */
 export async function submitCustomerApplication(db: Firestore, customerId: string, loanData: any) {
     const loanCollection = collection(db, 'loans');
+    
+    let customerEmail = "";
+    try {
+        const cSnap = await getDoc(doc(db, 'customers', customerId));
+        if (cSnap.exists()) customerEmail = cSnap.data().email || "";
+    } catch (e) {}
+
     const applicationData = {
         ...loanData,
         customerId,
+        customerEmail,
         status: 'application',
         loanNumber: `APP-${Date.now().toString().slice(-6)}`,
         createdAt: serverTimestamp(),
@@ -300,16 +320,18 @@ async function recordDisbursement(db: Firestore, loan: any) {
 
     await updateDoc(loanRef, { disbursementRecorded: true });
 
-    if (loan.customerEmail || loan.email) {
+    // Send the approval notification
+    const email = loan.customerEmail || loan.email;
+    if (email) {
         sendAutomatedEmail({
             type: 'loan_approved',
-            recipientEmail: loan.customerEmail || loan.email,
+            recipientEmail: email,
             data: {
                 customerName: loan.customerName,
                 loanNumber: loan.loanNumber,
                 amount: takeHome,
                 balance: loan.totalRepayableAmount,
-                dueDate: 'refer to portal'
+                dueDate: 'Refer to Portal'
             }
         });
     }
@@ -334,7 +356,11 @@ export async function approveLoanApplication(db: Firestore, loan: Loan, updateDa
     };
 
     await updateDoc(loanRef, finalUpdate);
-    await recordDisbursement(db, { ...loan, ...finalUpdate });
+    
+    // Ensure we have the full context including ID for recordDisbursement
+    const loanSnap = await getDoc(loanRef);
+    const fullLoanData = { ...loanSnap.data(), id: loan.id };
+    await recordDisbursement(db, fullLoanData);
 }
 
 export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {
@@ -358,18 +384,22 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
         const oldData = loanSnap.data() as Loan;
         await updateDoc(loanRef, { ...updateData, updatedAt: serverTimestamp() });
 
-        if (updateData.totalPaid && updateData.totalPaid > (oldData.totalPaid || 0) && (oldData.customerEmail)) {
-            const paymentAmount = updateData.totalPaid - (oldData.totalPaid || 0);
-            sendAutomatedEmail({
-                type: 'payment_received',
-                recipientEmail: oldData.customerEmail,
-                data: {
-                    customerName: oldData.customerName,
-                    loanNumber: oldData.loanNumber,
-                    amount: paymentAmount,
-                    balance: (oldData.totalRepayableAmount - (updateData.totalPaid || oldData.totalPaid))
-                }
-            });
+        // If a payment was recorded, send notification
+        if (updateData.totalPaid && updateData.totalPaid > (oldData.totalPaid || 0)) {
+            const email = oldData.customerEmail || "";
+            if (email) {
+                const paymentAmount = updateData.totalPaid - (oldData.totalPaid || 0);
+                sendAutomatedEmail({
+                    type: 'payment_received',
+                    recipientEmail: email,
+                    data: {
+                        customerName: oldData.customerName,
+                        loanNumber: oldData.loanNumber,
+                        amount: paymentAmount,
+                        balance: (oldData.totalRepayableAmount - (updateData.totalPaid || oldData.totalPaid))
+                    }
+                });
+            }
         }
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
@@ -540,16 +570,17 @@ export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: {
             totalRepayableAmount: increment(penalty.amount)
         });
 
-        if (loanData.customerEmail) {
+        const email = loanData.customerEmail || "";
+        if (email) {
             sendAutomatedEmail({
                 type: 'penalty_applied',
-                recipientEmail: loanData.customerEmail,
+                recipientEmail: email,
                 data: {
                     customerName: loanData.customerName,
                     loanNumber: loanData.loanNumber,
                     amount: penalty.amount,
                     description: penalty.description,
-                    balance: (loanData.totalRepayableAmount + penalty.amount - loanData.totalPaid)
+                    balance: (loanData.totalRepayableAmount + penalty.amount - (loanData.totalPaid || 0))
                 }
             });
         }

@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -15,6 +14,11 @@ const resend = new Resend(process.env.RESEND_API_KEY || 're_RGjGEBJf_JL8dayzB1Ji
  * This function triggers the Resend API to deliver the personalized message.
  */
 export async function sendAutomatedEmail(input: EmailEventInput & { recipientEmail: string }) {
+  if (!input.recipientEmail) {
+    console.error(`[AUTOMATION ERROR] Cannot send ${input.type} email: No recipient email provided.`);
+    return { success: false, error: 'Recipient email is missing' };
+  }
+
   try {
     // 1. Generate personalized content using Genkit AI
     const emailContent = await generateEmailContent({
@@ -32,14 +36,14 @@ export async function sendAutomatedEmail(input: EmailEventInput & { recipientEma
     });
 
     if (error) {
-      console.error(`[RESEND ERROR] Failed to send ${input.type} email:`, error);
+      console.error(`[RESEND API ERROR] Failed to deliver ${input.type} email to ${input.recipientEmail}:`, error);
       return { success: false, error };
     }
 
-    console.log(`[AUTOMATION SUCCESS] ${input.type} email sent to ${input.recipientEmail}. ID: ${data?.id}`);
+    console.log(`[AUTOMATION SUCCESS] ${input.type} email delivered to ${input.recipientEmail}. Message ID: ${data?.id}`);
     return { success: true, data };
   } catch (error) {
-    console.error('Critical failure in automated email flow:', error);
+    console.error(`[CRITICAL SYSTEM FAILURE] Email automation flow crashed for ${input.type} to ${input.recipientEmail}:`, error);
     return { success: false, error };
   }
 }
