@@ -183,7 +183,7 @@ export default function AccountPage() {
           
           if (isNaN(dDate.getTime())) return null;
 
-          const paidInstalments = Math.floor(loan.totalPaid / (loan.instalmentAmount || 1));
+          const paidInstalments = Math.floor((loan.totalPaid || 0) / (loan.instalmentAmount || 1));
           const nextIdx = paidInstalments + 1;
           
           if (loan.paymentFrequency === 'daily') return addDays(dDate, nextIdx);
@@ -221,7 +221,7 @@ export default function AccountPage() {
                     <div className="space-y-4">
                         <h3 className="text-lg font-semibold">Your Loans</h3>
                         {customerLoans.map(loan => {
-                            const balance = loan.totalRepayableAmount - loan.totalPaid;
+                            const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
                             const nextDue = getNextDueDate(loan);
                             
                             const dDate = loan.disbursementDate?.seconds 
@@ -250,7 +250,7 @@ export default function AccountPage() {
                                         <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
                                             <div>
                                                 <div className="text-[10px] text-muted-foreground uppercase font-bold">To Repay</div>
-                                                <div className="font-semibold text-sm">Ksh {loan.totalRepayableAmount.toLocaleString()}</div>
+                                                <div className="font-semibold text-sm">Ksh {(loan.totalRepayableAmount || 0).toLocaleString()}</div>
                                             </div>
                                             <div>
                                                 <div className="text-[10px] text-muted-foreground uppercase font-bold">Remaining</div>
@@ -304,7 +304,7 @@ export default function AccountPage() {
                       )}/>
                       <FormField control={applicationForm.control} name="paymentFrequency" render={({ field }) => (
                           <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                      )}/>
+                    )}/>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField control={applicationForm.control} name="phone" render={({ field }) => (
@@ -354,7 +354,7 @@ export default function AccountPage() {
                                   return (
                                     <TableRow key={p.paymentId || i}>
                                         <TableCell className="text-xs">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PPP')}</TableCell>
-                                        <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold text-green-600">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
                                     </TableRow>
                                   );
                               })}

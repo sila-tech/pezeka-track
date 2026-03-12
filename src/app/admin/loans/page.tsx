@@ -40,7 +40,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -196,8 +195,8 @@ export default function LoansPage() {
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => loan.status === 'application').sort((a, b) => {
-        const d1 = a.disbursementDate?.seconds ? a.disbursementDate.seconds : 0;
-        const d2 = b.disbursementDate?.seconds ? b.disbursementDate.seconds : 0;
+        const d1 = a.disbursementDate?.seconds ? a.disbursementDate.seconds : (a.disbursementDate ? new Date(a.disbursementDate).getTime() / 1000 : 0);
+        const d2 = b.disbursementDate?.seconds ? b.disbursementDate.seconds : (b.disbursementDate ? new Date(b.disbursementDate).getTime() / 1000 : 0);
         return d2 - d1;
     });
   }, [loans]);
@@ -287,7 +286,7 @@ export default function LoansPage() {
   const handleManageApplication = (loan: Loan) => {
       setApplicationToManage(loan);
       approvalForm.reset({
-          disbursementDate: format(new Date(), 'yyyy-MM-dd'), principalAmount: loan.principalAmount, interestRate: loan.interestRate || 0, processingFee: loan.processingFee || 0, registrationFee: loan.registrationFee || 0, carTrackInstallationFee: loan.carTrackInstallationFee || 0, chargingCost: loan.chargingCost || 0, numberOfInstalments: loan.numberOfInstalments || 1, paymentFrequency: loan.paymentFrequency || 'monthly', idNumber: loan.idNumber || "", alternativeNumber: loan.alternativeNumber || "", assignedStaffId: loan.assignedStaffId || "",
+          disbursementDate: format(new Date(), 'yyyy-MM-dd'), principalAmount: loan.principalAmount || 0, interestRate: loan.interestRate || 0, processingFee: loan.processingFee || 0, registrationFee: loan.registrationFee || 0, carTrackInstallationFee: loan.carTrackInstallationFee || 0, chargingCost: loan.chargingCost || 0, numberOfInstalments: loan.numberOfInstalments || 1, paymentFrequency: loan.paymentFrequency || 'monthly', idNumber: loan.idNumber || "", alternativeNumber: loan.alternativeNumber || "", assignedStaffId: loan.assignedStaffId || "",
       });
   };
 
@@ -342,12 +341,12 @@ export default function LoansPage() {
 
       editTermsForm.reset({
           interestRate: loan.interestRate || 0,
-          principalAmount: loan.principalAmount,
-          numberOfInstalments: loan.numberOfInstalments,
-          paymentFrequency: loan.paymentFrequency,
+          principalAmount: loan.principalAmount || 0,
+          numberOfInstalments: loan.numberOfInstalments || 1,
+          paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
           disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
-          totalRepayableAmount: loan.totalRepayableAmount,
+          totalRepayableAmount: loan.totalRepayableAmount || 0,
       });
       setIsEditingTerms(true);
   };
@@ -394,7 +393,7 @@ export default function LoansPage() {
 
   const penaltyCalculation = useMemo(() => {
       if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
-      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments, loanToEdit.paymentFrequency);
+      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount || 0, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments || 1, loanToEdit.paymentFrequency || 'monthly');
       const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
       const dailyRate = oneInstInterest / daysInFreq;
       
@@ -405,9 +404,9 @@ export default function LoansPage() {
       if (isNaN(dDate.getTime())) return { dailyRate: 0, daysLate: 0, suggested: 0 };
 
       let finalDueDate: Date;
-      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments);
-      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments);
-      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments);
+      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments || 1);
+      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments || 1);
+      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments || 1);
       
       const daysLate = differenceInDays(new Date(), finalDueDate);
       return { dailyRate, daysLate: daysLate > 0 ? daysLate : 0, suggested: Math.round((daysLate > 0 ? daysLate : 0) * dailyRate) };
@@ -523,7 +522,7 @@ export default function LoansPage() {
                                         <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
                                         <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-sm">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                         <TableCell>{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
-                                        <TableCell className="text-right font-bold">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold">{((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
                                         <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
                                     </TableRow>
                                   );
@@ -545,7 +544,7 @@ export default function LoansPage() {
                                 <TableRow key={loan.id}>
                                     <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
                                     <TableCell>{loan.loanType}</TableCell>
-                                    <TableCell className="font-bold">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                    <TableCell className="font-bold">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
@@ -569,7 +568,7 @@ export default function LoansPage() {
                       <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
                           <div className="text-muted-foreground">Customer:</div><div className="font-medium">{viewingApplication.customerName}</div>
                           <div className="text-muted-foreground">National ID:</div><div className="font-medium">{viewingApplication.idNumber || 'N/A'}</div>
-                          <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {viewingApplication.principalAmount.toLocaleString()}</div>
+                          <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {(viewingApplication.principalAmount || 0).toLocaleString()}</div>
                           <div className="text-muted-foreground">Loan Product:</div><div className="font-medium">{viewingApplication.loanType}</div>
                       </div>
                   </div>
@@ -688,7 +687,7 @@ export default function LoansPage() {
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
                                         <div className="flex justify-between"><span>Assigned:</span><span className="font-medium">{loanToEdit.assignedStaffName || 'Unassigned'}</span></div>
                                         <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
-                                        <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {(loanToEdit.totalRepayableAmount - loanToEdit.totalPaid).toLocaleString()}</span></div>
+                                        <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {((loanToEdit.totalRepayableAmount || 0) - (loanToEdit.totalPaid || 0)).toLocaleString()}</span></div>
                                     </CardContent>
                                 </Card>
                                 {canEdit && (
@@ -719,7 +718,7 @@ export default function LoansPage() {
                                             return (
                                                 <TableRow key={p.paymentId || i}>
                                                     <TableCell className="text-xs">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'dd/MM/yy HH:mm')}</TableCell>
-                                                    <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-medium">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
                                                 </TableRow>
                                             )
                                         })}</TableBody></Table></ScrollArea>
@@ -772,7 +771,7 @@ export default function LoansPage() {
                                                 <TableRow key={p.penaltyId || i}>
                                                     <TableCell className="text-xs">{isNaN(penaltyDate.getTime()) ? 'N/A' : format(penaltyDate, 'dd/MM/yy')}</TableCell>
                                                     <TableCell className="text-xs">{p.description}</TableCell>
-                                                    <TableCell className="text-right font-medium">Ksh {p.amount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-medium">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
                                                 </TableRow>
                                             )
                                         })}</TableBody></Table></ScrollArea>

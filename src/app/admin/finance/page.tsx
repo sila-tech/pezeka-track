@@ -179,9 +179,9 @@ export default function FinancePage() {
           if (loan.status === 'application' || loan.status === 'rejected') return false;
           
           const searchMatch = !lbSearch || 
-              loan.customerName.toLowerCase().includes(lbSearch.toLowerCase()) ||
-              loan.loanNumber.toLowerCase().includes(lbSearch.toLowerCase()) ||
-              loan.customerPhone.includes(lbSearch);
+              (loan.customerName || '').toLowerCase().includes(lbSearch.toLowerCase()) ||
+              (loan.loanNumber || '').toLowerCase().includes(lbSearch.toLowerCase()) ||
+              (loan.customerPhone || '').includes(lbSearch);
               
           const statusMatch = lbStatus === 'all' || loan.status === lbStatus;
           const staffMatch = lbStaff === 'all' || loan.assignedStaffId === lbStaff;
@@ -251,7 +251,7 @@ export default function FinancePage() {
         : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
       
       ledgerForm.reset({
-          principalAmount: loan.principalAmount,
+          principalAmount: loan.principalAmount || 0,
           registrationFee: loan.registrationFee || 0,
           processingFee: loan.processingFee || 0,
           carTrackInstallationFee: loan.carTrackInstallationFee || 0,
@@ -261,7 +261,7 @@ export default function FinancePage() {
           paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
           disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
-          totalRepayableAmount: loan.totalRepayableAmount,
+          totalRepayableAmount: loan.totalRepayableAmount || 0,
       });
   };
 
@@ -477,9 +477,9 @@ export default function FinancePage() {
                               <TableBody>
                                   {filteredLoanBook.map(loan => {
                                       const totalFees = (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0) + (Number(loan.carTrackInstallationFee) || 0) + (Number(loan.chargingCost) || 0);
-                                      const takeHome = loan.principalAmount - totalFees;
-                                      const balance = loan.totalRepayableAmount - loan.totalPaid;
-                                      const expectedInterest = loan.totalRepayableAmount - (loan.totalPenalties || 0) - loan.principalAmount;
+                                      const takeHome = (loan.principalAmount || 0) - totalFees;
+                                      const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
+                                      const expectedInterest = (loan.totalRepayableAmount || 0) - (loan.totalPenalties || 0) - (loan.principalAmount || 0);
                                       const expectedIncome = expectedInterest + (Number(loan.registrationFee) || 0) + (Number(loan.processingFee) || 0);
                                       
                                       const dDate = loan.disbursementDate?.seconds 
@@ -492,16 +492,16 @@ export default function FinancePage() {
                                               <TableCell>{loan.customerPhone}</TableCell>
                                               <TableCell>{loan.loanNumber}</TableCell>
                                               <TableCell>{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
-                                              <TableCell className="text-right">{loan.principalAmount.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right">{(loan.principalAmount || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.registrationFee || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.processingFee || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold text-primary">{takeHome.toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.carTrackInstallationFee || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{(loan.chargingCost || 0).toLocaleString()}</TableCell>
-                                              <TableCell className="text-center">{loan.numberOfInstalments} ({loan.paymentFrequency})</TableCell>
-                                              <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right font-bold">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-green-600 font-semibold">{loan.totalPaid.toLocaleString()}</TableCell>
+                                              <TableCell className="text-center">{(loan.numberOfInstalments || 0)} ({loan.paymentFrequency})</TableCell>
+                                              <TableCell className="text-right">{(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
+                                              <TableCell className="text-right font-bold">{(loan.totalRepayableAmount || 0).toLocaleString()}</TableCell>
+                                              <TableCell className="text-right text-green-600 font-semibold">{(loan.totalPaid || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                               <TableCell className="text-right text-destructive">{(loan.totalPenalties || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-right">{expectedInterest.toLocaleString()}</TableCell>
@@ -636,7 +636,7 @@ export default function FinancePage() {
                                   return (
                                     <TableRow key={p.paymentId || i}>
                                         <TableCell>{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PPP')}</TableCell>
-                                        <TableCell className="text-right font-bold text-green-600">Ksh {p.amount.toLocaleString()}</TableCell>
+                                        <TableCell className="text-right font-bold text-green-600">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
                                     </TableRow>
                                   )
                               })}
