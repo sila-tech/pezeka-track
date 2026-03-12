@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -521,7 +521,7 @@ export default function FinancePage() {
                 entries={financialData.allReceipts} 
                 loading={financeEntriesLoading}
                 onEdit={handleEditEntry}
-                onDelete={handleEditEntry}
+                onDelete={handleDeleteEntry}
               />
           </TabsContent>
           <TabsContent value="payouts">
@@ -531,7 +531,7 @@ export default function FinancePage() {
                 entries={financialData.allPayouts} 
                 loading={financeEntriesLoading}
                 onEdit={handleEditEntry}
-                onDelete={handleEditEntry}
+                onDelete={handleDeleteEntry}
               />
           </TabsContent>
           <TabsContent value="investors"><InvestorsPortfolioTab/></TabsContent>
