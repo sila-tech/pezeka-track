@@ -42,8 +42,7 @@ service cloud.firestore {
     }
 
     // Shared validation for loan applications (Customer Side)
-    // Updated to allow all fields sent by the app's internal submission logic
-    // while strictly enforcing the 'application' status.
+    // Updated to be case-insensitive and safer for Android SDK calls
     function isValidCustomerApplication() {
       let allowedFields = [
         'amount', 'principalAmount', 'tenureMonths', 'idNumber', 'nextOfKinName', 
@@ -56,8 +55,8 @@ service cloud.firestore {
         'followUpNotes', 'disbursementRecorded', 'updatedAt'
       ];
       return isAuthenticated() && 
-             request.resource.data.customerId == request.auth.uid &&
-             request.resource.data.status == 'application' &&
+             request.resource.data.get('customerId', '') == request.auth.uid &&
+             request.resource.data.get('status', '').lower() == 'application' &&
              request.resource.data.keys().hasOnly(allowedFields);
     }
 
@@ -65,7 +64,7 @@ service cloud.firestore {
     // Collection Rules
     // =====================================================================
 
-    // User Profiles (Admin Staff/Finance)
+    // User Profiles (Admin Staff/Finance) - Privacy Shield
     match /users/{userId} {
       allow read: if isStaff();
       allow write: if isSuperAdmin();
@@ -88,6 +87,7 @@ service cloud.firestore {
       allow create: if isFinance() || isValidCustomerApplication();
       
       // Update: Finance manages all. Staff can ONLY add followUpNotes.
+      // Customers NEVER update loans once submitted.
       allow update: if isFinance() || (
         isStaff() && 
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
@@ -113,6 +113,11 @@ service cloud.firestore {
     match /investors/{investorId} {
       allow read: if isFinance() || isOwner(investorId);
       allow write: if isFinance();
+    }
+
+    // System Config (e.g. for App Updates check)
+    match /system_config/{configId} {
+      allow read: if true;
     }
   }
 }
