@@ -543,8 +543,8 @@ export default function FinancePage() {
               </DialogHeader>
               <Form {...ledgerForm}>
                   <ScrollArea className="max-h-[70vh] pr-4">
-                    <form id="edit-ledger-form" onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="space-y-6 pt-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <form id="edit-ledger-form" onSubmit={ledgerForm.handleSubmit(onLedgerSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 col-span-1 md:col-span-2">
                             <FormField control={ledgerForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-1 md:col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
                             <FormField control={ledgerForm.control} name="assignedStaffId" render={({ field }) => (
                                 <FormItem className="col-span-1 md:col-span-2">
