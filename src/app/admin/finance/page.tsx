@@ -62,6 +62,7 @@ const editLedgerSchema = z.object({
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
     assignedStaffId: z.string().min(1, 'Staff member is required'),
     disbursementDate: z.string().min(1, 'Date is required'),
+    totalRepayableAmount: z.coerce.number().min(0, 'Amount to pay is required'),
 });
 
 interface Loan {
@@ -249,6 +250,7 @@ export default function FinancePage() {
           paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
           disbursementDate: format(dDate, 'yyyy-MM-dd'),
+          totalRepayableAmount: loan.totalRepayableAmount,
       });
   };
 
@@ -256,15 +258,17 @@ export default function FinancePage() {
       if (!loanToEditLedger) return;
       setIsSubmitting(true);
       try {
-          const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
           const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
           
+          // Manual input for Total Repayable is respected. Recalculate instalment based on manual total.
+          const instalmentAmount = values.numberOfInstalments > 0 ? values.totalRepayableAmount / values.numberOfInstalments : 0;
+
           const updateData = {
               ...values,
               disbursementDate: new Date(values.disbursementDate),
               assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
               instalmentAmount,
-              totalRepayableAmount: totalRepayableAmount + (loanToEditLedger.totalPenalties || 0),
+              totalRepayableAmount: values.totalRepayableAmount,
           };
           
           await updateLoan(firestore, loanToEditLedger.id, updateData);
@@ -539,7 +543,7 @@ export default function FinancePage() {
           <DialogContent className="sm:max-w-3xl">
               <DialogHeader>
                   <DialogTitle>Edit Internal Ledger Record</DialogTitle>
-                  <DialogDescription>Modify primary financial terms. Installments will be recalculated automatically.</DialogDescription>
+                  <DialogDescription>Modify primary financial terms. You can manually adjust the "Amount to Pay".</DialogDescription>
               </DialogHeader>
               <Form {...ledgerForm}>
                   <ScrollArea className="max-h-[70vh] pr-4">
@@ -571,6 +575,13 @@ export default function FinancePage() {
                                     </Select>
                                 </FormItem>
                             )}/>
+                            <FormField control={ledgerForm.control} name="totalRepayableAmount" render={({field}) => (
+                                <FormItem className="col-span-1 md:col-span-2">
+                                    <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
+                                    <FormControl><Input type="number" {...field} className="border-primary/50 bg-primary/5 font-bold" /></FormControl>
+                                    <FormDescription className="text-[10px]">Override the calculated total here if necessary. Installments will adjust automatically.</FormDescription>
+                                </FormItem>
+                            )} />
                         </div>
                     </form>
                   </ScrollArea>

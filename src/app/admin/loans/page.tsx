@@ -25,6 +25,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
@@ -116,6 +117,7 @@ const editTermsSchema = z.object({
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
     assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
     disbursementDate: z.string().min(1, 'Disbursement date is required.'),
+    totalRepayableAmount: z.coerce.number().min(0, 'Amount to pay is required'),
 });
 
 const paymentSchema = z.object({
@@ -341,6 +343,7 @@ export default function LoansPage() {
           paymentFrequency: loan.paymentFrequency,
           assignedStaffId: loan.assignedStaffId || '',
           disbursementDate: format(dDate, 'yyyy-MM-dd'),
+          totalRepayableAmount: loan.totalRepayableAmount,
       });
       setIsEditingTerms(true);
   };
@@ -350,13 +353,16 @@ export default function LoansPage() {
       setIsUpdating(true);
       try {
           const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
-          const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
+          
+          // Manual input for Total Repayable is respected. Recalculate instalment based on manual total.
+          const instalmentAmount = values.numberOfInstalments > 0 ? values.totalRepayableAmount / values.numberOfInstalments : 0;
+
           const updateData = {
               ...values,
               disbursementDate: new Date(values.disbursementDate),
               assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
               instalmentAmount,
-              totalRepayableAmount: totalRepayableAmount + (loanToEdit.totalPenalties || 0),
+              totalRepayableAmount: values.totalRepayableAmount,
           };
           await updateLoan(firestore, loanToEdit.id, updateData);
           toast({ title: 'Terms Updated' });
@@ -605,8 +611,11 @@ export default function LoansPage() {
       </Dialog>
 
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
-          <DialogContent>
-              <DialogHeader><DialogTitle>Update Loan Terms</DialogTitle><DialogDescription>Changing interest rate, principal, or dates will trigger an automatic recalculation of instalments.</DialogDescription></DialogHeader>
+          <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Update Loan Terms</DialogTitle>
+                <DialogDescription>Modify primary financial terms. You can manually override the "Amount to Pay".</DialogDescription>
+              </DialogHeader>
               <Form {...editTermsForm}>
                   <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
@@ -631,8 +640,15 @@ export default function LoansPage() {
                           <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
                               <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                           )}/>
+                          <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (
+                                <FormItem className="col-span-2">
+                                    <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
+                                    <FormControl><Input type="number" {...field} className="border-primary/50 bg-primary/5 font-bold" /></FormControl>
+                                    <FormDescription className="text-[10px]">Manual override for corrections. Installments will automatically sync.</FormDescription>
+                                </FormItem>
+                            )} />
                       </div>
-                      <Button type="submit" className="w-full" disabled={isUpdating}>Save & Recalculate</Button>
+                      <Button type="submit" className="w-full" disabled={isUpdating}>Save & Update Totals</Button>
                   </form>
               </Form>
           </DialogContent>
