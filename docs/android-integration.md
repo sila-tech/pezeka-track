@@ -38,12 +38,20 @@ To prevent "Insufficient Permissions," you must **ONLY** send these fields. Inje
 * **Query Requirement**: You **cannot** call `get()` on the whole collection. You MUST use a filter:
   `db.collection("loans").whereEqualTo("customerId", currentUid).get()`
 
-## 4. Common Permission Errors (403)
+## 4. Financial Definitions (Matching the Admin Ledger)
+To ensure the Android app matches the Admin Dashboard, use these definitions:
+
+*   **Principal Amount (`principalAmount`)**: The gross loan amount before any deductions.
+*   **Disbursed Amount (Take-home)**: `principalAmount - (all upfront fees)`. This is the cash the customer actually receives.
+*   **Total Repayable (`totalRepayableAmount`)**: `principalAmount + interestAmount + totalPenalties`. This is the total amount the customer owes back.
+*   **Outstanding Balance**: `totalRepayableAmount - totalPaid`.
+
+## 5. Common Permission Errors (403)
 * **Extra Fields**: Attempting to send `principalAmount` or `interestRate` in the initial application. These are calculated by the Finance team during approval.
 * **Invalid Type**: Sending `amount` as a String instead of a Number.
 * **Wrong UID**: If `customerId` does not match the logged-in user.
 * **Privacy Violation**: Attempting to read the `/users` collection (Reserved for Staff).
 
-## 5. Shared Terms (Enums)
+## 6. Shared Terms (Enums)
 * **Status**: `application`, `active`, `due`, `overdue`, `paid`, `rollover`, `rejected`.
 * **Frequency**: `daily`, `weekly`, `monthly`.

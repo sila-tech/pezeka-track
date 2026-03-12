@@ -445,12 +445,12 @@ export default function FinancePage() {
                                       <TableHead className="text-right">Principal</TableHead>
                                       <TableHead className="text-right">Reg. Fee</TableHead>
                                       <TableHead className="text-right">Proc. Fee</TableHead>
-                                      <TableHead className="text-right font-bold text-primary">Take Home</TableHead>
+                                      <TableHead className="text-right font-bold text-primary">Disbursed Amt</TableHead>
                                       <TableHead className="text-right">Car Track</TableHead>
                                       <TableHead className="text-right">Charging Cost</TableHead>
                                       <TableHead className="text-center">Instalments</TableHead>
                                       <TableHead className="text-right">Inst. Amount</TableHead>
-                                      <TableHead className="text-right">Amt to Pay</TableHead>
+                                      <TableHead className="text-right font-bold">Total Repayable</TableHead>
                                       <TableHead className="text-right text-green-600">Paid Amount</TableHead>
                                       <TableHead className="text-right font-bold">Balance</TableHead>
                                       <TableHead className="text-right text-destructive">Penalties</TableHead>
@@ -481,7 +481,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right">{(loan.chargingCost || 0).toLocaleString()}</TableCell>
                                               <TableCell className="text-center">{loan.numberOfInstalments} ({loan.paymentFrequency})</TableCell>
                                               <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                              <TableCell className="text-right font-bold">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
                                               <TableCell className="text-right text-green-600 font-semibold">{loan.totalPaid.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-bold">{balance.toLocaleString()}</TableCell>
                                               <TableCell className="text-right text-destructive">{(loan.totalPenalties || 0).toLocaleString()}</TableCell>
