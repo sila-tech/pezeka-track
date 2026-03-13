@@ -128,7 +128,13 @@ export default function Dashboard() {
 
   const myPortfolio = useMemo(() => {
       if (!loans || !user) return [];
-      return loans.filter(loan => loan.assignedStaffId === user.uid && loan.status !== 'application' && loan.status !== 'rejected');
+      // Rolled over loans are considered "completed" facilities as they are replaced by new active loans
+      return loans.filter(loan => 
+          loan.assignedStaffId === user.uid && 
+          loan.status !== 'application' && 
+          loan.status !== 'rejected' &&
+          loan.status !== 'rollover'
+      );
   }, [loans, user]);
 
   const stats = useMemo(() => {
@@ -143,7 +149,7 @@ export default function Dashboard() {
   }, [loans]);
 
   const myPortfolioStats = useMemo(() => {
-      const activeLoans = myPortfolio.filter(l => l.status !== 'paid');
+      const activeLoans = myPortfolio.filter(l => l.status !== 'paid' && l.status !== 'rollover');
       const totalDisbursed = myPortfolio.reduce((acc, l) => acc + (Number(l.principalAmount) || 0), 0);
       const totalCollected = myPortfolio.reduce((acc, l) => acc + (Number(l.totalPaid) || 0), 0);
       return { activeCount: activeLoans.length, totalDisbursed, totalCollected };
@@ -153,7 +159,13 @@ export default function Dashboard() {
     if (!loans) return [];
     const today = startOfToday();
     
-    return loans.filter(loan => loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected').map(loan => {
+    // Exclude Rollover status from due alerts
+    return loans.filter(loan => 
+        loan.status !== 'paid' && 
+        loan.status !== 'application' && 
+        loan.status !== 'rejected' &&
+        loan.status !== 'rollover'
+    ).map(loan => {
         let dDate: Date;
         if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
         else if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;

@@ -70,7 +70,7 @@ export function PortfolioReportsTab({ loans }: PortfolioReportsTabProps) {
         'Outstanding Balance': balance,
         'Frequency': loan.paymentFrequency,
         'Disbursement Date': isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'yyyy-MM-dd'),
-        'Next Due Date': loan.status === 'paid' ? 'N/A' : format(nextDue, 'yyyy-MM-dd'),
+        'Next Due Date': loan.status === 'paid' || loan.status === 'rollover' ? 'N/A' : format(nextDue, 'yyyy-MM-dd'),
         'Comments / Rollover Info': loan.comments || ''
       };
     });
@@ -89,16 +89,17 @@ export function PortfolioReportsTab({ loans }: PortfolioReportsTabProps) {
         filename = 'all_disbursed_loans';
         break;
       case 'active':
-        filtered = loans.filter(l => ['active', 'due', 'overdue', 'rollover'].includes(l.status));
+        // Rollover facilities are historically refinanced, so they are excluded from current "Active Debt" reporting
+        filtered = loans.filter(l => ['active', 'due', 'overdue'].includes(l.status));
         filename = 'active_portfolio';
         break;
       case 'overdue':
-        filtered = loans.filter(l => l.status === 'overdue' || (l.status !== 'paid' && isBefore(getNextDueDate(l), today)));
+        filtered = loans.filter(l => l.status === 'overdue' || (l.status !== 'paid' && l.status !== 'rollover' && isBefore(getNextDueDate(l), today)));
         filename = 'overdue_loans';
         break;
       case 'due':
         filtered = loans.filter(l => {
-            if (l.status === 'paid' || l.status === 'application') return false;
+            if (l.status === 'paid' || l.status === 'application' || l.status === 'rollover') return false;
             const daysUntil = differenceInDays(getNextDueDate(l), today);
             return daysUntil >= 0 && daysUntil <= 7;
         });

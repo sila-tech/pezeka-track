@@ -182,7 +182,9 @@ export default function LoansPage() {
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => {
-        if (loan.status === 'application' || loan.status === 'rejected') return false;
+        // Rollover facilities are considered closed/historical in the Active Debt tab
+        if (loan.status === 'application' || loan.status === 'rejected' || loan.status === 'rollover') return false;
+        
         const statusMatch = statusFilter === 'all' || loan.status === statusFilter;
         const searchMatch = searchTerm === '' ||
             loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
