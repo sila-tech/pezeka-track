@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, History } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, History, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -155,6 +155,7 @@ export default function LoansPage() {
   const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
   const [viewingApplication, setViewingApplication] = useState<Loan | null>(null);
   const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
+  const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isAddingPenalty, setIsAddingPenalty] = useState(false);
@@ -377,15 +378,20 @@ export default function LoansPage() {
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); } finally { setIsUpdating(false); }
   }
 
-  const handleConfirmDelete = async (e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (!loanToEdit || !canEdit) return;
+  const handleConfirmDelete = async () => {
+    if (!loanToDelete || !canEdit) return;
     
     setIsDeleting(true);
     try {
-      await deleteLoan(firestore, loanToEdit.id);
-      toast({ title: 'Loan Deleted', description: `Loan #${loanToEdit.loanNumber} has been permanently removed.` });
-      setLoanToEdit(null);
+      await deleteLoan(firestore, loanToDelete.id);
+      toast({ title: 'Loan Deleted', description: `Loan #${loanToDelete.loanNumber} has been permanently removed.` });
+      
+      // If the management dialog was open for this same loan, close it
+      if (loanToEdit?.id === loanToDelete.id) {
+          setLoanToEdit(null);
+      }
+      
+      setLoanToDelete(null);
       setDeleteConfirmOpen(false);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
@@ -684,7 +690,7 @@ export default function LoansPage() {
                                 <Card>
                                     <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
                                         <CardTitle className="text-sm">Summary</CardTitle>
-                                        {canEdit && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3 w-3" /></Button>}
+                                        {canEdit && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3.5 w-3.5" /></Button>}
                                     </CardHeader>
                                     <CardContent className="space-y-4 text-sm">
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
@@ -699,7 +705,7 @@ export default function LoansPage() {
                                         <CardContent className="space-y-2">
                                             <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Rolled Over' }); setLoanToEdit(null); })}>Rollover</Button>
                                             <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked Paid' }); setLoanToEdit(null); })}>Mark Paid</Button>
-                                            <Button variant="destructive" className="w-full text-xs mt-4" onClick={() => setDeleteConfirmOpen(true)}>Delete Loan</Button>
+                                            <Button variant="destructive" className="w-full text-xs mt-4" onClick={() => { setLoanToDelete(loanToEdit); setDeleteConfirmOpen(true); }}>Delete Loan</Button>
                                         </CardContent>
                                     </Card>
                                 )}
@@ -794,13 +800,13 @@ export default function LoansPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Loan Record?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete Loan #{loanToEdit?.loanNumber} and all its associated history (payments, penalties, notes). This action cannot be undone.
+              This will permanently delete Loan #{loanToDelete?.loanNumber || loanToEdit?.loanNumber} and all its associated history (payments, penalties, notes). This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteConfirmOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => { setDeleteConfirmOpen(false); setLoanToDelete(null); }}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleConfirmDelete} 
+              onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }} 
               className="bg-destructive hover:bg-destructive/90"
               disabled={isDeleting}
             >

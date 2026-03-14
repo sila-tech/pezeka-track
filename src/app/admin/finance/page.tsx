@@ -18,7 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, deleteFinanceEntry } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, deleteFinanceEntry, deleteLoan } from '@/lib/firestore';
 import { EditableFinanceReportTab, DatePickerWithRange } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
@@ -112,6 +112,7 @@ export default function FinancePage() {
   const [loanHistoryToShow, setLoanHistoryToShow] = useState<Loan | null>(null);
   const [editingEntry, setEditingEntry] = useState<FinanceEntry | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<FinanceEntry | null>(null);
+  const [loanToDeleteFromLedger, setLoanToDeleteFromLedger] = useState<Loan | null>(null);
   
   // Loan Book Filters
   const [lbSearch, setLbSearch] = useState('');
@@ -308,6 +309,20 @@ export default function FinancePage() {
           setEntryToDelete(null);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Error', description: e.message });
+      }
+  };
+
+  const confirmDeleteLoanFromLedger = async () => {
+      if (!loanToDeleteFromLedger || !isAuthorized) return;
+      setIsSubmitting(true);
+      try {
+          await deleteLoan(firestore, loanToDeleteFromLedger.id);
+          toast({ title: 'Loan Record Deleted Permanently' });
+          setLoanToDeleteFromLedger(null);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
       }
   };
 
@@ -514,6 +529,9 @@ export default function FinancePage() {
                                                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLoanHistoryToShow(loan)}>
                                                           <History className="h-3.5 w-3.5" />
                                                       </Button>
+                                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setLoanToDeleteFromLedger(loan)}>
+                                                          <Trash2 className="h-3.5 w-3.5" />
+                                                      </Button>
                                                   </div>
                                               </TableCell>
                                           </TableRow>
@@ -650,6 +668,7 @@ export default function FinancePage() {
           </DialogContent>
       </Dialog>
 
+      {/* Delete Finance Entry Confirmation */}
       <AlertDialog open={!!entryToDelete} onOpenChange={(open) => !open && setEntryToDelete(null)}>
           <AlertDialogContent>
               <AlertDialogHeader>
@@ -657,8 +676,28 @@ export default function FinancePage() {
                   <AlertDialogDescription>This will permanently remove this financial record. This action cannot be undone.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel onClick={() => setEntryToDelete(null)}>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={confirmDeleteEntry} className="bg-destructive hover:bg-destructive/90">Delete Permanently</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Loan from Ledger Confirmation */}
+      <AlertDialog open={!!loanToDeleteFromLedger} onOpenChange={(open) => !open && setLoanToDeleteFromLedger(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Loan Record Permanently?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      You are about to permanently delete <strong>Loan #{loanToDeleteFromLedger?.loanNumber}</strong> for <strong>{loanToDeleteFromLedger?.customerName}</strong>. 
+                      This will remove all associated history and balances. This action is irreversible.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setLoanToDeleteFromLedger(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDeleteLoanFromLedger} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                      Delete Permanently
+                  </AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
