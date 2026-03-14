@@ -407,23 +407,49 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
     const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined && v !== null));
 
     try {
-        const loanSnap = await getDoc(loanRef);
-        const oldData = loanSnap.data() as Loan;
         await updateDoc(loanRef, { ...updateData, updatedAt: serverTimestamp() });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: loanRef.path,
+            operation: 'update',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
 
-        // If a payment was recorded, send notification
-        if (updateData.totalPaid && updateData.totalPaid > (oldData.totalPaid || 0)) {
-            const email = oldData.customerEmail || "";
+/**
+ * Specifically handles recording a payment, updating totals, and triggering notifications.
+ */
+export async function recordLoanPayment(db: Firestore, loanId: string, payment: { amount: number, date: Date, recordedBy?: string }) {
+    const loanRef = doc(db, 'loans', loanId);
+    const paymentId = doc(collection(db, 'temp')).id;
+    const paymentEntry = { paymentId, ...payment };
+
+    try {
+        // 1. Update the document
+        await updateDoc(loanRef, {
+            totalPaid: increment(payment.amount),
+            payments: arrayUnion(paymentEntry),
+            updatedAt: serverTimestamp()
+        });
+
+        // 2. Fetch fresh data for the email (to get the exact current balance)
+        const loanSnap = await getDoc(loanRef);
+        if (loanSnap.exists()) {
+            const loan = { ...loanSnap.data(), id: loanId } as Loan;
+            const email = loan.customerEmail || "";
             if (email) {
-                const paymentAmount = updateData.totalPaid - (oldData.totalPaid || 0);
+                const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
                 sendAutomatedEmail({
                     type: 'payment_received',
                     recipientEmail: email,
                     data: {
-                        customerName: oldData.customerName,
-                        loanNumber: oldData.loanNumber,
-                        amount: paymentAmount,
-                        balance: (oldData.totalRepayableAmount - (updateData.totalPaid || oldData.totalPaid))
+                        customerName: loan.customerName,
+                        loanNumber: loan.loanNumber,
+                        amount: payment.amount,
+                        balance: balance
                     }
                 }).then(res => {
                     if (res.success && res.sentContent) {
@@ -436,7 +462,7 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
         const permissionError = new FirestorePermissionError({
             path: loanRef.path,
             operation: 'update',
-            requestResourceData: updateData,
+            requestResourceData: { type: 'LOAN_PAYMENT', amount: payment.amount },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;

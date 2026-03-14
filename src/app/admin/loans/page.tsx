@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -54,6 +55,7 @@ import {
   addPenaltyToLoan, 
   rolloverLoan,
   deleteLoan,
+  recordLoanPayment,
   type Loan
 } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -63,7 +65,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 
 const loanSchema = z.object({
@@ -320,9 +321,12 @@ export default function LoansPage() {
     if (!loanToEdit || !canEdit) return;
     setIsUpdating(true);
     try {
-        const paymentId = doc(collection(firestore, 'payments')).id;
-        await updateLoan(firestore, loanToEdit.id, { totalPaid: increment(values.paymentAmount), payments: arrayUnion({ paymentId, amount: values.paymentAmount, date: new Date(values.paymentDate) }) });
-        toast({ title: 'Payment Recorded' });
+        await recordLoanPayment(firestore, loanToEdit.id, { 
+            amount: values.paymentAmount, 
+            date: new Date(values.paymentDate),
+            recordedBy: user?.name || user?.email || 'Admin'
+        });
+        toast({ title: 'Payment Recorded', description: 'Notification sent to customer.' });
         paymentForm.reset();
     } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsUpdating(false); }
   }
