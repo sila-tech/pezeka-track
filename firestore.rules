@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -41,7 +42,7 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Simplified validation for loan applications (Customer Side)
+    // Simplified validation for loan applications
     function isValidCustomerApplication() {
       return isAuthenticated() && 
              request.resource.data.get('customerId', '') == request.auth.uid &&
@@ -52,13 +53,11 @@ service cloud.firestore {
     // Collection Rules
     // =====================================================================
 
-    // User Profiles (Admin Staff/Finance)
     match /users/{userId} {
       allow read: if isStaff() || isOwner(userId);
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || isOwner(userId);
     }
 
-    // Customers
     match /customers/{customerId} {
       allow read: if isStaff() || isOwner(customerId);
       allow create: if isStaff() || isOwner(customerId);
@@ -66,37 +65,34 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    // Loans
     match /loans/{loanId} {
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       allow create: if isFinance() || isValidCustomerApplication();
-      allow update: if isFinance() || (
-        isStaff() && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt'])
-      );
+      allow update: if isFinance() || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt']));
       allow delete: if isFinance();
     }
 
-    // Loan Applications
     match /loan_applications/{appId} {
       allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
       allow create: if isFinance() || isValidCustomerApplication();
       allow update, delete: if isFinance();
     }
 
-    // Finance Entries (Receipts, Payouts, Expenses)
     match /financeEntries/{entryId} {
       allow read: if isStaff();
       allow write: if isFinance();
     }
 
-    // Investors
+    match /mail_logs/{logId} {
+      allow read: if isFinance();
+      allow write: if isAuthenticated();
+    }
+
     match /investors/{investorId} {
       allow read: if isFinance() || isOwner(investorId);
       allow write: if isFinance();
     }
 
-    // System Config
     match /system_config/{configId} {
       allow read: if true;
       allow write: if isSuperAdmin();

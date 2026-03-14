@@ -1,7 +1,8 @@
+
 'use server';
 
 /**
- * @fileOverview Server actions for handling automated email delivery via Resend.
+ * @fileOverview Server actions for handling automated and manual email delivery via Resend.
  */
 
 import { generateEmailContent, type EmailEventInput } from '@/ai/flows/email-generation-flow';
@@ -27,7 +28,6 @@ export async function sendAutomatedEmail(input: EmailEventInput & { recipientEma
     });
 
     // 2. Deliver the email via Resend
-    // IMPORTANT: Ensure 'pezeka.com' is verified in the Resend dashboard.
     const { data, error } = await resend.emails.send({
       from: 'Pezeka Credit <notifications@pezeka.com>',
       to: input.recipientEmail,
@@ -41,9 +41,39 @@ export async function sendAutomatedEmail(input: EmailEventInput & { recipientEma
     }
 
     console.log(`[AUTOMATION SUCCESS] ${input.type} email delivered to ${input.recipientEmail}. Message ID: ${data?.id}`);
-    return { success: true, data };
+    
+    // Return content so the client can log it to Firestore
+    return { 
+      success: true, 
+      data,
+      sentContent: {
+        recipient: input.recipientEmail,
+        subject: emailContent.subject,
+        body: emailContent.body,
+        type: input.type
+      }
+    };
   } catch (error) {
     console.error(`[CRITICAL SYSTEM FAILURE] Email automation flow crashed for ${input.type} to ${input.recipientEmail}:`, error);
     return { success: false, error };
   }
+}
+
+/**
+ * Sends a manual email composed by a staff member.
+ */
+export async function sendManualEmail(input: { recipient: string, subject: string, body: string }) {
+    try {
+        const { data, error } = await resend.emails.send({
+            from: 'Pezeka Credit <office@pezeka.com>',
+            to: input.recipient,
+            subject: input.subject,
+            text: input.body,
+        });
+
+        if (error) return { success: false, error };
+        return { success: true, data };
+    } catch (error) {
+        return { success: false, error };
+    }
 }

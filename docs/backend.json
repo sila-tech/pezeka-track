@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -43,6 +44,19 @@
         "totalPaid": { "type": "number", "default": 0 },
         "totalPenalties": { "type": "number", "default": 0 }
       }
+    },
+    "MailLog": {
+      "title": "Mail Log",
+      "description": "Records of emails sent by the system or staff.",
+      "type": "object",
+      "properties": {
+        "recipient": { "type": "string" },
+        "subject": { "type": "string" },
+        "body": { "type": "string" },
+        "type": { "type": "string" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "sender": { "type": "string" }
+      }
     }
   },
   "auth": {
@@ -67,6 +81,10 @@
     },
     "/financeEntries/{entryId}": {
       "description": "Stores all financial entries."
+    },
+    "/mail_logs/{logId}": {
+      "schema": { "$ref": "#/entities/MailLog" },
+      "description": "Logs of sent emails."
     },
     "/system_config/{configId}": {
       "description": "General application configuration and metadata."

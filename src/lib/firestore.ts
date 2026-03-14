@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where } from 'firebase/firestore';
@@ -47,6 +48,20 @@ export interface Loan {
   disbursementRecorded?: boolean;
 }
 
+/**
+ * Logs a sent email to the mail_logs collection.
+ */
+export async function addMailLog(db: Firestore, logData: { recipient: string, subject: string, body: string, type: string, sender: string }) {
+    const logsCollection = collection(db, 'mail_logs');
+    try {
+        await addDoc(logsCollection, {
+            ...logData,
+            sentAt: serverTimestamp()
+        });
+    } catch (e) {
+        console.error("Failed to log email to Firestore", e);
+    }
+}
 
 async function generateAccountNumber(db: Firestore): Promise<string> {
   const customerCollection = collection(db, 'customers');
@@ -80,6 +95,10 @@ export async function addCustomer(db: Firestore, customerData: CustomerData): Pr
             type: 'welcome',
             recipientEmail: customerData.email,
             data: { customerName: customerData.name }
+        }).then(res => {
+            if (res.success && res.sentContent) {
+                addMailLog(db, { ...res.sentContent, sender: 'AI Automation' });
+            }
         });
     }
 
@@ -110,6 +129,10 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
                 type: 'welcome',
                 recipientEmail: customerData.email,
                 data: { customerName: customerData.name }
+            }).then(res => {
+                if (res.success && res.sentContent) {
+                    addMailLog(db, { ...res.sentContent, sender: 'AI Automation' });
+                }
             });
         }
     }
@@ -333,6 +356,10 @@ async function recordDisbursement(db: Firestore, loan: any) {
                 balance: loan.totalRepayableAmount,
                 dueDate: 'Refer to Portal'
             }
+        }).then(res => {
+            if (res.success && res.sentContent) {
+                addMailLog(db, { ...res.sentContent, sender: 'AI Automation' });
+            }
         });
     }
 }
@@ -397,6 +424,10 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
                         loanNumber: oldData.loanNumber,
                         amount: paymentAmount,
                         balance: (oldData.totalRepayableAmount - (updateData.totalPaid || oldData.totalPaid))
+                    }
+                }).then(res => {
+                    if (res.success && res.sentContent) {
+                        addMailLog(db, { ...res.sentContent, sender: 'AI Automation' });
                     }
                 });
             }
@@ -581,6 +612,10 @@ export async function addPenaltyToLoan(db: Firestore, loanId: string, penalty: {
                     amount: penalty.amount,
                     description: penalty.description,
                     balance: (loanData.totalRepayableAmount + penalty.amount - (loanData.totalPaid || 0))
+                }
+            }).then(res => {
+                if (res.success && res.sentContent) {
+                    addMailLog(db, { ...res.sentContent, sender: 'AI Automation' });
                 }
             });
         }
