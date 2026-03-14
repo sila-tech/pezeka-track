@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -22,7 +21,8 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
         pathname === path ? "bg-muted text-primary" : "text-muted-foreground"
     );
 
-    const isAdmin = isSuperAdmin || isFinance;
+    // As requested, we show the full menu to all authorized admin team members (Staff, Finance, Admin)
+    const isAnyAdmin = isSuperAdmin || isFinance || isStaff;
 
     return (
         <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
@@ -41,35 +41,35 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
                 Loans
             </Link>
             
-            {isAdmin && (
+            {isAnyAdmin && (
                 <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
                     <FileDown className="h-4 w-4" />
                     Finance
                 </Link>
             )}
 
-            {(isStaff || isAdmin) && (
+            {isAnyAdmin && (
                 <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
                     <FileText className="h-4 w-4" />
                     Application Forms
                 </Link>
             )}
 
-            {isAdmin && (
+            {isAnyAdmin && (
                 <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
                     <Mail className="h-4 w-4" />
                     Mail
                 </Link>
             )}
 
-            {isAdmin && (
+            {isAnyAdmin && (
                 <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
                     <Briefcase className="h-4 w-4" />
                     Investors
                 </Link>
             )}
 
-            {isSuperAdmin && (
+            {isAnyAdmin && (
                 <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
                     <ShieldCheck className="h-4 w-4" />
                     User Management

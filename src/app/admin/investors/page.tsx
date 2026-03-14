@@ -86,8 +86,16 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // Grant Finance users the same permissions as Super Admin
+    // As requested, visibility is expanded to Staff, Finance, and Super Admin
     const canViewPage = useMemo(() => {
+        if (!currentUser) return false;
+        const email = currentUser.email?.toLowerCase();
+        const role = currentUser.role?.toLowerCase();
+        return email === 'simon@pezeka.com' || role === 'finance' || role === 'staff' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+    }, [currentUser]);
+
+    // But only Finance and Super Admin can actually ADD or EDIT portfolios
+    const canEdit = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase();
         const role = currentUser.role?.toLowerCase();
@@ -114,6 +122,7 @@ export default function InvestorsPage() {
     });
 
     async function onAddSubmit(values: z.infer<typeof investorSchema>) {
+        if (!canEdit) return;
         setIsSubmitting(true);
         try {
             await addInvestor(firestore, { uid: values.uid, name: values.name, email: values.email, totalInvestment: values.totalInvestment, currentBalance: values.totalInvestment, interestRate: values.interestRate || 0 });
@@ -124,13 +133,14 @@ export default function InvestorsPage() {
     }
 
     const handleEditClick = (investor: Investor) => {
+        if (!canEdit) return;
         setInvestorToEdit(investor);
         editForm.reset({ uid: investor.uid, name: investor.name, email: investor.email, totalInvestment: investor.totalInvestment, interestRate: investor.interestRate || 0, createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd') });
         setEditDialogOpen(true);
     };
     
     async function onEditSubmit(values: z.infer<typeof investorSchema>) {
-      if (!investorToEdit) return;
+      if (!investorToEdit || !canEdit) return;
       setIsSubmitting(true);
       try {
         const updateData: any = { name: values.name, email: values.email, totalInvestment: values.totalInvestment, interestRate: values.interestRate || 0 };
@@ -142,9 +152,14 @@ export default function InvestorsPage() {
       } catch (error: any) { toast({ variant: "destructive", title: "Update Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    const handleDeleteClick = (investor: Investor) => { setInvestorToDelete(investor); setDeleteDialogOpen(true); };
+    const handleDeleteClick = (investor: Investor) => { 
+        if (!canEdit) return;
+        setInvestorToDelete(investor); 
+        setDeleteDialogOpen(true); 
+    };
+
     async function confirmDelete() {
-        if (!investorToDelete) return;
+        if (!investorToDelete || !canEdit) return;
         setIsSubmitting(true);
         try { await deleteInvestor(firestore, investorToDelete.id); toast({ title: 'Deleted' }); setDeleteDialogOpen(false); setInvestorToDelete(null); } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
@@ -162,24 +177,26 @@ export default function InvestorsPage() {
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">Investors</h1>
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Investor</Button></DialogTrigger>
-        <DialogContent>
-            <DialogHeader><DialogTitle>Add New Investor</DialogTitle></DialogHeader>
-            <Form {...addForm}>
-            <ScrollArea className="max-h-[70vh] pr-4">
-                <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
-                    <FormField control={addForm.control} name="uid" render={({ field }) => (<FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={addForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={addForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (<FormItem><FormLabel>Total Investment (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
-                    <FormField control={addForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
-                </form>
-            </ScrollArea>
-            </Form>
-            <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Investor</Button></DialogFooter>
-        </DialogContent>
-        </Dialog>
+        {canEdit && (
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Investor</Button></DialogTrigger>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Add New Investor</DialogTitle></DialogHeader>
+                <Form {...addForm}>
+                <ScrollArea className="max-h-[70vh] pr-4">
+                    <form id="add-investor-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
+                        <FormField control={addForm.control} name="uid" render={({ field }) => (<FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                        <FormField control={addForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                        <FormField control={addForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl><FormMessage /></FormItem>)}/>
+                        <FormField control={addForm.control} name="totalInvestment" render={({ field }) => (<FormItem><FormLabel>Total Investment (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
+                        <FormField control={addForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
+                    </form>
+                </ScrollArea>
+                </Form>
+                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Investor</Button></DialogFooter>
+            </DialogContent>
+            </Dialog>
+        )}
       </div>
       <Card>
         <CardHeader><CardTitle>Investor Portfolios</CardTitle></CardHeader>
@@ -188,16 +205,28 @@ export default function InvestorsPage() {
           {!investorsLoading && (!investors || investors.length === 0) ? (<Alert><AlertTitle>No Investors Found</AlertTitle></Alert>) : !investorsLoading && (
             <ScrollArea className="h-[60vh]">
               <Table>
-                  <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
+                  <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Rate (%)</TableHead><TableHead className="text-right">Investment</TableHead><TableHead className="text-right">Balance</TableHead>{canEdit && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
                   <TableBody>{investors?.map((investor) => (
-                          <TableRow key={investor.id}><TableCell className="font-medium">{investor.name}</TableCell><TableCell>{investor.email}</TableCell><TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell><TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(investor)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(investor)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
+                          <TableRow key={investor.id}><TableCell className="font-medium">{investor.name}</TableCell><TableCell>{investor.email}</TableCell><TableCell>{(investor.interestRate || 0).toFixed(2)}%</TableCell><TableCell className="text-right font-medium">{(investor.totalInvestment || 0).toLocaleString()}</TableCell><TableCell className="text-right font-bold">{(investor.currentBalance || 0).toLocaleString()}</TableCell>
+                          {canEdit && (
+                            <TableCell className="text-right">
+                                <DropdownMenu open={openMenu === investor.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? investor.id : null)}>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditClick(investor)}>Edit</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDeleteClick(investor)} className="text-destructive">Delete</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
+                          )}
+                          </TableRow>
                         ))}</TableBody>
                   <TableFooter>
                       <TableRow className="font-bold bg-muted/50">
                           <TableCell colSpan={3}>Grand Totals</TableCell>
                           <TableCell className="text-right">{portfolioTotals.investment.toLocaleString()}</TableCell>
                           <TableCell className="text-right">{portfolioTotals.balance.toLocaleString()}</TableCell>
-                          <TableCell />
+                          {canEdit && <TableCell />}
                       </TableRow>
                   </TableFooter>
               </Table>
@@ -206,28 +235,32 @@ export default function InvestorsPage() {
         </CardContent>
       </Card>
       
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-            <DialogHeader><DialogTitle>Edit Investor</DialogTitle></DialogHeader>
-            <Form {...editForm}>
-              <ScrollArea className="max-h-[70vh] pr-4">
-                <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
-                    <FormField control={editForm.control} name="uid" render={({ field }) => (<FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''}/></FormControl></FormItem>)}/>
-                    <FormField control={editForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
-                    <FormField control={editForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
-                    <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (<FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
-                    <FormField control={editForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
-                    <FormField control={editForm.control} name="createdAt" render={({ field }) => (<FormItem><FormLabel>Investment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
-                </form>
-              </ScrollArea>
-            </Form>
-             <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Portfolio?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
+      {canEdit && (
+        <>
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Edit Investor</DialogTitle></DialogHeader>
+                    <Form {...editForm}>
+                    <ScrollArea className="max-h-[70vh] pr-4">
+                        <form id="edit-investor-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
+                            <FormField control={editForm.control} name="uid" render={({ field }) => (<FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                            <FormField control={editForm.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                            <FormField control={editForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''}/></FormControl></FormItem>)}/>
+                            <FormField control={editForm.control} name="totalInvestment" render={({ field }) => (<FormItem><FormLabel>Total Investment</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
+                            <FormField control={editForm.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Monthly Interest Rate (%)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
+                            <FormField control={editForm.control} name="createdAt" render={({ field }) => (<FormItem><FormLabel>Investment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
+                        </form>
+                    </ScrollArea>
+                    </Form>
+                    <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-investor-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+            
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Portfolio?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setInvestorToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+            </AlertDialog>
+        </>
+      )}
     </>
   );
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -72,9 +71,12 @@ export default function MailPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingMail, setViewingMail] = useState<MailLog | null>(null);
 
-  const isFinance = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  // Now accessible to all authorized admin team members (Staff, Finance, Admin)
+  const isAuthorized = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  // But strictly limit who can actually SEND manual outreach
+  const canSend = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
 
-  const { data: logs, loading: logsLoading } = useCollection<MailLog>(isFinance ? 'mail_logs' : null);
+  const { data: logs, loading: logsLoading } = useCollection<MailLog>(isAuthorized ? 'mail_logs' : null);
   const { data: customers } = useCollection<Customer>('customers');
 
   const customersWithEmail = useMemo(() => {
@@ -105,6 +107,7 @@ export default function MailPage() {
   const inboundLogs = useMemo(() => filteredLogs.filter(l => l.direction === 'inbound'), [filteredLogs]);
 
   async function onSendSubmit(values: z.infer<typeof mailSchema>) {
+    if (!canSend) return;
     setIsSending(true);
     try {
       const result = await sendManualEmail(values);
@@ -128,7 +131,7 @@ export default function MailPage() {
   }
 
   if (userLoading || logsLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  if (!isFinance) return <div className="p-12 text-center">Access Denied. Only Finance users can manage communications.</div>;
+  if (!isAuthorized) return <div className="p-12 text-center">Access Denied.</div>;
 
   return (
     <div className="space-y-6">
@@ -137,59 +140,61 @@ export default function MailPage() {
             <h1 className="text-3xl font-bold tracking-tight">Mail</h1>
             <p className="text-muted-foreground">Monitor and manage all customer communications.</p>
         </div>
-        <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-          <DialogTrigger asChild>
-            <Button className="h-11 px-6 font-bold shadow-md">
-                <PlusCircle className="mr-2 h-5 w-5" />
-                New Email
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Compose Outreach Email</DialogTitle>
-              <DialogDescription>Select a customer to send a manual message via Resend.</DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSendSubmit)} className="space-y-4 pt-4">
-                <FormField control={form.control} name="recipient" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Recipient Customer</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a customer with email" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            {customersWithEmail.map(customer => (
-                                <SelectItem key={customer.id} value={customer.email!}>
-                                    {customer.name} ({customer.email})
-                                </SelectItem>
-                            ))}
-                            {customersWithEmail.length === 0 && (
-                                <SelectItem value="none" disabled>No customers with emails found</SelectItem>
-                            )}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}/>
-                <FormField control={form.control} name="subject" render={({ field }) => (
-                  <FormItem><FormLabel>Subject</FormLabel><FormControl><Input placeholder="Re: Loan Status Update" {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <FormField control={form.control} name="body" render={({ field }) => (
-                  <FormItem><FormLabel>Message Body</FormLabel><FormControl><Textarea className="min-h-[200px]" placeholder="Type your message here..." {...field} /></FormControl><FormMessage /></FormItem>
-                )}/>
-                <DialogFooter className="pt-4">
-                  <Button type="submit" disabled={isSending} className="w-full sm:w-auto h-11 px-8">
-                    {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                    Send Email Now
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        {canSend && (
+          <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-11 px-6 font-bold shadow-md">
+                  <PlusCircle className="mr-2 h-5 w-5" />
+                  New Email
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Compose Outreach Email</DialogTitle>
+                <DialogDescription>Select a customer to send a manual message via Resend.</DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSendSubmit)} className="space-y-4 pt-4">
+                  <FormField control={form.control} name="recipient" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Recipient Customer</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select a customer with email" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              {customersWithEmail.map(customer => (
+                                  <SelectItem key={customer.id} value={customer.email!}>
+                                      {customer.name} ({customer.email})
+                                  </SelectItem>
+                              ))}
+                              {customersWithEmail.length === 0 && (
+                                  <SelectItem value="none" disabled>No customers with emails found</SelectItem>
+                              )}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}/>
+                  <FormField control={form.control} name="subject" render={({ field }) => (
+                    <FormItem><FormLabel>Subject</FormLabel><FormControl><Input placeholder="Re: Loan Status Update" {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <FormField control={form.control} name="body" render={({ field }) => (
+                    <FormItem><FormLabel>Message Body</FormLabel><FormControl><Textarea className="min-h-[200px]" placeholder="Type your message here..." {...field} /></FormControl><FormMessage /></FormItem>
+                  )}/>
+                  <DialogFooter className="pt-4">
+                    <Button type="submit" disabled={isSending} className="w-full sm:w-auto h-11 px-8">
+                      {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                      Send Email Now
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Tabs defaultValue="sent">

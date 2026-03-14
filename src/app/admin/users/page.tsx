@@ -87,22 +87,29 @@ export default function UserManagementPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // Grant Finance users the same permissions as Super Admin
-    const isAuthorizedAdmin = useMemo(() => {
+    // As requested, the module is now visible to all authorized admin team members
+    const canViewPage = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase();
         const role = currentUser.role?.toLowerCase();
-        return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+        return email === 'simon@pezeka.com' || role === 'finance' || role === 'staff' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+    }, [currentUser]);
+
+    // But only Super Admin can actually ADD, EDIT or DELETE other admin users
+    const isSuperAdmin = useMemo(() => {
+        if (!currentUser) return false;
+        const email = currentUser.email?.toLowerCase();
+        return email === 'simon@pezeka.com' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
     
     useEffect(() => {
-        if (!userLoading && !isAuthorizedAdmin) {
+        if (!userLoading && !canViewPage) {
             toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
             router.push('/admin');
         }
-    }, [userLoading, isAuthorizedAdmin, router, toast]);
+    }, [userLoading, canViewPage, router, toast]);
 
-    const { data: users, loading: usersLoading } = useCollection<UserProfile>(isAuthorizedAdmin ? 'users' : null);
+    const { data: users, loading: usersLoading } = useCollection<UserProfile>(canViewPage ? 'users' : null);
 
     const addForm = useForm<z.infer<typeof userProfileSchema>>({
         resolver: zodResolver(userProfileSchema),
@@ -114,6 +121,7 @@ export default function UserManagementPage() {
     });
 
     async function onAddSubmit(values: z.infer<typeof userProfileSchema>) {
+        if (!isSuperAdmin) return;
         setIsSubmitting(true);
         try {
             await createUserProfile(firestore, values.uid, { email: values.email, role: values.role, name: values.name });
@@ -124,13 +132,14 @@ export default function UserManagementPage() {
     }
 
     const handleEditClick = (user: UserProfile) => {
+        if (!isSuperAdmin) return;
         setUserToEdit(user);
         editForm.reset({ uid: user.uid, name: user.name, email: user.email, role: user.role });
         setEditDialogOpen(true);
     };
     
     async function onEditSubmit(values: z.infer<typeof userProfileSchema>) {
-      if (!userToEdit) return;
+      if (!userToEdit || !isSuperAdmin) return;
       setIsSubmitting(true);
       try {
         await updateUserProfile(firestore, userToEdit.id, { name: values.name, email: values.email, role: values.role });
@@ -141,12 +150,13 @@ export default function UserManagementPage() {
     }
     
     const handleDeleteClick = (user: UserProfile) => {
+        if (!isSuperAdmin) return;
         setUserToDelete(user);
         setDeleteDialogOpen(true);
     };
 
     async function confirmDelete() {
-        if (!userToDelete) return;
+        if (!userToDelete || !isSuperAdmin) return;
         setIsSubmitting(true);
         try {
             await deleteUserProfile(firestore, userToDelete.id);
@@ -156,7 +166,7 @@ export default function UserManagementPage() {
         } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    if (userLoading || (currentUser && !isAuthorizedAdmin)) {
+    if (userLoading || (currentUser && !canViewPage)) {
         return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
 
@@ -164,34 +174,36 @@ export default function UserManagementPage() {
     <>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-          <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add User Profile</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add New User Profile</DialogTitle><DialogDescription>First, create the user in the Firebase Authentication console.</DialogDescription></DialogHeader>
-            <Form {...addForm}>
-              <ScrollArea className="max-h-[70vh] pr-4">
-                <form id="add-user-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
-                    <FormField control={addForm.control} name="uid" render={({ field }) => (
-                    <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Auth" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={addForm.control} name="role" render={({ field }) => (
-                    <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
-                        <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
-                    </Select><FormMessage /></FormItem>
-                    )}/>
-                </form>
-              </ScrollArea>
-            </Form>
-             <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-user-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Profile</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {isSuperAdmin && (
+            <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add User Profile</Button></DialogTrigger>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Add New User Profile</DialogTitle><DialogDescription>First, create the user in the Firebase Authentication console.</DialogDescription></DialogHeader>
+                <Form {...addForm}>
+                <ScrollArea className="max-h-[70vh] pr-4">
+                    <form id="add-user-form" onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-2">
+                        <FormField control={addForm.control} name="uid" render={({ field }) => (
+                        <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input placeholder="Paste UID from Auth" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="name" render={({ field }) => (
+                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="email" render={({ field }) => (
+                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="role" render={({ field }) => (
+                        <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
+                            <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
+                        </Select><FormMessage /></FormItem>
+                        )}/>
+                    </form>
+                </ScrollArea>
+                </Form>
+                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-user-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Profile</Button></DialogFooter>
+            </DialogContent>
+            </Dialog>
+        )}
       </div>
       <Card>
         <CardHeader><CardTitle>Admin Users</CardTitle><CardDescription>A list of all users with staff or finance roles.</CardDescription></CardHeader>
@@ -200,46 +212,62 @@ export default function UserManagementPage() {
           {!usersLoading && (!users || users.length === 0) && (<Alert><AlertTitle>No User Profiles Found</AlertTitle></Alert>)}
           {!usersLoading && users && users.length > 0 && (
             <ScrollArea className="h-[60vh]">
-              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead className="text-right w-[80px]">Actions</TableHead></TableRow></TableHeader>
+              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead>{isSuperAdmin && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
                   <TableBody>{users.map((user) => (
-                          <TableRow key={user.id}><TableCell className="font-medium">{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell><Badge variant="secondary">{user.role}</Badge></TableCell><TableCell className="text-right"><DropdownMenu open={openMenu === user.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? user.id : null)}><DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleEditClick(user)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>
+                          <TableRow key={user.id}><TableCell className="font-medium">{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
+                          {isSuperAdmin && (
+                            <TableCell className="text-right">
+                                <DropdownMenu open={openMenu === user.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? user.id : null)}>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEditClick(user)}>Edit</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">Delete</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
+                          )}
+                          </TableRow>
                       ))}</TableBody></Table>
             </ScrollArea>
           )}
         </CardContent>
       </Card>
       
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-            <DialogHeader><DialogTitle>Edit User Profile</DialogTitle></DialogHeader>
-            <Form {...editForm}>
-                <ScrollArea className="max-h-[70vh] pr-4">
-                    <form id="edit-user-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
-                        <FormField control={editForm.control} name="uid" render={({ field }) => (
-                        <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''} /></FormControl></FormItem>
-                        )}/>
-                        <FormField control={editForm.control} name="name" render={({ field }) => (
-                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                        )}/>
-                        <FormField control={editForm.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                        )}/>
-                        <FormField control={editForm.control} name="role" render={({ field }) => (
-                        <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
-                        </Select></FormItem>
-                        )}/>
-                    </form>
-                </ScrollArea>
-            </Form>
-             <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-user-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Profile?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive">{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
+      {isSuperAdmin && (
+        <>
+            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Edit User Profile</DialogTitle></DialogHeader>
+                    <Form {...editForm}>
+                        <ScrollArea className="max-h-[70vh] pr-4">
+                            <form id="edit-user-form" onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-2">
+                                <FormField control={editForm.control} name="uid" render={({ field }) => (
+                                <FormItem><FormLabel>User ID (UID)</FormLabel><FormControl><Input {...field} disabled value={field.value ?? ''} /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={editForm.control} name="name" render={({ field }) => (
+                                <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={editForm.control} name="email" render={({ field }) => (
+                                <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={editForm.control} name="role" render={({ field }) => (
+                                <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                    <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
+                                </Select></FormItem>
+                                )}/>
+                            </form>
+                        </ScrollArea>
+                    </Form>
+                    <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="edit-user-form" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+            
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Profile?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setUserToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-destructive">{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+            </AlertDialog>
+        </>
+      )}
     </>
   );
 }
