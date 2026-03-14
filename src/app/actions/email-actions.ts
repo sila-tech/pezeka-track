@@ -61,11 +61,12 @@ export async function sendAutomatedEmail(input: EmailEventInput & { recipientEma
 
 /**
  * Sends a manual email composed by a staff member.
+ * Consistently uses the notifications@pezeka.com origin as requested.
  */
 export async function sendManualEmail(input: { recipient: string, subject: string, body: string }) {
     try {
         const { data, error } = await resend.emails.send({
-            from: 'Pezeka Credit <office@pezeka.com>',
+            from: 'Pezeka Credit <notifications@pezeka.com>',
             to: input.recipient,
             subject: input.subject,
             text: input.body,
