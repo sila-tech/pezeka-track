@@ -165,8 +165,13 @@ type FinanceEntryData = {
 export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData): Promise<DocumentReference<DocumentData>> {
   const financeCollection = collection(db, 'financeEntries');
 
+  // Filter out any undefined or null values to prevent Firestore crashes
+  const sanitizedData = Object.fromEntries(
+    Object.entries(entryData).filter(([_, v]) => v !== undefined && v !== null)
+  );
+
   const newEntry = {
-    ...entryData,
+    ...sanitizedData,
     transactionFee: entryData.transactionFee || 0,
     createdAt: serverTimestamp(),
   };

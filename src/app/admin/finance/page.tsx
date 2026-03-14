@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -330,16 +331,43 @@ export default function FinancePage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      const data = { 
-          ...values, 
-          date: new Date(values.date),
-          recordedBy: user.name || user.email || 'Admin'
+      // Explicitly construct the object to avoid sending 'undefined' fields to Firestore
+      const entryData: any = {
+        type: values.type,
+        date: new Date(values.date),
+        amount: Number(values.amount),
+        transactionFee: Number(values.transactionFee || 0),
+        description: values.description,
+        recordedBy: user.name || user.email || 'Admin'
       };
-      if (editingEntry) await updateFinanceEntry(firestore, editingEntry.id, data);
-      else await addFinanceEntry(firestore, data as any);
-      setOpen(false); setEditingEntry(null); addForm.reset({ type: 'receipt', date: format(new Date(), 'yyyy-MM-dd'), amount: 0, description: '', transactionFee: 0 });
+
+      // Only add relevant category fields to prevent "undefined field" errors in Firestore
+      if (values.type === 'expense' && values.expenseCategory) entryData.expenseCategory = values.expenseCategory;
+      if (values.type === 'receipt' && values.receiptCategory) entryData.receiptCategory = values.receiptCategory;
+      if (values.type === 'payout' && values.payoutCategory) entryData.payoutCategory = values.payoutCategory;
+      if (values.loanId) entryData.loanId = values.loanId;
+
+      if (editingEntry) {
+        await updateFinanceEntry(firestore, editingEntry.id, entryData);
+      } else {
+        await addFinanceEntry(firestore, entryData);
+      }
+
+      setOpen(false); 
+      setEditingEntry(null); 
+      addForm.reset({ 
+        type: 'receipt', 
+        date: format(new Date(), 'yyyy-MM-dd'), 
+        amount: 0, 
+        description: '', 
+        transactionFee: 0 
+      });
       toast({ title: editingEntry ? 'Entry Updated' : 'Entry Recorded' });
-    } catch (e: any) { toast({ variant: "destructive", title: "Error", description: e.message }); } finally { setIsSubmitting(false); }
+    } catch (e: any) { 
+      toast({ variant: "destructive", title: "Error", description: e.message }); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   }
 
   if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
