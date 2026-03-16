@@ -85,11 +85,11 @@ export default function AccountPage() {
   }, [activeLoans]);
 
   return (
-    <div className="min-h-screen bg-[#0A0E12] text-white pb-24 font-sans">
+    <div className="min-h-screen bg-[#1B2B33] text-white pb-24 font-sans">
       {/* Header */}
-      <header className="px-6 pt-10 pb-4 flex items-center justify-between sticky top-0 bg-[#0A0E12]/80 backdrop-blur-md z-50">
+      <header className="px-6 pt-10 pb-4 flex items-center justify-between sticky top-0 bg-[#1B2B33]/80 backdrop-blur-md z-50">
         <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#27AE60] flex items-center justify-center font-bold text-white text-lg">
+            <div className="w-10 h-10 rounded-full bg-[#5BA9D0] flex items-center justify-center font-bold text-white text-lg shadow-lg shadow-[#5BA9D0]/20">
                 {initials}
             </div>
             <div className="flex items-center gap-1">
@@ -100,8 +100,8 @@ export default function AccountPage() {
         <div className="flex items-center gap-4">
             <Search className="h-6 w-6 text-white/60" />
             <div className="relative">
-                <Bell className="h-6 w-6 text-[#27AE60]" />
-                <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0A0E12]" />
+                <Bell className="h-6 w-6 text-[#5BA9D0]" />
+                <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-[#1B2B33]" />
             </div>
         </div>
       </header>
@@ -109,7 +109,7 @@ export default function AccountPage() {
       <main className="p-6 space-y-8 max-w-lg mx-auto">
         {/* Balance Card */}
         <div className="relative">
-            <div className="bg-gradient-to-br from-[#2ECC71] to-[#27AE60] rounded-[2rem] p-8 shadow-2xl relative overflow-hidden h-56 flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-[#5BA9D0] to-[#4A98C0] rounded-[2rem] p-8 shadow-2xl relative overflow-hidden h-56 flex flex-col justify-between">
                 <div>
                     <p className="text-white/80 text-sm font-medium">Total Balance</p>
                     <h2 className="text-4xl font-black mt-1">KES {totalBalance.toLocaleString()}</h2>
@@ -146,11 +146,11 @@ export default function AccountPage() {
         <section className="space-y-4">
             <h3 className="text-lg font-bold tracking-tight px-1">Loan Applications</h3>
             {loansLoading ? (
-                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-[#27AE60]" /></div>
+                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-[#5BA9D0]" /></div>
             ) : applications.length > 0 ? (
                 <div className="space-y-3">
                     {applications.map(loan => (
-                        <div key={loan.id} className="bg-[#161B22] rounded-2xl p-5 flex items-center justify-between border border-white/5">
+                        <div key={loan.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between border border-white/5">
                             <div className="space-y-1">
                                 <p className="font-bold text-white text-base">{loan.loanType || 'Quick Pesa'}</p>
                                 <p className="text-xs text-white/40 font-medium">Amount: KES {loan.principalAmount.toLocaleString()}</p>
@@ -162,7 +162,7 @@ export default function AccountPage() {
                     ))}
                 </div>
             ) : (
-                <div className="bg-[#161B22] rounded-2xl p-8 text-center border border-dashed border-white/10">
+                <div className="bg-white/5 rounded-2xl p-8 text-center border border-dashed border-white/10">
                     <p className="text-xs text-white/40 font-medium">No pending applications.</p>
                 </div>
             )}
@@ -172,26 +172,31 @@ export default function AccountPage() {
         <section className="space-y-4">
             <h3 className="text-lg font-bold tracking-tight px-1">Active Loans</h3>
             {loansLoading ? (
-                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-[#27AE60]" /></div>
+                <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-[#5BA9D0]" /></div>
             ) : activeLoans.length > 0 ? (
                 <div className="space-y-3">
                     {activeLoans.map(loan => {
                         const balance = loan.totalRepayableAmount - loan.totalPaid;
                         return (
-                            <div key={loan.id} className="bg-[#161B22] rounded-2xl p-5 flex items-center justify-between border border-white/5">
+                            <div key={loan.id} className="bg-white/5 rounded-2xl p-5 flex items-center justify-between border border-white/5">
                                 <div className="space-y-1">
                                     <p className="font-bold text-white text-base">Loan #{loan.loanNumber}</p>
                                     <p className="text-xs text-white/40 font-medium">Bal: KES {balance.toLocaleString()}</p>
                                 </div>
-                                <Button variant="ghost" size="sm" onClick={() => setShowPaymentInstructions(true)} className="h-8 text-[#27AE60] font-black text-xs px-0 hover:bg-transparent">
-                                    PAY NOW
-                                </Button>
+                                <div className="flex items-center gap-3">
+                                    <Badge className="bg-[#27AE60]/20 text-[#27AE60] border-none font-black text-[9px] uppercase">
+                                        ACTIVE
+                                    </Badge>
+                                    <Button variant="ghost" size="sm" onClick={() => setShowPaymentInstructions(true)} className="h-8 text-[#5BA9D0] font-black text-xs px-0 hover:bg-transparent">
+                                        PAY NOW
+                                    </Button>
+                                </div>
                             </div>
                         )
                     })}
                 </div>
             ) : (
-                <div className="bg-[#161B22] rounded-2xl p-8 text-center border border-dashed border-white/10">
+                <div className="bg-white/5 rounded-2xl p-8 text-center border border-dashed border-white/10">
                     <p className="text-xs text-white/40 font-medium">No active loans found.</p>
                 </div>
             )}
@@ -199,7 +204,7 @@ export default function AccountPage() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-[#0A0E12] border-t border-white/5 px-10 flex items-center justify-between z-50">
+      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-[#1B2B33] border-t border-white/5 px-10 flex items-center justify-between z-50">
           <NavItem icon={<Home className="h-6 w-6" />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
           <NavItem icon={<Plus className="h-6 w-6" />} label="Apply" active={activeTab === 'Apply'} onClick={() => router.push('/account/apply')} />
           <NavItem icon={<User className="h-6 w-6" />} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
@@ -207,27 +212,27 @@ export default function AccountPage() {
 
       {/* Payment Instructions Dialog */}
       <Dialog open={showPaymentInstructions} onOpenChange={setShowPaymentInstructions}>
-          <DialogContent className="bg-[#161B22] border-white/10 text-white sm:max-w-md rounded-[2rem] p-8">
+          <DialogContent className="bg-[#1B2B33] border-white/10 text-white sm:max-w-md rounded-[2rem] p-8">
               <DialogHeader>
                   <DialogTitle className="text-2xl font-black">How to Pay</DialogTitle>
                   <DialogDescription className="text-white/60">Use M-Pesa to settle your balance.</DialogDescription>
               </DialogHeader>
               <div className="space-y-6 py-4 text-sm font-medium">
-                  <div className="bg-[#27AE60]/10 border border-[#27AE60]/20 rounded-2xl p-6 space-y-4">
+                  <div className="bg-[#5BA9D0]/10 border border-[#5BA9D0]/20 rounded-2xl p-6 space-y-4">
                       <div className="flex justify-between items-center border-b border-white/5 pb-3">
                           <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Paybill</span>
-                          <span className="text-xl font-black text-[#27AE60]">522522</span>
+                          <span className="text-xl font-black text-[#5BA9D0]">522522</span>
                       </div>
                       <div className="flex justify-between items-center border-b border-white/5 pb-3">
                           <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Account</span>
-                          <span className="text-xl font-black text-[#27AE60]">1347823360</span>
+                          <span className="text-xl font-black text-[#5BA9D0]">1347823360</span>
                       </div>
                       <div className="flex justify-between items-center pt-1">
                           <span className="text-[10px] font-black uppercase text-white/40 tracking-widest">Reference</span>
-                          <span className="text-sm font-bold bg-[#0A0E12] px-3 py-1 rounded-lg">ID Number</span>
+                          <span className="text-sm font-bold bg-[#1B2B33] px-3 py-1 rounded-lg">ID Number</span>
                       </div>
                   </div>
-                  <div className="text-xs text-white/40 space-y-2 bg-[#0A0E12] p-4 rounded-xl border border-white/5 leading-relaxed">
+                  <div className="text-xs text-white/40 space-y-2 bg-[#1B2B33] p-4 rounded-xl border border-white/5 leading-relaxed font-medium">
                       <p>1. Go to M-Pesa &gt; Lipa na M-Pesa</p>
                       <p>2. Select Pay Bill & enter Business No.</p>
                       <p>3. Enter Account No. (see above)</p>
@@ -235,7 +240,7 @@ export default function AccountPage() {
                   </div>
               </div>
               <DialogFooter>
-                  <Button onClick={() => setShowPaymentInstructions(false)} className="w-full h-12 rounded-xl font-black bg-[#27AE60] hover:bg-[#2ecc71] text-white border-none shadow-lg shadow-[#27AE60]/20">I Have Paid</Button>
+                  <Button onClick={() => setShowPaymentInstructions(false)} className="w-full h-12 rounded-xl font-black bg-[#5BA9D0] hover:bg-[#4A98C0] text-white border-none shadow-lg shadow-[#5BA9D0]/20">I Have Paid</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
@@ -249,7 +254,7 @@ function ActionIcon({ icon, label, active = false, onClick }: { icon: React.Reac
             onClick={onClick}
             className="flex flex-col items-center gap-3 outline-none group"
         >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${active ? 'bg-[#27AE60] text-white' : 'bg-[#161B22] text-[#27AE60] group-hover:bg-[#1c232b]'}`}>
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${active ? 'bg-[#5BA9D0] text-white' : 'bg-white/5 text-[#5BA9D0] group-hover:bg-white/10'}`}>
                 {icon}
             </div>
             <span className={`text-xs font-bold tracking-tight ${active ? 'text-white' : 'text-white/40'}`}>{label}</span>
@@ -261,9 +266,9 @@ function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNo
     return (
         <button 
             onClick={onClick}
-            className={`flex flex-col items-center gap-1.5 transition-all outline-none ${active ? 'text-[#27AE60]' : 'text-white/30 hover:text-white/60'}`}
+            className={`flex flex-col items-center gap-1.5 transition-all outline-none ${active ? 'text-[#5BA9D0]' : 'text-white/30 hover:text-white/60'}`}
         >
-            <div className={`p-2 rounded-xl transition-all ${active ? 'bg-[#27AE60]/10' : 'bg-transparent'}`}>
+            <div className={`p-2 rounded-xl transition-all ${active ? 'bg-[#5BA9D0]/10' : 'bg-transparent'}`}>
                 {icon}
             </div>
             <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
