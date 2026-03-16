@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -20,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { addLoan, addFollowUpNoteToLoan } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 
 interface FollowUpNote {
     noteId: string;
@@ -128,7 +130,6 @@ export default function Dashboard() {
 
   const myPortfolio = useMemo(() => {
       if (!loans || !user) return [];
-      // Rolled over loans are considered "completed" facilities as they are replaced by new active loans
       return loans.filter(loan => 
           loan.assignedStaffId === user.uid && 
           loan.status !== 'application' && 
@@ -159,7 +160,6 @@ export default function Dashboard() {
     if (!loans) return [];
     const today = startOfToday();
     
-    // Exclude Rollover status from due alerts
     return loans.filter(loan => 
         loan.status !== 'paid' && 
         loan.status !== 'application' && 
@@ -269,7 +269,7 @@ export default function Dashboard() {
         <Card className="flex flex-col h-[600px]">
             <CardHeader className="pb-2">
                 <CardTitle>Due Loans & Follow-ups</CardTitle>
-                <CardDescription>Accounts requiring immediate attention based on frequency.</CardDescription>
+                <CardDescription>Accounts requiring immediate attention.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
                 <Tabs defaultValue="all" className="h-full flex flex-col">
@@ -374,15 +374,60 @@ export default function Dashboard() {
             </CardContent>
         </Card>
 
-        {user?.role?.toLowerCase() === 'staff' ? (
-            <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>My Portfolio</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader><TableBody>{myPortfolio.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-medium text-xs">{loan.customerName}</div><div className="text-[9px] text-muted-foreground uppercase">{loan.paymentFrequency}</div></TableCell><TableCell className="text-right font-bold text-xs">Ksh {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell><TableCell className="text-center"><Badge variant="outline" className="text-[10px]">{loan.status}</Badge></TableCell></TableRow>))}</TableBody></Table></ScrollArea></CardContent></Card>
-        ) : (
-            <Card className="flex flex-col h-[600px]"><CardHeader><CardTitle>New Applications</CardTitle></CardHeader><CardContent className="flex-1 overflow-hidden">
-                    {newApplications.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No New Applications</AlertTitle></Alert></div>) : (
-                        <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{newApplications.map((loan) => (<TableRow key={loan.id}><TableCell><div>{loan.customerName}</div></TableCell><TableCell>{loan.loanType}</TableCell><TableCell className="text-right font-bold">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></ScrollArea>
-                    )}
-                </CardContent></Card>
-        )}
+        <Card className="flex flex-col h-[600px]">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                    <CardTitle>New Applications</CardTitle>
+                    <CardDescription>Latest customer self-submissions.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                    <Link href="/admin/loans">
+                        Review All <ArrowRight className="ml-2 h-3 w-3" />
+                    </Link>
+                </Button>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-hidden">
+                {newApplications.length === 0 ? (
+                    <div className="p-6 text-center">
+                        <Alert><AlertTitle>No Pending Applications</AlertTitle></Alert>
+                    </div>
+                ) : (
+                    <ScrollArea className="h-full">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-card z-10">
+                                <TableRow>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead className="text-right">Amount</TableHead>
+                                    <TableHead className="w-[50px]"></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {newApplications.map((loan) => (
+                                    <TableRow key={loan.id} className="group">
+                                        <TableCell>
+                                            <div className="font-medium text-xs">{loan.customerName}</div>
+                                            <div className="text-[10px] text-muted-foreground">{format(loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date(), 'MMM dd, HH:mm')}</div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">{loan.loanType}</TableCell>
+                                        <TableCell className="text-right font-bold text-xs">
+                                            Ksh {(loan.principalAmount || 0).toLocaleString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                                                <Link href="/admin/loans">
+                                                    <ExternalLink className="h-3 w-3" />
+                                                </Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                )}
+            </CardContent>
+        </Card>
       </div>
 
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>

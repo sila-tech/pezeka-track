@@ -279,7 +279,8 @@ export async function addLoan(db: Firestore, loanData: any): Promise<{docRef: Do
 }
 
 /**
- * Specifically for Android/Customer side applications.
+ * Specifically for Customer side applications.
+ * Ensures the application is immediately visible to admins for review.
  */
 export async function submitCustomerApplication(db: Firestore, customerId: string, loanData: any) {
     const loanCollection = collection(db, 'loans');
@@ -297,6 +298,7 @@ export async function submitCustomerApplication(db: Firestore, customerId: strin
         status: 'application',
         loanNumber: `APP-${Date.now().toString().slice(-6)}`,
         createdAt: serverTimestamp(),
+        disbursementDate: serverTimestamp(),
         payments: [],
         penalties: [],
         totalPenalties: 0,
