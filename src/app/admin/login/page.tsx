@@ -152,7 +152,7 @@ export default function AdminLoginPage() {
   if (!loading && user && !isAuthorizedAdmin) {
      return (
         <main className="flex min-h-screen flex-col items-center justify-center p-4">
-            <Card className="w-full max-w-sm">
+            <Card className="w-full max-sm">
                  <CardHeader>
                     <CardTitle>Access Restricted</CardTitle>
                     <CardDescription>
@@ -171,6 +171,9 @@ export default function AdminLoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="mb-8 text-center">
+        <img src="/pezeka_logo_transparent.png" alt="Pezeka Logo" className="h-20 w-20 mx-auto mb-2 object-contain" />
+      </div>
       <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Pezeka Credit</CardTitle>

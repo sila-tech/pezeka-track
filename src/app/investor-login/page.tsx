@@ -88,9 +88,12 @@ export default function InvestorLoginPage() {
   }
 
   return (
-    <>
-      <Card className="w-full max-w-md">
-        <CardHeader>
+    <div className="w-full max-w-md flex flex-col items-center">
+      <div className="mb-6">
+        <img src="/pezeka_logo_transparent.png" alt="Pezeka Logo" className="h-20 w-20 object-contain" />
+      </div>
+      <Card className="w-full">
+        <CardHeader className="text-center">
           <CardTitle>Investor Portal</CardTitle>
           <CardDescription>Sign in to view your portfolio.</CardDescription>
         </CardHeader>
@@ -124,6 +127,6 @@ export default function InvestorLoginPage() {
               </Form>
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }

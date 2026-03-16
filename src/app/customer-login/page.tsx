@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -132,58 +131,63 @@ export default function CustomerLoginPage() {
   if (loading || user) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
-    <Card className="w-full max-w-md shadow-lg border-t-4 border-t-primary">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">Customer Portal</CardTitle>
-        <CardDescription>{isSignUp ? 'Create your account to start your application' : 'Sign in to manage your loans'}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
-            {isSignUp && (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="firstName" render={({ field }) => (
-                    <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+    <div className="w-full max-w-md flex flex-col items-center">
+      <div className="mb-6">
+        <img src="/pezeka_logo_transparent.png" alt="Pezeka Logo" className="h-20 w-20 object-contain" />
+      </div>
+      <Card className="w-full shadow-lg border-t-4 border-t-primary">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">Customer Portal</CardTitle>
+          <CardDescription>{isSignUp ? 'Create your account to start your application' : 'Sign in to manage your loans'}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
+              {isSignUp && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="firstName" render={({ field }) => (
+                      <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="lastName" render={({ field }) => (
+                      <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <FormField control={form.control} name="phone" render={({ field }) => (
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <FormField control={form.control} name="lastName" render={({ field }) => (
-                    <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-                <FormField control={form.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                )} />
-              </>
-            )}
-            <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="email@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={form.control} name="password" render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center justify-between">
-                    <FormLabel>Password</FormLabel>
-                    {!isSignUp && (
-                        <Button type="button" variant="link" className="px-0 font-normal h-auto text-xs" onClick={handleForgotPassword} disabled={isResetting}>
-                            {isResetting ? 'Sending...' : 'Forgot Password?'}
-                        </Button>
-                    )}
-                </div>
-                <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? 'Create Account' : 'Sign In'}
-            </Button>
-            <div className="text-center text-sm">
-              <Button type="button" variant="link" onClick={() => setIsSignUp(!isSignUp)}>
-                {isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'}
+                </>
+              )}
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="email@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="password" render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      {!isSignUp && (
+                          <Button type="button" variant="link" className="px-0 font-normal h-auto text-xs" onClick={handleForgotPassword} disabled={isResetting}>
+                              {isResetting ? 'Sending...' : 'Forgot Password?'}
+                          </Button>
+                      )}
+                  </div>
+                  <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSignUp ? 'Create Account' : 'Sign In'}
               </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+              <div className="text-center text-sm">
+                <Button type="button" variant="link" onClick={() => setIsSignUp(!isSignUp)}>
+                  {isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

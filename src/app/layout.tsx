@@ -9,7 +9,11 @@ export const metadata: Metadata = {
   title: 'Pezeka Credit Ltd',
   description: 'Affordable Credit, Real Opportunities',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/pezeka_logo_transparent.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
     apple: '/apple-touch-icon.png',
   },
   openGraph: {

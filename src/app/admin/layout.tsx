@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -12,7 +11,6 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescri
 import { NotificationBell } from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
-import Image from 'next/image';
 
 
 const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, isStaff: boolean, onLinkClick?: () => void }) => {
@@ -121,7 +119,7 @@ export default function AdminLayout({
             <div className="flex h-full flex-col gap-2">
             <div className="flex h-16 items-center border-b px-4 lg:h-[64px] lg:px-6">
                 <Link href="/admin" className="flex items-center gap-2 font-bold text-primary">
-                    <Image src="/pezeka_logo_transparent.png" alt="Pezeka" width={32} height={32} />
+                    <img src="/pezeka_logo_transparent.png" alt="Pezeka" className="h-8 w-8 object-contain" />
                     <span className="tracking-tight">Pezeka Admin</span>
                 </Link>
             </div>
@@ -158,7 +156,7 @@ export default function AdminLayout({
                  </SheetHeader>
                  <div className="flex h-16 items-center border-b px-4 lg:h-[64px] lg:px-6">
                   <Link href="/admin" className="flex items-center gap-2 font-bold text-primary" onClick={() => setMobileMenuOpen(false)}>
-                    <Image src="/pezeka_logo_transparent.png" alt="Logo" width={28} height={28} />
+                    <img src="/pezeka_logo_transparent.png" alt="Logo" className="h-8 w-8 object-contain" />
                     <span>Pezeka Credit</span>
                   </Link>
                 </div>
@@ -167,7 +165,7 @@ export default function AdminLayout({
                 </div>
                  <div className="mt-auto p-4 border-t flex flex-col gap-2 bg-muted/20">
                   <PWAInstallButton className="w-full justify-start" variant="ghost" />
-                  <Button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} variant="ghost" className="w-full justify-start text-destructive">
+                  <Button onClick={handleLogout} variant="ghost" className="w-full justify-start text-destructive">
                       <LogOut className="mr-2 h-4 w-4" />
                       Logout
                   </Button>

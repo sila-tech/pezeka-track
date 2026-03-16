@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -7,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
-import Image from 'next/image';
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -22,16 +20,10 @@ export default function Header() {
   return (
     <header className="px-4 lg:px-6 h-16 flex items-center bg-card border-b sticky top-0 z-50">
       <Link href="/" className="flex items-center justify-center" onClick={closeMenu}>
-        <Image 
+        <img 
           src="/pezeka_logo_transparent.png" 
           alt="Pezeka Credit" 
-          width={40} 
-          height={40} 
-          className="h-10 w-auto object-contain"
-          onError={(e) => {
-            // Fallback if logo is missing
-            e.currentTarget.style.display = 'none';
-          }}
+          className="h-10 w-10 object-contain"
         />
         <span className="ml-2 font-bold text-xl tracking-tight text-primary">Pezeka Credit</span>
       </Link>
@@ -71,7 +63,7 @@ export default function Header() {
               </SheetHeader>
               <div className="grid gap-4 py-6">
                  <Link href="/" className="flex items-center gap-2 mb-4" onClick={closeMenu}>
-                  <Image src="/pezeka_logo_transparent.png" alt="Logo" width={32} height={32} />
+                  <img src="/pezeka_logo_transparent.png" alt="Logo" className="h-8 w-8 object-contain" />
                   <span className="font-bold text-xl text-primary">Pezeka Credit</span>
                 </Link>
                 <Link href="#products" className="text-lg font-semibold hover:text-primary" onClick={closeMenu}>
