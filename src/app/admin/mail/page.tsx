@@ -71,10 +71,15 @@ export default function MailPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingMail, setViewingMail] = useState<MailLog | null>(null);
 
-  // Now accessible to all authorized admin team members (Staff, Finance, Admin)
-  const isAuthorized = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-  // But strictly limit who can actually SEND manual outreach
-  const canSend = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const userRole = user?.role?.toLowerCase();
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isFinance = userRole === 'finance';
+  const isStaff = userRole === 'staff';
+
+  // Accessible to all authorized admin team members
+  const isAuthorized = isStaff || isFinance || isSuperAdmin;
+  // Send capability limited to Finance/Admin
+  const canSend = isFinance || isSuperAdmin;
 
   const { data: logs, loading: logsLoading } = useCollection<MailLog>(isAuthorized ? 'mail_logs' : null);
   const { data: customers } = useCollection<Customer>('customers');
@@ -143,7 +148,7 @@ export default function MailPage() {
         {canSend && (
           <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
             <DialogTrigger asChild>
-              <Button className="h-11 px-6 font-bold shadow-md">
+              <Button className="h-11 px-6 font-bold shadow-md bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white border-none">
                   <PlusCircle className="mr-2 h-5 w-5" />
                   New Email
               </Button>
@@ -185,7 +190,7 @@ export default function MailPage() {
                     <FormItem><FormLabel>Message Body</FormLabel><FormControl><Textarea className="min-h-[200px]" placeholder="Type your message here..." {...field} /></FormControl><FormMessage /></FormItem>
                   )}/>
                   <DialogFooter className="pt-4">
-                    <Button type="submit" disabled={isSending} className="w-full sm:w-auto h-11 px-8">
+                    <Button type="submit" disabled={isSending} className="w-full sm:w-auto h-11 px-8 bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white border-none">
                       {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
                       Send Email Now
                     </Button>
@@ -244,7 +249,7 @@ export default function MailPage() {
                             <Inbox className="h-12 w-12 text-muted-foreground/20 mb-4" />
                             <p className="text-muted-foreground font-medium">No incoming messages yet.</p>
                             <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                                To receive emails directly here, configure your MX records to point to your inbound webhook.
+                                Inbound messages are recorded via integration webhooks.
                             </p>
                         </div>
                     ) : (
@@ -305,7 +310,7 @@ function MailList({ logs, onSelect }: { logs: MailLog[], onSelect: (log: MailLog
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-1.5 text-xs">
-                                        {log.sender === 'AI Automation' ? <CheckCircle2 className="h-3 w-3 text-primary" /> : <Info className="h-3 w-3 text-muted-foreground" />}
+                                        {log.sender === 'AI Automation' ? <CheckCircle2 className="h-3 w-3 text-[#5BA9D0]" /> : <Info className="h-3 w-3 text-muted-foreground" />}
                                         {log.sender}
                                     </div>
                                 </TableCell>
