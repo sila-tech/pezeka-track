@@ -89,7 +89,7 @@ export default function LoanCalculator() {
 
   if (!mounted) {
     return (
-      <section id="calculator" className="w-full py-12 md:py-24 bg-white">
+      <section id="calculator" className="w-full py-12 md:py-24 bg-[#F8FAFB]">
         <div className="container px-4 md:px-6">
           <div className="h-[600px] w-full animate-pulse bg-muted rounded-3xl" />
         </div>
@@ -100,10 +100,10 @@ export default function LoanCalculator() {
   return (
     <section id="calculator" className="w-full py-12 md:py-24 bg-white">
       <div className="container px-4 md:px-6">
-        <div className="grid gap-0 lg:grid-cols-2 items-stretch bg-white rounded-3xl overflow-hidden shadow-2xl border border-primary/10">
+        <div className="grid gap-0 lg:grid-cols-2 items-stretch bg-[#F8FAFB] rounded-3xl overflow-hidden shadow-xl border border-[#5BA9D0]/20">
           <div className="p-8 md:p-12 space-y-6 flex flex-col justify-center border-r border-muted">
             <div className="space-y-4">
-              <h2 className="text-4xl font-extrabold tracking-tighter text-primary">
+              <h2 className="text-4xl font-extrabold tracking-tighter text-[#1B2B33]">
                 Pezeka Loan Calculator
               </h2>
               <p className="text-muted-foreground text-lg leading-relaxed">
@@ -111,17 +111,17 @@ export default function LoanCalculator() {
               </p>
             </div>
             
-            <div className="text-sm text-muted-foreground bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-1">
-                <p><span className="font-bold text-primary">Quick Pesa / Salary Advance:</span> 10% Monthly Interest, 10% Appraisal (Upfront).</p>
-                <p><span className="font-bold text-primary">Logbook Loan:</span> 10% Monthly Interest, 10% Appraisal (Upfront).</p>
-                <p><span className="font-bold text-primary">Business Loan:</span> 5% Monthly Interest, 10% Appraisal (Upfront).</p>
+            <div className="text-xs text-muted-foreground bg-white p-4 rounded-lg border border-[#5BA9D0]/10 space-y-1">
+                <p><span className="font-bold text-[#1B2B33]">Quick Pesa / Salary Advance:</span> 10% Monthly Interest, 10% Appraisal (Upfront).</p>
+                <p><span className="font-bold text-[#1B2B33]">Logbook Loan:</span> 10% Monthly Interest, 10% Appraisal (Upfront).</p>
+                <p><span className="font-bold text-[#1B2B33]">Business Loan:</span> 5% Monthly Interest, 10% Appraisal (Upfront).</p>
             </div>
 
             <div className="space-y-5 pt-4">
               <div className="space-y-2">
-                  <Label htmlFor="loan-type" className="text-sm font-bold uppercase text-primary tracking-wide">Loan Product</Label>
+                  <Label htmlFor="loan-type" className="text-xs font-bold uppercase text-[#1B2B33] tracking-widest">Loan Product</Label>
                   <Select value={loanType} onValueChange={setLoanType}>
-                      <SelectTrigger className="h-12 text-lg border-2 rounded-xl">
+                      <SelectTrigger className="h-12 text-lg border-2 border-muted bg-white rounded-xl">
                           <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -135,33 +135,33 @@ export default function LoanCalculator() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label htmlFor="loan-amount" className="text-sm font-bold uppercase text-primary tracking-wide">Loan amount (KSH)</Label>
+                    <Label htmlFor="loan-amount" className="text-xs font-bold uppercase text-[#1B2B33] tracking-widest">Loan amount (KSH)</Label>
                     <Input
                     id="loan-amount"
                     type="number"
                     placeholder="e.g. 5,000"
                     value={amount || ''}
                     onChange={(e) => setAmount(Number(e.target.value))}
-                    className="h-12 text-lg border-2 focus:ring-primary rounded-xl"
+                    className="h-12 text-lg border-2 border-muted bg-white focus:ring-[#5BA9D0] rounded-xl"
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="loan-date" className="text-sm font-bold uppercase text-primary tracking-wide">Start date</Label>
+                    <Label htmlFor="loan-date" className="text-xs font-bold uppercase text-[#1B2B33] tracking-widest">Start date</Label>
                     <Input
                     id="loan-date"
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="h-12 text-lg border-2 focus:ring-primary rounded-xl"
+                    className="h-12 text-lg border-2 border-muted bg-white focus:ring-[#5BA9D0] rounded-xl"
                     />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label htmlFor="frequency" className="text-sm font-bold uppercase text-primary tracking-wide">Frequency</Label>
+                    <Label htmlFor="frequency" className="text-xs font-bold uppercase text-[#1B2B33] tracking-widest">Frequency</Label>
                     <Select value={frequency} onValueChange={(val: any) => setFrequency(val)}>
-                        <SelectTrigger className="h-12 text-lg border-2 rounded-xl">
+                        <SelectTrigger className="h-12 text-lg border-2 border-muted bg-white rounded-xl">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -172,24 +172,24 @@ export default function LoanCalculator() {
                     </Select>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="period" className="text-sm font-bold uppercase text-primary tracking-wide">Number of {frequency}s</Label>
+                    <Label htmlFor="period" className="text-xs font-bold uppercase text-[#1B2B33] tracking-widest">Number of {frequency}s</Label>
                     <Input
                     id="period"
                     type="number"
                     min="1"
                     value={period || ''}
                     onChange={(e) => setPeriod(Number(e.target.value))}
-                    className="h-12 text-lg border-2 focus:ring-primary rounded-xl"
+                    className="h-12 text-lg border-2 border-muted bg-white focus:ring-[#5BA9D0] rounded-xl"
                     />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="p-8 md:p-12 space-y-8 bg-primary text-primary-foreground flex flex-col justify-center">
+          <div className="p-8 md:p-12 space-y-8 bg-[#1B2B33] text-white flex flex-col justify-center">
             <div className="text-center space-y-2">
-              <h2 className="text-5xl font-black tracking-tight">Loan Results</h2>
-              <p className="text-primary-foreground/80 text-xl font-medium tracking-wide uppercase">Your Estimated Schedule</p>
+              <h2 className="text-5xl font-black tracking-tight text-white">Loan Results</h2>
+              <p className="text-white/60 text-sm font-black tracking-widest uppercase">Your Estimated Schedule</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -205,10 +205,10 @@ export default function LoanCalculator() {
             </div>
 
             <div className="text-center space-y-6 pt-6">
-                <p className="text-xs text-primary-foreground/70 font-medium">
-                    Calculations are based on selected product terms. Upfront deductions applied to take-home amount.
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest">
+                    Standard upfront deductions applied to take-home amount.
                 </p>
-                <Button onClick={handleApply} variant="secondary" className="w-full h-16 rounded-full font-extrabold text-xl shadow-xl transition-all">
+                <Button onClick={handleApply} variant="secondary" className="w-full h-16 rounded-full font-black text-xl shadow-2xl bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white border-none transition-all hover:scale-105">
                     Apply for this Loan
                 </Button>
             </div>
@@ -221,9 +221,9 @@ export default function LoanCalculator() {
 
 function ResultCard({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`p-5 rounded-2xl border-2 ${highlight ? 'bg-primary-foreground/10 border-primary-foreground/20 shadow-inner' : 'bg-black/10 border-white/10'} transition-all hover:scale-[1.02]`}>
-      <p className="text-[11px] uppercase font-black text-primary-foreground/60 mb-2 tracking-widest">{label}</p>
-      <p className="text-2xl font-black tabular-nums">{value}</p>
+    <div className={`p-5 rounded-2xl border-2 ${highlight ? 'bg-white/5 border-[#5BA9D0]/40' : 'bg-white/5 border-white/5'} transition-all hover:bg-white/10`}>
+      <p className="text-[10px] uppercase font-black text-white/40 mb-2 tracking-widest">{label}</p>
+      <p className={`text-2xl font-black tabular-nums ${highlight ? 'text-[#5BA9D0]' : 'text-white'}`}>{value}</p>
     </div>
   );
 }
