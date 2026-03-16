@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download, Smartphone, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface PWAInstallButtonProps {
   className?: string;
@@ -14,12 +20,17 @@ interface PWAInstallButtonProps {
 export function PWAInstallButton({ className, variant = 'outline', showIconOnly = false }: PWAInstallButtonProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // Check if app is already installed (standalone mode)
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
       setIsInstalled(true);
     }
+
+    // Detect iOS
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    setIsIOS(/iphone|ipad|ipod/.test(userAgent));
 
     const handler = (e: any) => {
       // Prevent the mini-infobar from appearing on mobile
@@ -34,7 +45,13 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+        // Fallback for browsers that don't support beforeinstallprompt yet
+        if (!isIOS) {
+            alert("To install: Tap your browser's menu (three dots) and select 'Install' or 'Add to Home Screen'.");
+        }
+        return;
+    }
 
     // Show the install prompt
     deferredPrompt.prompt();
@@ -53,7 +70,7 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
       <Button
         variant={variant}
         size={showIconOnly ? 'icon' : 'default'}
-        className={cn("gap-2 text-primary border-primary/20 bg-primary/5", className)}
+        className={cn("gap-2 text-green-600 border-green-200 bg-green-50", className)}
         disabled
       >
         <CheckCircle className="h-4 w-4" />
@@ -62,20 +79,27 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
     );
   }
 
-  if (!deferredPrompt) {
-    // If no prompt, we still show the button but it's a generic link to the section (which we removed)
-    // or just an icon that does nothing if we want to be very minimal.
-    // Let's keep it functional as a visual placeholder for support.
+  // iOS Specific Tooltip instructions
+  if (isIOS) {
     return (
-      <Button
-        variant={variant}
-        size={showIconOnly ? 'icon' : 'default'}
-        className={cn("gap-2 opacity-50", className)}
-        title="Mobile App Available"
-      >
-        <Smartphone className="h-4 w-4" />
-        {!showIconOnly && <span>Mobile App</span>}
-      </Button>
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant={variant}
+                        size={showIconOnly ? 'icon' : 'default'}
+                        className={cn("gap-2", className)}
+                    >
+                        <Smartphone className="h-4 w-4" />
+                        {!showIconOnly && <span>Download App</span>}
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[220px] text-xs p-4 bg-white text-[#1B2B33] border shadow-xl">
+                    <p className="font-bold mb-1">Install on iPhone:</p>
+                    <p>Tap the <span className="inline-block px-1 border rounded bg-muted">Share</span> icon in Safari and select <span className="font-bold">"Add to Home Screen"</span>.</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     );
   }
 
@@ -84,11 +108,15 @@ export function PWAInstallButton({ className, variant = 'outline', showIconOnly 
       variant={variant}
       size={showIconOnly ? 'icon' : 'default'}
       onClick={handleInstallClick}
-      className={cn("gap-2", className)}
+      className={cn(
+        "gap-2 transition-all", 
+        deferredPrompt && "animate-pulse border-primary/50 shadow-md",
+        className
+      )}
       title="Install Pezeka App"
     >
-      <Download className="h-4 w-4" />
-      {!showIconOnly && <span>Download App</span>}
+      {deferredPrompt ? <Download className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
+      {!showIconOnly && <span>{deferredPrompt ? 'Install App' : 'Download App'}</span>}
     </Button>
   );
 }

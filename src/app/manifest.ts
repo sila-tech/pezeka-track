@@ -8,17 +8,19 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
-    theme_color: '#166534',
+    theme_color: '#1B2B33',
     icons: [
       {
         src: '/apple-touch-icon.png',
         sizes: '192x192',
         type: 'image/png',
+        purpose: 'maskable'
       },
       {
         src: '/pezeka_logo_transparent.png',
         sizes: '512x512',
         type: 'image/png',
+        purpose: 'any'
       },
     ],
   }
