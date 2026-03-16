@@ -74,16 +74,13 @@ export default function MailPage() {
   const userRole = user?.role?.toLowerCase()?.trim();
   const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
   const isFinance = userRole === 'finance';
-  const isStaff = userRole === 'staff';
 
-  // Accessible to all authorized admin team members
-  const isAuthorized = isStaff || isFinance || isSuperAdmin;
-  
-  // Send capability limited to Finance/Admin
-  const canSend = isFinance || isSuperAdmin;
+  // Mail is strictly restricted to Finance and Admin. Staff cannot see this module.
+  const isAuthorized = isFinance || isSuperAdmin;
+  const canSend = isAuthorized;
 
   const { data: logs, loading: logsLoading } = useCollection<MailLog>(isAuthorized ? 'mail_logs' : null);
-  const { data: customers } = useCollection<Customer>('customers');
+  const { data: customers } = useCollection<Customer>(isAuthorized ? 'customers' : null);
 
   const customersWithEmail = useMemo(() => {
       return (customers || []).filter(c => !!c.email);
@@ -137,7 +134,15 @@ export default function MailPage() {
   }
 
   if (userLoading || logsLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  if (!isAuthorized) return <div className="p-12 text-center">Access Denied.</div>;
+  if (!isAuthorized) {
+      return (
+          <div className="flex h-[60vh] flex-col items-center justify-center text-center p-8 bg-card rounded-xl border border-dashed">
+              <Mail className="h-12 w-12 text-muted-foreground mb-4" />
+              <h2 className="text-xl font-bold">Access Restricted</h2>
+              <p className="text-muted-foreground mt-2">Only Finance and Administration can access the communications module.</p>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6">

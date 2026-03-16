@@ -13,9 +13,16 @@ import { cn } from '@/lib/utils';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
 
 
-const NavLinks = ({ onLinkClick }: { onLinkClick?: () => void }) => {
+const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }) => {
     const pathname = usePathname();
     
+    const userRole = user?.role?.toLowerCase()?.trim();
+    const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+    const isFinance = userRole === 'finance';
+    
+    // Only Finance and Super Admin see sensitive modules
+    const canSeeSensitive = isSuperAdmin || isFinance;
+
     const linkClass = (path: string) => cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary",
         pathname === path ? "bg-primary/10 text-primary font-bold shadow-sm" : "text-muted-foreground"
@@ -48,20 +55,24 @@ const NavLinks = ({ onLinkClick }: { onLinkClick?: () => void }) => {
                 Application Forms
             </Link>
 
-            <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
-                <Mail className="h-4 w-4" />
-                Mail
-            </Link>
+            {canSeeSensitive && (
+                <>
+                    <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
+                        <Mail className="h-4 w-4" />
+                        Mail
+                    </Link>
 
-            <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
-                <Briefcase className="h-4 w-4" />
-                Investors
-            </Link>
+                    <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
+                        <Briefcase className="h-4 w-4" />
+                        Investors
+                    </Link>
 
-            <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
-                <ShieldCheck className="h-4 w-4" />
-                User Management
-            </Link>
+                    <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
+                        <ShieldCheck className="h-4 w-4" />
+                        User Management
+                    </Link>
+                </>
+            )}
         </nav>
     );
 };
@@ -118,7 +129,7 @@ export default function AdminLayout({
                 </Link>
             </div>
             <div className="flex-1 py-4">
-                <NavLinks />
+                <NavLinks user={user} />
             </div>
             <div className="mt-auto p-4 flex flex-col gap-2 border-t">
                 <div className="px-2 py-2 mb-2 bg-muted/50 rounded-lg">
@@ -155,7 +166,7 @@ export default function AdminLayout({
                   </Link>
                 </div>
                 <div className="flex-1 overflow-y-auto py-4">
-                    <NavLinks onLinkClick={() => setMobileMenuOpen(false)} />
+                    <NavLinks user={user} onLinkClick={() => setMobileMenuOpen(false)} />
                 </div>
                  <div className="mt-auto p-4 border-t flex flex-col gap-2 bg-muted/20">
                   <PWAInstallButton className="w-full justify-start" variant="ghost" />

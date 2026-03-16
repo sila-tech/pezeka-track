@@ -9,7 +9,7 @@ import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { addInvestor, updateInvestor, deleteInvestor } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, MoreHorizontal } from 'lucide-react';
+import { Loader2, PlusCircle, MoreHorizontal, Briefcase } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -86,21 +86,16 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // Explicitly allow all authorized roles to view
+    // Investors module is strictly hidden and restricted from Staff roles.
     const canViewPage = useMemo(() => {
-        if (!currentUser) return false;
-        const email = currentUser.email?.toLowerCase()?.trim();
-        const role = currentUser.role?.toLowerCase()?.trim();
-        return email === 'simon@pezeka.com' || role === 'finance' || role === 'staff' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-    }, [currentUser]);
-
-    // But only Finance and Super Admin can actually ADD or EDIT portfolios
-    const canEdit = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase()?.trim();
         const role = currentUser.role?.toLowerCase()?.trim();
         return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
+
+    // Only Finance and Super Admin can manage portfolios
+    const canEdit = canViewPage;
 
     useEffect(() => {
         if (!userLoading && currentUser && !canViewPage) {
@@ -164,8 +159,17 @@ export default function InvestorsPage() {
         try { await deleteInvestor(firestore, investorToDelete.id); toast({ title: 'Deleted' }); setDeleteDialogOpen(false); setInvestorToDelete(null); } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    if (userLoading || (currentUser && !canViewPage)) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    if (!canViewPage) return null;
+    if (userLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    
+    if (currentUser && !canViewPage) {
+        return (
+            <div className="flex h-[60vh] flex-col items-center justify-center text-center p-8 bg-card rounded-xl border border-dashed">
+                <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-bold">Access Denied</h2>
+                <p className="text-muted-foreground mt-2">Investor portfolios are restricted to Finance and Admin roles.</p>
+            </div>
+        );
+    }
 
     const portfolioTotals = investors ? investors.reduce((acc, inv) => {
         acc.investment += (inv.totalInvestment || 0);

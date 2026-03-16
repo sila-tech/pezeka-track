@@ -9,7 +9,7 @@ import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { createUserProfile, updateUserProfile, deleteUserProfile } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, MoreHorizontal } from 'lucide-react';
+import { Loader2, PlusCircle, MoreHorizontal, ShieldCheck } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -87,15 +87,15 @@ export default function UserManagementPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // Explicitly allow all authorized admin team members
+    // User management is strictly restricted to Administration and Finance. Staff cannot see this module.
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase()?.trim();
         const role = currentUser.role?.toLowerCase()?.trim();
-        return email === 'simon@pezeka.com' || role === 'finance' || role === 'staff' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+        return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
 
-    // But only Super Admin can actually ADD, EDIT or DELETE other admin users
+    // Only Super Admin can actually manage other admin accounts
     const isSuperAdmin = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase()?.trim();
@@ -103,11 +103,11 @@ export default function UserManagementPage() {
     }, [currentUser]);
     
     useEffect(() => {
-        if (!userLoading && !canViewPage) {
-            toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
+        if (!userLoading && currentUser && !canViewPage) {
+            toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view User Management.' });
             router.push('/admin');
         }
-    }, [userLoading, canViewPage, router, toast]);
+    }, [userLoading, canViewPage, currentUser, router, toast]);
 
     const { data: users, loading: usersLoading } = useCollection<UserProfile>(canViewPage ? 'users' : null);
 
@@ -166,8 +166,16 @@ export default function UserManagementPage() {
         } catch (error: any) { toast({ variant: "destructive", title: "Delete Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
     
-    if (userLoading || (currentUser && !canViewPage)) {
-        return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+    if (userLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+
+    if (currentUser && !canViewPage) {
+        return (
+            <div className="flex h-[60vh] flex-col items-center justify-center text-center p-8 bg-card rounded-xl border border-dashed">
+                <ShieldCheck className="h-12 w-12 text-muted-foreground mb-4" />
+                <h2 className="text-xl font-bold">Access Denied</h2>
+                <p className="text-muted-foreground mt-2">Only Super Admins and Finance can manage team access.</p>
+            </div>
+        );
     }
 
     return (
@@ -188,7 +196,7 @@ export default function UserManagementPage() {
                         <FormField control={addForm.control} name="name" render={({ field }) => (
                         <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
-                        <FormField control={form.control} name="email" render={({ field }) => (
+                        <FormField control={addForm.control} name="email" render={({ field }) => (
                         <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={addForm.control} name="role" render={({ field }) => (
