@@ -130,13 +130,10 @@ export default function FinancePage() {
   const userRole = user?.role?.toLowerCase()?.trim();
   const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
   const isFinance = userRole === 'finance';
-  const isStaff = userRole === 'staff';
   
-  // Explicitly allow all admin roles to view
-  const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  
-  // Strictly limit write permissions to Finance/Admin
-  const canEdit = isSuperAdmin || isFinance;
+  // Strictly limit visibility and access to Finance/Admin
+  const isAuthorized = isSuperAdmin || isFinance;
+  const canEdit = isAuthorized;
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
@@ -376,7 +373,16 @@ export default function FinancePage() {
   }
 
   if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  if (!isAuthorized) return <div className="p-12">Access Restricted</div>;
+  
+  if (!isAuthorized) {
+      return (
+          <div className="flex h-[60vh] flex-col items-center justify-center text-center p-8 bg-card rounded-xl border border-dashed">
+              <FileBarChart className="h-12 w-12 text-muted-foreground mb-4" />
+              <h2 className="text-xl font-bold">Access Restricted</h2>
+              <p className="text-muted-foreground mt-2">Only Finance and Super Admin roles can access the internal ledger and financial reports.</p>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6">

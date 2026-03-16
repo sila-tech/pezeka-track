@@ -44,11 +44,6 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
                 <HandCoins className="h-4 w-4" />
                 Loans
             </Link>
-            
-            <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
-                <FileDown className="h-4 w-4" />
-                Finance
-            </Link>
 
             <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
                 <FileText className="h-4 w-4" />
@@ -57,6 +52,11 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
 
             {canSeeSensitive && (
                 <>
+                    <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
+                        <FileDown className="h-4 w-4" />
+                        Finance
+                    </Link>
+
                     <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
                         <Mail className="h-4 w-4" />
                         Mail
