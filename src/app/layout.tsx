@@ -1,3 +1,4 @@
+
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -7,7 +8,16 @@ import ClientOverlays from '@/components/ClientOverlays';
 
 export const metadata: Metadata = {
   title: 'Pezeka Credit Ltd',
-  description: 'In-house credit management system',
+  description: 'Affordable Credit, Real Opportunities',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  openGraph: {
+    title: 'Pezeka Credit Ltd',
+    description: 'Fast and reliable credit solutions in Kenya.',
+    images: ['/pezeka_social_profile.png'],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

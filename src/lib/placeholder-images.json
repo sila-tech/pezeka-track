@@ -10,5 +10,11 @@
     "width": 550,
     "height": 550,
     "hint": "diverse team collaboration"
+  },
+  "mainLogo": {
+    "src": "/pezeka_logo_transparent.png",
+    "width": 512,
+    "height": 512,
+    "hint": "company logo"
   }
 }

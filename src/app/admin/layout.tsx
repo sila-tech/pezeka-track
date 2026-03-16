@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, LayoutDashboard, Users, Landmark, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Users, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
@@ -11,6 +12,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescri
 import { NotificationBell } from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
+import Image from 'next/image';
 
 
 const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance: boolean, isSuperAdmin: boolean, isStaff: boolean, onLinkClick?: () => void }) => {
@@ -18,14 +20,13 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
     
     const linkClass = (path: string) => cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary",
-        pathname === path ? "bg-muted text-primary" : "text-muted-foreground"
+        pathname === path ? "bg-primary/10 text-primary font-bold shadow-sm" : "text-muted-foreground"
     );
 
-    // As requested, we show the full menu to all authorized admin team members (Staff, Finance, Admin)
     const isAnyAdmin = isSuperAdmin || isFinance || isStaff;
 
     return (
-        <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
+        <nav className="grid items-start px-2 text-sm font-medium lg:px-4 gap-1">
             <Link href="/admin" className={linkClass("/admin")} onClick={onLinkClick}>
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
@@ -42,38 +43,32 @@ const NavLinks = ({ isFinance, isSuperAdmin, isStaff, onLinkClick }: { isFinance
             </Link>
             
             {isAnyAdmin && (
-                <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
-                    <FileDown className="h-4 w-4" />
-                    Finance
-                </Link>
-            )}
+                <>
+                    <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
+                        <FileDown className="h-4 w-4" />
+                        Finance
+                    </Link>
 
-            {isAnyAdmin && (
-                <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
-                    <FileText className="h-4 w-4" />
-                    Application Forms
-                </Link>
-            )}
+                    <Link href="/admin/application-forms" className={linkClass("/admin/application-forms")} onClick={onLinkClick}>
+                        <FileText className="h-4 w-4" />
+                        Application Forms
+                    </Link>
 
-            {isAnyAdmin && (
-                <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
-                    <Mail className="h-4 w-4" />
-                    Mail
-                </Link>
-            )}
+                    <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
+                        <Mail className="h-4 w-4" />
+                        Mail
+                    </Link>
 
-            {isAnyAdmin && (
-                <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
-                    <Briefcase className="h-4 w-4" />
-                    Investors
-                </Link>
-            )}
+                    <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
+                        <Briefcase className="h-4 w-4" />
+                        Investors
+                    </Link>
 
-            {isAnyAdmin && (
-                <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
-                    <ShieldCheck className="h-4 w-4" />
-                    User Management
-                </Link>
+                    <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>
+                        <ShieldCheck className="h-4 w-4" />
+                        User Management
+                    </Link>
+                </>
             )}
         </nav>
     );
@@ -110,7 +105,7 @@ export default function AdminLayout({
     if (loading || !isAuthorized) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
-                <Loader2 className="h-8 w-8 animate-spin" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -121,21 +116,26 @@ export default function AdminLayout({
     }
 
     return (
-        <div className="grid h-screen w-full overflow-hidden md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
+        <div className="grid h-screen w-full overflow-hidden md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]">
         <div className="hidden border-r bg-card md:block overflow-y-auto">
             <div className="flex h-full flex-col gap-2">
-            <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-                <Link href="/admin" className="flex items-center gap-2 font-semibold">
-                < Landmark className="h-6 w-6 text-primary" />
-                <span>Pezeka Credit</span>
+            <div className="flex h-16 items-center border-b px-4 lg:h-[64px] lg:px-6">
+                <Link href="/admin" className="flex items-center gap-2 font-bold text-primary">
+                    <Image src="/pezeka_logo_transparent.png" alt="Pezeka" width={32} height={32} />
+                    <span className="tracking-tight">Pezeka Admin</span>
                 </Link>
             </div>
-            <div className="flex-1 py-2">
+            <div className="flex-1 py-4">
                 <NavLinks isFinance={isFinance} isSuperAdmin={isSuperAdmin} isStaff={isStaff} />
             </div>
             <div className="mt-auto p-4 flex flex-col gap-2 border-t">
-                <PWAInstallButton className="w-full justify-start" variant="ghost" />
-                <Button onClick={handleLogout} variant="ghost" className="w-full justify-start">
+                <div className="px-2 py-2 mb-2 bg-muted/50 rounded-lg">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground px-1 mb-1">Logged in as</p>
+                    <p className="text-xs font-bold truncate px-1 text-primary">{user?.name || user?.email}</p>
+                    <p className="text-[10px] text-muted-foreground px-1 uppercase">{user?.role || 'Admin'}</p>
+                </div>
+                <PWAInstallButton className="w-full justify-start h-9 text-xs" variant="ghost" />
+                <Button onClick={handleLogout} variant="ghost" className="w-full justify-start h-9 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                 </Button>
@@ -143,7 +143,7 @@ export default function AdminLayout({
             </div>
         </div>
         <div className="flex flex-col overflow-hidden">
-            <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 shrink-0">
+            <header className="flex h-16 items-center gap-4 border-b bg-card px-4 lg:h-[64px] lg:px-6 shrink-0">
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -156,18 +156,18 @@ export default function AdminLayout({
                     <SheetTitle>Pezeka Navigation</SheetTitle>
                     <SheetDescription>Access management modules.</SheetDescription>
                  </SheetHeader>
-                 <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-                  <Link href="/admin" className="flex items-center gap-2 font-semibold" onClick={() => setMobileMenuOpen(false)}>
-                    <Landmark className="h-6 w-6 text-primary" />
+                 <div className="flex h-16 items-center border-b px-4 lg:h-[64px] lg:px-6">
+                  <Link href="/admin" className="flex items-center gap-2 font-bold text-primary" onClick={() => setMobileMenuOpen(false)}>
+                    <Image src="/pezeka_logo_transparent.png" alt="Logo" width={28} height={28} />
                     <span>Pezeka Credit</span>
                   </Link>
                 </div>
-                <div className="flex-1 overflow-y-auto py-2">
+                <div className="flex-1 overflow-y-auto py-4">
                     <NavLinks isFinance={isFinance} isSuperAdmin={isSuperAdmin} isStaff={isStaff} onLinkClick={() => setMobileMenuOpen(false)} />
                 </div>
-                 <div className="mt-auto p-4 border-t flex flex-col gap-2">
+                 <div className="mt-auto p-4 border-t flex flex-col gap-2 bg-muted/20">
                   <PWAInstallButton className="w-full justify-start" variant="ghost" />
-                  <Button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} variant="ghost" className="w-full justify-start">
+                  <Button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} variant="ghost" className="w-full justify-start text-destructive">
                       <LogOut className="mr-2 h-4 w-4" />
                       Logout
                   </Button>
@@ -179,7 +179,7 @@ export default function AdminLayout({
                 <NotificationBell />
             </div>
             </header>
-            <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-background">
+            <main className="flex-1 overflow-y-auto p-4 lg:p-8 bg-background">
                 <div className="mx-auto max-w-[1600px] w-full">
                     {children}
                 </div>
