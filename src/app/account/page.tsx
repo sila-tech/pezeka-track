@@ -1,5 +1,5 @@
 'use client';
-import { useUser, useCollection, useFirestore, useDoc } from '@/firebase';
+import { useUser, useCollection, useFirestore, useDoc, useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { 
   Search, 
@@ -13,11 +13,12 @@ import {
   User,
   CreditCard,
   Wallet,
+  LogOut,
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { signOut } from 'firebase/auth';
 
 interface Loan {
   id: string;
@@ -43,6 +44,7 @@ interface Customer {
 
 export default function AccountPage() {
   const { user, loading: userLoading } = useUser();
+  const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Home');
@@ -89,6 +91,11 @@ export default function AccountPage() {
       return activeLoans.reduce((acc, loan) => acc + (loan.totalRepayableAmount - loan.totalPaid), 0);
   }, [activeLoans]);
 
+  const handleLogout = async () => {
+      await signOut(auth);
+      router.push('/');
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFB] text-[#1B2B33] pb-24 font-sans flex flex-col">
       {/* Header Section */}
@@ -102,16 +109,23 @@ export default function AccountPage() {
                 <span className="text-lg">👋</span>
             </div>
         </div>
-        <div className="flex items-center gap-4">
-            <button className="text-[#1B2B33]/60 hover:text-[#5BA9D0] transition-colors">
-                <Search className="h-6 w-6" />
+        <div className="flex items-center gap-3">
+            <button className="text-[#1B2B33]/60 hover:text-[#5BA9D0] transition-colors p-1">
+                <Search className="h-5 w-5" />
             </button>
             <div className="relative">
-                <button className="text-[#1B2B33]/60 hover:text-[#5BA9D0] transition-colors">
-                    <Bell className="h-6 w-6" />
+                <button className="text-[#1B2B33]/60 hover:text-[#5BA9D0] transition-colors p-1">
+                    <Bell className="h-5 w-5" />
                 </button>
-                <div className="absolute top-0 right-0 h-2.5 w-2.5 bg-[#27AE60] rounded-full border-2 border-white"></div>
+                <div className="absolute top-1 right-1 h-2 w-2 bg-[#27AE60] rounded-full border-2 border-white"></div>
             </div>
+            <button 
+                onClick={handleLogout}
+                className="text-destructive hover:text-destructive/80 transition-colors p-1 ml-1"
+                title="Logout"
+            >
+                <LogOut className="h-5 w-5" />
+            </button>
         </div>
       </header>
 
