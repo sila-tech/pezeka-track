@@ -298,14 +298,6 @@ export default function AccountPage() {
             </h3>
             <div className="overflow-x-auto pb-4 -mx-6 px-6 no-scrollbar flex gap-4">
                 <ExploreCard 
-                    title="silatech" 
-                    subtitle="Savings" 
-                    desc="Start your deposits today." 
-                    buttonText="Top Up (Ksh 1000.0)"
-                    image="https://picsum.photos/seed/silatech/400/300"
-                    color="bg-[#00897B]"
-                />
-                <ExploreCard 
                     title="Business" 
                     subtitle="Loans" 
                     desc="Fuel your growth." 
