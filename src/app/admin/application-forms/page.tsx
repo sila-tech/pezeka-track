@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,8 +27,10 @@ const forms = [
 export default function ApplicationFormsPage() {
   const { user, loading } = useAppUser();
   
-  // Explicitly allow all admin team members
-  const isAuthorized = user && (user.role === 'staff' || user.role === 'finance' || user.email === 'simon@pezeka.com' || user.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2');
+  // Robust case-insensitive check for all admin team members
+  const userRole = user?.role?.toLowerCase();
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isAuthorized = user && (isSuperAdmin || userRole === 'staff' || userRole === 'finance');
 
   if (loading) {
     return (
