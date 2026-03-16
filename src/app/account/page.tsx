@@ -99,8 +99,13 @@ export default function AccountPage() {
   const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
 
   const firstName = useMemo(() => {
-      const fullName = customerProfile?.name || user?.displayName || "";
-      return fullName.split(' ')[0] || "there";
+      const fullName = customerProfile?.name || user?.displayName;
+      if (fullName) return fullName.split(' ')[0];
+      
+      const email = user?.email || "";
+      if (email) return email.split('@')[0];
+      
+      return "there";
   }, [customerProfile, user]);
 
   const applicationForm = useForm<z.infer<typeof applicationSchema>>({
@@ -215,12 +220,20 @@ export default function AccountPage() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-[#1B2B33] px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
-        <div className="flex items-center gap-2 font-bold text-xl"><img src="/pezeka_logo_transparent.png" alt="Pezeka" className="h-8 w-8 object-contain" /><span className="hidden sm:inline text-white sm:text-[#1B2B33]">Customer Portal</span></div>
-        <div className="ml-auto"><Button onClick={handleLogout} variant="outline" size="sm" className="rounded-full border-white/20 text-white sm:text-[#1B2B33] sm:border-[#1B2B33]/20 hover:bg-white/10"><LogOut className="mr-2 h-4 w-4" />Logout</Button></div>
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 sm:px-6 py-4">
+        <div className="flex items-center gap-2 font-bold text-xl">
+          <img src="/pezeka_logo_transparent.png" alt="Pezeka" className="h-8 w-8 object-contain" />
+          <span className="hidden sm:inline text-[#1B2B33]">Customer Portal</span>
+        </div>
+        <div className="ml-auto">
+          <Button onClick={handleLogout} variant="outline" size="sm" className="rounded-full border-[#1B2B33]/20 text-[#1B2B33] hover:bg-[#1B2B33]/5">
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </header>
       
-      <main className="p-4 sm:px-6 sm:py-0 max-w-6xl mx-auto w-full space-y-8">
+      <main className="p-4 sm:px-6 sm:py-8 max-w-6xl mx-auto w-full space-y-8">
           <section>
             <div className="mb-6">
                 <h1 className="text-3xl font-black tracking-tight text-[#1B2B33]">Welcome back, <span className="text-[#5BA9D0]">{firstName}</span>!</h1>
