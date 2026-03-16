@@ -1,10 +1,31 @@
 'use client';
-import { useUser, useAuth, useCollection, useFirestore, useDoc } from '@/firebase';
+import { useUser, useCollection, useFirestore, useDoc } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Landmark, LogOut, Loader2, FileUp, History, CalendarDays, Wallet, ArrowRight, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { 
+  PlusCircle, 
+  Loader2, 
+  FileUp, 
+  History, 
+  Wallet, 
+  ArrowRight, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock, 
+  Bell, 
+  User, 
+  PiggyBank, 
+  ArrowUpRight, 
+  Receipt, 
+  Smartphone, 
+  Home, 
+  CreditCard, 
+  Users, 
+  Bot,
+  MoreHorizontal
+} from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { format, addDays, addWeeks, addMonths, isBefore, startOfToday } from 'date-fns';
@@ -23,7 +44,6 @@ import { calculateAmortization } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
 
 interface Payment {
   paymentId: string;
@@ -78,16 +98,15 @@ const applicationSchema = z.object({
   }),
 });
 
-
 export default function AccountPage() {
   const { user, loading: userLoading } = useUser();
-  const auth = useAuth();
   const router = useRouter();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLoanForHistory, setSelectedLoanForHistory] = useState<Loan | null>(null);
   const [showPaymentInstructions, setShowPaymentInstructions] = useState(false);
+  const [activeTab, setActiveTab] = useState('Home');
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
@@ -98,13 +117,18 @@ export default function AccountPage() {
 
   const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
 
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
+
   const firstName = useMemo(() => {
       const fullName = customerProfile?.name || user?.displayName;
       if (fullName) return fullName.split(' ')[0];
-      
       const email = user?.email || "";
       if (email) return email.split('@')[0];
-      
       return "there";
   }, [customerProfile, user]);
 
@@ -137,11 +161,6 @@ export default function AccountPage() {
       }
     }
   }, [applicationForm]);
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push('/');
-  };
 
   async function onApplicationSubmit(values: z.infer<typeof applicationSchema>) {
     if (!user) return;
@@ -214,188 +233,154 @@ export default function AccountPage() {
       if (nextDue && isBefore(nextDue, today)) return { label: 'OVERDUE', color: 'bg-red-600 text-white border-red-700 shadow-sm shadow-red-500/20', icon: <AlertCircle className="h-3 w-3" /> };
       if (status === 'due') return { label: 'DUE SOON', color: 'bg-orange-100 text-orange-700 border-orange-200', icon: <Clock className="h-3 w-3" /> };
       
-      // ACTIVE status refined to use Muted Green (#27AE60)
       return { label: 'ACTIVE', color: 'bg-[#27AE60] text-white border-[#27AE60]/20 shadow-sm shadow-[#27AE60]/20', icon: <CheckCircle2 className="h-3 w-3" /> };
   };
 
   return (
-    <>
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-white px-4 sm:px-6 py-4">
-        <div className="flex items-center gap-2 font-bold text-xl">
-          <img src="/pezeka_logo_transparent.png" alt="Pezeka" className="h-8 w-8 object-contain" />
-          <span className="hidden sm:inline text-[#1B2B33]">Customer Portal</span>
+    <div className="min-h-screen bg-[#F8FAFB] pb-24">
+      {/* Header */}
+      <header className="px-6 pt-8 pb-4 flex flex-col items-center gap-1 relative bg-white border-b border-muted">
+        <div className="absolute left-6 top-10 flex items-center justify-center w-10 h-10 rounded-full bg-muted overflow-hidden">
+            <User className="h-6 w-6 text-muted-foreground" />
         </div>
-        <div className="ml-auto">
-          <Button onClick={handleLogout} variant="outline" size="sm" className="rounded-full border-[#1B2B33]/20 text-[#1B2B33] hover:bg-[#1B2B33]/5">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+        <h1 className="text-xl font-black text-[#1B2B33] tracking-tight">Home</h1>
+        <p className="text-sm text-muted-foreground">{greeting}, <span className="font-bold text-[#1B2B33]">{firstName}</span></p>
+        <div className="absolute right-6 top-10">
+            <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-6 w-6" />
+                <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-red-500 text-white text-[10px]">7</Badge>
+            </Button>
         </div>
       </header>
-      
-      <main className="p-4 sm:px-6 sm:py-8 max-w-6xl mx-auto w-full space-y-8">
-          <section>
-            <div className="mb-6">
-                <h1 className="text-3xl font-black tracking-tight text-[#1B2B33]">Welcome back, <span className="text-[#5BA9D0]">{firstName}</span>!</h1>
-                <p className="text-muted-foreground">Here is a quick overview of your account and loan status.</p>
-            </div>
 
-            {customerProfile?.accountNumber && (
-                <div className="flex items-center gap-3 p-4 bg-[#5BA9D0]/5 rounded-xl border border-[#5BA9D0]/10 mb-6 w-fit">
-                    <div className="bg-[#5BA9D0] text-white p-2 rounded-lg"><Wallet className="h-5 w-5" /></div>
-                    <div>
-                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest leading-none mb-1">My Account Number</p>
-                        <p className="text-lg font-mono font-black text-[#1B2B33]">{customerProfile.accountNumber}</p>
-                    </div>
+      <main className="p-6 space-y-8 max-w-lg mx-auto">
+        {/* Main Account Card */}
+        <div className="relative group">
+            <Card className="bg-[#1B2B33] text-white rounded-[2.5rem] p-8 border-none shadow-2xl overflow-hidden min-h-[220px] flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                    <span className="text-xs font-bold uppercase tracking-widest opacity-60">
+                        {customerProfile?.name || firstName.toUpperCase()}
+                    </span>
+                    <MoreHorizontal className="h-6 w-6 opacity-60" />
+                </div>
+                <div>
+                    <p className="text-sm opacity-60 mb-1">Balance</p>
+                    <p className="text-4xl font-black">KES. {((customerLoans && customerLoans[0]?.principalAmount) || 0).toLocaleString()}.00</p>
+                </div>
+                <div className="flex justify-between items-end">
+                    <p className="font-mono text-sm opacity-60">{customerProfile?.accountNumber || '1000000151'}</p>
+                    <span className="text-xs font-bold opacity-60">Current Account</span>
+                </div>
+                {/* Decorative circle */}
+                <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+            </Card>
+            <div className="flex justify-center gap-1.5 mt-4">
+                <div className="w-4 h-1.5 bg-red-500 rounded-full" />
+                <div className="w-1.5 h-1.5 bg-muted-foreground/20 rounded-full" />
+            </div>
+        </div>
+
+        {/* Action Grid */}
+        <Card className="rounded-[2.5rem] border-none shadow-xl bg-white p-6">
+            <div className="grid grid-cols-5 gap-2">
+                <ActionIcon icon={<PiggyBank className="h-5 w-5" />} label="Save" />
+                <ActionIcon icon={<CreditCard className="h-5 w-5" />} label="Loan" active />
+                <ActionIcon icon={<ArrowUpRight className="h-5 w-5" />} label="Transfer" />
+                <ActionIcon icon={<Receipt className="h-5 w-5" />} label="Invoice" />
+                <ActionIcon icon={<Smartphone className="h-5 w-5" />} label="Bills" badge="Soon" />
+            </div>
+        </Card>
+
+        {/* Explore Section */}
+        <section className="space-y-4">
+            <h3 className="text-xl font-black flex items-center gap-2">
+                Explore Your Next Steps <span className="text-xl">🔥</span>
+            </h3>
+            <div className="overflow-x-auto pb-4 -mx-6 px-6 no-scrollbar flex gap-4">
+                <ExploreCard 
+                    title="silatech" 
+                    subtitle="Savings" 
+                    desc="Start your deposits today." 
+                    buttonText="Top Up (Ksh 1000.0)"
+                    image="https://picsum.photos/seed/silatech/400/300"
+                    color="bg-[#00897B]"
+                />
+                <ExploreCard 
+                    title="Business" 
+                    subtitle="Loans" 
+                    desc="Fuel your growth." 
+                    buttonText="Apply Now"
+                    image="https://picsum.photos/seed/bizloan/400/300"
+                    color="bg-[#5BA9D0]"
+                />
+            </div>
+        </section>
+
+        {/* My Loans Section (Existing functionality adapted) */}
+        <section className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black">My Active Loans</h3>
+                <Button variant="link" size="sm" className="text-[#5BA9D0] font-bold p-0 h-auto">View All</Button>
+            </div>
+            {loansLoading ? (
+                <div className="flex items-center justify-center p-8 bg-white rounded-3xl border border-dashed"><Loader2 className="h-6 w-6 animate-spin text-[#5BA9D0]" /></div>
+            ) : (customerLoans && customerLoans.length > 0) ? (
+                <div className="space-y-4">
+                    {customerLoans.slice(0, 2).map(loan => {
+                        const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
+                        const nextDue = getNextDueDate(loan);
+                        const status = getStatusConfig(loan.status, nextDue);
+                        return (
+                            <Card key={loan.id} className="rounded-3xl border-none shadow-md bg-white overflow-hidden p-5 flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${status.color.split(' ')[0]} bg-opacity-10 text-opacity-100`}>
+                                    <Wallet className="h-6 w-6" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="font-black text-[#1B2B33]">Loan #{loan.loanNumber}</p>
+                                    <p className="text-xs text-muted-foreground">Bal: Ksh {balance.toLocaleString()}</p>
+                                </div>
+                                <div className="text-right">
+                                    <Badge className={`rounded-full text-[10px] uppercase font-black px-2 py-0 ${status.color}`}>
+                                        {status.label}
+                                    </Badge>
+                                    {loan.status !== 'paid' && (
+                                        <Button variant="ghost" size="sm" onClick={() => setShowPaymentInstructions(true)} className="h-8 text-[#5BA9D0] font-bold text-xs p-0 mt-1 block ml-auto">Pay Now</Button>
+                                    )}
+                                </div>
+                            </Card>
+                        )
+                    })}
+                </div>
+            ) : (
+                <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed flex flex-col items-center">
+                    <PlusCircle className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-xs text-muted-foreground font-medium">No active loans found.</p>
+                    <Button variant="outline" size="sm" className="mt-4 rounded-full" onClick={() => setActiveTab('Loan')}>Apply Now</Button>
                 </div>
             )}
-
-            <div className="space-y-4">
-                <h3 className="text-lg font-bold flex items-center gap-2 text-[#1B2B33]">
-                    <div className="h-6 w-1 bg-[#5BA9D0] rounded-full" />
-                    My Loan Portfolio
-                </h3>
-                {loansLoading ? (<div className="flex items-center justify-center p-12 bg-white rounded-2xl border"><Loader2 className="h-8 w-8 animate-spin text-[#5BA9D0]" /></div>) : (customerLoans && customerLoans.length > 0) ? (
-                    <div className="grid gap-4">
-                        {customerLoans.map(loan => {
-                            const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
-                            const nextDue = getNextDueDate(loan);
-                            const status = getStatusConfig(loan.status, nextDue);
-                            
-                            const dDate = loan.disbursementDate?.seconds 
-                                ? new Date(loan.disbursementDate.seconds * 1000) 
-                                : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
-                            
-                            const dateLabel = loan.status === 'application' ? 'Applied' : 'Disbursed';
-                            const dateValue = isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'PP');
-
-                            return (
-                                <Card key={loan.id} className="overflow-hidden border-none shadow-lg hover:shadow-xl transition-all duration-300 group bg-white">
-                                    <div className={`h-1.5 w-full ${status.color.split(' ')[0]}`} />
-                                    <CardHeader className="pb-4">
-                                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <CardTitle className="text-xl font-black text-[#1B2B33]">Loan #{loan.loanNumber}</CardTitle>
-                                                    <Badge className={`rounded-full px-3 py-0.5 text-[10px] font-black border uppercase flex items-center gap-1 ${status.color}`}>
-                                                        {status.icon}
-                                                        {status.label}
-                                                    </Badge>
-                                                </div>
-                                                <CardDescription className="text-xs font-medium flex items-center gap-1">
-                                                    {dateLabel} on {dateValue} • {loan.loanType}
-                                                </CardDescription>
-                                            </div>
-                                            {loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected' && (
-                                                <Button onClick={() => setShowPaymentInstructions(true)} className="w-full sm:w-auto rounded-full font-black shadow-lg shadow-[#5BA9D0]/20 bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white border-none group-hover:scale-105 transition-transform">
-                                                    Pay Now
-                                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid gap-6 grid-cols-1 sm:grid-cols-3 bg-[#F8FAFB] p-6 rounded-2xl border border-[#5BA9D0]/5">
-                                            <div className="space-y-1">
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Remaining Balance</p>
-                                                <p className="text-2xl font-black text-[#1B2B33]">Ksh {balance.toLocaleString()}</p>
-                                            </div>
-                                            
-                                            {loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected' && (
-                                                <>
-                                                    <div className="space-y-1">
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest flex items-center gap-1">Next Payment Due</p>
-                                                        <p className="text-lg font-black text-[#1B2B33]">{nextDue ? format(nextDue, 'PPP') : 'N/A'}</p>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Amount Due</p>
-                                                        <p className="text-lg font-black text-[#1B2B33]">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</p>
-                                                    </div>
-                                                </>
-                                            )}
-                                            
-                                            {loan.status === 'application' && (
-                                                <div className="sm:col-span-2 flex items-center text-sm font-medium text-muted-foreground italic">
-                                                    Your application is currently being appraised by our credit committee.
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="mt-4 flex justify-end">
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedLoanForHistory(loan)} className="text-xs font-bold text-muted-foreground hover:text-[#5BA9D0] hover:bg-[#5BA9D0]/5">
-                                                <History className="mr-2 h-4 w-4" />
-                                                View Payment History
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </div>
-                ) : (
-                    <div className="text-center py-16 bg-white border-2 border-dashed rounded-3xl">
-                        <div className="bg-[#5BA9D0]/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Landmark className="h-8 w-8 text-[#5BA9D0]/40" />
-                        </div>
-                        <h4 className="text-lg font-bold text-[#1B2B33]">No active loans</h4>
-                        <p className="text-muted-foreground max-w-xs mx-auto text-sm">You don't have any active loans or applications at the moment. Use the form below to apply.</p>
-                    </div>
-                )}
-            </div>
-          </section>
-
-          <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
-            <CardHeader className="bg-[#1B2B33] text-white p-8">
-                <CardTitle className="text-2xl font-black text-white">Apply for a New Loan</CardTitle>
-                <CardDescription className="text-white/70 font-medium">Get instant capital for your personal or business needs.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-8">
-                <Form {...applicationForm}>
-                <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-6">
-                    <FormField control={applicationForm.control} name="loanType" render={({ field }) => (
-                        <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]"><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Individual & Business Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                    )}/>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField control={applicationForm.control} name="loanAmount" render={({ field }) => (
-                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Requested Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]" /></FormControl><FormMessage /></FormItem>
-                      )}/>
-                      <FormField control={applicationForm.control} name="idNumber" render={({ field }) => (
-                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">National ID Number</FormLabel><FormControl><Input placeholder="ID Card Number" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]" /></FormControl><FormMessage /></FormItem>
-                      )}/>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField control={applicationForm.control} name="numberOfInstalments" render={({ field }) => (
-                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]" /></FormControl><FormMessage /></FormItem>
-                      )}/>
-                      <FormField control={applicationForm.control} name="paymentFrequency" render={({ field }) => (
-                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]"><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                    )}/>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField control={applicationForm.control} name="phone" render={({ field }) => (
-                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]" /></FormControl><FormMessage /></FormItem>
-                      )}/>
-                      <FormField control={applicationForm.control} name="alternativeNumber" render={({ field }) => (
-                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Alternative Phone (Optional)</FormLabel><FormControl><Input placeholder="Second contact" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2 border-muted bg-[#F8FAFB]" /></FormControl></FormItem>
-                      )}/>
-                    </div>
-                    <FormField control={applicationForm.control} name="agreeToTerms" render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 rounded-2xl border-2 border-muted p-6 bg-[#F8FAFB]"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel className="font-bold text-sm text-[#1B2B33]">I agree to the terms and conditions of Pezeka Credit Ltd.</FormLabel><FormDescription className="text-[10px] mt-1">By submitting this form, you authorize our team to verify your information.</FormDescription><FormMessage /></div></FormItem>
-                    )}/>
-                    <Button type="submit" size="lg" className="w-full h-16 text-xl font-black rounded-2xl shadow-xl shadow-[#5BA9D0]/20 bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white border-none" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-6 w-6" /> : <FileUp className="mr-2 h-6 w-6" />}
-                        Submit Application
-                    </Button>
-                </form>
-                </Form>
-            </CardContent>
-          </Card>
+        </section>
       </main>
 
-      {/* Pay Now Instructions Dialog */}
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-muted px-6 flex items-center justify-between z-40">
+          <NavItem icon={<Home className="h-6 w-6" />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
+          <NavItem icon={<Users className="h-6 w-6" />} label="Community" active={activeTab === 'Community'} onClick={() => setActiveTab('Community')} />
+          
+          {/* FAB Center */}
+          <div className="relative -top-10 flex flex-col items-center">
+              <div className="absolute -inset-2 bg-red-100 rounded-full blur-xl opacity-50" />
+              <Button className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 shadow-xl shadow-red-200 border-none flex items-center justify-center transition-transform hover:scale-110 active:scale-95">
+                  <Bot className="h-8 w-8 text-white" />
+              </Button>
+          </div>
+
+          <NavItem icon={<CreditCard className="h-6 w-6" />} label="Cards" active={activeTab === 'Cards'} onClick={() => setActiveTab('Cards')} />
+          <NavItem icon={<User className="h-6 w-6" />} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
+      </nav>
+
+      {/* Reused Payment Instructions Dialog */}
       <Dialog open={showPaymentInstructions} onOpenChange={setShowPaymentInstructions}>
-          <DialogContent className="sm:max-w-md rounded-3xl border-[#5BA9D0]/20">
+          <DialogContent className="sm:max-w-md rounded-[2.5rem] border-none shadow-2xl p-8">
               <DialogHeader>
                   <DialogTitle className="text-2xl font-black text-[#1B2B33]">How to Pay</DialogTitle>
                   <DialogDescription className="font-medium">Please use the details below to make your repayment via M-Pesa.</DialogDescription>
@@ -427,50 +412,59 @@ export default function AccountPage() {
               </DialogFooter>
           </DialogContent>
       </Dialog>
-
-      {/* Payment History Dialog */}
-      <Dialog open={!!selectedLoanForHistory} onOpenChange={(open) => !open && setSelectedLoanForHistory(null)}>
-          <DialogContent className="sm:max-w-md rounded-3xl border-[#5BA9D0]/20">
-              <DialogHeader>
-                  <DialogTitle className="text-xl font-black text-[#1B2B33]">Payment History: #{selectedLoanForHistory?.loanNumber}</DialogTitle>
-                  <DialogDescription className="font-medium">List of all verified payments made for this loan.</DialogDescription>
-              </DialogHeader>
-              <ScrollArea className="h-80 border-2 border-muted rounded-2xl p-2 bg-[#F8FAFB]">
-                  {(!selectedLoanForHistory?.payments || selectedLoanForHistory.payments.length === 0) ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                          <History className="h-12 w-12 text-muted-foreground/20 mb-2" />
-                          <p className="text-muted-foreground text-sm font-bold italic">No payments recorded yet.</p>
-                      </div>
-                  ) : (
-                      <Table>
-                          <TableHeader>
-                              <TableRow className="border-b-2">
-                                  <TableHead className="font-black uppercase text-[10px]">Date</TableHead>
-                                  <TableHead className="text-right font-black uppercase text-[10px]">Amount</TableHead>
-                              </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                              {selectedLoanForHistory.payments.map((p, i) => {
-                                  const payDate = (p.date as any)?.seconds 
-                                    ? new Date((p.date as any).seconds * 1000) 
-                                    : (p.date instanceof Date ? p.date : new Date());
-                                  
-                                  return (
-                                    <TableRow key={p.paymentId || i} className="border-b">
-                                        <TableCell className="text-xs font-medium">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PP')}</TableCell>
-                                        <TableCell className="text-right font-black text-[#5BA9D0]">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
-                                    </TableRow>
-                                  );
-                              })}
-                          </TableBody>
-                      </Table>
-                  )}
-              </ScrollArea>
-              <DialogFooter>
-                  <DialogClose asChild><Button variant="outline" className="w-full rounded-xl font-bold border-[#1B2B33]/20">Close</Button></DialogClose>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
+}
+
+function ActionIcon({ icon, label, badge, active = false }: { icon: React.ReactNode, label: string, badge?: string, active?: boolean }) {
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <div className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all ${active ? 'bg-red-500 text-white' : 'bg-muted/50 text-[#1B2B33] hover:bg-muted'}`}>
+                {icon}
+                {badge && (
+                    <div className="absolute -top-1 -right-1 bg-red-200 text-red-600 text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full border border-white">
+                        {badge}
+                    </div>
+                )}
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-tight ${badge ? 'text-muted-foreground/50' : 'text-[#1B2B33]'}`}>{label}</span>
+        </div>
+    );
+}
+
+function ExploreCard({ title, subtitle, desc, buttonText, image, color }: any) {
+    return (
+        <Card className={`min-w-[280px] h-40 rounded-[2.5rem] border-none shadow-lg overflow-hidden flex relative ${color}`}>
+            <div className="w-1/2 p-6 flex flex-col justify-between text-white relative z-10">
+                <div className="space-y-0.5">
+                    <h4 className="text-lg font-black leading-tight">{title}</h4>
+                    <p className="text-xs font-bold opacity-80">{subtitle}</p>
+                </div>
+                <Button className="w-full h-8 text-[10px] font-black rounded-full bg-white text-[#1B2B33] border-none hover:bg-white/90">
+                    {buttonText}
+                </Button>
+                <p className="text-[8px] opacity-60 absolute bottom-2 left-6">T&Cs apply</p>
+            </div>
+            <div className="w-1/2 relative">
+                <img src={image} alt={title} className="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay" />
+                {/* Visual gradient overlay to blend into the color side */}
+                <div className={`absolute inset-y-0 left-0 w-8 ${color} blur-md -ml-4`} />
+            </div>
+        </Card>
+    );
+}
+
+function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick: () => void }) {
+    return (
+        <button 
+            onClick={onClick}
+            className={`flex flex-col items-center gap-1 transition-all ${active ? 'text-red-500' : 'text-muted-foreground hover:text-[#1B2B33]'}`}
+        >
+            <div className="relative">
+                {icon}
+                {active && <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-1 bg-red-500 rounded-full" />}
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-tight">{label}</span>
+        </button>
+    );
 }
