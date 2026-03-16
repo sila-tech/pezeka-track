@@ -87,18 +87,18 @@ export default function UserManagementPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // As requested, the module is now visible to all authorized admin team members
+    // Explicitly allow all authorized admin team members
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
-        const email = currentUser.email?.toLowerCase();
-        const role = currentUser.role?.toLowerCase();
+        const email = currentUser.email?.toLowerCase()?.trim();
+        const role = currentUser.role?.toLowerCase()?.trim();
         return email === 'simon@pezeka.com' || role === 'finance' || role === 'staff' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
 
     // But only Super Admin can actually ADD, EDIT or DELETE other admin users
     const isSuperAdmin = useMemo(() => {
         if (!currentUser) return false;
-        const email = currentUser.email?.toLowerCase();
+        const email = currentUser.email?.toLowerCase()?.trim();
         return email === 'simon@pezeka.com' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
     
@@ -188,7 +188,7 @@ export default function UserManagementPage() {
                         <FormField control={addForm.control} name="name" render={({ field }) => (
                         <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
-                        <FormField control={addForm.control} name="email" render={({ field }) => (
+                        <FormField control={form.control} name="email" render={({ field }) => (
                         <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="user@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <FormField control={addForm.control} name="role" render={({ field }) => (

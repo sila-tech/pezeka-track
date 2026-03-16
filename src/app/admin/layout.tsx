@@ -80,8 +80,8 @@ export default function AdminLayout({
 
     const isLoginPage = pathname === '/admin/login';
     
-    const userRole = user?.role?.toLowerCase();
-    const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+    const userRole = user?.role?.toLowerCase()?.trim();
+    const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     const isFinance = userRole === 'finance';
     const isStaff = userRole === 'staff';
     const isAuthorized = user && (isSuperAdmin || isFinance || isStaff);

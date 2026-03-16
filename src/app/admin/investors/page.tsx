@@ -86,19 +86,19 @@ export default function InvestorsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // As requested, visibility is expanded to Staff, Finance, and Super Admin
+    // Explicitly allow all authorized roles to view
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
-        const email = currentUser.email?.toLowerCase();
-        const role = currentUser.role?.toLowerCase();
+        const email = currentUser.email?.toLowerCase()?.trim();
+        const role = currentUser.role?.toLowerCase()?.trim();
         return email === 'simon@pezeka.com' || role === 'finance' || role === 'staff' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
 
     // But only Finance and Super Admin can actually ADD or EDIT portfolios
     const canEdit = useMemo(() => {
         if (!currentUser) return false;
-        const email = currentUser.email?.toLowerCase();
-        const role = currentUser.role?.toLowerCase();
+        const email = currentUser.email?.toLowerCase()?.trim();
+        const role = currentUser.role?.toLowerCase()?.trim();
         return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
 

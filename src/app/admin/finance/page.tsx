@@ -127,13 +127,14 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-  const userRole = user?.role?.toLowerCase();
+  const userRole = user?.role?.toLowerCase()?.trim();
+  const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
   const isFinance = userRole === 'finance';
   const isStaff = userRole === 'staff';
   
-  // Allow everyone in the admin team to view
+  // Explicitly allow all admin roles to view
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  
   // Strictly limit write permissions to Finance/Admin
   const canEdit = isSuperAdmin || isFinance;
 
