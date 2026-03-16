@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Landmark, LogOut, Loader2, FileUp, History, CalendarDays } from 'lucide-react';
+import { Landmark, LogOut, Loader2, FileUp, History, CalendarDays, Wallet, ArrowRight, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { format, addDays, addWeeks, addMonths } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, isBefore, startOfToday } from 'date-fns';
 import { collection, query, where } from 'firebase/firestore';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -87,6 +87,7 @@ export default function AccountPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLoanForHistory, setSelectedLoanForHistory] = useState<Loan | null>(null);
+  const [showPaymentInstructions, setShowPaymentInstructions] = useState(false);
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
@@ -96,6 +97,11 @@ export default function AccountPage() {
   }, [firestore, user?.uid, userLoading]);
 
   const { data: customerLoans, loading: loansLoading } = useCollection<Loan>(customerLoansQuery);
+
+  const firstName = useMemo(() => {
+      const fullName = customerProfile?.name || user?.displayName || "";
+      return fullName.split(' ')[0] || "there";
+  }, [customerProfile, user]);
 
   const applicationForm = useForm<z.infer<typeof applicationSchema>>({
     resolver: zodResolver(applicationSchema),
@@ -194,131 +200,177 @@ export default function AccountPage() {
       }
   };
 
+  const getStatusConfig = (status: string, nextDue: Date | null) => {
+      const today = startOfToday();
+      if (status === 'paid') return { label: 'PAID', color: 'bg-green-100 text-green-700 border-green-200', icon: <CheckCircle2 className="h-3 w-3" /> };
+      if (status === 'application') return { label: 'PENDING APPROVAL', color: 'bg-amber-100 text-amber-700 border-amber-200', icon: <Clock className="h-3 w-3" /> };
+      if (status === 'rejected') return { label: 'REJECTED', color: 'bg-red-100 text-red-700 border-red-200', icon: <AlertCircle className="h-3 w-3" /> };
+      
+      if (nextDue && isBefore(nextDue, today)) return { label: 'OVERDUE', color: 'bg-red-600 text-white border-red-700', icon: <AlertCircle className="h-3 w-3" /> };
+      if (status === 'due') return { label: 'DUE SOON', color: 'bg-orange-100 text-orange-700 border-orange-200', icon: <Clock className="h-3 w-3" /> };
+      
+      return { label: 'ACTIVE', color: 'bg-green-600 text-white border-green-700', icon: <CheckCircle2 className="h-3 w-3" /> };
+  };
+
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
-        <div className="flex items-center gap-2 font-semibold"><Landmark className="h-6 w-6 text-primary" /><span>Customer Portal</span></div>
-        <div className="ml-auto"><Button onClick={handleLogout} variant="outline"><LogOut className="mr-2 h-4 w-4" />Logout</Button></div>
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
+        <div className="flex items-center gap-2 font-bold text-xl"><img src="/pezeka_logo_transparent.png" alt="Pezeka" className="h-8 w-8 object-contain" /><span className="hidden sm:inline text-primary">Customer Portal</span></div>
+        <div className="ml-auto"><Button onClick={handleLogout} variant="outline" size="sm" className="rounded-full"><LogOut className="mr-2 h-4 w-4" />Logout</Button></div>
       </header>
-      <main className="p-4 sm:px-6 sm:py-0 max-w-6xl mx-auto w-full">
-          <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                    <CardTitle>Welcome, {user?.displayName || user?.email}!</CardTitle>
-                    <CardDescription>Manage your account and applications.</CardDescription>
-                </div>
-                {customerProfile?.accountNumber && (
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold">Account Number</span>
-                        <Badge variant="outline" className="text-sm font-mono py-1 px-3 border-primary/30 text-primary">
-                            {customerProfile.accountNumber}
-                        </Badge>
+      
+      <main className="p-4 sm:px-6 sm:py-0 max-w-6xl mx-auto w-full space-y-8">
+          <section>
+            <div className="mb-6">
+                <h1 className="text-3xl font-black tracking-tight">Welcome back, <span className="text-primary">{firstName}</span>!</h1>
+                <p className="text-muted-foreground">Here is a quick overview of your account and loan status.</p>
+            </div>
+
+            {customerProfile?.accountNumber && (
+                <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10 mb-6 w-fit">
+                    <div className="bg-primary text-white p-2 rounded-lg"><Wallet className="h-5 w-5" /></div>
+                    <div>
+                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest leading-none mb-1">My Account Number</p>
+                        <p className="text-lg font-mono font-black text-primary">{customerProfile.accountNumber}</p>
                     </div>
-                )}
-            </CardHeader>
-            <CardContent>
-                {loansLoading ? (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>) : (customerLoans && customerLoans.length > 0) ? (
-                    <div className="space-y-4">
-                        <h3 className="text-lg font-semibold">Your Loans</h3>
+                </div>
+            )}
+
+            <div className="space-y-4">
+                <h3 className="text-lg font-bold flex items-center gap-2">
+                    <div className="h-6 w-1 bg-primary rounded-full" />
+                    My Loan Portfolio
+                </h3>
+                {loansLoading ? (<div className="flex items-center justify-center p-12 bg-white rounded-2xl border"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>) : (customerLoans && customerLoans.length > 0) ? (
+                    <div className="grid gap-4">
                         {customerLoans.map(loan => {
                             const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
                             const nextDue = getNextDueDate(loan);
+                            const status = getStatusConfig(loan.status, nextDue);
                             
                             const dDate = loan.disbursementDate?.seconds 
                                 ? new Date(loan.disbursementDate.seconds * 1000) 
                                 : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
                             
-                            const dateLabel = loan.status === 'application' ? 'Applied on' : 'Disbursed on';
-                            const dateValue = isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'PPP');
+                            const dateLabel = loan.status === 'application' ? 'Applied' : 'Disbursed';
+                            const dateValue = isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'PP');
 
                             return (
-                                <Card key={loan.id} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
-                                    <CardHeader className="pb-2">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <CardTitle className="text-lg">Loan #{loan.loanNumber}</CardTitle>
-                                                <CardDescription>
-                                                    {dateLabel}: {dateValue}
+                                <Card key={loan.id} className="overflow-hidden border-none shadow-lg hover:shadow-xl transition-all duration-300 group">
+                                    <div className={`h-1.5 w-full ${status.color.split(' ')[0]}`} />
+                                    <CardHeader className="pb-4">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <CardTitle className="text-xl font-black">Loan #{loan.loanNumber}</CardTitle>
+                                                    <Badge className={`rounded-full px-3 py-0.5 text-[10px] font-black border uppercase flex items-center gap-1 ${status.color}`}>
+                                                        {status.icon}
+                                                        {status.label}
+                                                    </Badge>
+                                                </div>
+                                                <CardDescription className="text-xs font-medium flex items-center gap-1">
+                                                    {dateLabel} on {dateValue} • {loan.loanType}
                                                 </CardDescription>
                                             </div>
-                                            <Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>
-                                                {loan.status.toUpperCase()}
-                                            </Badge>
+                                            {loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected' && (
+                                                <Button onClick={() => setShowPaymentInstructions(true)} className="w-full sm:w-auto rounded-full font-black shadow-lg shadow-primary/20 group-hover:scale-105 transition-transform">
+                                                    Pay Now
+                                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
-                                            <div>
-                                                <div className="text-[10px] text-muted-foreground uppercase font-bold">To Repay</div>
-                                                <div className="font-semibold text-sm">Ksh {(loan.totalRepayableAmount || 0).toLocaleString()}</div>
+                                        <div className="grid gap-6 grid-cols-1 sm:grid-cols-3 bg-muted/30 p-6 rounded-2xl">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Remaining Balance</p>
+                                                <p className="text-2xl font-black text-primary">Ksh {balance.toLocaleString()}</p>
                                             </div>
-                                            <div>
-                                                <div className="text-[10px] text-muted-foreground uppercase font-bold">Remaining</div>
-                                                <div className="font-bold text-lg text-primary">Ksh {balance.toLocaleString()}</div>
-                                            </div>
-                                            <div>
-                                                {loan.status !== 'paid' && loan.status !== 'application' && nextDue && (
-                                                    <>
-                                                        <div className="text-[10px] text-muted-foreground uppercase font-bold flex items-center gap-1"><CalendarDays className="h-3 w-3" /> Next Due</div>
-                                                        <div className="font-medium text-sm">{format(nextDue, 'dd/MM/yyyy')}</div>
-                                                    </>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center justify-end">
-                                                <Button variant="ghost" size="sm" onClick={() => setSelectedLoanForHistory(loan)}>
-                                                    <History className="mr-2 h-4 w-4" />
-                                                    Payments
-                                                </Button>
-                                            </div>
+                                            
+                                            {loan.status !== 'paid' && loan.status !== 'application' && loan.status !== 'rejected' && (
+                                                <>
+                                                    <div className="space-y-1">
+                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest flex items-center gap-1">Next Payment Due</p>
+                                                        <p className="text-lg font-black">{nextDue ? format(nextDue, 'PPP') : 'N/A'}</p>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Amount Due</p>
+                                                        <p className="text-lg font-black">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</p>
+                                                    </div>
+                                                </>
+                                            )}
+                                            
+                                            {loan.status === 'application' && (
+                                                <div className="sm:col-span-2 flex items-center text-sm font-medium text-muted-foreground italic">
+                                                    Your application is currently being appraised by our credit committee.
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="mt-4 flex justify-end">
+                                            <Button variant="ghost" size="sm" onClick={() => setSelectedLoanForHistory(loan)} className="text-xs font-bold text-muted-foreground hover:text-primary">
+                                                <History className="mr-2 h-4 w-4" />
+                                                View Payment History
+                                            </Button>
                                         </div>
                                     </CardContent>
                                 </Card>
                             )
                         })}
                     </div>
-                ) : (<div className="text-center py-12 border-2 border-dashed rounded-lg"><p className="text-muted-foreground">You don't have any active loans or applications yet.</p></div>)}
-            </CardContent>
-          </Card>
+                ) : (
+                    <div className="text-center py-16 bg-white border-2 border-dashed rounded-3xl">
+                        <div className="bg-primary/5 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Landmark className="h-8 w-8 text-primary/40" />
+                        </div>
+                        <h4 className="text-lg font-bold">No active loans</h4>
+                        <p className="text-muted-foreground max-w-xs mx-auto text-sm">You don't have any active loans or applications at the moment. Use the form below to apply.</p>
+                    </div>
+                )}
+            </div>
+          </section>
 
-          <Card>
-            <CardHeader><CardTitle>Apply for a New Loan</CardTitle><CardDescription>Select a product and fill in your details to start your application.</CardDescription></CardHeader>
-            <CardContent>
+          <Card className="border-none shadow-xl rounded-3xl overflow-hidden">
+            <CardHeader className="bg-primary text-primary-foreground p-8">
+                <CardTitle className="text-2xl font-black">Apply for a New Loan</CardTitle>
+                <CardDescription className="text-primary-foreground/80 font-medium">Get instant capital for your personal or business needs.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8">
                 <Form {...applicationForm}>
                 <form onSubmit={applicationForm.handleSubmit(onApplicationSubmit)} className="space-y-6">
                     <FormField control={applicationForm.control} name="loanType" render={({ field }) => (
-                        <FormItem><FormLabel>Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Individual & Business Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                        <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Loan Product</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger className="h-12 rounded-xl border-2"><SelectValue placeholder="Select product" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quick Pesa">Quick Pesa (1 Month)</SelectItem><SelectItem value="Individual & Business Loan">Individual & Business Loan</SelectItem><SelectItem value="Salary Advance Loan">Salary Advance</SelectItem><SelectItem value="Logbook Loan">Logbook Loan</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                     )}/>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField control={applicationForm.control} name="loanAmount" render={({ field }) => (
-                          <FormItem><FormLabel>Requested Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Requested Amount (Ksh)</FormLabel><FormControl><Input type="number" placeholder="e.g. 5000" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2" /></FormControl><FormMessage /></FormItem>
                       )}/>
                       <FormField control={applicationForm.control} name="idNumber" render={({ field }) => (
-                          <FormItem><FormLabel>National ID Number</FormLabel><FormControl><Input placeholder="ID Card Number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">National ID Number</FormLabel><FormControl><Input placeholder="ID Card Number" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2" /></FormControl><FormMessage /></FormItem>
                       )}/>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField control={applicationForm.control} name="numberOfInstalments" render={({ field }) => (
-                          <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2" /></FormControl><FormMessage /></FormItem>
                       )}/>
                       <FormField control={applicationForm.control} name="paymentFrequency" render={({ field }) => (
-                          <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger className="h-12 rounded-xl border-2"><SelectValue placeholder="Select frequency" /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                     )}/>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <FormField control={applicationForm.control} name="phone" render={({ field }) => (
-                          <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2" /></FormControl><FormMessage /></FormItem>
                       )}/>
                       <FormField control={applicationForm.control} name="alternativeNumber" render={({ field }) => (
-                          <FormItem><FormLabel>Alternative Phone (Optional)</FormLabel><FormControl><Input placeholder="Second contact" {...field} value={field.value ?? ''} /></FormControl></FormItem>
+                          <FormItem><FormLabel className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground">Alternative Phone (Optional)</FormLabel><FormControl><Input placeholder="Second contact" {...field} value={field.value ?? ''} className="h-12 rounded-xl border-2" /></FormControl></FormItem>
                       )}/>
                     </div>
                     <FormField control={applicationForm.control} name="agreeToTerms" render={({ field }) => (
-                        <FormItem className="flex items-start space-x-3 rounded-md border p-4 bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel>I agree to the terms and conditions of Pezeka Credit Ltd.</FormLabel><FormDescription className="text-[10px]">By submitting this form, you authorize our team to verify your information.</FormDescription><FormMessage /></div></FormItem>
+                        <FormItem className="flex items-start space-x-3 rounded-2xl border-2 p-6 bg-muted/30"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="leading-none"><FormLabel className="font-bold text-sm">I agree to the terms and conditions of Pezeka Credit Ltd.</FormLabel><FormDescription className="text-[10px] mt-1">By submitting this form, you authorize our team to verify your information.</FormDescription><FormMessage /></div></FormItem>
                     )}/>
-                    <Button type="submit" size="lg" className="w-full h-14 text-lg font-bold" disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <FileUp className="mr-2 h-5 w-5" />}
+                    <Button type="submit" size="lg" className="w-full h-16 text-xl font-black rounded-2xl shadow-xl shadow-primary/20" disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="animate-spin mr-2 h-6 w-6" /> : <FileUp className="mr-2 h-6 w-6" />}
                         Submit Application
                     </Button>
                 </form>
@@ -327,22 +379,60 @@ export default function AccountPage() {
           </Card>
       </main>
 
+      {/* Pay Now Instructions Dialog */}
+      <Dialog open={showPaymentInstructions} onOpenChange={setShowPaymentInstructions}>
+          <DialogContent className="sm:max-w-md rounded-3xl">
+              <DialogHeader>
+                  <DialogTitle className="text-2xl font-black">How to Pay</DialogTitle>
+                  <DialogDescription className="font-medium">Please use the details below to make your repayment via M-Pesa.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                  <div className="bg-primary/5 border-2 border-primary/10 rounded-2xl p-6 space-y-4">
+                      <div className="flex justify-between items-center border-b border-primary/10 pb-3">
+                          <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Paybill Number</span>
+                          <span className="text-xl font-black text-primary">522522</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b border-primary/10 pb-3">
+                          <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Account Number</span>
+                          <span className="text-xl font-black text-primary">1347823360</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1">
+                          <span className="text-xs font-black uppercase text-muted-foreground tracking-widest">Reference</span>
+                          <span className="text-sm font-bold bg-white px-2 py-1 rounded border">Your National ID</span>
+                      </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-2 font-medium bg-muted p-4 rounded-xl">
+                      <p>1. Go to M-Pesa Menu > Lipa na M-Pesa</p>
+                      <p>2. Select Pay Bill and enter the Business No. above</p>
+                      <p>3. Enter the Account No. and your Loan ID or National ID</p>
+                      <p>4. Enter the amount and your M-Pesa PIN</p>
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button onClick={() => setShowPaymentInstructions(false)} className="w-full h-12 rounded-xl font-black">I Have Paid</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
       {/* Payment History Dialog */}
       <Dialog open={!!selectedLoanForHistory} onOpenChange={(open) => !open && setSelectedLoanForHistory(null)}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md rounded-3xl">
               <DialogHeader>
-                  <DialogTitle>Repayment History: #{selectedLoanForHistory?.loanNumber}</DialogTitle>
-                  <DialogDescription>List of all verified payments made for this loan.</DialogDescription>
+                  <DialogTitle className="text-xl font-black">Payment History: #{selectedLoanForHistory?.loanNumber}</DialogTitle>
+                  <DialogDescription className="font-medium">List of all verified payments made for this loan.</DialogDescription>
               </DialogHeader>
-              <ScrollArea className="h-80 border rounded-md p-2">
+              <ScrollArea className="h-80 border-2 rounded-2xl p-2 bg-muted/10">
                   {(!selectedLoanForHistory?.payments || selectedLoanForHistory.payments.length === 0) ? (
-                      <p className="text-center py-12 text-muted-foreground text-sm italic">No payments recorded yet.</p>
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <History className="h-12 w-12 text-muted-foreground/20 mb-2" />
+                          <p className="text-muted-foreground text-sm font-bold italic">No payments recorded yet.</p>
+                      </div>
                   ) : (
                       <Table>
                           <TableHeader>
-                              <TableRow>
-                                  <TableHead>Date</TableHead>
-                                  <TableHead className="text-right">Amount</TableHead>
+                              <TableRow className="border-b-2">
+                                  <TableHead className="font-black uppercase text-[10px]">Date</TableHead>
+                                  <TableHead className="text-right font-black uppercase text-[10px]">Amount</TableHead>
                               </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -352,9 +442,9 @@ export default function AccountPage() {
                                     : (p.date instanceof Date ? p.date : new Date());
                                   
                                   return (
-                                    <TableRow key={p.paymentId || i}>
-                                        <TableCell className="text-xs">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PPP')}</TableCell>
-                                        <TableCell className="text-right font-bold text-green-600">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
+                                    <TableRow key={p.paymentId || i} className="border-b">
+                                        <TableCell className="text-xs font-medium">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'PP')}</TableCell>
+                                        <TableCell className="text-right font-black text-primary">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
                                     </TableRow>
                                   );
                               })}
@@ -363,7 +453,7 @@ export default function AccountPage() {
                   )}
               </ScrollArea>
               <DialogFooter>
-                  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+                  <DialogClose asChild><Button variant="outline" className="w-full rounded-xl font-bold">Close</Button></DialogClose>
               </DialogFooter>
           </DialogContent>
       </Dialog>
