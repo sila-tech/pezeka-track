@@ -14,7 +14,7 @@ import {
   CreditCard,
   Wallet,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -46,6 +46,15 @@ export default function AccountPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Home');
+  const [greeting, setGreeting] = useState('Welcome');
+
+  // Handle dynamic greeting based on time of day
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good morning');
+    else if (hour < 18) setGreeting('Good afternoon');
+    else setGreeting('Good evening');
+  }, []);
 
   const { data: customerProfile } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
@@ -59,6 +68,10 @@ export default function AccountPage() {
   const fullName = useMemo(() => {
       return customerProfile?.name || user?.displayName || "Valued Customer";
   }, [customerProfile, user]);
+
+  const firstName = useMemo(() => {
+      return fullName.split(' ')[0];
+  }, [fullName]);
 
   const initials = useMemo(() => {
       return fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -85,7 +98,7 @@ export default function AccountPage() {
                 <AvatarFallback className="bg-[#1B2B33] text-white font-black">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex items-center gap-1">
-                <span className="text-lg font-bold text-[#1B2B33]">Hello</span>
+                <span className="text-lg font-bold text-[#1B2B33]">{greeting}, {firstName}</span>
                 <span className="text-lg">👋</span>
             </div>
         </div>
@@ -144,7 +157,7 @@ export default function AccountPage() {
             <h3 className="text-lg font-bold text-[#1B2B33] tracking-tight">Loan Applications</h3>
             {pendingApplications.length === 0 ? (
                 <div className="bg-white border border-muted rounded-3xl p-8 text-center shadow-sm">
-                    <p className="text-muted-foreground text-sm italic">No pending applications.</p>
+                    <p className="text-muted-foreground text-sm italic">No pending applications found.</p>
                 </div>
             ) : (
                 <div className="space-y-3">
@@ -152,7 +165,7 @@ export default function AccountPage() {
                         <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex items-center justify-between group transition-all hover:shadow-md">
                             <div className="space-y-1">
                                 <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
-                                <p className="text-muted-foreground text-xs font-bold">Amount: KES {loan.principalAmount.toLocaleString()}</p>
+                                <p className="text-muted-foreground text-xs font-bold">Requested: KES {loan.principalAmount.toLocaleString()}</p>
                             </div>
                             <div className="bg-[#FDE68A] text-[#92400E] text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider">
                                 Pending
@@ -198,10 +211,10 @@ export default function AccountPage() {
           />
           <NavItem 
             icon={<Plus className="h-6 w-6" />} 
-            label="Apply" 
-            active={activeTab === 'Apply'} 
+            label="New Loan" 
+            active={activeTab === 'New Loan'} 
             onClick={() => {
-                setActiveTab('Apply');
+                setActiveTab('New Loan');
                 router.push('/account/apply');
             }} 
           />
