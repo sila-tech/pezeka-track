@@ -402,7 +402,7 @@ export default function AccountPage() {
                       </div>
                   </div>
                   <div className="text-xs text-muted-foreground space-y-2 font-medium bg-muted p-4 rounded-xl">
-                      <p>1. Go to M-Pesa Menu > Lipa na M-Pesa</p>
+                      <p>1. Go to M-Pesa Menu &gt; Lipa na M-Pesa</p>
                       <p>2. Select Pay Bill and enter the Business No. above</p>
                       <p>3. Enter the Account No. and your Loan ID or National ID</p>
                       <p>4. Enter the amount and your M-Pesa PIN</p>
