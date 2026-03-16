@@ -64,7 +64,6 @@ export default function CustomerLoginPage() {
         await updateProfile(cred.user, { displayName: fullName });
         
         // 2. Link existing loans if any
-        // We look for loans that were added by admin using this phone number
         const loansQuery = query(collection(firestore, 'loans'), where('customerPhone', '==', values.phone));
         const loansSnapshot = await getDocs(loansQuery);
         

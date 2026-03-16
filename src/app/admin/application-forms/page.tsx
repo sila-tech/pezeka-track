@@ -27,7 +27,7 @@ const forms = [
 export default function ApplicationFormsPage() {
   const { user, loading } = useAppUser();
   
-  // Robust case-insensitive check for all admin team members
+  // Robust check for all admin team roles
   const userRole = user?.role?.toLowerCase();
   const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
   const isAuthorized = user && (isSuperAdmin || userRole === 'staff' || userRole === 'finance');
