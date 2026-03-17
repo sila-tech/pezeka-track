@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, useAppUser } from '@/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -29,6 +28,7 @@ const authSchema = z.object({
 
 export default function CustomerLoginPage() {
   const { user, loading } = useUser();
+  const { user: appUser } = useAppUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
@@ -43,8 +43,15 @@ export default function CustomerLoginPage() {
   });
 
   useEffect(() => {
-    if (!loading && user) router.push('/account');
-  }, [user, loading, router]);
+    if (!loading && user) {
+        // If they are an agent, redirect to agent portal, otherwise standard account
+        if (appUser?.role === 'agent') {
+            router.push('/agent');
+        } else if (appUser) {
+            router.push('/account');
+        }
+    }
+  }, [user, appUser, loading, router]);
   
   async function onEmailSubmit(values: z.infer<typeof authSchema>) {
     setIsSubmitting(true);
@@ -126,7 +133,7 @@ export default function CustomerLoginPage() {
         await signInWithEmailAndPassword(auth, values.email, values.password);
         toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
       }
-      router.push('/account');
+      // Redirection is handled by the useEffect above
     } catch (e: any) { 
       toast({ 
         variant: 'destructive', 
