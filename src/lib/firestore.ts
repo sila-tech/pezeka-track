@@ -802,6 +802,35 @@ export async function createUserProfile(db: Firestore, userId: string, data: { e
     }
 }
 
+/**
+ * Specifically for Agent Self-Registration
+ */
+export async function registerAgent(db: Firestore, userId: string, data: { email: string, name: string, phone: string }) {
+    const userRef = doc(db, 'users', userId);
+    const referralCode = await generateReferralCode(db, data.name);
+    const profileData = {
+        uid: userId,
+        email: data.email,
+        name: data.name,
+        phone: data.phone,
+        role: 'agent',
+        status: 'pending',
+        referralCode,
+        createdAt: serverTimestamp()
+    };
+    try {
+        await setDoc(userRef, profileData, { merge: true });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: userRef.path,
+            operation: 'create',
+            requestResourceData: profileData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
 export async function updateUserProfile(db: Firestore, userId: string, data: { [key: string]: any }) {
     const userRef = doc(db, 'users', userId);
     const updateData = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined && v !== null));

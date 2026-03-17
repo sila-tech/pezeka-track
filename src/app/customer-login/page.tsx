@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { upsertCustomer, getUserByReferralCode, addReferral } from '@/lib/firestore';
+import Link from 'next/link';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
@@ -206,10 +207,14 @@ export default function CustomerLoginPage() {
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSignUp ? 'Create Account' : 'Sign In'}
               </Button>
-              <div className="text-center text-sm">
+              <div className="text-center text-sm flex flex-col gap-2">
                 <Button type="button" variant="link" onClick={() => setIsSignUp(!isSignUp)}>
                   {isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'}
                 </Button>
+                <div className="h-px bg-muted w-full my-2" />
+                <p className="text-xs text-muted-foreground">
+                    Interested in becoming a business partner? <Link href="/agent-signup" className="text-[#5BA9D0] font-bold hover:underline">Apply as an Agent</Link>
+                </p>
               </div>
             </form>
           </Form>
