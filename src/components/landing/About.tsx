@@ -1,6 +1,10 @@
+
 import Image from 'next/image';
+import placeholderImages from '@/lib/placeholder-images.json';
 
 export default function About() {
+  const aboutImg = placeholderImages.aboutUs;
+
   return (
     <section id="about" className="w-full py-12 md:py-24 lg:py-32">
       <div className="container grid items-center gap-6 px-4 md:px-6 lg:grid-cols-2 lg:gap-10">
@@ -17,14 +21,17 @@ export default function About() {
           </p>
         </div>
         <div className="flex justify-center">
-            <Image
-                src="https://picsum.photos/seed/team-working/550/550"
-                width={550}
-                height={550}
-                alt="About us"
-                data-ai-hint="diverse team collaboration"
-                className="overflow-hidden rounded-xl object-cover"
-            />
+            <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-[#5BA9D0] to-green-400 rounded-3xl blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
+                <Image
+                    src={aboutImg.src}
+                    width={aboutImg.width}
+                    height={aboutImg.height}
+                    alt="About Pezeka Credit"
+                    data-ai-hint={aboutImg.hint}
+                    className="relative overflow-hidden rounded-3xl object-cover shadow-xl"
+                />
+            </div>
         </div>
       </div>
     </section>
