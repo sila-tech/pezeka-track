@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, ShieldCheck, TrendingUp, LogIn, ArrowLeft } from 'lucide-react';
 import { registerAgent } from '@/lib/firestore';
-import Link from 'link';
+import Link from 'next/link';
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name.'),
