@@ -16,7 +16,12 @@ import {
   LogOut,
   Info,
   CheckCircle2,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck,
+  Phone,
+  Mail,
+  UserCircle,
+  Loader2
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
@@ -34,6 +39,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { updateCustomer } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 interface Loan {
   id: string;
@@ -55,6 +65,7 @@ interface Customer {
     name: string;
     phone: string;
     email?: string;
+    idNumber?: string;
 }
 
 const LOAN_PRODUCTS = [
@@ -69,10 +80,18 @@ export default function AccountPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
+  
   const [activeTab, setActiveTab] = useState('Home');
   const [greeting, setGreeting] = useState('Welcome');
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isLoansOpen, setIsLoansOpen] = useState(false);
+  const [isUpdatingProfile, setIsUpdating] = useState(false);
+
+  // Profile Form State
+  const [profileName, setProfileName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileIdNumber, setProfileIdNumber] = useState('');
 
   // Handle dynamic greeting based on time of day
   useEffect(() => {
@@ -82,7 +101,16 @@ export default function AccountPage() {
     else setGreeting('Good evening');
   }, []);
 
-  const { data: customerProfile } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
+  const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
+
+  // Sync local form state with fetched profile
+  useEffect(() => {
+      if (customerProfile) {
+          setProfileName(customerProfile.name || '');
+          setProfilePhone(customerProfile.phone || '');
+          setProfileIdNumber(customerProfile.idNumber || '');
+      }
+  }, [customerProfile]);
 
   const customerLoansQuery = useMemo(() => {
     if (userLoading || !firestore || !user?.uid) return null;
@@ -125,6 +153,23 @@ export default function AccountPage() {
       router.push('/');
   };
 
+  const handleUpdateProfile = async () => {
+      if (!user) return;
+      setIsUpdating(true);
+      try {
+          await updateCustomer(firestore, user.uid, {
+              name: profileName,
+              phone: profilePhone,
+              idNumber: profileIdNumber,
+          });
+          toast({ title: 'Profile Updated', description: 'Your details have been saved successfully.' });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+      } finally {
+          setIsUpdating(false);
+      }
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFB] text-[#1B2B33] pb-24 font-sans flex flex-col">
       {/* Header Section */}
@@ -134,8 +179,8 @@ export default function AccountPage() {
                 <AvatarFallback className="bg-[#1B2B33] text-white font-black">{initials}</AvatarFallback>
             </Avatar>
             <div className="flex items-center gap-1">
-                <span className="text-lg font-bold text-[#1B2B33]">{greeting}, {firstName}</span>
-                <span className="text-lg">👋</span>
+                <span className="text-lg font-bold text-[#1B2B33]">{activeTab === 'Profile' ? 'My Profile' : `${greeting}, ${firstName}`}</span>
+                {activeTab !== 'Profile' && <span className="text-lg">👋</span>}
             </div>
         </div>
         <div className="flex items-center gap-3">
@@ -160,108 +205,204 @@ export default function AccountPage() {
 
       {/* Main Content */}
       <main className="px-6 space-y-8 flex-1 pt-6">
-        {/* Balance Card - Brand Focal Point */}
-        <div className="relative overflow-hidden rounded-[2.5rem] p-8 min-h-[220px] bg-gradient-to-br from-[#5BA9D0] to-[#005C97] shadow-xl shadow-[#5BA9D0]/20 flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-                <div className="space-y-1 text-white">
-                    <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Balance</p>
-                    <h2 className="text-4xl font-black">KES {totalBalance.toLocaleString()}</h2>
+        {activeTab === 'Home' && (
+            <>
+                {/* Balance Card - Brand Focal Point */}
+                <div className="relative overflow-hidden rounded-[2.5rem] p-8 min-h-[220px] bg-gradient-to-br from-[#5BA9D0] to-[#005C97] shadow-xl shadow-[#5BA9D0]/20 flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                        <div className="space-y-1 text-white">
+                            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Balance</p>
+                            <h2 className="text-4xl font-black">KES {totalBalance.toLocaleString()}</h2>
+                        </div>
+                        <CreditCard className="h-10 w-10 text-white/40" />
+                    </div>
+                    
+                    <div className="flex justify-between items-end text-white">
+                        <div className="space-y-1">
+                            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Account Holder</p>
+                            <p className="text-sm font-black uppercase">{fullName}</p>
+                        </div>
+                        <div className="text-right space-y-1">
+                            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Credit Limit</p>
+                            <p className="text-sm font-black">KES 0</p>
+                        </div>
+                    </div>
+                    
+                    {/* Decorative background shapes */}
+                    <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="absolute top-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl"></div>
                 </div>
-                <CreditCard className="h-10 w-10 text-white/40" />
-            </div>
-            
-            <div className="flex justify-between items-end text-white">
-                <div className="space-y-1">
-                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Account Holder</p>
-                    <p className="text-sm font-black uppercase">{fullName}</p>
-                </div>
-                <div className="text-right space-y-1">
-                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Credit Limit</p>
-                    <p className="text-sm font-black">KES 0</p>
-                </div>
-            </div>
-            
-            {/* Decorative background shapes */}
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-            <div className="absolute top-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl"></div>
-        </div>
 
-        {/* Action Grid - Minimal Blue tint */}
-        <div className="flex justify-between items-center px-2">
-            <ActionCircle 
-                icon={<SendHorizontal className="h-6 w-6 text-[#5BA9D0]" />} 
-                label="Send" 
-                status="Soon"
-            />
-            <ActionCircle 
-                icon={<Wallet className="h-6 w-6 text-[#5BA9D0]" />} 
-                label="Pay" 
-                onClick={() => setIsPayOpen(true)}
-            />
-            <ActionCircle 
-                icon={<Landmark className="h-6 w-6 text-[#5BA9D0]" />} 
-                label="Loans" 
-                onClick={() => setIsLoansOpen(true)}
-            />
-            <ActionCircle 
-                icon={<Briefcase className="h-6 w-6 text-[#5BA9D0]" />} 
-                label="Biz" 
-                status="Soon"
-            />
-            <ActionCircle 
-                icon={<Folder className="h-6 w-6 text-[#5BA9D0]" />} 
-                label="Invest" 
-                status="Soon"
-            />
-        </div>
-
-        {/* Loan Applications Section */}
-        <section className="space-y-4">
-            <h3 className="text-lg font-bold text-[#1B2B33] tracking-tight">Loan Applications</h3>
-            {pendingApplications.length === 0 ? (
-                <div className="bg-white border border-muted rounded-3xl p-8 text-center shadow-sm">
-                    <p className="text-muted-foreground text-sm italic">No pending applications found.</p>
+                {/* Action Grid - Minimal Blue tint */}
+                <div className="flex justify-between items-center px-2">
+                    <ActionCircle 
+                        icon={<SendHorizontal className="h-6 w-6 text-[#5BA9D0]" />} 
+                        label="Send" 
+                        status="Soon"
+                    />
+                    <ActionCircle 
+                        icon={<Wallet className="h-6 w-6 text-[#5BA9D0]" />} 
+                        label="Pay" 
+                        onClick={() => setIsPayOpen(true)}
+                    />
+                    <ActionCircle 
+                        icon={<Landmark className="h-6 w-6 text-[#5BA9D0]" />} 
+                        label="Loans" 
+                        onClick={() => setIsLoansOpen(true)}
+                    />
+                    <ActionCircle 
+                        icon={<Briefcase className="h-6 w-6 text-[#5BA9D0]" />} 
+                        label="Biz" 
+                        status="Soon"
+                    />
+                    <ActionCircle 
+                        icon={<Folder className="h-6 w-6 text-[#5BA9D0]" />} 
+                        label="Invest" 
+                        status="Soon"
+                    />
                 </div>
-            ) : (
-                <div className="space-y-3">
-                    {pendingApplications.map(loan => (
-                        <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex items-center justify-between group transition-all hover:shadow-md">
-                            <div className="space-y-1">
-                                <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
-                                <p className="text-muted-foreground text-xs font-bold">Requested: KES {loan.principalAmount.toLocaleString()}</p>
+
+                {/* Loan Applications Section */}
+                <section className="space-y-4">
+                    <h3 className="text-lg font-bold text-[#1B2B33] tracking-tight">Loan Applications</h3>
+                    {pendingApplications.length === 0 ? (
+                        <div className="bg-white border border-muted rounded-3xl p-8 text-center shadow-sm">
+                            <p className="text-muted-foreground text-sm italic">No pending applications found.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {pendingApplications.map(loan => (
+                                <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex items-center justify-between group transition-all hover:shadow-md">
+                                    <div className="space-y-1">
+                                        <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
+                                        <p className="text-muted-foreground text-xs font-bold">Requested: KES {loan.principalAmount.toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-[#FDE68A] text-[#92400E] text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider">
+                                        Pending
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+
+                {/* Active Loans Section */}
+                <section className="space-y-4">
+                    <h3 className="text-lg font-bold text-[#1B2B33] tracking-tight">Active Loans</h3>
+                    {activeLoans.length === 0 ? (
+                        <div className="bg-white border border-muted rounded-3xl p-8 text-center shadow-sm">
+                            <p className="text-muted-foreground text-sm italic">No active loans found.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3 pb-10">
+                            {activeLoans.map(loan => (
+                                <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex items-center justify-between group transition-all hover:shadow-md">
+                                    <div className="space-y-1">
+                                        <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
+                                        <p className="text-muted-foreground text-xs font-bold">Balance: KES {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-[#27AE60]/10 text-[#27AE60] text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider border border-[#27AE60]/20">
+                                        Active
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </>
+        )}
+
+        {activeTab === 'Profile' && (
+            <div className="space-y-6 pb-10">
+                <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+                    <CardHeader className="bg-[#1B2B33] text-white p-8">
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full bg-[#5BA9D0] flex items-center justify-center text-3xl font-black text-white shadow-lg">
+                                {initials}
                             </div>
-                            <div className="bg-[#FDE68A] text-[#92400E] text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider">
-                                Pending
+                            <div>
+                                <CardTitle className="text-2xl font-black text-white">{fullName}</CardTitle>
+                                <CardDescription className="text-white/60">Account: {customerProfile?.accountNumber || 'N/A'}</CardDescription>
                             </div>
                         </div>
-                    ))}
-                </div>
-            )}
-        </section>
-
-        {/* Active Loans Section */}
-        <section className="space-y-4">
-            <h3 className="text-lg font-bold text-[#1B2B33] tracking-tight">Active Loans</h3>
-            {activeLoans.length === 0 ? (
-                <div className="bg-white border border-muted rounded-3xl p-8 text-center shadow-sm">
-                    <p className="text-muted-foreground text-sm italic">No active loans found.</p>
-                </div>
-            ) : (
-                <div className="space-y-3 pb-10">
-                    {activeLoans.map(loan => (
-                        <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex items-center justify-between group transition-all hover:shadow-md">
-                            <div className="space-y-1">
-                                <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
-                                <p className="text-muted-foreground text-xs font-bold">Balance: KES {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</p>
+                    </CardHeader>
+                    <CardContent className="p-8 space-y-6">
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Full Name</Label>
+                                <div className="relative">
+                                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
+                                    <Input 
+                                        value={profileName} 
+                                        onChange={(e) => setProfileName(e.target.value)} 
+                                        className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                    />
+                                </div>
                             </div>
-                            <div className="bg-[#27AE60]/10 text-[#27AE60] text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider border border-[#27AE60]/20">
-                                Active
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Phone Number</Label>
+                                <div className="relative">
+                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
+                                    <Input 
+                                        value={profilePhone} 
+                                        onChange={(e) => setProfilePhone(e.target.value)} 
+                                        className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">National ID Number</Label>
+                                <div className="relative">
+                                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
+                                    <Input 
+                                        value={profileIdNumber} 
+                                        onChange={(e) => setProfileIdNumber(e.target.value)} 
+                                        className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Email Address</Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]/40" />
+                                    <Input 
+                                        value={customerProfile?.email || user?.email || ''} 
+                                        disabled 
+                                        className="pl-12 h-14 rounded-2xl border-none bg-muted/50 text-muted-foreground italic cursor-not-allowed"
+                                    />
+                                </div>
+                                <p className="text-[9px] text-muted-foreground ml-1">Primary authentication email cannot be changed.</p>
                             </div>
                         </div>
-                    ))}
+
+                        <Button 
+                            onClick={handleUpdateProfile} 
+                            disabled={isUpdatingProfile}
+                            className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-lg shadow-xl shadow-[#5BA9D0]/20 transition-all active:scale-95"
+                        >
+                            {isUpdatingProfile ? (
+                                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving Changes...</>
+                            ) : (
+                                'Save Profile Changes'
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <div className="bg-[#5BA9D0]/5 border border-[#5BA9D0]/10 rounded-3xl p-6 flex items-start gap-4">
+                    <Info className="h-6 w-6 text-[#5BA9D0] shrink-0" />
+                    <div className="space-y-1">
+                        <p className="font-bold text-sm text-[#1B2B33]">Security Note</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            To update your registered email or change your login password, please visit the account settings in the login portal.
+                        </p>
+                    </div>
                 </div>
-            )}
-        </section>
+            </div>
+        )}
       </main>
 
       {/* Payment Dialog */}
