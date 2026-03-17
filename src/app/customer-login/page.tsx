@@ -23,6 +23,7 @@ const authSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   phone: z.string().optional(),
+  idNumber: z.string().optional(),
 });
 
 export default function CustomerLoginPage() {
@@ -43,6 +44,7 @@ export default function CustomerLoginPage() {
       firstName: '',
       lastName: '',
       phone: '',
+      idNumber: '',
     },
   });
 
@@ -56,11 +58,11 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
-        if (!values.firstName || !values.lastName || !values.phone || values.phone.length < 10 || !values.password) {
+        if (!values.firstName || !values.lastName || !values.phone || values.phone.length < 10 || !values.idNumber || values.idNumber.length < 5 || !values.password) {
           toast({ 
             variant: 'destructive', 
             title: 'Missing Information', 
-            description: 'Full name, valid phone number, and password are required.' 
+            description: 'Full name, valid phone number, National ID, and password are required.' 
           });
           setIsSubmitting(false); 
           return;
@@ -73,7 +75,8 @@ export default function CustomerLoginPage() {
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
-            email: values.email
+            email: values.email,
+            idNumber: values.idNumber
         });
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
@@ -140,9 +143,14 @@ export default function CustomerLoginPage() {
                       <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
-                  <FormField control={form.control} name="phone" render={({ field }) => (
-                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="phone" render={({ field }) => (
+                      <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="idNumber" render={({ field }) => (
+                      <FormItem><FormLabel>National ID</FormLabel><FormControl><Input placeholder="ID Card No" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  </div>
                 </>
               )}
               <FormField control={form.control} name="email" render={({ field }) => (
@@ -162,7 +170,7 @@ export default function CustomerLoginPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSignUp ? 'Create Account' : 'Sign In'}
               </Button>

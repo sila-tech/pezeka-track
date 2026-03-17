@@ -50,8 +50,8 @@ import {
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Name required.'),
-  phone: z.string().min(1, 'Phone required.'),
-  idNumber: z.string().optional(),
+  phone: z.string().min(10, 'Valid phone number required.'),
+  idNumber: z.string().min(5, 'National ID is required.'),
 });
 
 export default function CustomersPage() {
@@ -76,7 +76,8 @@ export default function CustomersPage() {
     if (!customers) return [];
     return customers.filter(c => 
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.phone.includes(searchTerm)
+        c.phone.includes(searchTerm) ||
+        c.idNumber?.includes(searchTerm)
     ).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   }, [customers, searchTerm]);
 
@@ -128,18 +129,19 @@ export default function CustomersPage() {
         <CardHeader>
             <div className="flex items-center justify-between">
                 <CardTitle>Customer List</CardTitle>
-                <div className="relative"><Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[250px]" /></div>
+                <div className="relative"><Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone or ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[300px]" /></div>
             </div>
         </CardHeader>
         <CardContent className="p-0">
             <ScrollArea className="h-[60vh]">
                 <Table>
-                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>Account No.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>National ID</TableHead><TableHead>Account No.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                         {sortedCustomers.map((c) => (
                             <TableRow key={c.id}>
                                 <TableCell className="font-bold">{c.name}</TableCell>
                                 <TableCell>{c.phone}</TableCell>
+                                <TableCell className="text-xs">{c.idNumber || '-'}</TableCell>
                                 <TableCell className="font-mono text-xs">{c.accountNumber}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
@@ -164,9 +166,11 @@ export default function CustomersPage() {
               <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
                       <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                      <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                      <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                      <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Customer</Button>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem><FormLabel>National ID</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                      </div>
+                      <Button type="submit" className="w-full h-11" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Customer</Button>
                   </form>
               </Form>
           </DialogContent>
