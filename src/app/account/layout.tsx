@@ -14,16 +14,12 @@ export default function AccountLayout({
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-        if (!user) {
-            router.replace('/customer-login');
-        } else if (user.role === 'agent') {
-            router.replace('/agent');
-        }
+    if (!loading && !user) {
+        router.replace('/customer-login');
     }
   }, [user, loading, router]);
 
-  if (loading || !user || user.role === 'agent') {
+  if (loading || !user) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin" />

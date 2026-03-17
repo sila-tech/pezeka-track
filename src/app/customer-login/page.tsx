@@ -15,8 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { upsertCustomer, getUserByReferralCode, addReferral } from '@/lib/firestore';
-import Link from 'next/link';
+import { upsertCustomer } from '@/lib/firestore';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
@@ -47,14 +46,9 @@ export default function CustomerLoginPage() {
     },
   });
 
-  // Handle automatic redirection if already logged in
   useEffect(() => {
     if (!loading && user) {
-        if (user.role === 'agent') {
-            router.replace('/agent');
-        } else {
-            router.replace('/account');
-        }
+        router.replace('/account');
     }
   }, [user, loading, router]);
   
@@ -66,7 +60,7 @@ export default function CustomerLoginPage() {
           toast({ 
             variant: 'destructive', 
             title: 'Missing Information', 
-            description: 'Name, valid Phone number, and Password are required for registration.' 
+            description: 'Full name, valid phone number, and password are required.' 
           });
           setIsSubmitting(false); 
           return;
@@ -76,52 +70,10 @@ export default function CustomerLoginPage() {
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
-        // Link existing loans by phone
-        const loansQuery = query(collection(firestore, 'loans'), where('customerPhone', '==', values.phone));
-        const loansSnapshot = await getDocs(loansQuery);
-        
-        if (!loansSnapshot.empty) {
-            const batch = writeBatch(firestore);
-            loansSnapshot.docs.forEach((loanDoc) => {
-                batch.update(doc(firestore, 'loans', loanDoc.id), {
-                    customerId: cred.user.uid,
-                    customerEmail: values.email,
-                    updatedAt: new Date()
-                });
-            });
-            await batch.commit();
-        }
-
-        // Referral tracking
-        let referredByUid = "";
-        let referredByCode = "";
-        let referrerName = "";
-        const savedRefCode = sessionStorage.getItem('pezeka_referral_code');
-        
-        if (savedRefCode) {
-            const referrer = await getUserByReferralCode(firestore, savedRefCode);
-            if (referrer) {
-                referredByUid = referrer.uid;
-                referredByCode = savedRefCode;
-                referrerName = referrer.name;
-                
-                await addReferral(firestore, {
-                    referrerId: referredByUid,
-                    referrerName: referrerName,
-                    refereeId: cred.user.uid,
-                    refereeName: fullName
-                });
-                
-                sessionStorage.removeItem('pezeka_referral_code');
-            }
-        }
-
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
-            email: values.email,
-            referredBy: referredByUid,
-            referredByCode: referredByCode
+            email: values.email
         });
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
@@ -155,7 +107,7 @@ export default function CustomerLoginPage() {
     setIsResetting(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      toast({ title: 'Email Sent', description: `A password reset link has been sent to ${email}.` });
+      toast({ title: 'Email Sent', description: `A reset link has been sent to ${email}.` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Reset Failed', description: error.message });
     } finally {
@@ -218,10 +170,6 @@ export default function CustomerLoginPage() {
                 <Button type="button" variant="link" onClick={() => setIsSignUp(!isSignUp)}>
                   {isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'}
                 </Button>
-                <div className="h-px bg-muted w-full my-2" />
-                <p className="text-xs text-muted-foreground">
-                    Interested in becoming a business partner? <Link href="/agent/login" className="text-[#5BA9D0] font-bold hover:underline">Apply as an Agent</Link>
-                </p>
               </div>
             </form>
           </Form>

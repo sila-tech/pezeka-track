@@ -4,7 +4,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import ClientOverlays from '@/components/ClientOverlays';
-import ReferralTracker from '@/components/ReferralTracker';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
@@ -12,21 +11,12 @@ export const metadata: Metadata = {
   description: 'Affordable Credit, Real Opportunities',
   icons: {
     icon: [
-      { url: '/favicon.ico' },
       { url: '/pezeka_logo_transparent.png', type: 'image/png' },
     ],
-    shortcut: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
-  },
-  openGraph: {
-    title: 'Pezeka Credit Ltd',
-    description: 'Fast and reliable credit solutions in Kenya.',
-    images: ['/pezeka_social_profile.png'],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#166534',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -42,9 +32,6 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={cn('font-sans antialiased')}>
         <FirebaseClientProvider>
-          <Suspense>
-            <ReferralTracker />
-          </Suspense>
           {children}
         </FirebaseClientProvider>
         <Toaster />

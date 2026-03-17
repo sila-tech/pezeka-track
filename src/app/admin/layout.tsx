@@ -10,17 +10,12 @@ import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/admin/NotificationBell';
 import { cn } from '@/lib/utils';
-import { PWAInstallButton } from '@/components/PWAInstallButton';
-
 
 const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }) => {
     const pathname = usePathname();
-    
     const userRole = user?.role?.toLowerCase()?.trim();
     const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     const isFinance = userRole === 'finance';
-    
-    // Only Finance and Super Admin see sensitive modules
     const canSeeSensitive = isSuperAdmin || isFinance;
 
     const linkClass = (path: string) => cn(
@@ -77,7 +72,6 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
     );
 };
 
-
 export default function AdminLayout({
   children,
 }: {
@@ -90,7 +84,6 @@ export default function AdminLayout({
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const isLoginPage = pathname === '/admin/login';
-    
     const userRole = user?.role?.toLowerCase()?.trim();
     const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     const isFinance = userRole === 'finance';
@@ -99,7 +92,7 @@ export default function AdminLayout({
 
     useEffect(() => {
         if (!loading && !isAuthorized && !isLoginPage) {
-            router.push('/admin/login');
+            router.replace('/admin/login');
         }
     }, [user, loading, isAuthorized, isLoginPage, router]);
     
@@ -115,7 +108,7 @@ export default function AdminLayout({
 
     const handleLogout = async () => {
         await signOut(auth);
-        router.push('/admin/login');
+        router.replace('/admin/login');
     }
 
     return (
@@ -137,7 +130,6 @@ export default function AdminLayout({
                     <p className="text-xs font-bold truncate px-1 text-primary">{user?.name || user?.email}</p>
                     <p className="text-[10px] text-muted-foreground px-1 uppercase">{user?.role || 'Admin'}</p>
                 </div>
-                <PWAInstallButton className="w-full justify-start h-9 text-xs" variant="ghost" />
                 <Button onClick={handleLogout} variant="ghost" className="w-full justify-start h-9 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
@@ -169,7 +161,6 @@ export default function AdminLayout({
                     <NavLinks user={user} onLinkClick={() => setMobileMenuOpen(false)} />
                 </div>
                  <div className="mt-auto p-4 border-t flex flex-col gap-2 bg-muted/20">
-                  <PWAInstallButton className="w-full justify-start" variant="ghost" />
                   <Button onClick={handleLogout} variant="ghost" className="w-full justify-start text-destructive">
                       <LogOut className="mr-2 h-4 w-4" />
                       Logout
@@ -177,15 +168,12 @@ export default function AdminLayout({
                 </div>
               </SheetContent>
             </Sheet>
-            
             <div className="ml-auto flex items-center gap-2">
                 <NotificationBell />
             </div>
             </header>
             <main className="flex-1 overflow-y-auto p-4 lg:p-8 bg-background">
-                <div className="mx-auto max-w-[1600px] w-full">
-                    {children}
-                </div>
+                <div className="mx-auto max-w-[1600px] w-full">{children}</div>
             </main>
         </div>
         </div>

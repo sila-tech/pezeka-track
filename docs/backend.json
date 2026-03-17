@@ -1,18 +1,15 @@
-
 {
   "entities": {
     "UserProfile": {
       "title": "User Profile",
-      "description": "Stores user-specific information and role for staff, finance, and agents.",
+      "description": "Stores user-specific information and role for staff and finance.",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["staff", "finance", "agent"] },
+        "role": { "type": "string", "enum": ["staff", "finance"] },
         "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "default": "approved" },
-        "name": { "type": "string" },
-        "referralCode": { "type": "string" },
-        "referredBy": { "type": "string" }
+        "name": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
     },
@@ -26,9 +23,6 @@
         "phone": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "idNumber": { "type": "string" },
-        "referralCode": { "type": "string" },
-        "referredBy": { "type": "string", "description": "UID of the user who referred this customer" },
-        "referredByCode": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
@@ -49,20 +43,6 @@
         "totalRepayableAmount": { "type": "number" },
         "totalPaid": { "type": "number", "default": 0 },
         "totalPenalties": { "type": "number", "default": 0 }
-      }
-    },
-    "Referral": {
-      "title": "Referral",
-      "description": "Tracking record for a referral event.",
-      "type": "object",
-      "properties": {
-        "referrerId": { "type": "string" },
-        "referrerName": { "type": "string" },
-        "refereeId": { "type": "string" },
-        "refereeName": { "type": "string" },
-        "status": { "type": "string", "enum": ["signed_up", "applied", "disbursed"] },
-        "verified": { "type": "boolean", "default": false },
-        "timestamp": { "type": "string", "format": "date-time" }
       }
     },
     "MailLog": {
@@ -94,10 +74,6 @@
     "/loans/{loanId}": {
       "schema": { "$ref": "#/entities/Loan" },
       "description": "Stores all loan records."
-    },
-    "/referrals/{referralId}": {
-      "schema": { "$ref": "#/entities/Referral" },
-      "description": "Records of referral conversions."
     },
     "/financeEntries/{entryId}": {
       "description": "Stores all financial entries."
