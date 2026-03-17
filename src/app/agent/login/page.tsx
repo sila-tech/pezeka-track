@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,9 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShieldCheck, TrendingUp, Users, LogIn, ArrowLeft } from 'lucide-react';
+import { Loader2, ShieldCheck, TrendingUp, LogIn, ArrowLeft } from 'lucide-react';
 import { registerAgent } from '@/lib/firestore';
-import Link from 'next/link';
+import Link from 'link';
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name.'),
@@ -38,7 +37,7 @@ export default function AgentLoginPage() {
   const { user, loading: userLoading } = useUser();
   const { user: appUser, loading: appUserLoading } = useAppUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLogin, setIsLogin] = useState(true); // Default to login
+  const [isLogin, setIsLogin] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -110,7 +109,6 @@ export default function AgentLoginPage() {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({ title: 'Welcome Back', description: 'Accessing agent portal...' });
-      // Redirection logic in useEffect will handle the rest
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Login Failed', description: 'Invalid email or password.' });
     } finally {
@@ -122,7 +120,6 @@ export default function AgentLoginPage() {
 
   return (
     <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8 items-center py-12 px-4 mx-auto">
-      {/* Brand Value Side */}
       <div className="space-y-8 p-4">
           <Link href="/" className="inline-flex items-center text-sm font-bold text-muted-foreground hover:text-[#5BA9D0] transition-colors mb-4">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -151,7 +148,6 @@ export default function AgentLoginPage() {
           </div>
       </div>
 
-      {/* Form Side */}
       <Card className="shadow-2xl border-none rounded-[2.5rem] overflow-hidden">
         <CardHeader className="bg-[#1B2B33] text-white p-8">
           <CardTitle className="text-2xl font-black">{isLogin ? 'Agent Sign In' : 'Agent Registration'}</CardTitle>
@@ -185,7 +181,7 @@ export default function AgentLoginPage() {
                         <FormItem>
                           <FormLabel>Email Address</FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="agent@example.com" className="h-12 rounded-xl" {...field} />
+                            <Input type="email" placeholder="agent@example.com" className="h-12 rounded-xl" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -194,7 +190,7 @@ export default function AgentLoginPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="••••••••" className="h-12 rounded-xl" {...field} />
+                            <Input type="password" placeholder="••••••••" className="h-12 rounded-xl" {...field} value={field.value ?? ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -217,7 +213,7 @@ export default function AgentLoginPage() {
                   <FormItem>
                     <FormLabel>Full Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" className="h-12 rounded-xl" {...field} />
+                      <Input placeholder="John Doe" className="h-12 rounded-xl" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -226,7 +222,7 @@ export default function AgentLoginPage() {
                   <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="john@example.com" className="h-12 rounded-xl" {...field} />
+                      <Input type="email" placeholder="john@example.com" className="h-12 rounded-xl" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -235,7 +231,7 @@ export default function AgentLoginPage() {
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="0712 345 678" className="h-12 rounded-xl" {...field} />
+                      <Input placeholder="0712 345 678" className="h-12 rounded-xl" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -244,7 +240,7 @@ export default function AgentLoginPage() {
                   <FormItem>
                     <FormLabel>Secure Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="Min. 6 characters" className="h-12 rounded-xl" {...field} />
+                      <Input type="password" placeholder="Min. 6 characters" className="h-12 rounded-xl" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

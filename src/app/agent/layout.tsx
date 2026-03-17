@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
 import { Loader2, LogOut, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,16 +16,25 @@ export default function AgentLayout({
   const { user, loading } = useAppUser();
   const auth = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const isLoginPage = pathname?.includes('/agent/login');
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/agent/login');
-    }
-    // Only Agents can access this portal
-    if (!loading && user && user.role !== 'agent') {
+    // If it's not the login page and we're not loading, check auth
+    if (!isLoginPage && !loading) {
+      if (!user) {
+        router.push('/agent/login');
+      } else if (user.role !== 'agent') {
         router.push('/account');
+      }
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isLoginPage]);
+
+  // Allow the login page to render without blocking
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (loading || !user) {
     return (
@@ -36,12 +44,7 @@ export default function AgentLayout({
     );
   }
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.push('/');
-  };
-
-  // Approval Check
+  // Approval Check for Agents
   if (user.role === 'agent' && user.status !== 'approved') {
       return (
           <div className="min-h-screen flex flex-col bg-[#F8FAFB]">
@@ -51,7 +54,7 @@ export default function AgentLayout({
                     <span className="font-black text-lg text-[#1B2B33]">Agent Portal</span>
                 </Link>
                 <div className="ml-auto">
-                    <Button onClick={handleLogout} variant="ghost" size="sm" className="text-destructive">
+                    <Button onClick={() => signOut(auth)} variant="ghost" size="sm" className="text-destructive">
                         <LogOut className="h-4 w-4 mr-2" />
                         Logout
                     </Button>
@@ -88,7 +91,7 @@ export default function AgentLayout({
         </Link>
         <div className="ml-auto flex items-center gap-4">
             <span className="text-xs font-bold text-muted-foreground hidden sm:block">Hello, {user.name}</span>
-            <Button onClick={handleLogout} variant="ghost" size="sm" className="text-destructive">
+            <Button onClick={() => signOut(auth)} variant="ghost" size="sm" className="text-destructive">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
             </Button>
