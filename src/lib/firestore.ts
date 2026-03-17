@@ -67,6 +67,7 @@ export async function generateReferralCode(db: Firestore, name: string): Promise
 
 /**
  * Finds a user ID by their referral code.
+ * Only returns if the referrer is approved.
  */
 export async function getUserByReferralCode(db: Firestore, code: string): Promise<{ uid: string, name: string } | null> {
     const q = query(collection(db, 'users'), where('referralCode', '==', code), limit(1));
@@ -78,7 +79,11 @@ export async function getUserByReferralCode(db: Firestore, code: string): Promis
         if (snapc.empty) return null;
         return { uid: snapc.docs[0].id, name: snapc.docs[0].data().name };
     }
-    return { uid: snap.docs[0].id, name: snap.docs[0].data().name };
+    
+    const userData = snap.docs[0].data();
+    if (userData.role === 'agent' && userData.status !== 'approved') return null;
+    
+    return { uid: snap.docs[0].id, name: userData.name };
 }
 
 /**
@@ -89,12 +94,25 @@ export async function addReferral(db: Firestore, data: { referrerId: string, ref
     const newRef = {
         ...data,
         status: 'signed_up',
+        verified: false,
         timestamp: serverTimestamp()
     };
     try {
         await addDoc(refCollection, newRef);
     } catch (e) {
         console.error("Referral logging failed", e);
+    }
+}
+
+/**
+ * Approves a referral conversion.
+ */
+export async function approveReferral(db: Firestore, referralId: string) {
+    const ref = doc(db, 'referrals', referralId);
+    try {
+        await updateDoc(ref, { verified: true, updatedAt: serverTimestamp() });
+    } catch (e) {
+        console.error("Referral approval failed", e);
     }
 }
 
@@ -760,13 +778,14 @@ export async function addFollowUpNoteToLoan(db: Firestore, loanId: string, note:
 }
 
 
-export async function createUserProfile(db: Firestore, userId: string, data: { email: string, role: string, name?: string }) {
+export async function createUserProfile(db: Firestore, userId: string, data: { email: string, role: string, name?: string, status?: string }) {
     const userRef = doc(db, 'users', userId);
     const referralCode = await generateReferralCode(db, data.name || data.email);
     const profileData = {
         uid: userId,
         email: data.email,
         role: data.role,
+        status: data.status || (data.role === 'agent' ? 'pending' : 'approved'),
         name: data.name || data.email.split('@')[0],
         referralCode,
     };

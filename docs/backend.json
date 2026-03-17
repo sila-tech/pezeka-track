@@ -9,6 +9,7 @@
         "uid": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "role": { "type": "string", "enum": ["staff", "finance", "agent"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "default": "approved" },
         "name": { "type": "string" },
         "referralCode": { "type": "string" },
         "referredBy": { "type": "string" }
@@ -60,6 +61,7 @@
         "refereeId": { "type": "string" },
         "refereeName": { "type": "string" },
         "status": { "type": "string", "enum": ["signed_up", "applied", "disbursed"] },
+        "verified": { "type": "boolean", "default": false },
         "timestamp": { "type": "string", "format": "date-time" }
       }
     },

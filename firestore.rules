@@ -37,9 +37,9 @@ service cloud.firestore {
       return isFinance() || hasRole('staff');
     }
 
-    // Agent Role
+    // Agent Role: Must be approved
     function isAgent() {
-      return hasRole('agent');
+      return hasRole('agent') && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'pending') == 'approved';
     }
     
     // Check if the user is the owner of the document

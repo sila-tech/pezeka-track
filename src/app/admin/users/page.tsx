@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { createUserProfile, updateUserProfile, deleteUserProfile } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, MoreHorizontal, ShieldCheck } from 'lucide-react';
+import { Loader2, PlusCircle, MoreHorizontal, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -63,14 +64,16 @@ interface UserProfile {
   uid: string;
   name: string;
   email: string;
-  role: 'staff' | 'finance';
+  role: 'staff' | 'finance' | 'agent';
+  status?: 'pending' | 'approved' | 'rejected';
 }
 
 const userProfileSchema = z.object({
   uid: z.string().min(1, 'Firebase UID is required.'),
   name: z.string().min(1, 'Name is required.'),
   email: z.string().email('A valid email is required.'),
-  role: z.enum(['staff', 'finance'], { required_error: 'Please select a role.' }),
+  role: z.enum(['staff', 'finance', 'agent'], { required_error: 'Please select a role.' }),
+  status: z.enum(['pending', 'approved', 'rejected']).default('approved'),
 });
 
 export default function UserManagementPage() {
@@ -87,7 +90,6 @@ export default function UserManagementPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // User management is strictly restricted to Administration and Finance. Staff cannot see this module.
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase()?.trim();
@@ -95,7 +97,6 @@ export default function UserManagementPage() {
         return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
     }, [currentUser]);
 
-    // Only Super Admin can actually manage other admin accounts
     const isSuperAdmin = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase()?.trim();
@@ -113,7 +114,7 @@ export default function UserManagementPage() {
 
     const addForm = useForm<z.infer<typeof userProfileSchema>>({
         resolver: zodResolver(userProfileSchema),
-        defaultValues: { uid: '', name: '', email: '', role: undefined },
+        defaultValues: { uid: '', name: '', email: '', role: 'staff', status: 'approved' },
     });
 
     const editForm = useForm<z.infer<typeof userProfileSchema>>({
@@ -124,7 +125,7 @@ export default function UserManagementPage() {
         if (!isSuperAdmin) return;
         setIsSubmitting(true);
         try {
-            await createUserProfile(firestore, values.uid, { email: values.email, role: values.role, name: values.name });
+            await createUserProfile(firestore, values.uid, values);
             toast({ title: 'User Profile Created', description: `Profile for ${values.name} has been added.` });
             setAddDialogOpen(false);
             addForm.reset();
@@ -134,7 +135,7 @@ export default function UserManagementPage() {
     const handleEditClick = (user: UserProfile) => {
         if (!isSuperAdmin) return;
         setUserToEdit(user);
-        editForm.reset({ uid: user.uid, name: user.name, email: user.email, role: user.role });
+        editForm.reset({ uid: user.uid, name: user.name, email: user.email, role: user.role, status: user.status || 'approved' });
         setEditDialogOpen(true);
     };
     
@@ -142,12 +143,22 @@ export default function UserManagementPage() {
       if (!userToEdit || !isSuperAdmin) return;
       setIsSubmitting(true);
       try {
-        await updateUserProfile(firestore, userToEdit.id, { name: values.name, email: values.email, role: values.role });
+        await updateUserProfile(firestore, userToEdit.id, values);
         toast({ title: "Profile Updated" });
         setEditDialogOpen(false);
         setUserToEdit(null);
       } catch (error: any) { toast({ variant: "destructive", title: "Update Failed", description: error.message }); } finally { setIsSubmitting(false); }
     }
+
+    const handleApprove = async (user: UserProfile) => {
+        if (!isSuperAdmin) return;
+        try {
+            await updateUserProfile(firestore, user.id, { status: 'approved' });
+            toast({ title: "User Approved", description: `${user.name} can now access the system.` });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'Approval Failed', description: e.message });
+        }
+    };
     
     const handleDeleteClick = (user: UserProfile) => {
         if (!isSuperAdmin) return;
@@ -168,23 +179,13 @@ export default function UserManagementPage() {
     
     if (userLoading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
-    if (currentUser && !canViewPage) {
-        return (
-            <div className="flex h-[60vh] flex-col items-center justify-center text-center p-8 bg-card rounded-xl border border-dashed">
-                <ShieldCheck className="h-12 w-12 text-muted-foreground mb-4" />
-                <h2 className="text-xl font-bold">Access Denied</h2>
-                <p className="text-muted-foreground mt-2">Only Super Admins and Finance can manage team access.</p>
-            </div>
-        );
-    }
-
     return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#1B2B33]">User Management</h1>
         {isSuperAdmin && (
             <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add User Profile</Button></DialogTrigger>
+            <DialogTrigger asChild><Button className="bg-[#1B2B33]"><PlusCircle className="mr-2 h-4 w-4" />Add User Profile</Button></DialogTrigger>
             <DialogContent>
                 <DialogHeader><DialogTitle>Add New User Profile</DialogTitle><DialogDescription>First, create the user in the Firebase Authentication console.</DialogDescription></DialogHeader>
                 <Form {...addForm}>
@@ -202,7 +203,13 @@ export default function UserManagementPage() {
                         <FormField control={addForm.control} name="role" render={({ field }) => (
                         <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
-                            <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
+                            <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem><SelectItem value="agent">Agent (Referrer)</SelectItem></SelectContent>
+                        </Select><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={addForm.control} name="status" render={({ field }) => (
+                        <FormItem><FormLabel>Initial Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                            <SelectContent><SelectItem value="approved">Approved</SelectItem><SelectItem value="pending">Pending Review</SelectItem></SelectContent>
                         </Select><FormMessage /></FormItem>
                         )}/>
                     </form>
@@ -213,27 +220,42 @@ export default function UserManagementPage() {
             </Dialog>
         )}
       </div>
-      <Card>
-        <CardHeader><CardTitle>Admin Users</CardTitle><CardDescription>A list of all users with staff or finance roles.</CardDescription></CardHeader>
+      <Card className="rounded-2xl border-none shadow-xl shadow-navy-900/5">
+        <CardHeader><CardTitle>Admin Users</CardTitle><CardDescription>Manage staff, finance, and approved referrers.</CardDescription></CardHeader>
         <CardContent>
           {usersLoading && (<div className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>)}
           {!usersLoading && (!users || users.length === 0) && (<Alert><AlertTitle>No User Profiles Found</AlertTitle></Alert>)}
           {!usersLoading && users && users.length > 0 && (
             <ScrollArea className="h-[60vh]">
-              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead>{isSuperAdmin && <TableHead className="text-right w-[80px]">Actions</TableHead>}</TableRow></TableHeader>
-                  <TableBody>{users.map((user) => (
-                          <TableRow key={user.id}><TableCell className="font-medium">{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell><Badge variant="secondary">{user.role}</Badge></TableCell>
-                          {isSuperAdmin && (
-                            <TableCell className="text-right">
-                                <DropdownMenu open={openMenu === user.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? user.id : null)}>
-                                    <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => handleEditClick(user)}>Edit</DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">Delete</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                          )}
+              <Table><TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Role</TableHead><TableHead>Status</TableHead>{isSuperAdmin && <TableHead className="text-right w-[150px]">Actions</TableHead>}</TableRow></TableHeader>
+                  <TableBody>{users.sort((a,b) => (a.status === 'pending' ? -1 : 1)).map((user) => (
+                          <TableRow key={user.id}>
+                              <TableCell className="font-medium">{user.name}</TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell><Badge variant="secondary" className="uppercase text-[10px] font-bold">{user.role}</Badge></TableCell>
+                              <TableCell>
+                                  <Badge variant={user.status === 'approved' ? 'default' : (user.status === 'rejected' ? 'destructive' : 'secondary')} className="uppercase text-[10px] font-black">
+                                      {user.status || 'approved'}
+                                  </Badge>
+                              </TableCell>
+                              {isSuperAdmin && (
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        {user.status === 'pending' && (
+                                            <Button size="sm" variant="outline" className="h-8 border-green-600 text-green-600 hover:bg-green-50" onClick={() => handleApprove(user)}>
+                                                <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
+                                            </Button>
+                                        )}
+                                        <DropdownMenu open={openMenu === user.id} onOpenChange={(isOpen) => setOpenMenu(isOpen ? user.id : null)}>
+                                            <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => handleEditClick(user)}>Edit</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDeleteClick(user)} className="text-destructive">Delete</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </TableCell>
+                              )}
                           </TableRow>
                       ))}</TableBody></Table>
             </ScrollArea>
@@ -261,7 +283,13 @@ export default function UserManagementPage() {
                                 <FormField control={editForm.control} name="role" render={({ field }) => (
                                 <FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                    <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem></SelectContent>
+                                    <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="finance">Finance</SelectItem><SelectItem value="agent">Agent (Referrer)</SelectItem></SelectContent>
+                                </Select></FormItem>
+                                )}/>
+                                <FormField control={editForm.control} name="status" render={({ field }) => (
+                                <FormItem><FormLabel>Status</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                    <SelectContent><SelectItem value="approved">Approved</SelectItem><SelectItem value="pending">Pending Review</SelectItem><SelectItem value="rejected">Rejected</SelectItem></SelectContent>
                                 </Select></FormItem>
                                 )}/>
                             </form>

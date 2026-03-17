@@ -14,7 +14,8 @@ import {
     Wallet, 
     TrendingUp, 
     ExternalLink,
-    Send
+    Send,
+    ShieldCheck
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -27,6 +28,7 @@ interface Referral {
     referrerId: string;
     refereeName: string;
     status: 'signed_up' | 'applied' | 'disbursed';
+    verified?: boolean;
     timestamp: { seconds: number, nanoseconds: number } | any;
 }
 
@@ -46,13 +48,12 @@ export default function AgentDashboard() {
       return {
           total: myReferrals.length,
           converted: myReferrals.filter(r => r.status === 'disbursed').length,
-          pending: myReferrals.filter(r => r.status !== 'disbursed').length,
+          verified: myReferrals.filter(r => r.verified).length,
       };
   }, [myReferrals]);
 
   const referralLink = useMemo(() => {
       if (!user?.referralCode) return '';
-      // Replace with actual domain in production
       const base = typeof window !== 'undefined' ? window.location.origin : 'https://pezeka.com';
       return `${base}/customer-login?ref=${user.referralCode}`;
   }, [user?.referralCode]);
@@ -82,8 +83,8 @@ export default function AgentDashboard() {
               </div>
               <div className="w-px h-10 bg-white/10" />
               <div className="text-center">
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Loans Disbursed</p>
-                  <p className="text-2xl font-black text-green-400">{stats.converted}</p>
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Verified Earnings</p>
+                  <p className="text-2xl font-black text-green-400">{stats.verified}</p>
               </div>
           </div>
       </div>
@@ -97,7 +98,7 @@ export default function AgentDashboard() {
                   </div>
                   <h2 className="text-2xl font-black">Your Referral Link</h2>
               </div>
-              <p className="text-white/80 font-medium mb-6">Invite business owners and individuals to Pezeka. When they take their first loan, you'll earn your commission.</p>
+              <p className="text-white/80 font-medium mb-6">Invite business owners and individuals to Pezeka. When they take their first loan and it's verified, you'll earn your commission.</p>
               
               <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 bg-white/10 border border-white/20 rounded-2xl p-4 font-mono text-sm break-all flex items-center justify-between group">
@@ -137,9 +138,9 @@ export default function AgentDashboard() {
                               <TableHeader className="bg-muted/30">
                                   <TableRow>
                                       <TableHead className="font-bold text-[#1B2B33]">Customer Name</TableHead>
-                                      <TableHead className="font-bold text-[#1B2B33]">Date Joined</TableHead>
                                       <TableHead className="font-bold text-[#1B2B33]">Status</TableHead>
-                                      <TableHead className="text-right font-bold text-[#1B2B33]">Context</TableHead>
+                                      <TableHead className="font-bold text-[#1B2B33]">Verification</TableHead>
+                                      <TableHead className="text-right font-bold text-[#1B2B33]">Date</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -148,24 +149,26 @@ export default function AgentDashboard() {
                                       return (
                                           <TableRow key={ref.id}>
                                               <TableCell className="font-medium">{ref.refereeName}</TableCell>
-                                              <TableCell className="text-xs text-muted-foreground">{format(date, 'dd MMM yyyy')}</TableCell>
                                               <TableCell>
                                                   <Badge variant={ref.status === 'disbursed' ? 'default' : 'secondary'} className="rounded-lg px-2 py-1 uppercase text-[9px] font-black">
                                                       {ref.status.replace('_', ' ')}
                                                   </Badge>
                                               </TableCell>
-                                              <TableCell className="text-right">
-                                                  {ref.status === 'disbursed' ? (
-                                                      <div className="flex items-center justify-end gap-1 text-green-600 text-[10px] font-bold">
-                                                          <CheckCircle2 className="h-3 w-3" />
-                                                          QUALIFIED
+                                              <TableCell>
+                                                  {ref.verified ? (
+                                                      <div className="flex items-center gap-1 text-green-600 text-[10px] font-bold uppercase">
+                                                          <ShieldCheck className="h-3 w-3" />
+                                                          Verified
                                                       </div>
                                                   ) : (
-                                                      <div className="flex items-center justify-end gap-1 text-muted-foreground text-[10px] font-bold">
+                                                      <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-bold uppercase">
                                                           <Clock className="h-3 w-3" />
-                                                          PENDING
+                                                          Pending
                                                       </div>
                                                   )}
+                                              </TableCell>
+                                              <TableCell className="text-right text-[10px] text-muted-foreground font-bold">
+                                                  {format(date, 'dd MMM yyyy')}
                                               </TableCell>
                                           </TableRow>
                                       );
@@ -185,7 +188,7 @@ export default function AgentDashboard() {
               <div className="space-y-2">
                   <h3 className="font-black text-[#1B2B33]">Commission Structure</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                      Commissions are processed automatically once your referral's first loan is disbursed. Payouts are made every Friday to your registered M-Pesa number. Please contact support for specific rate details based on your agent tier.
+                      Commissions are processed once your referral's first loan is disbursed and **verified** by the finance team. Payouts are made to your registered contact number.
                   </p>
               </div>
           </div>

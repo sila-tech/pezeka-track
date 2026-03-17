@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart, Search, X, HandCoins, Users } from "lucide-react";
+import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart, Search, X, HandCoins, Users, CheckCircle2 } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, deleteFinanceEntry, deleteLoan, addLoan, addCustomer } from '@/lib/firestore';
+import { addFinanceEntry, updateLoan, rolloverLoan, addPenaltyToLoan, updateFinanceEntry, deleteFinanceEntry, deleteLoan, addLoan, addCustomer, approveReferral } from '@/lib/firestore';
 import { EditableFinanceReportTab, DatePickerWithRange } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
@@ -142,6 +142,7 @@ interface Referral {
     referrerName: string;
     refereeName: string;
     status: string;
+    verified?: boolean;
     timestamp: any;
 }
 
@@ -416,6 +417,16 @@ export default function FinancePage() {
           setEntryToDelete(null);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Error', description: e.message });
+      }
+  };
+
+  const handleVerifyReferral = async (ref: Referral) => {
+      if (!canEdit) return;
+      try {
+          await approveReferral(firestore, ref.id);
+          toast({ title: 'Referral Verified', description: `Conversion for ${ref.refereeName} confirmed.` });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
       }
   };
 
@@ -790,7 +801,7 @@ export default function FinancePage() {
               <Card>
                   <CardHeader>
                       <CardTitle>Referral Conversions</CardTitle>
-                      <CardDescription>Track customers brought in by agents or other clients.</CardDescription>
+                      <CardDescription>Track and verify customers brought in by agents or other clients.</CardDescription>
                   </CardHeader>
                   <CardContent>
                       <ScrollArea className="h-[60vh]">
@@ -801,11 +812,12 @@ export default function FinancePage() {
                                       <TableHead>Referrer (Source)</TableHead>
                                       <TableHead>Referee (Customer)</TableHead>
                                       <TableHead>Status</TableHead>
+                                      <TableHead className="text-right">Action</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
                                   {(referrals || []).length === 0 ? (
-                                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground italic">No referral events recorded.</TableCell></TableRow>
+                                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">No referral events recorded.</TableCell></TableRow>
                                   ) : (
                                       referrals?.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).map((ref) => (
                                           <TableRow key={ref.id}>
@@ -813,9 +825,25 @@ export default function FinancePage() {
                                               <TableCell className="font-bold text-[#5BA9D0]">{ref.referrerName}</TableCell>
                                               <TableCell className="font-medium">{ref.refereeName}</TableCell>
                                               <TableCell>
-                                                  <Badge variant={ref.status === 'disbursed' ? 'default' : 'secondary'} className="uppercase text-[9px] font-black">
-                                                      {ref.status.replace('_', ' ')}
-                                                  </Badge>
+                                                  <div className="flex flex-col gap-1">
+                                                      <Badge variant={ref.status === 'disbursed' ? 'default' : 'secondary'} className="uppercase text-[9px] font-black w-fit">
+                                                          {ref.status.replace('_', ' ')}
+                                                      </Badge>
+                                                      {ref.verified ? (
+                                                          <div className="flex items-center gap-1 text-green-600 text-[9px] font-bold">
+                                                              <CheckCircle2 className="h-3 w-3" /> VERIFIED
+                                                          </div>
+                                                      ) : (
+                                                          <div className="text-muted-foreground text-[9px] font-bold uppercase">Unverified</div>
+                                                      )}
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell className="text-right">
+                                                  {!ref.verified && ref.status === 'disbursed' && (
+                                                      <Button size="sm" variant="outline" className="h-8 border-[#5BA9D0] text-[#5BA9D0] hover:bg-[#5BA9D0]/10" onClick={() => handleVerifyReferral(ref)}>
+                                                          Verify Conversion
+                                                      </Button>
+                                                  )}
                                               </TableCell>
                                           </TableRow>
                                       ))
