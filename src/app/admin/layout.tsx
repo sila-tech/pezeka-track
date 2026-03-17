@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, LayoutDashboard, Users, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Users, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
@@ -33,6 +34,11 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
             <Link href="/admin/customers" className={linkClass("/admin/customers")} onClick={onLinkClick}>
                 <Users className="h-4 w-4" />
                 Customers
+            </Link>
+
+            <Link href="/admin/referrals" className={linkClass("/admin/referrals")} onClick={onLinkClick}>
+                <Share2 className="h-4 w-4" />
+                Referrals
             </Link>
 
             <Link href="/admin/loans" className={linkClass("/admin/loans")} onClick={onLinkClick}>

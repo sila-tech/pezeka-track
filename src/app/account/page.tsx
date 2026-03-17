@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useCollection, useFirestore, useDoc, useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -69,6 +70,7 @@ interface Customer {
     phone: string;
     email?: string;
     idNumber?: string;
+    referralCode?: string;
 }
 
 const LOAN_PRODUCTS = [
@@ -174,16 +176,20 @@ export default function AccountPage() {
       }
   };
 
+  const referralLink = useMemo(() => {
+      const code = customerProfile?.referralCode || 'INVITE';
+      return `pezeka.com/${code}`;
+  }, [customerProfile?.referralCode]);
+
   const handleShareReferral = () => {
-      const message = `Hi! I'm using Pezeka Credit for fast and reliable loans. You should check them out: ${window.location.origin}`;
+      const message = `Hi! I'm using Pezeka Credit for fast and reliable loans. Use my code to join: ${referralLink}`;
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
   };
 
   const copyReferralLink = () => {
-      const link = window.location.origin;
-      navigator.clipboard.writeText(link);
-      toast({ title: 'Link Copied', description: 'You can now paste and share it with friends.' });
+      navigator.clipboard.writeText(referralLink);
+      toast({ title: 'Link Copied', description: 'You can now share your referral code with friends.' });
   };
 
   return (
@@ -239,8 +245,8 @@ export default function AccountPage() {
                             <p className="text-sm font-black uppercase">{fullName}</p>
                         </div>
                         <div className="text-right space-y-1">
-                            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Credit Limit</p>
-                            <p className="text-sm font-black">KES 0</p>
+                            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Referral Code</p>
+                            <p className="text-sm font-black uppercase">{customerProfile?.referralCode || '-'}</p>
                         </div>
                     </div>
                     
@@ -472,20 +478,23 @@ export default function AccountPage() {
                       <div className="w-16 h-16 bg-[#5BA9D0]/10 rounded-full flex items-center justify-center mx-auto mb-2">
                           <Users className="h-8 w-8 text-[#5BA9D0]" />
                       </div>
-                      <h4 className="text-lg font-bold">Grow our community</h4>
-                      <p className="text-xs text-muted-foreground px-4">Share Pezeka with your business partners and friends. Let's build together.</p>
+                      <h4 className="text-lg font-bold">Your Referral Link</h4>
+                      <div className="bg-white border rounded-xl p-3 flex items-center justify-between gap-2 shadow-sm">
+                          <span className="text-sm font-bold text-[#5BA9D0] truncate">{referralLink}</span>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-[#5BA9D0]" onClick={copyReferralLink}>
+                              <Copy className="h-4 w-4" />
+                          </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground px-4">Friends who sign up using your link will be associated with your account.</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                       <Button onClick={handleShareReferral} className="h-14 rounded-2xl bg-[#25D366] hover:bg-[#25D366]/90 font-bold text-white">
-                          <Share2 className="mr-2 h-4 w-4" /> WhatsApp
-                      </Button>
-                      <Button onClick={copyReferralLink} variant="outline" className="h-14 rounded-2xl font-bold border-[#5BA9D0]/20 text-[#5BA9D0]">
-                          <Copy className="mr-2 h-4 w-4" /> Copy Link
+                          <Share2 className="mr-2 h-4 w-4" /> Share on WhatsApp
                       </Button>
                   </div>
               </div>
               <DialogFooter>
-                  <Button onClick={() => setIsReferOpen(false)} variant="ghost" className="w-full font-bold">
+                  <Button onClick={() => setIsReferOpen(false)} variant="ghost" className="w-full font-bold text-[#1B2B33]/40">
                       Maybe Later
                   </Button>
               </DialogFooter>

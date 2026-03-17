@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -22,8 +23,8 @@ const authSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }).optional().or(z.literal('')),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  phone: z.string().optional(),
-  idNumber: z.string().optional(),
+  phone: z.string().min(10, 'Valid phone number is required.').optional().or(z.literal('')),
+  idNumber: z.string().min(5, 'National ID is required.').optional().or(z.literal('')),
 });
 
 export default function CustomerLoginPage() {
@@ -58,15 +59,18 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
-        if (!values.firstName || !values.lastName || !values.phone || values.phone.length < 10 || !values.idNumber || values.idNumber.length < 5 || !values.password) {
+        if (!values.firstName || !values.lastName || !values.phone || !values.idNumber || !values.password) {
           toast({ 
             variant: 'destructive', 
             title: 'Missing Information', 
-            description: 'Full name, valid phone number, National ID, and password are required.' 
+            description: 'Full name, phone number, National ID, and password are required.' 
           });
           setIsSubmitting(false); 
           return;
         }
+
+        // Check for stored referral code
+        const referredBy = typeof window !== 'undefined' ? sessionStorage.getItem('referralCode') || undefined : undefined;
 
         const cred = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const fullName = `${values.firstName} ${values.lastName}`;
@@ -76,8 +80,13 @@ export default function CustomerLoginPage() {
             name: fullName,
             phone: values.phone,
             email: values.email,
-            idNumber: values.idNumber
+            idNumber: values.idNumber,
+            referredBy: referredBy
         });
+
+        if (referredBy) {
+            sessionStorage.removeItem('referralCode');
+        }
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
       } else {
