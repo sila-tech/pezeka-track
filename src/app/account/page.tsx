@@ -21,7 +21,10 @@ import {
   Phone,
   Mail,
   UserCircle,
-  Loader2
+  Loader2,
+  Users,
+  Share2,
+  Copy
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
@@ -86,6 +89,7 @@ export default function AccountPage() {
   const [greeting, setGreeting] = useState('Welcome');
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isLoansOpen, setIsLoansOpen] = useState(false);
+  const [isReferOpen, setIsReferOpen] = useState(false);
   const [isUpdatingProfile, setIsUpdating] = useState(false);
 
   // Profile Form State
@@ -170,6 +174,18 @@ export default function AccountPage() {
       }
   };
 
+  const handleShareReferral = () => {
+      const message = `Hi! I'm using Pezeka Credit for fast and reliable loans. You should check them out: ${window.location.origin}`;
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+  };
+
+  const copyReferralLink = () => {
+      const link = window.location.origin;
+      navigator.clipboard.writeText(link);
+      toast({ title: 'Link Copied', description: 'You can now paste and share it with friends.' });
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFB] text-[#1B2B33] pb-24 font-sans flex flex-col">
       {/* Header Section */}
@@ -233,8 +249,8 @@ export default function AccountPage() {
                     <div className="absolute top-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl"></div>
                 </div>
 
-                {/* Action Grid - Minimal Blue tint */}
-                <div className="flex justify-between items-center px-2">
+                {/* Action Grid - Enhanced with Refer */}
+                <div className="grid grid-cols-5 gap-2 px-2">
                     <ActionCircle 
                         icon={<SendHorizontal className="h-6 w-6 text-[#5BA9D0]" />} 
                         label="Send" 
@@ -251,9 +267,9 @@ export default function AccountPage() {
                         onClick={() => setIsLoansOpen(true)}
                     />
                     <ActionCircle 
-                        icon={<Briefcase className="h-6 w-6 text-[#5BA9D0]" />} 
-                        label="Biz" 
-                        status="Soon"
+                        icon={<Users className="h-6 w-6 text-[#5BA9D0]" />} 
+                        label="Refer" 
+                        onClick={() => setIsReferOpen(true)}
                     />
                     <ActionCircle 
                         icon={<Folder className="h-6 w-6 text-[#5BA9D0]" />} 
@@ -384,7 +400,7 @@ export default function AccountPage() {
                             className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-lg shadow-xl shadow-[#5BA9D0]/20 transition-all active:scale-95"
                         >
                             {isUpdatingProfile ? (
-                                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving Changes...</>
+                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving Changes...</>
                             ) : (
                                 'Save Profile Changes'
                             )}
@@ -439,6 +455,38 @@ export default function AccountPage() {
               <DialogFooter>
                   <Button onClick={() => setIsPayOpen(false)} className="w-full h-14 rounded-xl bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-bold text-white">
                       Done
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      {/* Refer a Friend Dialog */}
+      <Dialog open={isReferOpen} onOpenChange={setIsReferOpen}>
+          <DialogContent className="sm:max-w-md rounded-[2rem]">
+              <DialogHeader>
+                  <DialogTitle className="text-2xl font-black text-[#1B2B33]">Refer a Friend</DialogTitle>
+                  <DialogDescription>Love using Pezeka? Invite your friends and help them grow too!</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                  <div className="bg-[#F8FAFB] border border-[#5BA9D0]/20 rounded-3xl p-8 text-center space-y-4">
+                      <div className="w-16 h-16 bg-[#5BA9D0]/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                          <Users className="h-8 w-8 text-[#5BA9D0]" />
+                      </div>
+                      <h4 className="text-lg font-bold">Grow our community</h4>
+                      <p className="text-xs text-muted-foreground px-4">Share Pezeka with your business partners and friends. Let's build together.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                      <Button onClick={handleShareReferral} className="h-14 rounded-2xl bg-[#25D366] hover:bg-[#25D366]/90 font-bold text-white">
+                          <Share2 className="mr-2 h-4 w-4" /> WhatsApp
+                      </Button>
+                      <Button onClick={copyReferralLink} variant="outline" className="h-14 rounded-2xl font-bold border-[#5BA9D0]/20 text-[#5BA9D0]">
+                          <Copy className="mr-2 h-4 w-4" /> Copy Link
+                      </Button>
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button onClick={() => setIsReferOpen(false)} variant="ghost" className="w-full font-bold">
+                      Maybe Later
                   </Button>
               </DialogFooter>
           </DialogContent>
