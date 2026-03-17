@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
 import { addFinanceEntry, updateLoan, rolloverLoan, updateFinanceEntry, deleteFinanceEntry, deleteLoan, addLoan, addCustomer } from '@/lib/firestore';
-import { EditableFinanceReportTab, DatePickerWithRange } from './components/editable-finance-report-tab';
+import { EditableFinanceReportTab } from './components/editable-finance-report-tab';
 import { InvestorsPortfolioTab } from './components/investors-portfolio-tab';
 import { StaffPortfoliosTab } from './components/staff-portfolios-tab';
 import { PortfolioReportsTab } from './components/portfolio-reports-tab';
@@ -37,7 +37,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { DateRange } from 'react-day-picker';
 
 interface Payment {
     paymentId: string;
@@ -160,12 +159,12 @@ export default function FinancePage() {
                       </div>
                   </CardHeader>
                   <CardContent className="p-0">
-                      {/* Sideways scrolling container */}
-                      <ScrollArea className="h-[65vh] w-full border-t">
+                      {/* Fixed height container with native scroll to prevent auto-scrolling issues */}
+                      <div className="h-[65vh] w-full overflow-auto border-t">
                           <Table className="min-w-[2500px] border-separate border-spacing-0">
-                              <TableHeader className="bg-muted/50">
+                              <TableHeader className="bg-muted/50 sticky top-0 z-40">
                                   <TableRow>
-                                      <TableHead className="sticky left-0 bg-muted/50 z-30 w-[200px] border-r">Client Name</TableHead>
+                                      <TableHead className="sticky left-0 bg-muted/50 z-50 w-[200px] border-r">Client Name</TableHead>
                                       <TableHead className="w-[150px]">Phone</TableHead>
                                       <TableHead className="w-[150px]">Staff</TableHead>
                                       <TableHead className="w-[120px]">Loan No.</TableHead>
@@ -184,7 +183,7 @@ export default function FinancePage() {
                                       <TableHead className="text-right w-[120px]">Penalties</TableHead>
                                       <TableHead className="text-right w-[140px]">Exp. Interest</TableHead>
                                       <TableHead className="text-right w-[140px] bg-green-50/50">Exp. Income</TableHead>
-                                      <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-30 border-l">History</TableHead>
+                                      <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-50 border-l">History</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -206,7 +205,7 @@ export default function FinancePage() {
 
                                       return (
                                           <TableRow key={loan.id} className="hover:bg-muted/30 transition-colors group">
-                                              <TableCell className="font-bold sticky left-0 bg-background group-hover:bg-muted/30 transition-colors z-20 border-r">{loan.customerName}</TableCell>
+                                              <TableCell className="font-bold sticky left-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-r">{loan.customerName}</TableCell>
                                               <TableCell className="text-xs">{loan.customerPhone}</TableCell>
                                               <TableCell className="text-xs italic">{loan.assignedStaffName || 'Unassigned'}</TableCell>
                                               <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
@@ -225,7 +224,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right text-orange-600">{loan.totalPenalties?.toLocaleString() || '0'}</TableCell>
                                               <TableCell className="text-right font-medium">{interest.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-black bg-green-50/30 text-green-700">{totalIncome.toLocaleString()}</TableCell>
-                                              <TableCell className="text-center sticky right-0 bg-background group-hover:bg-muted/30 transition-colors z-20 border-l">
+                                              <TableCell className="text-center sticky right-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-l">
                                                   <Button 
                                                     variant="ghost" 
                                                     size="sm" 
@@ -240,9 +239,7 @@ export default function FinancePage() {
                                   })}
                               </TableBody>
                           </Table>
-                          {/* Explicit horizontal scrollbar for ShadCN ScrollArea */}
-                          <ScrollBar orientation="horizontal" />
-                      </ScrollArea>
+                      </div>
                   </CardContent>
               </Card>
           </TabsContent>
