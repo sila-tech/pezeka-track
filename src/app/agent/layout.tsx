@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, ShieldAlert } from 'lucide-react';
+import { Loader2, LogOut, ShieldAlert, User, LayoutDashboard, Share2, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function AgentLayout({
   children,
@@ -17,32 +18,43 @@ export default function AgentLayout({
   const auth = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
-  const isLoginPage = pathname?.includes('/agent/login');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // If it's not the login page and we're not loading, check auth
-    if (!isLoginPage && !loading) {
+    setMounted(true);
+  }, []);
+
+  const isLoginPage = pathname === '/agent/login';
+
+  useEffect(() => {
+    if (mounted && !loading && !isLoginPage) {
       if (!user) {
         router.push('/agent/login');
       } else if (user.role !== 'agent') {
         router.push('/account');
       }
     }
-  }, [user, loading, router, isLoginPage]);
+  }, [user, loading, router, isLoginPage, mounted]);
 
-  // Allow the login page to render without blocking
+  // Prevent flash or errors during initial hydration
+  if (!mounted) return null;
+
+  // Allow the login page to render its own nested layout/content
   if (isLoginPage) {
     return <>{children}</>;
   }
 
-  if (loading || !user) {
+  // Loading state
+  if (loading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
+      <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFB]">
         <Loader2 className="h-8 w-8 animate-spin text-[#5BA9D0]" />
       </div>
     );
   }
+
+  // Not logged in (handled by useEffect redirect, but safety check)
+  if (!user) return null;
 
   // Approval Check for Agents
   if (user.role === 'agent' && user.status !== 'approved') {
@@ -87,11 +99,19 @@ export default function AgentLayout({
       <header className="px-6 h-16 flex items-center bg-white border-b border-muted sticky top-0 z-50">
         <Link href="/agent" className="flex items-center gap-2">
             <img src="/pezeka_logo_transparent.png" className="h-8 w-8" alt="Pezeka" />
-            <span className="font-black text-lg text-[#1B2B33]">Agent Portal</span>
+            <span className="font-black text-lg text-[#1B2B33] hidden sm:inline">Agent Portal</span>
         </Link>
+        <nav className="ml-8 hidden md:flex items-center gap-6">
+            <Link href="/agent" className={cn("text-sm font-bold transition-colors", pathname === '/agent' ? "text-[#5BA9D0]" : "text-[#1B2B33]/60 hover:text-[#5BA9D0]")}>
+                Dashboard
+            </Link>
+        </nav>
         <div className="ml-auto flex items-center gap-4">
-            <span className="text-xs font-bold text-muted-foreground hidden sm:block">Hello, {user.name}</span>
-            <Button onClick={() => signOut(auth)} variant="ghost" size="sm" className="text-destructive">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-[10px] font-bold text-[#1B2B33] uppercase">Approved Agent</span>
+            </div>
+            <Button onClick={() => signOut(auth)} variant="ghost" size="sm" className="text-destructive font-bold hover:bg-destructive/5">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
             </Button>

@@ -46,10 +46,10 @@ export default function AgentLoginPage() {
 
   // Redirect if already logged in as an approved agent
   useEffect(() => {
-    if (!appUserLoading && appUser?.role === 'agent' && appUser.status === 'approved') {
+    if (mounted && !appUserLoading && appUser?.role === 'agent' && appUser.status === 'approved') {
       router.push('/agent');
     }
-  }, [appUser, appUserLoading, router]);
+  }, [appUser, appUserLoading, router, mounted]);
 
   const signupForm = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
