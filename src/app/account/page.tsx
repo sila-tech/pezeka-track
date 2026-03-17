@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useCollection, useFirestore, useDoc, useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -46,7 +45,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { updateCustomer } from '@/lib/firestore';
+import { updateCustomer, generateReferralCode } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 interface Loan {
@@ -108,6 +107,14 @@ export default function AccountPage() {
   }, []);
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
+
+  // Migration: Ensure user has a referral code if missing
+  useEffect(() => {
+      if (user && customerProfile && !profileLoading && !customerProfile.referralCode) {
+          const newCode = generateReferralCode();
+          updateCustomer(firestore, user.uid, { referralCode: newCode });
+      }
+  }, [customerProfile, profileLoading, user, firestore]);
 
   // Sync local form state with fetched profile
   useEffect(() => {

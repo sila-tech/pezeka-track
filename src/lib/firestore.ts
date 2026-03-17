@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
@@ -14,6 +13,7 @@ type CustomerData = {
   idNumber?: string;
   accountNumber?: string;
   referredBy?: string;
+  referralCode?: string;
 }
 
 export interface Loan {
@@ -79,7 +79,7 @@ async function generateAccountNumber(db: Firestore): Promise<string> {
   return accNo;
 }
 
-function generateReferralCode(): string {
+export function generateReferralCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = '';
     for (let i = 0; i < 5; i++) {
@@ -144,6 +144,14 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
                     addMailLog(db, { ...res.sentContent, sender: 'AI Automation' });
                 }
             });
+        }
+    } else {
+        const existingData = existingSnap.data();
+        if (!existingData.referralCode) {
+            finalData.referralCode = generateReferralCode();
+        }
+        if (!existingData.accountNumber) {
+            finalData.accountNumber = await generateAccountNumber(db);
         }
     }
 
