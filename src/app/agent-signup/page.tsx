@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,9 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShieldCheck, TrendingUp, Users, ArrowRight, LogIn } from 'lucide-react';
+import { Loader2, ShieldCheck, TrendingUp, Users, LogIn } from 'lucide-react';
 import { registerAgent } from '@/lib/firestore';
-import Link from 'next/link';
 
 const signupSchema = z.object({
   fullName: z.string().min(2, 'Please enter your full name.'),
@@ -190,10 +190,34 @@ export default function AgentSignupPage() {
             <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
                     <FormField control={loginForm.control} name="email" render={({ field }) => (
-                        <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="agent@example.com" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="email" 
+                              placeholder="agent@example.com" 
+                              className="h-12 rounded-xl" 
+                              {...field} 
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                     )} />
                     <FormField control={loginForm.control} name="password" render={({ field }) => (
-                        <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" placeholder="••••••••" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="••••••••" 
+                              className="h-12 rounded-xl" 
+                              {...field} 
+                              value={field.value ?? ''}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                     )} />
                     <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-[#1B2B33] hover:bg-[#1B2B33]/90 text-white transition-all active:scale-95 shadow-xl shadow-[#1B2B33]/20" disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
@@ -210,16 +234,62 @@ export default function AgentSignupPage() {
             <Form {...signupForm}>
               <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-5">
                 <FormField control={signupForm.control} name="fullName" render={({ field }) => (
-                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="John Doe" 
+                        className="h-12 rounded-xl" 
+                        {...field} 
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={signupForm.control} name="email" render={({ field }) => (
-                  <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="john@example.com" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Email Address</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="email" 
+                        placeholder="john@example.com" 
+                        className="h-12 rounded-xl" 
+                        {...field} 
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={signupForm.control} name="phone" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Phone Number</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="0712 345 678" 
+                        className="h-12 rounded-xl" 
+                        {...field} 
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={signupForm.control} name="password" render={({ field }) => (
-                  <FormItem><FormLabel>Secure Password</FormLabel><FormControl><Input type="password" placeholder="Min. 6 characters" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>Secure Password</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="password" 
+                        placeholder="Min. 6 characters" 
+                        className="h-12 rounded-xl" 
+                        {...field} 
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 
                 <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 transition-all active:scale-95 shadow-xl shadow-[#5BA9D0]/20" disabled={isSubmitting}>
