@@ -1,4 +1,3 @@
-
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
@@ -23,11 +22,6 @@ export const metadata: Metadata = {
     title: 'Pezeka Credit Ltd',
     description: 'Fast and reliable credit solutions in Kenya.',
     images: ['/pezeka_social_profile.png'],
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Pezeka Credit',
   },
 };
 
