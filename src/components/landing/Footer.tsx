@@ -1,4 +1,3 @@
-
 import Link from 'next/link';
 import { Landmark } from 'lucide-react';
 
@@ -13,9 +12,6 @@ export default function Footer() {
                 </p>
             </div>
             <nav className="flex flex-wrap justify-center gap-4 sm:gap-8">
-                <Link href="/agent-signup" className="text-sm font-bold text-[#5BA9D0] hover:text-white transition-colors">
-                    Become an Agent
-                </Link>
                 <Link href="#" className="text-sm text-white/60 hover:text-[#5BA9D0] transition-colors hover:underline underline-offset-4">
                     Terms of Service
                 </Link>
