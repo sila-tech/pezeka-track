@@ -160,30 +160,31 @@ export default function FinancePage() {
                       </div>
                   </CardHeader>
                   <CardContent className="p-0">
+                      {/* Sideways scrolling container */}
                       <ScrollArea className="h-[65vh] w-full border-t">
-                          <Table className="min-w-[2500px]">
+                          <Table className="min-w-[2500px] border-separate border-spacing-0">
                               <TableHeader className="bg-muted/50">
                                   <TableRow>
-                                      <TableHead className="sticky left-0 bg-muted/50 z-20 w-[200px]">Client Name</TableHead>
-                                      <TableHead className="w-[120px]">Phone</TableHead>
+                                      <TableHead className="sticky left-0 bg-muted/50 z-30 w-[200px] border-r">Client Name</TableHead>
+                                      <TableHead className="w-[150px]">Phone</TableHead>
                                       <TableHead className="w-[150px]">Staff</TableHead>
-                                      <TableHead className="w-[100px]">Loan No.</TableHead>
-                                      <TableHead className="w-[100px]">Date</TableHead>
-                                      <TableHead className="text-right w-[120px]">Principal</TableHead>
-                                      <TableHead className="text-right w-[100px]">Reg Fee</TableHead>
-                                      <TableHead className="text-right w-[100px]">Proc Fee</TableHead>
-                                      <TableHead className="text-right w-[120px] bg-blue-50/50">Take Home</TableHead>
-                                      <TableHead className="text-right w-[100px]">Car Track</TableHead>
-                                      <TableHead className="text-right w-[100px]">Charging</TableHead>
-                                      <TableHead className="text-center w-[100px]">Instalments</TableHead>
-                                      <TableHead className="text-right w-[120px]">Inst. Amt</TableHead>
-                                      <TableHead className="text-right w-[120px]">Amt to Pay</TableHead>
-                                      <TableHead className="text-right w-[120px] text-green-600">Paid Amt</TableHead>
-                                      <TableHead className="text-right w-[120px] text-destructive">Balance</TableHead>
-                                      <TableHead className="text-right w-[100px]">Penalties</TableHead>
-                                      <TableHead className="text-right w-[120px]">Exp. Interest</TableHead>
-                                      <TableHead className="text-right w-[120px] bg-green-50/50">Exp. Income</TableHead>
-                                      <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-20">History</TableHead>
+                                      <TableHead className="w-[120px]">Loan No.</TableHead>
+                                      <TableHead className="w-[120px]">Date</TableHead>
+                                      <TableHead className="text-right w-[140px]">Principal</TableHead>
+                                      <TableHead className="text-right w-[120px]">Reg Fee</TableHead>
+                                      <TableHead className="text-right w-[120px]">Proc Fee</TableHead>
+                                      <TableHead className="text-right w-[140px] bg-blue-50/50">Take Home</TableHead>
+                                      <TableHead className="text-right w-[120px]">Car Track</TableHead>
+                                      <TableHead className="text-right w-[120px]">Charging</TableHead>
+                                      <TableHead className="text-center w-[120px]">Instalments</TableHead>
+                                      <TableHead className="text-right w-[140px]">Inst. Amt</TableHead>
+                                      <TableHead className="text-right w-[140px]">Amt to Pay</TableHead>
+                                      <TableHead className="text-right w-[140px] text-green-600">Paid Amt</TableHead>
+                                      <TableHead className="text-right w-[140px] text-destructive">Balance</TableHead>
+                                      <TableHead className="text-right w-[120px]">Penalties</TableHead>
+                                      <TableHead className="text-right w-[140px]">Exp. Interest</TableHead>
+                                      <TableHead className="text-right w-[140px] bg-green-50/50">Exp. Income</TableHead>
+                                      <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-30 border-l">History</TableHead>
                                   </TableRow>
                               </TableHeader>
                               <TableBody>
@@ -204,8 +205,8 @@ export default function FinancePage() {
                                       const balance = loan.totalRepayableAmount - loan.totalPaid;
 
                                       return (
-                                          <TableRow key={loan.id} className="hover:bg-muted/30 transition-colors">
-                                              <TableCell className="font-bold sticky left-0 bg-background z-10 border-r">{loan.customerName}</TableCell>
+                                          <TableRow key={loan.id} className="hover:bg-muted/30 transition-colors group">
+                                              <TableCell className="font-bold sticky left-0 bg-background group-hover:bg-muted/30 transition-colors z-20 border-r">{loan.customerName}</TableCell>
                                               <TableCell className="text-xs">{loan.customerPhone}</TableCell>
                                               <TableCell className="text-xs italic">{loan.assignedStaffName || 'Unassigned'}</TableCell>
                                               <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
@@ -224,7 +225,7 @@ export default function FinancePage() {
                                               <TableCell className="text-right text-orange-600">{loan.totalPenalties?.toLocaleString() || '0'}</TableCell>
                                               <TableCell className="text-right font-medium">{interest.toLocaleString()}</TableCell>
                                               <TableCell className="text-right font-black bg-green-50/30 text-green-700">{totalIncome.toLocaleString()}</TableCell>
-                                              <TableCell className="text-center sticky right-0 bg-background z-10 border-l">
+                                              <TableCell className="text-center sticky right-0 bg-background group-hover:bg-muted/30 transition-colors z-20 border-l">
                                                   <Button 
                                                     variant="ghost" 
                                                     size="sm" 
@@ -239,6 +240,7 @@ export default function FinancePage() {
                                   })}
                               </TableBody>
                           </Table>
+                          {/* Explicit horizontal scrollbar for ShadCN ScrollArea */}
                           <ScrollBar orientation="horizontal" />
                       </ScrollArea>
                   </CardContent>
