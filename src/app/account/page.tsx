@@ -45,7 +45,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { updateCustomer, generateReferralCode } from '@/lib/firestore';
+import { updateCustomer, generateReferralCode, upsertCustomer } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 interface Loan {
@@ -108,11 +108,24 @@ export default function AccountPage() {
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
-  // Migration: Ensure user has a referral code if missing
+  /**
+   * SELF-HEALING MIGRATION
+   * Ensures every logged-in user has a profile document and a unique referral code.
+   */
   useEffect(() => {
-      if (user && customerProfile && !profileLoading && !customerProfile.referralCode) {
-          const newCode = generateReferralCode();
-          updateCustomer(firestore, user.uid, { referralCode: newCode });
+      if (user && !profileLoading && firestore) {
+          if (!customerProfile) {
+              // Case 1: User exists in Auth but has no profile document in Firestore
+              upsertCustomer(firestore, user.uid, {
+                  name: user.displayName || 'Pezeka Member',
+                  email: user.email || '',
+                  phone: '',
+              });
+          } else if (!customerProfile.referralCode) {
+              // Case 2: Profile exists but was created before the referral system
+              const newCode = generateReferralCode();
+              updateCustomer(firestore, user.uid, { referralCode: newCode });
+          }
       }
   }, [customerProfile, profileLoading, user, firestore]);
 
@@ -133,7 +146,7 @@ export default function AccountPage() {
   const { data: customerLoans } = useCollection<Loan>(customerLoansQuery);
 
   const fullName = useMemo(() => {
-      return customerProfile?.name || user?.displayName || "Valued Customer";
+      return customerProfile?.name || user?.displayName || "Valued Member";
   }, [customerProfile, user]);
 
   const firstName = useMemo(() => {
@@ -189,14 +202,14 @@ export default function AccountPage() {
   }, [customerProfile?.referralCode]);
 
   const handleShareReferral = () => {
-      const message = `Hi! I'm using Pezeka Credit for fast and reliable loans. Use my code to join: ${referralLink}`;
+      const message = `Hi! I'm using Pezeka Credit for fast and reliable loans. Use my link to join and get started: ${referralLink}`;
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
   };
 
   const copyReferralLink = () => {
       navigator.clipboard.writeText(referralLink);
-      toast({ title: 'Link Copied', description: 'You can now share your referral code with friends.' });
+      toast({ title: 'Link Copied', description: 'You can now share your referral link with friends.' });
   };
 
   return (
@@ -253,7 +266,7 @@ export default function AccountPage() {
                         </div>
                         <div className="text-right space-y-1">
                             <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Referral Code</p>
-                            <p className="text-sm font-black uppercase">{customerProfile?.referralCode || '-'}</p>
+                            <p className="text-sm font-black uppercase tracking-wider">{customerProfile?.referralCode || 'PROVISIONING...'}</p>
                         </div>
                     </div>
                     
@@ -262,7 +275,7 @@ export default function AccountPage() {
                     <div className="absolute top-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl"></div>
                 </div>
 
-                {/* Action Grid - Enhanced with Refer */}
+                {/* Action Grid */}
                 <div className="grid grid-cols-5 gap-2 px-2">
                     <ActionCircle 
                         icon={<SendHorizontal className="h-6 w-6 text-[#5BA9D0]" />} 

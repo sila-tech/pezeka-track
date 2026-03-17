@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal } from 'lucide-react';
+import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal, Share2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Name required.'),
@@ -77,7 +78,8 @@ export default function CustomersPage() {
     return customers.filter(c => 
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         c.phone.includes(searchTerm) ||
-        c.idNumber?.includes(searchTerm)
+        c.idNumber?.includes(searchTerm) ||
+        c.referralCode?.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   }, [customers, searchTerm]);
 
@@ -129,13 +131,22 @@ export default function CustomersPage() {
         <CardHeader>
             <div className="flex items-center justify-between">
                 <CardTitle>Customer List</CardTitle>
-                <div className="relative"><Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone or ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[300px]" /></div>
+                <div className="relative"><Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone, ID or code..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[350px]" /></div>
             </div>
         </CardHeader>
         <CardContent className="p-0">
             <ScrollArea className="h-[60vh]">
                 <Table>
-                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Phone</TableHead><TableHead>National ID</TableHead><TableHead>Account No.</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Phone</TableHead>
+                            <TableHead>National ID</TableHead>
+                            <TableHead>Account No.</TableHead>
+                            <TableHead>Referral Code</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
                     <TableBody>
                         {sortedCustomers.map((c) => (
                             <TableRow key={c.id}>
@@ -143,6 +154,12 @@ export default function CustomersPage() {
                                 <TableCell>{c.phone}</TableCell>
                                 <TableCell className="text-xs">{c.idNumber || '-'}</TableCell>
                                 <TableCell className="font-mono text-xs">{c.accountNumber}</TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-1.5">
+                                        <Share2 className="h-3 w-3 text-primary" />
+                                        <span className="font-bold text-xs uppercase tracking-wider">{c.referralCode || '-'}</span>
+                                    </div>
+                                </TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
