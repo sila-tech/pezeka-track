@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useUser } from '@/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { Loader2, ShieldCheck, TrendingUp, Users, ArrowRight } from 'lucide-react';
 import { registerAgent } from '@/lib/firestore';
 import Link from 'next/link';
 
@@ -30,12 +30,39 @@ export default function AgentSignupPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const { user, loading: userLoading } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof agentSchema>>({
     resolver: zodResolver(agentSchema),
     defaultValues: { fullName: '', email: '', phone: '', password: '' },
   });
+
+  // Pre-fill email if user is already logged in but not yet an agent
+  useEffect(() => {
+    if (user) {
+      form.setValue('email', user.email || '');
+      form.setValue('fullName', user.displayName || '');
+    }
+  }, [user, form]);
+
+  async function handleApplyDirectly() {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      await registerAgent(firestore, user.uid, {
+        email: user.email!,
+        name: user.displayName || 'Existing User',
+        phone: 'Contact provided previously'
+      });
+      toast({ title: 'Application Submitted', description: 'Your existing account has been submitted for agent approval.' });
+      router.push('/agent');
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   async function onSubmit(values: z.infer<typeof agentSchema>) {
     setIsSubmitting(true);
@@ -58,10 +85,17 @@ export default function AgentSignupPage() {
       
       router.push('/agent');
     } catch (e: any) {
+      let errorMessage = e.message || 'An error occurred during registration.';
+      
+      // Handle specific Firebase Auth errors for better UX
+      if (e.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please sign in to your account instead.';
+      }
+
       toast({ 
           variant: 'destructive', 
           title: 'Signup Failed', 
-          description: e.message || 'An error occurred during registration.' 
+          description: errorMessage
       });
     } finally {
       setIsSubmitting(false);
@@ -107,32 +141,52 @@ export default function AgentSignupPage() {
           <CardDescription className="text-white/60">Fill in your details to start your application.</CardDescription>
         </CardHeader>
         <CardContent className="p-8">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              <FormField control={form.control} name="fullName" render={({ field }) => (
-                <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="email" render={({ field }) => (
-                <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="john@example.com" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="phone" render={({ field }) => (
-                <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="password" render={({ field }) => (
-                <FormItem><FormLabel>Secure Password</FormLabel><FormControl><Input type="password" placeholder="Min. 6 characters" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              
-              <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 transition-all active:scale-95 shadow-xl shadow-[#5BA9D0]/20" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Apply to Join'}
-              </Button>
-
-              <div className="text-center pt-2">
-                  <p className="text-xs text-muted-foreground">
-                      Already have an account? <Link href="/customer-login" className="text-[#5BA9D0] font-bold hover:underline">Sign In</Link>
-                  </p>
+          {user && !userLoading ? (
+            <div className="space-y-6 py-4">
+              <div className="p-6 bg-[#5BA9D0]/5 rounded-2xl border border-[#5BA9D0]/10 text-center">
+                <p className="text-sm text-muted-foreground mb-2">You are already signed in as</p>
+                <p className="font-black text-[#1B2B33] text-lg">{user.displayName || user.email}</p>
               </div>
-            </form>
-          </Form>
+              <p className="text-xs text-center text-muted-foreground">
+                Would you like to use this account to apply for an agent partnership?
+              </p>
+              <Button onClick={handleApplyDirectly} disabled={isSubmitting} className="w-full h-14 rounded-full text-lg font-black bg-[#5BA9D0] hover:bg-[#5BA9D0]/90">
+                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Apply with this Account'}
+              </Button>
+              <div className="text-center">
+                <Button variant="link" className="text-xs" onClick={() => auth.signOut()}>
+                  Sign in with a different email
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                <FormField control={form.control} name="fullName" render={({ field }) => (
+                  <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" placeholder="john@example.com" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="phone" render={({ field }) => (
+                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="password" render={({ field }) => (
+                  <FormItem><FormLabel>Secure Password</FormLabel><FormControl><Input type="password" placeholder="Min. 6 characters" className="h-12 rounded-xl" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                
+                <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 transition-all active:scale-95 shadow-xl shadow-[#5BA9D0]/20" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : 'Apply to Join'}
+                </Button>
+
+                <div className="text-center pt-2 flex flex-col gap-3">
+                    <p className="text-xs text-muted-foreground">
+                        Already have an account? <Link href="/customer-login" className="text-[#5BA9D0] font-bold hover:underline">Sign In Instead</Link>
+                    </p>
+                </div>
+              </form>
+            </Form>
+          )}
         </CardContent>
       </Card>
     </div>
