@@ -38,6 +38,17 @@ export default function CustomerLoginPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
+  const form = useForm<z.infer<typeof authSchema>>({
+    resolver: zodResolver(authSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+      phone: '',
+    },
+  });
+
   useEffect(() => {
     if (!loading && !appUserLoading && user) {
         // Redirect based on role
