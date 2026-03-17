@@ -304,28 +304,36 @@ export default function AccountPage() {
 
       {/* Loans Explorer Dialog */}
       <Dialog open={isLoansOpen} onOpenChange={setIsLoansOpen}>
-          <DialogContent className="sm:max-w-md rounded-[2rem] overflow-hidden p-0 border-none">
-              <div className="bg-[#1B2B33] p-8 text-white">
+          <DialogContent className="sm:max-w-md rounded-[2.5rem] overflow-hidden p-0 border-none shadow-2xl">
+              <div className="bg-[#1B2B33] p-10 text-white">
                   <DialogHeader>
-                      <DialogTitle className="text-2xl font-black text-white">Loan Products</DialogTitle>
-                      <DialogDescription className="text-white/60">Choose the perfect credit facility for your needs.</DialogDescription>
+                      <DialogTitle className="text-3xl font-black text-white tracking-tight">Loan Products</DialogTitle>
+                      <DialogDescription className="text-white/60 text-base mt-2">Choose the perfect credit facility for your needs.</DialogDescription>
                   </DialogHeader>
               </div>
-              <div className="p-6 bg-white space-y-4">
-                  {LOAN_PRODUCTS.map((product, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-muted hover:border-[#5BA9D0]/30 hover:bg-[#5BA9D0]/5 transition-all group">
-                          <div className="space-y-1">
-                              <p className="font-black text-[#1B2B33]">{product.title}</p>
-                              <p className="text-[10px] text-muted-foreground max-w-[200px] leading-tight">{product.description}</p>
-                              <Badge variant="secondary" className="mt-1 bg-[#27AE60]/10 text-[#27AE60] border-none text-[9px] font-black uppercase tracking-widest">{product.rate}</Badge>
-                          </div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#5BA9D0] transition-colors" />
-                      </div>
-                  ))}
-                  <div className="pt-4">
+              <div className="p-8 bg-white space-y-6">
+                  <ScrollArea className="max-h-[50vh] pr-2">
+                    <div className="space-y-5">
+                        {LOAN_PRODUCTS.map((product, i) => (
+                            <div key={i} className="flex items-center justify-between p-6 rounded-[2rem] border border-muted hover:border-[#5BA9D0]/30 hover:bg-[#5BA9D0]/5 transition-all group cursor-pointer shadow-sm">
+                                <div className="space-y-2">
+                                    <p className="font-black text-xl text-[#1B2B33]">{product.title}</p>
+                                    <p className="text-sm text-muted-foreground max-w-[220px] leading-relaxed font-medium">{product.description}</p>
+                                    <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#27AE60]/10 border border-[#27AE60]/20">
+                                        <span className="text-[10px] font-black text-[#27AE60] uppercase tracking-wider">{product.rate.toUpperCase()}</span>
+                                    </div>
+                                </div>
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-muted/50 group-hover:bg-[#5BA9D0]/10 transition-colors">
+                                    <ChevronRight className="h-6 w-6 text-muted-foreground group-hover:text-[#5BA9D0] transition-colors" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                  </ScrollArea>
+                  <div className="pt-4 px-2">
                       <Button 
                         onClick={() => { setIsLoansOpen(false); router.push('/account/apply'); }} 
-                        className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-lg shadow-lg shadow-[#5BA9D0]/20"
+                        className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-xl shadow-xl shadow-[#5BA9D0]/30 transition-all active:scale-95"
                       >
                           Apply Now
                       </Button>
