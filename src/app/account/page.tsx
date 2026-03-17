@@ -109,7 +109,7 @@ export default function AccountPage() {
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isLoansOpen, setIsLoansOpen] = useState(false);
   const [isReferOpen, setIsReferOpen] = useState(false);
-  const [isUpdatingProfile, setIsUpdating] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
   // Handle dynamic greeting based on time of day
   useEffect(() => {
