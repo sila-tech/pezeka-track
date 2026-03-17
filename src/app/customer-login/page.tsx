@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -28,7 +29,7 @@ const authSchema = z.object({
 
 export default function CustomerLoginPage() {
   const { user, loading } = useUser();
-  const { user: appUser } = useAppUser();
+  const { user: appUser, loading: appUserLoading } = useAppUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
@@ -37,21 +38,16 @@ export default function CustomerLoginPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
-  const form = useForm<z.infer<typeof authSchema>>({
-    resolver: zodResolver(authSchema),
-    defaultValues: { email: '', password: '', firstName: '', lastName: '', phone: '' },
-  });
-
   useEffect(() => {
-    if (!loading && user) {
-        // If they are an agent, redirect to agent portal, otherwise standard account
+    if (!loading && !appUserLoading && user) {
+        // Redirect based on role
         if (appUser?.role === 'agent') {
             router.push('/agent');
         } else if (appUser) {
             router.push('/account');
         }
     }
-  }, [user, appUser, loading, router]);
+  }, [user, appUser, appUserLoading, loading, router]);
   
   async function onEmailSubmit(values: z.infer<typeof authSchema>) {
     setIsSubmitting(true);
@@ -67,12 +63,10 @@ export default function CustomerLoginPage() {
           return;
         }
 
-        // 1. Create the Auth Account
         const cred = await createUserWithEmailAndPassword(auth, values.email, values.password);
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
-        // 2. Link existing loans if any
         const loansQuery = query(collection(firestore, 'loans'), where('customerPhone', '==', values.phone));
         const loansSnapshot = await getDocs(loansQuery);
         
@@ -89,7 +83,6 @@ export default function CustomerLoginPage() {
             toast({ title: 'Profile Synced', description: 'We found and linked your existing loan history!' });
         }
 
-        // 3. Referral Handling
         let referredByUid = "";
         let referredByCode = "";
         let referrerName = "";
@@ -102,7 +95,6 @@ export default function CustomerLoginPage() {
                 referredByCode = savedRefCode;
                 referrerName = referrer.name;
                 
-                // Log the referral conversion
                 await addReferral(firestore, {
                     referrerId: referredByUid,
                     referrerName: referrerName,
@@ -110,11 +102,10 @@ export default function CustomerLoginPage() {
                     refereeName: fullName
                 });
                 
-                sessionStorage.removeItem('pezeka_referral_code'); // Done with it
+                sessionStorage.removeItem('pezeka_referral_code');
             }
         }
 
-        // 4. Create/Update Customer Document
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
@@ -133,7 +124,6 @@ export default function CustomerLoginPage() {
         await signInWithEmailAndPassword(auth, values.email, values.password);
         toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
       }
-      // Redirection is handled by the useEffect above
     } catch (e: any) { 
       toast({ 
         variant: 'destructive', 
@@ -163,7 +153,7 @@ export default function CustomerLoginPage() {
     }
   };
 
-  if (loading || user) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (loading || (user && !appUserLoading)) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <div className="w-full max-w-md flex flex-col items-center">
@@ -220,7 +210,7 @@ export default function CustomerLoginPage() {
                 </Button>
                 <div className="h-px bg-muted w-full my-2" />
                 <p className="text-xs text-muted-foreground">
-                    Interested in becoming a business partner? <Link href="/agent-signup" className="text-[#5BA9D0] font-bold hover:underline">Apply as an Agent</Link>
+                    Interested in becoming a business partner? <Link href="/agent/login" className="text-[#5BA9D0] font-bold hover:underline">Apply as an Agent</Link>
                 </p>
               </div>
             </form>

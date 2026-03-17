@@ -20,7 +20,7 @@ export default function AgentLayout({
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/customer-login');
+      router.push('/agent/login');
     }
     // Only Agents can access this portal
     if (!loading && user && user.role !== 'agent') {
