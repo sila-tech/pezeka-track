@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { upsertCustomer } from '@/lib/firestore';
+import { upsertCustomer, getUserByReferralCode, addReferral } from '@/lib/firestore';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
@@ -80,11 +81,38 @@ export default function CustomerLoginPage() {
             toast({ title: 'Profile Synced', description: 'We found and linked your existing loan history!' });
         }
 
-        // 3. Create/Update Customer Document
+        // 3. Referral Handling
+        let referredByUid = "";
+        let referredByCode = "";
+        let referrerName = "";
+        const savedRefCode = sessionStorage.getItem('pezeka_referral_code');
+        
+        if (savedRefCode) {
+            const referrer = await getUserByReferralCode(firestore, savedRefCode);
+            if (referrer) {
+                referredByUid = referrer.uid;
+                referredByCode = savedRefCode;
+                referrerName = referrer.name;
+                
+                // Log the referral conversion
+                await addReferral(firestore, {
+                    referrerId: referredByUid,
+                    referrerName: referrerName,
+                    refereeId: cred.user.uid,
+                    refereeName: fullName
+                });
+                
+                sessionStorage.removeItem('pezeka_referral_code'); // Done with it
+            }
+        }
+
+        // 4. Create/Update Customer Document
         await upsertCustomer(firestore, cred.user.uid, {
             name: fullName,
             phone: values.phone,
-            email: values.email
+            email: values.email,
+            referredBy: referredByUid,
+            referredByCode: referredByCode
         });
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });

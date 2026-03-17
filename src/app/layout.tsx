@@ -1,9 +1,12 @@
+
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import ClientOverlays from '@/components/ClientOverlays';
+import ReferralTracker from '@/components/ReferralTracker';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'Pezeka Credit Ltd',
@@ -45,6 +48,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={cn('font-sans antialiased')}>
         <FirebaseClientProvider>
+          <Suspense>
+            <ReferralTracker />
+          </Suspense>
           {children}
         </FirebaseClientProvider>
         <Toaster />

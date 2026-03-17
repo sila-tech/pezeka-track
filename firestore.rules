@@ -36,6 +36,11 @@ service cloud.firestore {
     function isStaff() {
       return isFinance() || hasRole('staff');
     }
+
+    // Agent Role
+    function isAgent() {
+      return hasRole('agent');
+    }
     
     // Check if the user is the owner of the document
     function isOwner(userId) {
@@ -54,13 +59,13 @@ service cloud.firestore {
     // =====================================================================
 
     match /users/{userId} {
-      allow read: if isStaff() || isOwner(userId);
+      allow read: if isStaff() || isAgent() || isOwner(userId);
       allow write: if isSuperAdmin() || isOwner(userId);
     }
 
     match /customers/{customerId} {
       allow read: if isStaff() || isOwner(customerId);
-      allow create: if isStaff() || isOwner(customerId);
+      allow create: if isStaff() || isOwner(customerId) || isAuthenticated();
       allow update: if isFinance() || isOwner(customerId);
       allow delete: if isFinance();
     }
@@ -72,9 +77,9 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    match /loan_applications/{appId} {
-      allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
-      allow create: if isFinance() || isValidCustomerApplication();
+    match /referrals/{referralId} {
+      allow read: if isFinance() || (isAuthenticated() && (resource == null || resource.data.referrerId == request.auth.uid));
+      allow create: if isAuthenticated();
       allow update, delete: if isFinance();
     }
 

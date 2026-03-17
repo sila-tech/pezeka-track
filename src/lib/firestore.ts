@@ -1,7 +1,7 @@
 
 'use client';
 
-import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where } from 'firebase/firestore';
+import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { calculateInterestForOneInstalment, calculateAmortization } from './utils';
@@ -13,6 +13,8 @@ type CustomerData = {
   email?: string;
   idNumber?: string;
   accountNumber?: string;
+  referredBy?: string;
+  referredByCode?: string;
 }
 
 export interface Loan {
@@ -49,6 +51,54 @@ export interface Loan {
 }
 
 /**
+ * Generates a unique referral code for a user.
+ */
+export async function generateReferralCode(db: Firestore, name: string): Promise<string> {
+    const prefix = (name.split(' ')[0] || 'PZ').toUpperCase().slice(0, 4);
+    const random = Math.floor(100 + Math.random() * 899);
+    const code = `PZ-${prefix}${random}`;
+    
+    // Check if code exists (basic check)
+    const q = query(collection(db, 'users'), where('referralCode', '==', code), limit(1));
+    const snap = await getDocs(q);
+    if (!snap.empty) return generateReferralCode(db, name);
+    return code;
+}
+
+/**
+ * Finds a user ID by their referral code.
+ */
+export async function getUserByReferralCode(db: Firestore, code: string): Promise<{ uid: string, name: string } | null> {
+    const q = query(collection(db, 'users'), where('referralCode', '==', code), limit(1));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+        // Also check customers if they act as referrers
+        const qc = query(collection(db, 'customers'), where('referralCode', '==', code), limit(1));
+        const snapc = await getDocs(qc);
+        if (snapc.empty) return null;
+        return { uid: snapc.docs[0].id, name: snapc.docs[0].data().name };
+    }
+    return { uid: snap.docs[0].id, name: snap.docs[0].data().name };
+}
+
+/**
+ * Records a referral event.
+ */
+export async function addReferral(db: Firestore, data: { referrerId: string, referrerName: string, refereeId: string, refereeName: string }) {
+    const refCollection = collection(db, 'referrals');
+    const newRef = {
+        ...data,
+        status: 'signed_up',
+        timestamp: serverTimestamp()
+    };
+    try {
+        await addDoc(refCollection, newRef);
+    } catch (e) {
+        console.error("Referral logging failed", e);
+    }
+}
+
+/**
  * Logs a sent email to the mail_logs collection.
  */
 export async function addMailLog(db: Firestore, logData: { recipient: string, subject: string, body: string, type: string, sender: string }) {
@@ -80,10 +130,12 @@ export async function addCustomer(db: Firestore, customerData: CustomerData): Pr
   const customerCollection = collection(db, 'customers');
   
   const accountNumber = await generateAccountNumber(db);
+  const referralCode = await generateReferralCode(db, customerData.name);
 
   const newCustomer = {
     ...customerData,
     accountNumber,
+    referralCode,
     createdAt: serverTimestamp(),
   };
 
@@ -122,7 +174,8 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
 
     if (!existingSnap.exists()) {
         const accountNumber = await generateAccountNumber(db);
-        finalData = { ...finalData, ...({ accountNumber } as any) };
+        const referralCode = await generateReferralCode(db, customerData.name);
+        finalData = { ...finalData, ...({ accountNumber, referralCode } as any) };
         
         if (customerData.email) {
             sendAutomatedEmail({
@@ -308,7 +361,16 @@ export async function submitCustomerApplication(db: Firestore, customerId: strin
     };
 
     try {
-        return await addDoc(loanCollection, applicationData);
+        const docRef = await addDoc(loanCollection, applicationData);
+        
+        // Update referral record if exists
+        const q = query(collection(db, 'referrals'), where('refereeId', '==', customerId), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            await updateDoc(doc(db, 'referrals', snap.docs[0].id), { status: 'applied' });
+        }
+
+        return docRef;
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: loanCollection.path,
@@ -349,6 +411,15 @@ async function recordDisbursement(db: Firestore, loan: any) {
     });
 
     await updateDoc(loanRef, { disbursementRecorded: true });
+
+    // Update referral status to disbursed
+    if (loan.customerId) {
+        const q = query(collection(db, 'referrals'), where('refereeId', '==', loan.customerId), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            await updateDoc(doc(db, 'referrals', snap.docs[0].id), { status: 'disbursed' });
+        }
+    }
 
     // Send the approval notification
     const email = loan.customerEmail || loan.email;
@@ -691,11 +762,13 @@ export async function addFollowUpNoteToLoan(db: Firestore, loanId: string, note:
 
 export async function createUserProfile(db: Firestore, userId: string, data: { email: string, role: string, name?: string }) {
     const userRef = doc(db, 'users', userId);
+    const referralCode = await generateReferralCode(db, data.name || data.email);
     const profileData = {
         uid: userId,
         email: data.email,
         role: data.role,
         name: data.name || data.email.split('@')[0],
+        referralCode,
     };
     try {
         await setDoc(userRef, profileData, { merge: true });

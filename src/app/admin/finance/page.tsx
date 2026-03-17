@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart, Search, X, HandCoins } from "lucide-react";
+import { PlusCircle, Loader2, AlertCircle, History, Info, Pencil, Trash2, FileBarChart, Search, X, HandCoins, Users } from "lucide-react";
 import { arrayUnion, increment, doc, collection } from 'firebase/firestore';
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -137,6 +137,14 @@ interface FinanceEntry {
   payoutCategory?: string;
 }
 
+interface Referral {
+    id: string;
+    referrerName: string;
+    refereeName: string;
+    status: string;
+    timestamp: any;
+}
+
 export default function FinancePage() {
   const [open, setOpen] = useState(false);
   const [loanDialogOpen, setLoanDialogOpen] = useState(false);
@@ -170,6 +178,7 @@ export default function FinancePage() {
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<FinanceEntry>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList } = useCollection<any>(isAuthorized ? 'users' : null);
   const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
+  const { data: referrals, loading: referralsLoading } = useCollection<Referral>(isAuthorized ? 'referrals' : null);
 
   const loanForm = useForm<z.infer<typeof loanSchema>>({
     resolver: zodResolver(loanSchema),
@@ -465,7 +474,7 @@ export default function FinancePage() {
     }
   }
 
-  if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (userLoading || loansLoading || financeEntriesLoading || referralsLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   
   if (!isAuthorized) {
       return (
@@ -634,6 +643,10 @@ export default function FinancePage() {
                 <FileBarChart className="h-4 w-4" />
                 Portfolio Reports
               </TabsTrigger>
+              <TabsTrigger value="referrals" className="gap-2 data-[state=active]:bg-[#5BA9D0] data-[state=active]:text-white">
+                <Users className="h-4 w-4" />
+                Referrals
+              </TabsTrigger>
               <TabsTrigger value="receipts" className="data-[state=active]:bg-[#5BA9D0] data-[state=active]:text-white">Receipts</TabsTrigger>
               <TabsTrigger value="payouts" className="data-[state=active]:bg-[#5BA9D0] data-[state=active]:text-white">Payouts & Expenses</TabsTrigger>
               <TabsTrigger value="investors" className="data-[state=active]:bg-[#5BA9D0] data-[state=active]:text-white">Investors</TabsTrigger>
@@ -772,6 +785,46 @@ export default function FinancePage() {
           </TabsContent>
           <TabsContent value="reports">
               <PortfolioReportsTab loans={loans} />
+          </TabsContent>
+          <TabsContent value="referrals">
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Referral Conversions</CardTitle>
+                      <CardDescription>Track customers brought in by agents or other clients.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <ScrollArea className="h-[60vh]">
+                          <Table>
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead>Date</TableHead>
+                                      <TableHead>Referrer (Source)</TableHead>
+                                      <TableHead>Referee (Customer)</TableHead>
+                                      <TableHead>Status</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {(referrals || []).length === 0 ? (
+                                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-muted-foreground italic">No referral events recorded.</TableCell></TableRow>
+                                  ) : (
+                                      referrals?.sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)).map((ref) => (
+                                          <TableRow key={ref.id}>
+                                              <TableCell className="text-xs">{ref.timestamp?.seconds ? format(new Date(ref.timestamp.seconds * 1000), 'dd/MM/yy HH:mm') : 'N/A'}</TableCell>
+                                              <TableCell className="font-bold text-[#5BA9D0]">{ref.referrerName}</TableCell>
+                                              <TableCell className="font-medium">{ref.refereeName}</TableCell>
+                                              <TableCell>
+                                                  <Badge variant={ref.status === 'disbursed' ? 'default' : 'secondary'} className="uppercase text-[9px] font-black">
+                                                      {ref.status.replace('_', ' ')}
+                                                  </Badge>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))
+                                  )}
+                              </TableBody>
+                          </Table>
+                      </ScrollArea>
+                  </CardContent>
+              </Card>
           </TabsContent>
           <TabsContent value="receipts">
               <EditableFinanceReportTab 
