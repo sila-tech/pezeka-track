@@ -59,12 +59,16 @@ service cloud.firestore {
     // =====================================================================
 
     match /users/{userId} {
-      allow read: if isStaff() || isAgent() || isOwner(userId);
+      // allow get: individual doc access
+      allow get: if isStaff() || isAgent() || isOwner(userId);
+      // allow list: collection queries (needed for referral code lookups during signup)
+      allow list: if isAuthenticated();
       allow write: if isSuperAdmin() || isOwner(userId);
     }
 
     match /customers/{customerId} {
-      allow read: if isStaff() || isOwner(customerId);
+      allow get: if isStaff() || isOwner(customerId);
+      allow list: if isAuthenticated();
       allow create: if isStaff() || isOwner(customerId) || isAuthenticated();
       allow update: if isFinance() || isOwner(customerId);
       allow delete: if isFinance();

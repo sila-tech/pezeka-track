@@ -60,9 +60,19 @@ export async function generateReferralCode(db: Firestore, name: string): Promise
     
     // Check if code exists (basic check)
     const q = query(collection(db, 'users'), where('referralCode', '==', code), limit(1));
-    const snap = await getDocs(q);
-    if (!snap.empty) return generateReferralCode(db, name);
-    return code;
+    try {
+        const snap = await getDocs(q);
+        if (!snap.empty) return generateReferralCode(db, name);
+        return code;
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: 'users',
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        // Fallback to current code if uniqueness check fails due to permissions
+        return code; 
+    }
 }
 
 /**
@@ -71,19 +81,28 @@ export async function generateReferralCode(db: Firestore, name: string): Promise
  */
 export async function getUserByReferralCode(db: Firestore, code: string): Promise<{ uid: string, name: string } | null> {
     const q = query(collection(db, 'users'), where('referralCode', '==', code), limit(1));
-    const snap = await getDocs(q);
-    if (snap.empty) {
-        // Also check customers if they act as referrers
-        const qc = query(collection(db, 'customers'), where('referralCode', '==', code), limit(1));
-        const snapc = await getDocs(qc);
-        if (snapc.empty) return null;
-        return { uid: snapc.docs[0].id, name: snapc.docs[0].data().name };
+    try {
+        const snap = await getDocs(q);
+        if (snap.empty) {
+            // Also check customers if they act as referrers
+            const qc = query(collection(db, 'customers'), where('referralCode', '==', code), limit(1));
+            const snapc = await getDocs(qc);
+            if (snapc.empty) return null;
+            return { uid: snapc.docs[0].id, name: snapc.docs[0].data().name };
+        }
+        
+        const userData = snap.docs[0].data();
+        if (userData.role === 'agent' && userData.status !== 'approved') return null;
+        
+        return { uid: snap.docs[0].id, name: userData.name };
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: 'referral_lookup',
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        return null;
     }
-    
-    const userData = snap.docs[0].data();
-    if (userData.role === 'agent' && userData.status !== 'approved') return null;
-    
-    return { uid: snap.docs[0].id, name: userData.name };
 }
 
 /**
@@ -97,11 +116,15 @@ export async function addReferral(db: Firestore, data: { referrerId: string, ref
         verified: false,
         timestamp: serverTimestamp()
     };
-    try {
-        await addDoc(refCollection, newRef);
-    } catch (e) {
-        console.error("Referral logging failed", e);
-    }
+    
+    addDoc(refCollection, newRef).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: refCollection.path,
+            operation: 'create',
+            requestResourceData: newRef,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
 }
 
 /**
@@ -109,11 +132,14 @@ export async function addReferral(db: Firestore, data: { referrerId: string, ref
  */
 export async function approveReferral(db: Firestore, referralId: string) {
     const ref = doc(db, 'referrals', referralId);
-    try {
-        await updateDoc(ref, { verified: true, updatedAt: serverTimestamp() });
-    } catch (e) {
-        console.error("Referral approval failed", e);
-    }
+    updateDoc(ref, { verified: true, updatedAt: serverTimestamp() }).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: ref.path,
+            operation: 'update',
+            requestResourceData: { verified: true },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
 }
 
 /**
@@ -121,14 +147,19 @@ export async function approveReferral(db: Firestore, referralId: string) {
  */
 export async function addMailLog(db: Firestore, logData: { recipient: string, subject: string, body: string, type: string, sender: string }) {
     const logsCollection = collection(db, 'mail_logs');
-    try {
-        await addDoc(logsCollection, {
-            ...logData,
-            sentAt: serverTimestamp()
+    const newLog = {
+        ...logData,
+        sentAt: serverTimestamp()
+    };
+    
+    addDoc(logsCollection, newLog).catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+            path: logsCollection.path,
+            operation: 'create',
+            requestResourceData: newLog,
         });
-    } catch (e) {
-        console.error("Failed to log email to Firestore", e);
-    }
+        errorEmitter.emit('permission-error', permissionError);
+    });
 }
 
 async function generateAccountNumber(db: Firestore): Promise<string> {
@@ -188,12 +219,13 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
   const customerRef = doc(db, 'customers', customerId);
   try {
     const existingSnap = await getDoc(customerRef);
-    let finalData = { ...customerData, updatedAt: serverTimestamp() };
+    let finalData: any = { ...customerData, updatedAt: serverTimestamp() };
 
     if (!existingSnap.exists()) {
         const accountNumber = await generateAccountNumber(db);
         const referralCode = await generateReferralCode(db, customerData.name);
-        finalData = { ...finalData, ...({ accountNumber, referralCode } as any) };
+        finalData.accountNumber = accountNumber;
+        finalData.referralCode = referralCode;
         
         if (customerData.email) {
             sendAutomatedEmail({
@@ -383,10 +415,11 @@ export async function submitCustomerApplication(db: Firestore, customerId: strin
         
         // Update referral record if exists
         const q = query(collection(db, 'referrals'), where('refereeId', '==', customerId), limit(1));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-            await updateDoc(doc(db, 'referrals', snap.docs[0].id), { status: 'applied' });
-        }
+        getDocs(q).then(snap => {
+            if (!snap.empty) {
+                updateDoc(doc(db, 'referrals', snap.docs[0].id), { status: 'applied' });
+            }
+        });
 
         return docRef;
     } catch (serverError) {
@@ -417,7 +450,7 @@ async function recordDisbursement(db: Firestore, loan: any) {
         ? loan.disbursementDate 
         : (loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date());
 
-    await addFinanceEntry(db, {
+    addFinanceEntry(db, {
         type: 'payout',
         payoutCategory: 'loan_disbursement',
         date: disbursementDate,
@@ -428,15 +461,16 @@ async function recordDisbursement(db: Firestore, loan: any) {
         recordedBy: 'System (Approval)'
     });
 
-    await updateDoc(loanRef, { disbursementRecorded: true });
+    updateDoc(loanRef, { disbursementRecorded: true });
 
     // Update referral status to disbursed
     if (loan.customerId) {
         const q = query(collection(db, 'referrals'), where('refereeId', '==', loan.customerId), limit(1));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-            await updateDoc(doc(db, 'referrals', snap.docs[0].id), { status: 'disbursed' });
-        }
+        getDocs(q).then(snap => {
+            if (!snap.empty) {
+                updateDoc(doc(db, 'referrals', snap.docs[0].id), { status: 'disbursed' });
+            }
+        });
     }
 
     // Send the approval notification
@@ -482,8 +516,10 @@ export async function approveLoanApplication(db: Firestore, loan: Loan, updateDa
     
     // Ensure we have the full context including ID for recordDisbursement
     const loanSnap = await getDoc(loanRef);
-    const fullLoanData = { ...loanSnap.data(), id: loan.id };
-    await recordDisbursement(db, fullLoanData);
+    if (loanSnap.exists()) {
+        const fullLoanData = { ...loanSnap.data(), id: loan.id };
+        await recordDisbursement(db, fullLoanData);
+    }
 }
 
 export async function updateLoan(db: Firestore, loanId: string, data: { [key: string]: any }) {
@@ -494,7 +530,7 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
         if (loanSnap.exists()) {
             const loanData = loanSnap.data();
             if (!loanData.disbursementRecorded) {
-                await recordDisbursement(db, { ...loanData, id: loanId, ...data });
+                recordDisbursement(db, { ...loanData, id: loanId, ...data });
                 data.disbursementRecorded = true;
             }
         }
@@ -626,67 +662,70 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         loanId: originalLoan.id,
         recordedBy: 'System (Rollover)'
     };
-    const receiptDocRef = await addFinanceEntry(db, receiptData);
-
-    const interestPayment = {
-        paymentId: receiptDocRef.id,
-        amount: interestAmount,
-        date: rolloverDate,
-        recordedBy: 'System (Rollover)'
-    };
-
-    await updateLoan(db, originalLoan.id, {
-        status: 'rollover',
-        comments: `${originalLoan.comments || ''}\nRolled over on ${rolloverDate.toLocaleDateString()}.`.trim(),
-        payments: arrayUnion(interestPayment),
-        totalPaid: increment(interestAmount)
-    });
-
-    const loansCollection = collection(db, 'loans');
-    const q = query(loansCollection);
-    const querySnapshot = await getDocs(q);
-    const loanCount = querySnapshot.size;
-    const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
-
-    const newLoanData = {
-        loanNumber: newLoanNumber,
-        customerId: originalLoan.customerId,
-        customerName: originalLoan.customerName,
-        customerPhone: originalLoan.customerPhone,
-        customerEmail: originalLoan.customerEmail || "",
-        alternativeNumber: originalLoan.alternativeNumber || "",
-        idNumber: originalLoan.idNumber || "",
-        assignedStaffId: originalLoan.assignedStaffId || "",
-        assignedStaffName: originalLoan.assignedStaffName || "",
-        disbursementDate: rolloverDate,
-        principalAmount: originalLoan.principalAmount,
-        interestRate: originalLoan.interestRate ?? 0,
-        registrationFee: originalLoan.registrationFee,
-        processingFee: originalLoan.processingFee,
-        carTrackInstallationFee: originalLoan.carTrackInstallationFee,
-        chargingCost: originalLoan.chargingCost,
-        numberOfInstalments: originalLoan.numberOfInstalments,
-        instalmentAmount: originalLoan.instalmentAmount,
-        totalRepayableAmount: originalLoan.totalRepayableAmount,
-        paymentFrequency: originalLoan.paymentFrequency,
-        status: 'active',
-        totalPaid: 0,
-        payments: [],
-        penalties: [],
-        totalPenalties: 0,
-        followUpNotes: [],
-        comments: `Rollover from Loan #${originalLoan.loanNumber}`,
-        createdAt: serverTimestamp(),
-        disbursementRecorded: true 
-    };
-
+    
     try {
+        const receiptDocRef = await addDoc(collection(db, 'financeEntries'), {
+            ...receiptData,
+            createdAt: serverTimestamp()
+        });
+
+        const interestPayment = {
+            paymentId: receiptDocRef.id,
+            amount: interestAmount,
+            date: rolloverDate,
+            recordedBy: 'System (Rollover)'
+        };
+
+        await updateLoan(db, originalLoan.id, {
+            status: 'rollover',
+            comments: `${originalLoan.comments || ''}\nRolled over on ${rolloverDate.toLocaleDateString()}.`.trim(),
+            payments: arrayUnion(interestPayment),
+            totalPaid: increment(interestAmount)
+        });
+
+        const loansCollection = collection(db, 'loans');
+        const q = query(loansCollection);
+        const querySnapshot = await getDocs(q);
+        const loanCount = querySnapshot.size;
+        const newLoanNumber = `LN-${String(loanCount + 1).padStart(3, '0')}`;
+
+        const newLoanData = {
+            loanNumber: newLoanNumber,
+            customerId: originalLoan.customerId,
+            customerName: originalLoan.customerName,
+            customerPhone: originalLoan.customerPhone,
+            customerEmail: originalLoan.customerEmail || "",
+            alternativeNumber: originalLoan.alternativeNumber || "",
+            idNumber: originalLoan.idNumber || "",
+            assignedStaffId: originalLoan.assignedStaffId || "",
+            assignedStaffName: originalLoan.assignedStaffName || "",
+            disbursementDate: rolloverDate,
+            principalAmount: originalLoan.principalAmount,
+            interestRate: originalLoan.interestRate ?? 0,
+            registrationFee: originalLoan.registrationFee,
+            processingFee: originalLoan.processingFee,
+            carTrackInstallationFee: originalLoan.carTrackInstallationFee,
+            chargingCost: originalLoan.chargingCost,
+            numberOfInstalments: originalLoan.numberOfInstalments,
+            instalmentAmount: originalLoan.instalmentAmount,
+            totalRepayableAmount: originalLoan.totalRepayableAmount,
+            paymentFrequency: originalLoan.paymentFrequency,
+            status: 'active',
+            totalPaid: 0,
+            payments: [],
+            penalties: [],
+            totalPenalties: 0,
+            followUpNotes: [],
+            comments: `Rollover from Loan #${originalLoan.loanNumber}`,
+            createdAt: serverTimestamp(),
+            disbursementRecorded: true 
+        };
+
         await addDoc(loansCollection, newLoanData);
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
-            path: loansCollection.path,
+            path: 'loan_rollover',
             operation: 'create',
-            requestResourceData: newLoanData,
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
@@ -1108,7 +1147,7 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
         w.withdrawalId === withdrawalId ? { ...w, status: 'processed' } : w
     );
     
-    await addFinanceEntry(db, {
+    addFinanceEntry(db, {
         type: 'payout',
         payoutCategory: 'investor_withdrawal',
         date: new Date(),
@@ -1195,7 +1234,7 @@ export async function approveDeposit(db: Firestore, investorId: string, depositI
         d.depositId === depositId ? { ...d, status: 'approved' } : d
     );
     
-    await addFinanceEntry(db, {
+    addFinanceEntry(db, {
         type: 'receipt',
         receiptCategory: 'investment',
         date: new Date(),
