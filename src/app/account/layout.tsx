@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -15,12 +14,12 @@ export default function AccountLayout({
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/customer-login');
-    }
-    // If user is an agent, they shouldn't be in the /account customer area
-    if (!loading && user && user.role === 'agent') {
-        router.push('/agent');
+    if (!loading) {
+        if (!user) {
+            router.replace('/customer-login');
+        } else if (user.role === 'agent') {
+            router.replace('/agent');
+        }
     }
   }, [user, loading, router]);
 

@@ -150,7 +150,7 @@ export default function AccountPage() {
 
   const handleLogout = async () => {
       await signOut(auth);
-      router.push('/');
+      router.replace('/');
   };
 
   const handleUpdateProfile = async () => {

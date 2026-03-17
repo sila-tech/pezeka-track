@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useUser, useFirestore, useAppUser } from '@/firebase';
+import { useAuth, useFirestore, useAppUser } from '@/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -28,8 +27,7 @@ const authSchema = z.object({
 });
 
 export default function CustomerLoginPage() {
-  const { user, loading } = useUser();
-  const { user: appUser, loading: appUserLoading } = useAppUser();
+  const { user, loading } = useAppUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
@@ -49,16 +47,16 @@ export default function CustomerLoginPage() {
     },
   });
 
+  // Handle automatic redirection if already logged in
   useEffect(() => {
-    if (!loading && !appUserLoading && user) {
-        // Redirect based on role
-        if (appUser?.role === 'agent') {
-            router.push('/agent');
-        } else if (appUser) {
-            router.push('/account');
+    if (!loading && user) {
+        if (user.role === 'agent') {
+            router.replace('/agent');
+        } else {
+            router.replace('/account');
         }
     }
-  }, [user, appUser, appUserLoading, loading, router]);
+  }, [user, loading, router]);
   
   async function onEmailSubmit(values: z.infer<typeof authSchema>) {
     setIsSubmitting(true);
@@ -78,6 +76,7 @@ export default function CustomerLoginPage() {
         const fullName = `${values.firstName} ${values.lastName}`;
         await updateProfile(cred.user, { displayName: fullName });
         
+        // Link existing loans by phone
         const loansQuery = query(collection(firestore, 'loans'), where('customerPhone', '==', values.phone));
         const loansSnapshot = await getDocs(loansQuery);
         
@@ -91,9 +90,9 @@ export default function CustomerLoginPage() {
                 });
             });
             await batch.commit();
-            toast({ title: 'Profile Synced', description: 'We found and linked your existing loan history!' });
         }
 
+        // Referral tracking
         let referredByUid = "";
         let referredByCode = "";
         let referrerName = "";
@@ -164,7 +163,7 @@ export default function CustomerLoginPage() {
     }
   };
 
-  if (loading || (user && !appUserLoading)) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (loading) return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <div className="w-full max-w-md flex flex-col items-center">
