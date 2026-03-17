@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useAppUser, useCollection, useFirestore } from '@/firebase';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAppUser, useCollection, useFirestore, useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
 import { 
     Users, 
     Share2, 
@@ -14,7 +14,10 @@ import {
     TrendingUp, 
     ExternalLink,
     Send,
-    ShieldCheck
+    ShieldCheck,
+    Loader2,
+    LogOut,
+    ShieldAlert
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,6 +25,9 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { collection, query, where } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface Referral {
     id: string;
@@ -33,21 +39,33 @@ interface Referral {
 }
 
 export default function AgentDashboard() {
-  const { user } = useAppUser();
+  const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
+  const auth = useAuth();
+  const router = useRouter();
   const { toast } = useToast();
   
+  // Auth Guard & Redirection Logic
+  useEffect(() => {
+    if (!userLoading) {
+      if (!user) {
+        router.replace('/agent/login');
+      } else if (user.role !== 'agent') {
+        router.replace('/account');
+      }
+    }
+  }, [user, userLoading, router]);
+
   // Use a filtered query to comply with Firestore Security Rules
   const referralsQuery = useMemo(() => {
-    if (!user || !firestore) return null;
+    if (!user || !firestore || user.role !== 'agent') return null;
     return query(collection(firestore, 'referrals'), where('referrerId', '==', user.uid));
   }, [user, firestore]);
 
-  const { data: referrals, loading } = useCollection<Referral>(referralsQuery);
+  const { data: referrals, loading: referralsLoading } = useCollection<Referral>(referralsQuery);
 
   const myReferrals = useMemo(() => {
       if (!referrals) return [];
-      // Data is already filtered by the query, we just handle sorting
       return [...referrals].sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
   }, [referrals]);
 
@@ -75,131 +93,208 @@ export default function AgentDashboard() {
       window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
+  const handleLogout = async () => {
+      await signOut(auth);
+      router.replace('/agent/login');
+  };
+
+  // 1. Loading State
+  if (userLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#F8FAFB]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#5BA9D0]" />
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated or Wrong Role
+  if (!user || user.role !== 'agent') return null;
+
+  // 3. Pending Approval State
+  if (user.status !== 'approved') {
+      return (
+          <div className="min-h-screen flex flex-col bg-[#F8FAFB]">
+              <header className="px-6 h-16 flex items-center bg-white border-b border-muted">
+                <Link href="/" className="flex items-center gap-2">
+                    <img src="/pezeka_logo_transparent.png" className="h-8 w-8" alt="Pezeka" />
+                    <span className="font-black text-lg text-[#1B2B33]">Agent Portal</span>
+                </Link>
+                <div className="ml-auto">
+                    <Button onClick={handleLogout} variant="ghost" size="sm" className="text-destructive font-bold">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                    </Button>
+                </div>
+              </header>
+              <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                  <div className="max-w-md space-y-6">
+                      <div className="w-24 h-24 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
+                          <ShieldAlert className="h-12 w-12 text-orange-600" />
+                      </div>
+                      <div className="space-y-2">
+                          <h1 className="text-2xl font-black text-[#1B2B33]">Awaiting Approval</h1>
+                          <p className="text-muted-foreground">Your agent account is currently under review. Our team will verify your details and activate your referral link shortly.</p>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl border border-muted shadow-sm">
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Status</p>
+                          <p className="text-lg font-black text-orange-600 uppercase">PENDING REVIEW</p>
+                      </div>
+                      <Button variant="outline" onClick={() => router.push('/')} className="w-full h-12 rounded-xl font-bold">
+                          Return to Home
+                      </Button>
+                  </div>
+              </main>
+          </div>
+      );
+  }
+
+  // 4. Approved Agent Dashboard
   return (
-    <div className="space-y-8">
-      {/* Welcome & Stats Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-              <h1 className="text-3xl font-black text-[#1B2B33]">Overview</h1>
-              <p className="text-muted-foreground">Track your performance and invite new clients.</p>
-          </div>
-          <div className="bg-[#1B2B33] text-white p-6 rounded-[2rem] flex items-center gap-6 shadow-xl shadow-navy-900/10">
-              <div className="text-center">
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Total Referrals</p>
-                  <p className="text-2xl font-black">{stats.total}</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-center">
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Verified Earnings</p>
-                  <p className="text-2xl font-black text-green-400">{stats.verified}</p>
-              </div>
-          </div>
-      </div>
+    <div className="flex min-h-screen w-full flex-col bg-[#F8FAFB]">
+      <header className="px-6 h-16 flex items-center bg-white border-b border-muted sticky top-0 z-50">
+        <Link href="/agent" className="flex items-center gap-2">
+            <img src="/pezeka_logo_transparent.png" className="h-8 w-8" alt="Pezeka" />
+            <span className="font-black text-lg text-[#1B2B33] hidden sm:inline">Agent Portal</span>
+        </Link>
+        <div className="ml-auto flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span className="text-[10px] font-bold text-[#1B2B33] uppercase">Approved Agent</span>
+            </div>
+            <Button onClick={handleLogout} variant="ghost" size="sm" className="text-destructive font-bold hover:bg-destructive/5">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+            </Button>
+        </div>
+      </header>
 
-      {/* Referral Link Action Card */}
-      <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden">
-          <div className="bg-[#5BA9D0] p-8 text-white">
-              <div className="flex items-center gap-3 mb-4">
-                  <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
-                      <Share2 className="h-6 w-6 text-white" />
-                  </div>
-                  <h2 className="text-2xl font-black">Your Referral Link</h2>
-              </div>
-              <p className="text-white/80 font-medium mb-6">Invite business owners and individuals to Pezeka. When they take their first loan and it's verified, you'll earn your commission.</p>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="flex-1 bg-white/10 border border-white/20 rounded-2xl p-4 font-mono text-sm break-all flex items-center justify-between group">
-                      <span className="truncate">{referralLink || 'Generating...'}</span>
-                      <button onClick={copyLink} className="ml-2 p-2 hover:bg-white/20 rounded-xl transition-colors">
-                          <Copy className="h-4 w-4" />
-                      </button>
-                  </div>
-                  <Button onClick={shareToWhatsApp} className="h-full bg-white text-[#5BA9D0] hover:bg-white/90 font-black px-8 py-4 rounded-2xl shadow-lg flex gap-2">
-                      <Send className="h-5 w-5" />
-                      Share to WhatsApp
-                  </Button>
-              </div>
-          </div>
-      </Card>
+      <main className="flex-1 p-6 md:p-8">
+          <div className="max-w-5xl mx-auto space-y-8">
+            {/* Welcome & Stats Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-1">
+                    <h1 className="text-3xl font-black text-[#1B2B33]">Overview</h1>
+                    <p className="text-muted-foreground">Track your performance and invite new clients.</p>
+                </div>
+                <div className="bg-[#1B2B33] text-white p-6 rounded-[2rem] flex items-center gap-6 shadow-xl shadow-navy-900/10">
+                    <div className="text-center">
+                        <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Total Referrals</p>
+                        <p className="text-2xl font-black">{stats.total}</p>
+                    </div>
+                    <div className="w-px h-10 bg-white/10" />
+                    <div className="text-center">
+                        <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Verified Earnings</p>
+                        <p className="text-2xl font-black text-green-400">{stats.verified}</p>
+                    </div>
+                </div>
+            </div>
 
-      {/* Referrals List */}
-      <div className="grid gap-6">
-          <h2 className="text-xl font-black text-[#1B2B33] flex items-center gap-2">
-              <Users className="h-5 w-5 text-[#5BA9D0]" />
-              Recent Referrals
-          </h2>
-          
-          <Card className="rounded-[2rem] border-none shadow-lg overflow-hidden">
-              <CardContent className="p-0">
-                  <ScrollArea className="h-[400px]">
-                      {myReferrals.length === 0 && !loading ? (
-                          <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-                              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                                  <Users className="h-8 w-8 text-muted-foreground/40" />
-                              </div>
-                              <p className="font-bold text-[#1B2B33]">No referrals yet</p>
-                              <p className="text-sm text-muted-foreground mt-1 max-w-xs">Share your unique link to start building your network and earning commissions.</p>
-                          </div>
-                      ) : (
-                          <Table>
-                              <TableHeader className="bg-muted/30">
-                                  <TableRow>
-                                      <TableHead className="font-bold text-[#1B2B33]">Customer Name</TableHead>
-                                      <TableHead className="font-bold text-[#1B2B33]">Status</TableHead>
-                                      <TableHead className="font-bold text-[#1B2B33]">Verification</TableHead>
-                                      <TableHead className="text-right font-bold text-[#1B2B33]">Date</TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {myReferrals.map((ref) => {
-                                      const date = ref.timestamp?.seconds ? new Date(ref.timestamp.seconds * 1000) : new Date();
-                                      return (
-                                          <TableRow key={ref.id}>
-                                              <TableCell className="font-medium">{ref.refereeName}</TableCell>
-                                              <TableCell>
-                                                  <Badge variant={ref.status === 'disbursed' ? 'default' : 'secondary'} className="rounded-lg px-2 py-1 uppercase text-[9px] font-black">
-                                                      {ref.status.replace('_', ' ')}
-                                                  </Badge>
-                                              </TableCell>
-                                              <TableCell>
-                                                  {ref.verified ? (
-                                                      <div className="flex items-center gap-1 text-green-600 text-[10px] font-bold uppercase">
-                                                          <ShieldCheck className="h-3 w-3" />
-                                                          Verified
-                                                      </div>
-                                                  ) : (
-                                                      <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-bold uppercase">
-                                                          <Clock className="h-3 w-3" />
-                                                          Pending
-                                                      </div>
-                                                  )}
-                                              </TableCell>
-                                              <TableCell className="text-right text-[10px] text-muted-foreground font-bold">
-                                                  {format(date, 'dd MMM yyyy')}
-                                              </TableCell>
-                                          </TableRow>
-                                      );
-                                  })}
-                              </TableBody>
-                          </Table>
-                      )}
-                  </ScrollArea>
-              </CardContent>
-          </Card>
-      </div>
+            {/* Referral Link Action Card */}
+            <Card className="rounded-[2.5rem] border-none shadow-xl bg-white overflow-hidden">
+                <div className="bg-[#5BA9D0] p-8 text-white">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
+                            <Share2 className="h-6 w-6 text-white" />
+                        </div>
+                        <h2 className="text-2xl font-black">Your Referral Link</h2>
+                    </div>
+                    <p className="text-white/80 font-medium mb-6">Invite business owners and individuals to Pezeka. When they take their first loan and it's verified, you'll earn your commission.</p>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex-1 bg-white/10 border border-white/20 rounded-2xl p-4 font-mono text-sm break-all flex items-center justify-between group">
+                            <span className="truncate">{referralLink || 'Generating...'}</span>
+                            <button onClick={copyLink} className="ml-2 p-2 hover:bg-white/20 rounded-xl transition-colors">
+                                <Copy className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <Button onClick={shareToWhatsApp} className="h-full bg-white text-[#5BA9D0] hover:bg-white/90 font-black px-8 py-4 rounded-2xl shadow-lg flex gap-2">
+                            <Send className="h-5 w-5" />
+                            Share to WhatsApp
+                        </Button>
+                    </div>
+                </div>
+            </Card>
 
-      {/* Commission Guide */}
-      <div className="bg-[#1B2B33]/5 border border-[#1B2B33]/10 rounded-[2rem] p-8">
-          <div className="flex items-start gap-4">
-              <TrendingUp className="h-6 w-6 text-[#1B2B33] mt-1" />
-              <div className="space-y-2">
-                  <h3 className="font-black text-[#1B2B33]">Commission Structure</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                      Commissions are processed once your referral's first loan is disbursed and **verified** by the finance team. Payouts are made to your registered contact number.
-                  </p>
-              </div>
+            {/* Referrals List */}
+            <div className="grid gap-6">
+                <h2 className="text-xl font-black text-[#1B2B33] flex items-center gap-2">
+                    <Users className="h-5 w-5 text-[#5BA9D0]" />
+                    Recent Referrals
+                </h2>
+                
+                <Card className="rounded-[2rem] border-none shadow-lg overflow-hidden">
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[400px]">
+                            {(myReferrals.length === 0 && !referralsLoading) ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+                                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                                        <Users className="h-8 w-8 text-muted-foreground/40" />
+                                    </div>
+                                    <p className="font-bold text-[#1B2B33]">No referrals yet</p>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-xs">Share your unique link to start building your network and earning commissions.</p>
+                                </div>
+                            ) : (
+                                <Table>
+                                    <TableHeader className="bg-muted/30">
+                                        <TableRow>
+                                            <TableHead className="font-bold text-[#1B2B33]">Customer Name</TableHead>
+                                            <TableHead className="font-bold text-[#1B2B33]">Status</TableHead>
+                                            <TableHead className="font-bold text-[#1B2B33]">Verification</TableHead>
+                                            <TableHead className="text-right font-bold text-[#1B2B33]">Date</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {myReferrals.map((ref) => {
+                                            const date = ref.timestamp?.seconds ? new Date(ref.timestamp.seconds * 1000) : new Date();
+                                            return (
+                                                <TableRow key={ref.id}>
+                                                    <TableCell className="font-medium">{ref.refereeName}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={ref.status === 'disbursed' ? 'default' : 'secondary'} className="rounded-lg px-2 py-1 uppercase text-[9px] font-black">
+                                                            {ref.status.replace('_', ' ')}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {ref.verified ? (
+                                                            <div className="flex items-center gap-1 text-green-600 text-[10px] font-bold uppercase">
+                                                                <ShieldCheck className="h-3 w-3" />
+                                                                Verified
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-1 text-muted-foreground text-[10px] font-bold uppercase">
+                                                                <Clock className="h-3 w-3" />
+                                                                Pending
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-[10px] text-muted-foreground font-bold">
+                                                        {format(date, 'dd MMM yyyy')}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Commission Guide */}
+            <div className="bg-[#1B2B33]/5 border border-[#1B2B33]/10 rounded-[2rem] p-8">
+                <div className="flex items-start gap-4">
+                    <TrendingUp className="h-6 w-6 text-[#1B2B33] mt-1" />
+                    <div className="space-y-2">
+                        <h3 className="font-black text-[#1B2B33]">Commission Structure</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            Commissions are processed once your referral's first loan is disbursed and **verified** by the finance team. Payouts are made to your registered contact number.
+                        </p>
+                    </div>
+                </div>
+            </div>
           </div>
-      </div>
+      </main>
     </div>
   );
 }
