@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useCollection, useFirestore, useDoc, useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -47,6 +48,17 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { updateCustomer, generateReferralCode, upsertCustomer } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 interface Loan {
   id: string;
@@ -72,6 +84,12 @@ interface Customer {
     referralCode?: string;
 }
 
+const profileSchema = z.object({
+  name: z.string().min(1, 'Full name is required.'),
+  phone: z.string().min(10, 'Valid phone number is required.'),
+  idNumber: z.string().min(5, 'National ID is required.'),
+});
+
 const LOAN_PRODUCTS = [
     { title: 'Quick Pesa', description: 'Instant 1-month credit for emergency needs.', rate: '10% Interest' },
     { title: 'Salary Advance', description: 'Access funds ahead of your payday.', rate: '10% Interest' },
@@ -93,11 +111,6 @@ export default function AccountPage() {
   const [isReferOpen, setIsReferOpen] = useState(false);
   const [isUpdatingProfile, setIsUpdating] = useState(false);
 
-  // Profile Form State
-  const [profileName, setProfileName] = useState('');
-  const [profilePhone, setProfilePhone] = useState('');
-  const [profileIdNumber, setProfileIdNumber] = useState('');
-
   // Handle dynamic greeting based on time of day
   useEffect(() => {
     const hour = new Date().getHours();
@@ -108,6 +121,15 @@ export default function AccountPage() {
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
 
+  const profileForm = useForm<z.infer<typeof profileSchema>>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      name: '',
+      phone: '',
+      idNumber: '',
+    }
+  });
+
   /**
    * SELF-HEALING MIGRATION
    * Ensures every logged-in user has a profile document and a unique referral code.
@@ -115,28 +137,28 @@ export default function AccountPage() {
   useEffect(() => {
       if (user && !profileLoading && firestore) {
           if (!customerProfile) {
-              // Case 1: User exists in Auth but has no profile document in Firestore
               upsertCustomer(firestore, user.uid, {
                   name: user.displayName || 'Pezeka Member',
                   email: user.email || '',
                   phone: '',
               });
           } else if (!customerProfile.referralCode) {
-              // Case 2: Profile exists but was created before the referral system
               const newCode = generateReferralCode();
               updateCustomer(firestore, user.uid, { referralCode: newCode });
           }
       }
   }, [customerProfile, profileLoading, user, firestore]);
 
-  // Sync local form state with fetched profile
+  // Sync local form state with fetched profile ONLY once or when data changes and form is pristine
   useEffect(() => {
-      if (customerProfile) {
-          setProfileName(customerProfile.name || '');
-          setProfilePhone(customerProfile.phone || '');
-          setProfileIdNumber(customerProfile.idNumber || '');
+      if (customerProfile && !profileForm.formState.isDirty) {
+          profileForm.reset({
+              name: customerProfile.name || '',
+              phone: customerProfile.phone || '',
+              idNumber: customerProfile.idNumber || '',
+          });
       }
-  }, [customerProfile]);
+  }, [customerProfile, profileForm]);
 
   const customerLoansQuery = useMemo(() => {
     if (userLoading || !firestore || !user?.uid) return null;
@@ -179,20 +201,17 @@ export default function AccountPage() {
       router.replace('/');
   };
 
-  const handleUpdateProfile = async () => {
+  const onProfileSubmit = async (values: z.infer<typeof profileSchema>) => {
       if (!user) return;
-      setIsUpdating(true);
+      setIsUpdatingProfile(true);
       try {
-          await updateCustomer(firestore, user.uid, {
-              name: profileName,
-              phone: profilePhone,
-              idNumber: profileIdNumber,
-          });
+          await updateCustomer(firestore, user.uid, values);
           toast({ title: 'Profile Updated', description: 'Your details have been saved successfully.' });
+          profileForm.reset(values); // Mark as pristine again
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
       } finally {
-          setIsUpdating(false);
+          setIsUpdatingProfile(false);
       }
   };
 
@@ -270,7 +289,6 @@ export default function AccountPage() {
                         </div>
                     </div>
                     
-                    {/* Decorative background shapes */}
                     <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                     <div className="absolute top-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-2xl"></div>
                 </div>
@@ -369,68 +387,99 @@ export default function AccountPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-8 space-y-6">
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Full Name</Label>
-                                <div className="relative">
-                                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
-                                    <Input 
-                                        value={profileName} 
-                                        onChange={(e) => setProfileName(e.target.value)} 
-                                        className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                        <Form {...profileForm}>
+                            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
+                                <div className="space-y-4">
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="name"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-2">
+                                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Full Name</FormLabel>
+                                                <div className="relative">
+                                                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
+                                                    <FormControl>
+                                                        <Input 
+                                                            placeholder="Your full name"
+                                                            className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                </div>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Phone Number</Label>
-                                <div className="relative">
-                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
-                                    <Input 
-                                        value={profilePhone} 
-                                        onChange={(e) => setProfilePhone(e.target.value)} 
-                                        className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="phone"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-2">
+                                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Phone Number</FormLabel>
+                                                <div className="relative">
+                                                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
+                                                    <FormControl>
+                                                        <Input 
+                                                            placeholder="07XX XXX XXX"
+                                                            className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                </div>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">National ID Number</Label>
-                                <div className="relative">
-                                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
-                                    <Input 
-                                        value={profileIdNumber} 
-                                        onChange={(e) => setProfileIdNumber(e.target.value)} 
-                                        className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="idNumber"
+                                        render={({ field }) => (
+                                            <FormItem className="space-y-2">
+                                                <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">National ID Number</FormLabel>
+                                                <div className="relative">
+                                                    <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]" />
+                                                    <FormControl>
+                                                        <Input 
+                                                            placeholder="National ID"
+                                                            className="pl-12 h-14 rounded-2xl border-[#5BA9D0]/10 bg-[#F8FAFB] focus:bg-white transition-all focus:ring-[#5BA9D0]"
+                                                            {...field}
+                                                        />
+                                                    </FormControl>
+                                                </div>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
                                     />
-                                </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Email Address</Label>
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]/40" />
-                                    <Input 
-                                        value={customerProfile?.email || user?.email || ''} 
-                                        disabled 
-                                        className="pl-12 h-14 rounded-2xl border-none bg-muted/50 text-muted-foreground italic cursor-not-allowed"
-                                    />
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40 ml-1">Email Address</Label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-[#5BA9D0]/40" />
+                                            <Input 
+                                                value={customerProfile?.email || user?.email || ''} 
+                                                disabled 
+                                                className="pl-12 h-14 rounded-2xl border-none bg-muted/50 text-muted-foreground italic cursor-not-allowed"
+                                            />
+                                        </div>
+                                        <p className="text-[9px] text-muted-foreground ml-1">Primary authentication email cannot be changed.</p>
+                                    </div>
                                 </div>
-                                <p className="text-[9px] text-muted-foreground ml-1">Primary authentication email cannot be changed.</p>
-                            </div>
-                        </div>
 
-                        <Button 
-                            onClick={handleUpdateProfile} 
-                            disabled={isUpdatingProfile}
-                            className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-lg shadow-xl shadow-[#5BA9D0]/20 transition-all active:scale-95"
-                        >
-                            {isUpdatingProfile ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving Changes...</>
-                            ) : (
-                                'Save Profile Changes'
-                            )}
-                        </Button>
+                                <Button 
+                                    type="submit"
+                                    disabled={isUpdatingProfile}
+                                    className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-lg shadow-xl shadow-[#5BA9D0]/20 transition-all active:scale-95"
+                                >
+                                    {isUpdatingProfile ? (
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving Changes...</>
+                                    ) : (
+                                        'Save Profile Changes'
+                                    )}
+                                </Button>
+                            </form>
+                        </Form>
                     </CardContent>
                 </Card>
 
