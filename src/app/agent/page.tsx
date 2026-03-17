@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -22,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { collection, query, where } from 'firebase/firestore';
 
 interface Referral {
     id: string;
@@ -37,12 +37,19 @@ export default function AgentDashboard() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const { data: referrals, loading } = useCollection<Referral>(user ? 'referrals' : null);
+  // Use a filtered query to comply with Firestore Security Rules
+  const referralsQuery = useMemo(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'referrals'), where('referrerId', '==', user.uid));
+  }, [user, firestore]);
+
+  const { data: referrals, loading } = useCollection<Referral>(referralsQuery);
 
   const myReferrals = useMemo(() => {
-      if (!referrals || !user) return [];
-      return referrals.filter(r => r.referrerId === user.uid).sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-  }, [referrals, user]);
+      if (!referrals) return [];
+      // Data is already filtered by the query, we just handle sorting
+      return [...referrals].sort((a,b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+  }, [referrals]);
 
   const stats = useMemo(() => {
       return {
@@ -125,7 +132,7 @@ export default function AgentDashboard() {
           <Card className="rounded-[2rem] border-none shadow-lg overflow-hidden">
               <CardContent className="p-0">
                   <ScrollArea className="h-[400px]">
-                      {myReferrals.length === 0 ? (
+                      {myReferrals.length === 0 && !loading ? (
                           <div className="flex flex-col items-center justify-center py-20 text-center px-6">
                               <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
                                   <Users className="h-8 w-8 text-muted-foreground/40" />
