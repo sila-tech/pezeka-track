@@ -158,87 +158,92 @@ export default function FinancePage() {
                           </div>
                       </div>
                   </CardHeader>
-                  <CardContent className="p-0">
-                      {/* Fixed height container with native scroll to prevent auto-scrolling issues */}
-                      <div className="h-[65vh] w-full overflow-auto border-t">
-                          <Table className="min-w-[2500px] border-separate border-spacing-0">
-                              <TableHeader className="bg-muted/50 sticky top-0 z-40">
-                                  <TableRow>
-                                      <TableHead className="sticky left-0 bg-muted/50 z-50 w-[200px] border-r">Client Name</TableHead>
-                                      <TableHead className="w-[150px]">Phone</TableHead>
-                                      <TableHead className="w-[150px]">Staff</TableHead>
-                                      <TableHead className="w-[120px]">Loan No.</TableHead>
-                                      <TableHead className="w-[120px]">Date</TableHead>
-                                      <TableHead className="text-right w-[140px]">Principal</TableHead>
-                                      <TableHead className="text-right w-[120px]">Reg Fee</TableHead>
-                                      <TableHead className="text-right w-[120px]">Proc Fee</TableHead>
-                                      <TableHead className="text-right w-[140px] bg-blue-50/50">Take Home</TableHead>
-                                      <TableHead className="text-right w-[120px]">Car Track</TableHead>
-                                      <TableHead className="text-right w-[120px]">Charging</TableHead>
-                                      <TableHead className="text-center w-[120px]">Instalments</TableHead>
-                                      <TableHead className="text-right w-[140px]">Inst. Amt</TableHead>
-                                      <TableHead className="text-right w-[140px]">Amt to Pay</TableHead>
-                                      <TableHead className="text-right w-[140px] text-green-600">Paid Amt</TableHead>
-                                      <TableHead className="text-right w-[140px] text-destructive">Balance</TableHead>
-                                      <TableHead className="text-right w-[120px]">Penalties</TableHead>
-                                      <TableHead className="text-right w-[140px]">Exp. Interest</TableHead>
-                                      <TableHead className="text-right w-[140px] bg-green-50/50">Exp. Income</TableHead>
-                                      <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-50 border-l">History</TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {filteredLoanBook.map(loan => {
-                                      const dDate = loan.disbursementDate?.seconds 
-                                        ? new Date(loan.disbursementDate.seconds * 1000) 
-                                        : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
-                                      
-                                      const regFee = Number(loan.registrationFee) || 0;
-                                      const procFee = Number(loan.processingFee) || 0;
-                                      const trackFee = Number(loan.carTrackInstallationFee) || 0;
-                                      const chargeFee = Number(loan.chargingCost) || 0;
-                                      const totalFees = regFee + procFee + trackFee + chargeFee;
-                                      const takeHome = loan.principalAmount - totalFees;
-                                      
-                                      const interest = loan.totalRepayableAmount - loan.principalAmount;
-                                      const totalIncome = interest + totalFees;
-                                      const balance = loan.totalRepayableAmount - loan.totalPaid;
-
-                                      return (
-                                          <TableRow key={loan.id} className="hover:bg-muted/30 transition-colors group">
-                                              <TableCell className="font-bold sticky left-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-r">{loan.customerName}</TableCell>
-                                              <TableCell className="text-xs">{loan.customerPhone}</TableCell>
-                                              <TableCell className="text-xs italic">{loan.assignedStaffName || 'Unassigned'}</TableCell>
-                                              <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
-                                              <TableCell className="text-xs">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
-                                              <TableCell className="text-right font-medium">{loan.principalAmount.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-muted-foreground">{regFee.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-muted-foreground">{procFee.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right font-bold bg-blue-50/30 text-blue-700">{takeHome.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-muted-foreground">{trackFee.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-muted-foreground">{chargeFee.toLocaleString()}</TableCell>
-                                              <TableCell className="text-center">{loan.numberOfInstalments}</TableCell>
-                                              <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right font-semibold">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-green-600 font-medium">{loan.totalPaid.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right font-black text-destructive">{balance.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right text-orange-600">{loan.totalPenalties?.toLocaleString() || '0'}</TableCell>
-                                              <TableCell className="text-right font-medium">{interest.toLocaleString()}</TableCell>
-                                              <TableCell className="text-right font-black bg-green-50/30 text-green-700">{totalIncome.toLocaleString()}</TableCell>
-                                              <TableCell className="text-center sticky right-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-l">
-                                                  <Button 
-                                                    variant="ghost" 
-                                                    size="sm" 
-                                                    className="h-8 w-8 p-0"
-                                                    onClick={() => setSelectedLoanForHistory(loan)}
-                                                  >
-                                                      <History className="h-4 w-4 text-primary" />
-                                                  </Button>
-                                              </TableCell>
+                  <CardContent className="p-0 border-t">
+                      {/* Horizontal Scroll Container */}
+                      <div className="relative">
+                          <ScrollArea className="w-full">
+                              <div className="h-[65vh] w-full">
+                                  <Table className="min-w-[2800px] border-separate border-spacing-0">
+                                      <TableHeader className="bg-muted/50 sticky top-0 z-40">
+                                          <TableRow>
+                                              <TableHead className="sticky left-0 bg-muted/50 z-50 w-[220px] border-r">Client Name</TableHead>
+                                              <TableHead className="w-[150px]">Phone</TableHead>
+                                              <TableHead className="w-[150px]">Staff</TableHead>
+                                              <TableHead className="w-[120px]">Loan No.</TableHead>
+                                              <TableHead className="w-[120px]">Date</TableHead>
+                                              <TableHead className="text-right w-[140px]">Principal</TableHead>
+                                              <TableHead className="text-right w-[120px]">Reg Fee</TableHead>
+                                              <TableHead className="text-right w-[120px]">Proc Fee</TableHead>
+                                              <TableHead className="text-right w-[140px] bg-blue-50/50">Take Home</TableHead>
+                                              <TableHead className="text-right w-[140px]">Car Track</TableHead>
+                                              <TableHead className="text-right w-[140px]">Charging</TableHead>
+                                              <TableHead className="text-center w-[120px]">Instalments</TableHead>
+                                              <TableHead className="text-right w-[140px]">Inst. Amt</TableHead>
+                                              <TableHead className="text-right w-[140px]">Amount to Pay</TableHead>
+                                              <TableHead className="text-right w-[140px] text-green-600">Paid Amount</TableHead>
+                                              <TableHead className="text-right w-[140px] text-destructive">Balance</TableHead>
+                                              <TableHead className="text-right w-[120px]">Penalties</TableHead>
+                                              <TableHead className="text-right w-[140px]">Exp. Interest</TableHead>
+                                              <TableHead className="text-right w-[140px] bg-green-50/50">Exp. Income</TableHead>
+                                              <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-50 border-l">Repayment History</TableHead>
                                           </TableRow>
-                                      );
-                                  })}
-                              </TableBody>
-                          </Table>
+                                      </TableHeader>
+                                      <TableBody>
+                                          {filteredLoanBook.map(loan => {
+                                              const dDate = loan.disbursementDate?.seconds 
+                                                ? new Date(loan.disbursementDate.seconds * 1000) 
+                                                : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+                                              
+                                              const regFee = Number(loan.registrationFee) || 0;
+                                              const procFee = Number(loan.processingFee) || 0;
+                                              const trackFee = Number(loan.carTrackInstallationFee) || 0;
+                                              const chargeFee = Number(loan.chargingCost) || 0;
+                                              const totalFees = regFee + procFee + trackFee + chargeFee;
+                                              const takeHome = loan.principalAmount - totalFees;
+                                              
+                                              const interest = (loan.totalRepayableAmount || 0) - loan.principalAmount - (loan.totalPenalties || 0);
+                                              const totalIncome = interest + totalFees;
+                                              const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
+
+                                              return (
+                                                  <TableRow key={loan.id} className="hover:bg-muted/30 transition-colors group">
+                                                      <TableCell className="font-bold sticky left-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-r">{loan.customerName}</TableCell>
+                                                      <TableCell className="text-xs">{loan.customerPhone}</TableCell>
+                                                      <TableCell className="text-xs italic">{loan.assignedStaffName || 'Unassigned'}</TableCell>
+                                                      <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
+                                                      <TableCell className="text-xs">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
+                                                      <TableCell className="text-right font-medium">{loan.principalAmount.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right text-muted-foreground">{regFee.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right text-muted-foreground">{procFee.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right font-bold bg-blue-50/30 text-blue-700">{takeHome.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right text-muted-foreground">{trackFee.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right text-muted-foreground">{chargeFee.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-center">{loan.numberOfInstalments}</TableCell>
+                                                      <TableCell className="text-right">{loan.instalmentAmount.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right font-semibold">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right text-green-600 font-medium">{loan.totalPaid.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right font-black text-destructive">{balance.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right text-orange-600">{loan.totalPenalties?.toLocaleString() || '0'}</TableCell>
+                                                      <TableCell className="text-right font-medium">{interest.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-right font-black bg-green-50/30 text-green-700">{totalIncome.toLocaleString()}</TableCell>
+                                                      <TableCell className="text-center sticky right-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-l">
+                                                          <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-8 w-8 p-0"
+                                                            onClick={() => setSelectedLoanForHistory(loan)}
+                                                          >
+                                                              <History className="h-4 w-4 text-primary" />
+                                                          </Button>
+                                                      </TableCell>
+                                                  </TableRow>
+                                              );
+                                          })}
+                                      </TableBody>
+                                  </Table>
+                              </div>
+                              <ScrollBar orientation="horizontal" />
+                          </ScrollArea>
                       </div>
                   </CardContent>
               </Card>
