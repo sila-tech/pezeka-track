@@ -1,9 +1,9 @@
 {
   "landingHero": {
-    "src": "https://picsum.photos/seed/finance-hero/600/600",
-    "width": 600,
-    "height": 600,
-    "hint": "happy people business"
+    "src": "https://picsum.photos/seed/kenyan-entrepreneur/800/800",
+    "width": 800,
+    "height": 800,
+    "hint": "happy businessman"
   },
   "aboutUs": {
     "src": "https://picsum.photos/seed/team-working/550/550",

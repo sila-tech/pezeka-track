@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { PWAInstallButton } from '@/components/PWAInstallButton';
 import { ArrowRight } from 'lucide-react';
+import placeholderImages from '@/lib/placeholder-images.json';
 
 export default function Hero() {
+  const heroImg = placeholderImages.landingHero;
+
   return (
     <section id="home" className="w-full py-12 md:py-24 lg:py-32 bg-gradient-to-b from-white to-muted/20">
       <div className="container px-4 md:px-6 mx-auto">
@@ -39,10 +42,11 @@ export default function Hero() {
             <div className="absolute -inset-1 bg-gradient-to-r from-[#5BA9D0] to-green-400 rounded-3xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
             <div className="relative aspect-square sm:aspect-video lg:aspect-square overflow-hidden rounded-3xl shadow-2xl">
               <Image
-                src="https://picsum.photos/seed/finance-hero/800/800"
-                fill
-                alt="Pezeka Hero"
-                data-ai-hint="happy business people"
+                src={heroImg.src}
+                width={heroImg.width}
+                height={heroImg.height}
+                alt="Confident Kenyan Entrepreneur"
+                data-ai-hint={heroImg.hint}
                 className="object-cover transition-transform duration-500 group-hover:scale-105"
                 priority
               />
