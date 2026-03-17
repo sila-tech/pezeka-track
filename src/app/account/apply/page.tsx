@@ -29,6 +29,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const applySchema = z.object({
   loanType: z.string().min(1, 'Please select a loan product.'),
@@ -114,9 +115,9 @@ export default function ApplyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFB] pb-24">
-      {/* Header Area */}
-      <div className="bg-[#1B2B33] text-white px-6 pt-12 pb-14">
+    <div className="min-h-screen bg-[#F8FAFB] flex flex-col">
+      {/* Header Area - Static */}
+      <div className="bg-[#1B2B33] text-white px-6 pt-12 pb-14 shrink-0">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -126,176 +127,180 @@ export default function ApplyPage() {
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back
           </Button>
-          <h1 className="text-3xl font-black tracking-tight leading-tight">Apply for a New Loan</h1>
+          <h1 className="text-3xl font-black tracking-tight leading-tight text-white">Apply for a New Loan</h1>
           <p className="text-white/60 text-sm mt-1">Get instant capital for your personal or business needs.</p>
       </div>
 
-      {/* Form Body */}
-      <div className="px-6 -mt-8">
-          <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-navy-900/10 overflow-hidden">
-              <CardContent className="p-8">
-                  <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                          {/* Loan Product */}
-                          <FormField
-                              control={form.control}
-                              name="loanType"
-                              render={({ field }) => (
-                                  <FormItem>
-                                      <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Loan Product</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                          <FormControl>
-                                              <SelectTrigger className="h-14 rounded-xl border-[#5BA9D0]/20 bg-white shadow-sm focus:ring-[#5BA9D0]">
-                                                  <SelectValue placeholder="Select product" />
-                                              </SelectTrigger>
-                                          </FormControl>
-                                          <SelectContent>
-                                              <SelectItem value="Quick Pesa (1 Month)">Quick Pesa (1 Month)</SelectItem>
-                                              <SelectItem value="Salary Advance">Salary Advance</SelectItem>
-                                              <SelectItem value="Individual & Business Loan">Business Loan</SelectItem>
-                                              <SelectItem value="Logbook Loan">Logbook Loan</SelectItem>
-                                          </SelectContent>
-                                      </Select>
-                                      <FormMessage />
-                                  </FormItem>
-                              )}
-                          />
+      {/* Form Body - Scrollable Container */}
+      <div className="px-6 -mt-8 flex-1 overflow-hidden flex flex-col pb-6">
+          <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-navy-900/10 overflow-hidden flex-1 flex flex-col">
+              <CardContent className="p-0 flex-1 overflow-hidden">
+                  <ScrollArea className="h-full w-full">
+                      <div className="p-8 pb-12">
+                          <Form {...form}>
+                              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                                  {/* Loan Product */}
+                                  <FormField
+                                      control={form.control}
+                                      name="loanType"
+                                      render={({ field }) => (
+                                          <FormItem>
+                                              <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Loan Product</FormLabel>
+                                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                  <FormControl>
+                                                      <SelectTrigger className="h-14 rounded-xl border-[#5BA9D0]/20 bg-white shadow-sm focus:ring-[#5BA9D0]">
+                                                          <SelectValue placeholder="Select product" />
+                                                      </SelectTrigger>
+                                                  </FormControl>
+                                                  <SelectContent>
+                                                      <SelectItem value="Quick Pesa (1 Month)">Quick Pesa (1 Month)</SelectItem>
+                                                      <SelectItem value="Salary Advance">Salary Advance</SelectItem>
+                                                      <SelectItem value="Individual & Business Loan">Business Loan</SelectItem>
+                                                      <SelectItem value="Logbook Loan">Logbook Loan</SelectItem>
+                                                  </SelectContent>
+                                              </Select>
+                                              <FormMessage />
+                                          </FormItem>
+                                      )}
+                                  />
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField
-                                  control={form.control}
-                                  name="principalAmount"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Requested Amount (KSH)</FormLabel>
-                                          <FormControl>
-                                              <Input type="number" placeholder="0" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
-                              />
-                              <FormField
-                                  control={form.control}
-                                  name="idNumber"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">National ID Number</FormLabel>
-                                          <FormControl>
-                                              <Input placeholder="ID Card Number" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
-                              />
-                          </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <FormField
+                                          control={form.control}
+                                          name="principalAmount"
+                                          render={({ field }) => (
+                                              <FormItem>
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Requested Amount (KSH)</FormLabel>
+                                                  <FormControl>
+                                                      <Input type="number" placeholder="0" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                      <FormField
+                                          control={form.control}
+                                          name="idNumber"
+                                          render={({ field }) => (
+                                              <FormItem>
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">National ID Number</FormLabel>
+                                                  <FormControl>
+                                                      <Input placeholder="ID Card Number" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                  </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField
-                                  control={form.control}
-                                  name="numberOfInstalments"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Instalments</FormLabel>
-                                          <FormControl>
-                                              <Input type="number" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
-                              />
-                              <FormField
-                                  control={form.control}
-                                  name="paymentFrequency"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Frequency</FormLabel>
-                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <FormField
+                                          control={form.control}
+                                          name="numberOfInstalments"
+                                          render={({ field }) => (
+                                              <FormItem>
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Instalments</FormLabel>
+                                                  <FormControl>
+                                                      <Input type="number" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                      <FormField
+                                          control={form.control}
+                                          name="paymentFrequency"
+                                          render={({ field }) => (
+                                              <FormItem>
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Frequency</FormLabel>
+                                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                      <FormControl>
+                                                          <SelectTrigger className="h-14 rounded-xl border-[#5BA9D0]/20 bg-white shadow-sm focus:ring-[#5BA9D0]">
+                                                              <SelectValue placeholder="Frequency" />
+                                                          </SelectTrigger>
+                                                      </FormControl>
+                                                      <SelectContent>
+                                                          <SelectItem value="daily">Daily</SelectItem>
+                                                          <SelectItem value="weekly">Weekly</SelectItem>
+                                                          <SelectItem value="monthly">Monthly</SelectItem>
+                                                      </SelectContent>
+                                                  </Select>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <FormField
+                                          control={form.control}
+                                          name="customerPhone"
+                                          render={({ field }) => (
+                                              <FormItem>
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Phone Number</FormLabel>
+                                                  <FormControl>
+                                                      <Input placeholder="0712 345 678" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                      <FormField
+                                          control={form.control}
+                                          name="alternativeNumber"
+                                          render={({ field }) => (
+                                              <FormItem>
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Alternative Phone (Optional)</FormLabel>
+                                                  <FormControl>
+                                                      <Input placeholder="Second contact" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
+                                                  </FormControl>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                  </div>
+
+                                  {/* Terms Checkbox */}
+                                  <FormField
+                                      control={form.control}
+                                      name="agreedToTerms"
+                                      render={({ field }) => (
+                                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border border-[#5BA9D0]/10 bg-[#5BA9D0]/5 p-6 transition-colors hover:bg-[#5BA9D0]/10">
                                               <FormControl>
-                                                  <SelectTrigger className="h-14 rounded-xl border-[#5BA9D0]/20 bg-white shadow-sm focus:ring-[#5BA9D0]">
-                                                      <SelectValue placeholder="Frequency" />
-                                                  </SelectTrigger>
+                                                  <Checkbox
+                                                      checked={field.value}
+                                                      onCheckedChange={field.onChange}
+                                                      className="mt-1 border-[#5BA9D0] data-[state=checked]:bg-[#5BA9D0]"
+                                                  />
                                               </FormControl>
-                                              <SelectContent>
-                                                  <SelectItem value="daily">Daily</SelectItem>
-                                                  <SelectItem value="weekly">Weekly</SelectItem>
-                                                  <SelectItem value="monthly">Monthly</SelectItem>
-                                              </SelectContent>
-                                          </Select>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
-                              />
-                          </div>
+                                              <div className="space-y-1 leading-none">
+                                                  <FormLabel className="text-sm font-bold text-[#1B2B33]">
+                                                      I agree to the terms and conditions of Pezeka Credit Ltd.
+                                                  </FormLabel>
+                                                  <p className="text-[10px] text-muted-foreground font-medium">
+                                                      By submitting this form, you authorize our team to verify your information.
+                                                  </p>
+                                                  <FormMessage />
+                                              </div>
+                                          </FormItem>
+                                      )}
+                                  />
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField
-                                  control={form.control}
-                                  name="customerPhone"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Phone Number</FormLabel>
-                                          <FormControl>
-                                              <Input placeholder="0712 345 678" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
-                              />
-                              <FormField
-                                  control={form.control}
-                                  name="alternativeNumber"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#1B2B33]/40">Alternative Phone (Optional)</FormLabel>
-                                          <FormControl>
-                                              <Input placeholder="Second contact" className="h-14 rounded-xl border-[#5BA9D0]/20 shadow-sm focus:ring-[#5BA9D0]" {...field} />
-                                          </FormControl>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
-                              />
-                          </div>
-
-                          {/* Terms Checkbox */}
-                          <FormField
-                              control={form.control}
-                              name="agreedToTerms"
-                              render={({ field }) => (
-                                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border border-[#5BA9D0]/10 bg-[#5BA9D0]/5 p-6 transition-colors hover:bg-[#5BA9D0]/10">
-                                      <FormControl>
-                                          <Checkbox
-                                              checked={field.value}
-                                              onCheckedChange={field.onChange}
-                                              className="mt-1 border-[#5BA9D0] data-[state=checked]:bg-[#5BA9D0]"
-                                          />
-                                      </FormControl>
-                                      <div className="space-y-1 leading-none">
-                                          <FormLabel className="text-sm font-bold text-[#1B2B33]">
-                                              I agree to the terms and conditions of Pezeka Credit Ltd.
-                                          </FormLabel>
-                                          <p className="text-[10px] text-muted-foreground font-medium">
-                                              By submitting this form, you authorize our team to verify your information.
-                                          </p>
-                                          <FormMessage />
-                                      </div>
-                                  </FormItem>
-                              )}
-                          />
-
-                          <Button 
-                            type="submit" 
-                            disabled={isSubmitting}
-                            className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white text-lg font-black shadow-lg shadow-[#5BA9D0]/20 transition-all active:scale-95"
-                          >
-                              {isSubmitting ? (
-                                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing Request...</>
-                              ) : (
-                                  'Submit Loan Application'
-                              )}
-                          </Button>
-                      </form>
-                  </Form>
+                                  <Button 
+                                    type="submit" 
+                                    disabled={isSubmitting}
+                                    className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 text-white text-lg font-black shadow-lg shadow-[#5BA9D0]/20 transition-all active:scale-95"
+                                  >
+                                      {isSubmitting ? (
+                                          <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Processing Request...</>
+                                      ) : (
+                                          'Submit Loan Application'
+                                      )}
+                                  </Button>
+                              </form>
+                          </Form>
+                      </div>
+                  </ScrollArea>
               </CardContent>
           </Card>
       </div>
