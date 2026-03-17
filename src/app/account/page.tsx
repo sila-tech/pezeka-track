@@ -14,11 +14,25 @@ import {
   CreditCard,
   Wallet,
   LogOut,
+  Info,
+  CheckCircle2,
+  ChevronRight
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { signOut } from 'firebase/auth';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface Loan {
   id: string;
@@ -42,6 +56,13 @@ interface Customer {
     email?: string;
 }
 
+const LOAN_PRODUCTS = [
+    { title: 'Quick Pesa', description: 'Instant 1-month credit for emergency needs.', rate: '10% Interest' },
+    { title: 'Salary Advance', description: 'Access funds ahead of your payday.', rate: '10% Interest' },
+    { title: 'Business Loan', description: 'Grow your enterprise with flexible capital.', rate: '5% Interest' },
+    { title: 'Logbook Loan', description: 'Unlock value from your vehicle.', rate: '10% Interest' },
+];
+
 export default function AccountPage() {
   const { user, loading: userLoading } = useUser();
   const auth = useAuth();
@@ -49,6 +70,8 @@ export default function AccountPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('Home');
   const [greeting, setGreeting] = useState('Welcome');
+  const [isPayOpen, setIsPayOpen] = useState(false);
+  const [isLoansOpen, setIsLoansOpen] = useState(false);
 
   // Handle dynamic greeting based on time of day
   useEffect(() => {
@@ -89,6 +112,11 @@ export default function AccountPage() {
 
   const totalBalance = useMemo(() => {
       return activeLoans.reduce((acc, loan) => acc + (loan.totalRepayableAmount - loan.totalPaid), 0);
+  }, [activeLoans]);
+
+  const nextInstalment = useMemo(() => {
+      if (activeLoans.length === 0) return 0;
+      return activeLoans[0].instalmentAmount;
   }, [activeLoans]);
 
   const handleLogout = async () => {
@@ -159,11 +187,31 @@ export default function AccountPage() {
 
         {/* Action Grid - Minimal Blue tint */}
         <div className="flex justify-between items-center px-2">
-            <ActionCircle icon={<SendHorizontal className="h-6 w-6 text-[#5BA9D0]" />} label="Send" />
-            <ActionCircle icon={<Wallet className="h-6 w-6 text-[#5BA9D0]" />} label="Pay" />
-            <ActionCircle icon={<Landmark className="h-6 w-6 text-[#5BA9D0]" />} label="Loans" />
-            <ActionCircle icon={<Briefcase className="h-6 w-6 text-[#5BA9D0]" />} label="Biz" />
-            <ActionCircle icon={<Folder className="h-6 w-6 text-[#5BA9D0]" />} label="Invest" />
+            <ActionCircle 
+                icon={<SendHorizontal className="h-6 w-6 text-[#5BA9D0]" />} 
+                label="Send" 
+                status="Soon"
+            />
+            <ActionCircle 
+                icon={<Wallet className="h-6 w-6 text-[#5BA9D0]" />} 
+                label="Pay" 
+                onClick={() => setIsPayOpen(true)}
+            />
+            <ActionCircle 
+                icon={<Landmark className="h-6 w-6 text-[#5BA9D0]" />} 
+                label="Loans" 
+                onClick={() => setIsLoansOpen(true)}
+            />
+            <ActionCircle 
+                icon={<Briefcase className="h-6 w-6 text-[#5BA9D0]" />} 
+                label="Biz" 
+                status="Soon"
+            />
+            <ActionCircle 
+                icon={<Folder className="h-6 w-6 text-[#5BA9D0]" />} 
+                label="Invest" 
+                status="Soon"
+            />
         </div>
 
         {/* Loan Applications Section */}
@@ -215,6 +263,77 @@ export default function AccountPage() {
         </section>
       </main>
 
+      {/* Payment Dialog */}
+      <Dialog open={isPayOpen} onOpenChange={setIsPayOpen}>
+          <DialogContent className="sm:max-w-md rounded-[2rem]">
+              <DialogHeader>
+                  <DialogTitle className="text-2xl font-black text-[#1B2B33]">Pay Loan</DialogTitle>
+                  <DialogDescription>Use the details below to make your repayment via M-Pesa.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                  <div className="bg-[#1B2B33] text-white p-6 rounded-3xl space-y-4 shadow-xl">
+                      <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                          <span className="text-white/60 text-xs font-bold uppercase tracking-widest">Paybill Number</span>
+                          <span className="text-xl font-black">522522</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                          <span className="text-white/60 text-xs font-bold uppercase tracking-widest">Account Number</span>
+                          <span className="text-xl font-black">1347823360</span>
+                      </div>
+                      {nextInstalment > 0 && (
+                          <div className="flex justify-between items-center pt-2">
+                              <span className="text-[#5BA9D0] text-xs font-bold uppercase tracking-widest">Next Instalment</span>
+                              <span className="text-2xl font-black">KES {nextInstalment.toLocaleString()}</span>
+                          </div>
+                      )}
+                  </div>
+                  <div className="flex items-start gap-3 bg-[#5BA9D0]/10 p-4 rounded-2xl border border-[#5BA9D0]/20">
+                      <Info className="h-5 w-5 text-[#5BA9D0] shrink-0 mt-0.5" />
+                      <p className="text-xs font-medium text-[#1B2B33]/70 leading-relaxed">
+                          Once you make the payment, our system will automatically update your balance within 5-10 minutes. You will receive an email confirmation.
+                      </p>
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button onClick={() => setIsPayOpen(false)} className="w-full h-14 rounded-xl bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-bold text-white">
+                      Done
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      {/* Loans Explorer Dialog */}
+      <Dialog open={isLoansOpen} onOpenChange={setIsLoansOpen}>
+          <DialogContent className="sm:max-w-md rounded-[2rem] overflow-hidden p-0 border-none">
+              <div className="bg-[#1B2B33] p-8 text-white">
+                  <DialogHeader>
+                      <DialogTitle className="text-2xl font-black text-white">Loan Products</DialogTitle>
+                      <DialogDescription className="text-white/60">Choose the perfect credit facility for your needs.</DialogDescription>
+                  </DialogHeader>
+              </div>
+              <div className="p-6 bg-white space-y-4">
+                  {LOAN_PRODUCTS.map((product, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 rounded-2xl border border-muted hover:border-[#5BA9D0]/30 hover:bg-[#5BA9D0]/5 transition-all group">
+                          <div className="space-y-1">
+                              <p className="font-black text-[#1B2B33]">{product.title}</p>
+                              <p className="text-[10px] text-muted-foreground max-w-[200px] leading-tight">{product.description}</p>
+                              <Badge variant="secondary" className="mt-1 bg-[#27AE60]/10 text-[#27AE60] border-none text-[9px] font-black uppercase tracking-widest">{product.rate}</Badge>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#5BA9D0] transition-colors" />
+                      </div>
+                  ))}
+                  <div className="pt-4">
+                      <Button 
+                        onClick={() => { setIsLoansOpen(false); router.push('/account/apply'); }} 
+                        className="w-full h-16 rounded-full bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-black text-lg shadow-lg shadow-[#5BA9D0]/20"
+                      >
+                          Apply Now
+                      </Button>
+                  </div>
+              </div>
+          </DialogContent>
+      </Dialog>
+
       {/* Fixed Bottom Navigation - Light Theme */}
       <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t border-muted px-10 flex items-center justify-between z-50">
           <NavItem 
@@ -243,13 +362,18 @@ export default function AccountPage() {
   );
 }
 
-function ActionCircle({ icon, label }: { icon: React.ReactNode, label: string }) {
+function ActionCircle({ icon, label, status, onClick }: { icon: React.ReactNode, label: string, status?: string, onClick?: () => void }) {
     return (
-        <button className="flex flex-col items-center gap-2 group">
+        <button onClick={onClick} className="flex flex-col items-center gap-2 group relative">
             <div className="w-14 h-14 rounded-full bg-[#5BA9D0]/10 border border-[#5BA9D0]/20 flex items-center justify-center transition-all group-active:scale-90 hover:bg-[#5BA9D0]/20">
                 {icon}
             </div>
             <span className="text-[11px] font-bold text-[#1B2B33]/70">{label}</span>
+            {status && (
+                <div className="absolute -top-1 -right-1 bg-[#1B2B33] text-white text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-tighter ring-2 ring-white">
+                    {status}
+                </div>
+            )}
         </button>
     );
 }
