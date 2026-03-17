@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import ClientOverlays from '@/components/ClientOverlays';
+import { PWARegister } from '@/components/PWARegister';
 import { Suspense } from 'react';
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn('font-sans antialiased')}>
+        <PWARegister />
         <FirebaseClientProvider>
           {children}
         </FirebaseClientProvider>
