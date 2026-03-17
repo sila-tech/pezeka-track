@@ -32,6 +32,12 @@ export default function AgentSignupPage() {
   const { toast } = useToast();
   const { user, loading: userLoading } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Hydration fix: ensures client and server render match initially
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const form = useForm<z.infer<typeof agentSchema>>({
     resolver: zodResolver(agentSchema),
@@ -40,11 +46,11 @@ export default function AgentSignupPage() {
 
   // Pre-fill email if user is already logged in but not yet an agent
   useEffect(() => {
-    if (user) {
+    if (user && mounted) {
       form.setValue('email', user.email || '');
       form.setValue('fullName', user.displayName || '');
     }
-  }, [user, form]);
+  }, [user, form, mounted]);
 
   async function handleApplyDirectly() {
     if (!user) return;
@@ -100,6 +106,15 @@ export default function AgentSignupPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  // Prevent rendering dynamic user-state dependent UI until hydration is complete
+  if (!mounted) {
+    return (
+        <div className="w-full flex items-center justify-center p-20">
+            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground/20" />
+        </div>
+    );
   }
 
   return (
