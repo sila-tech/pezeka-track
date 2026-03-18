@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useCollection, useFirestore, useDoc, useAuth } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -230,8 +229,10 @@ export default function AccountPage() {
   };
 
   const copyReferralLink = () => {
-      navigator.clipboard.writeText(referralLink);
-      toast({ title: 'Link Copied', description: 'You can now share your referral link with friends.' });
+      if (typeof window !== 'undefined') {
+          navigator.clipboard.writeText(referralLink);
+          toast({ title: 'Link Copied', description: 'You can now share your referral link with friends.' });
+      }
   };
 
   return (
@@ -295,7 +296,7 @@ export default function AccountPage() {
                             <p className="text-xs font-black uppercase tracking-wider">{customerProfile?.accountNumber || 'PZ-XXXXX'}</p>
                         </div>
                         <div className="text-right space-y-1">
-                            <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Growth Code</p>
+                            <p className="text-white/40 text-[9px] font-black uppercase tracking-widest">Referral Code</p>
                             <p className="text-xs font-black uppercase tracking-wider text-[#5BA9D0]">{customerProfile?.referralCode || '...'}</p>
                         </div>
                     </div>
@@ -329,7 +330,7 @@ export default function AccountPage() {
                     />
                     <ActionCircle 
                         icon={<Folder className="h-6 w-6" />} 
-                        label="Vault" 
+                        label="Invest" 
                         status="SOON"
                     />
                 </div>
