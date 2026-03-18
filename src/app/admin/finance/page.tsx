@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format } from "date-fns";
-import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info } from "lucide-react";
+import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2 } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -28,16 +28,19 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+
+const editLoanSchema = z.object({
+  principalAmount: z.coerce.number().min(1, 'Principal is required.'),
+  registrationFee: z.coerce.number().min(0),
+  processingFee: z.coerce.number().min(0),
+  carTrackInstallationFee: z.coerce.number().min(0),
+  chargingCost: z.coerce.number().min(0),
+  numberOfInstalments: z.coerce.number().int().min(1),
+  paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+  assignedStaffId: z.string().min(1, 'Assign staff.'),
+  disbursementDate: z.string().min(1, 'Date is required.'),
+  totalRepayableAmount: z.coerce.number().min(0, 'Total to pay is required.'),
+});
 
 interface Payment {
     paymentId: string;
@@ -49,8 +52,10 @@ interface Payment {
 interface Loan {
   id: string;
   loanNumber: string;
+  customerId: string;
   customerName: string;
   customerPhone: string;
+  assignedStaffId?: string;
   assignedStaffName?: string;
   disbursementDate: any;
   principalAmount: number;
@@ -58,11 +63,13 @@ interface Loan {
   processingFee?: number;
   carTrackInstallationFee?: number;
   chargingCost?: number;
+  interestRate?: number;
   numberOfInstalments: number;
   instalmentAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
   totalPenalties?: number;
+  paymentFrequency: 'daily' | 'weekly' | 'monthly';
   status: string;
   payments?: Payment[];
 }
@@ -72,6 +79,7 @@ export default function FinancePage() {
   const [lbSearch, setLbSearch] = useState('');
   const [lbStatus, setLbStatus] = useState('all');
   const [selectedLoanForHistory, setSelectedLoanForHistory] = useState<Loan | null>(null);
+  const [selectedLoanForEdit, setSelectedLoanForEdit] = useState<Loan | null>(null);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -82,6 +90,10 @@ export default function FinancePage() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<any>(isAuthorized ? 'financeEntries' : null);
   const { data: staffList } = useCollection<any>(isAuthorized ? 'users' : null);
+
+  const editForm = useForm<z.infer<typeof editLoanSchema>>({
+    resolver: zodResolver(editLoanSchema),
+  });
 
   const financialData = useMemo(() => {
     const receipts: any[] = [];
@@ -112,6 +124,52 @@ export default function FinancePage() {
           return t2 - t1;
       });
   }, [loans, lbSearch, lbStatus]);
+
+  const handleEditClick = (loan: Loan) => {
+    setSelectedLoanForEdit(loan);
+    const dDate = loan.disbursementDate?.seconds 
+        ? new Date(loan.disbursementDate.seconds * 1000) 
+        : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+
+    editForm.reset({
+        principalAmount: loan.principalAmount || 0,
+        registrationFee: loan.registrationFee || 0,
+        processingFee: loan.processingFee || 0,
+        carTrackInstallationFee: loan.carTrackInstallationFee || 0,
+        chargingCost: loan.chargingCost || 0,
+        numberOfInstalments: loan.numberOfInstalments || 1,
+        paymentFrequency: loan.paymentFrequency || 'monthly',
+        assignedStaffId: loan.assignedStaffId || '',
+        disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
+        totalRepayableAmount: loan.totalRepayableAmount || 0,
+    });
+  };
+
+  async function onEditSubmit(values: z.infer<typeof editLoanSchema>) {
+    if (!selectedLoanForEdit) return;
+    setIsSubmitting(true);
+    try {
+        const staff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
+        
+        // Recalculate instalment based on total repayable
+        const instalmentAmount = values.numberOfInstalments > 0 ? values.totalRepayableAmount / values.numberOfInstalments : 0;
+
+        const updateData = {
+            ...values,
+            disbursementDate: new Date(values.disbursementDate),
+            assignedStaffName: staff?.name || staff?.email || "Unknown",
+            instalmentAmount,
+        };
+
+        await updateLoan(firestore, selectedLoanForEdit.id, updateData);
+        toast({ title: 'Record Updated', description: `Loan #${selectedLoanForEdit.loanNumber} has been updated.` });
+        setSelectedLoanForEdit(null);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
 
   if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!isAuthorized) return <div className="p-12 text-center font-bold">Access Denied</div>;
@@ -161,11 +219,10 @@ export default function FinancePage() {
                       </div>
                   </CardHeader>
                   <CardContent className="p-0 border-t">
-                      {/* Horizontal Scroll Container */}
                       <div className="relative">
                           <ScrollArea className="w-full">
                               <div className="h-[65vh] w-full">
-                                  <Table className="min-w-[2800px] border-separate border-spacing-0">
+                                  <Table className="min-w-[3000px] border-separate border-spacing-0">
                                       <TableHeader className="bg-muted/50 sticky top-0 z-40">
                                           <TableRow>
                                               <TableHead className="sticky left-0 bg-muted/50 z-50 w-[220px] border-r">Client Name</TableHead>
@@ -187,7 +244,7 @@ export default function FinancePage() {
                                               <TableHead className="text-right w-[120px]">Penalties</TableHead>
                                               <TableHead className="text-right w-[140px]">Exp. Interest</TableHead>
                                               <TableHead className="text-right w-[140px] bg-green-50/50">Exp. Income</TableHead>
-                                              <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-50 border-l">Repayment History</TableHead>
+                                              <TableHead className="text-center w-[120px] sticky right-0 bg-muted/50 z-50 border-l">Actions</TableHead>
                                           </TableRow>
                                       </TableHeader>
                                       <TableBody>
@@ -229,14 +286,24 @@ export default function FinancePage() {
                                                       <TableCell className="text-right font-medium">{interest.toLocaleString()}</TableCell>
                                                       <TableCell className="text-right font-black bg-green-50/30 text-green-700">{totalIncome.toLocaleString()}</TableCell>
                                                       <TableCell className="text-center sticky right-0 bg-background group-hover:bg-muted/30 transition-colors z-30 border-l">
-                                                          <Button 
-                                                            variant="ghost" 
-                                                            size="sm" 
-                                                            className="h-8 w-8 p-0"
-                                                            onClick={() => setSelectedLoanForHistory(loan)}
-                                                          >
-                                                              <History className="h-4 w-4 text-primary" />
-                                                          </Button>
+                                                          <div className="flex items-center justify-center gap-1">
+                                                              <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => handleEditClick(loan)}
+                                                              >
+                                                                  <Pencil className="h-4 w-4 text-primary" />
+                                                              </Button>
+                                                              <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="h-8 w-8 p-0"
+                                                                onClick={() => setSelectedLoanForHistory(loan)}
+                                                              >
+                                                                  <History className="h-4 w-4 text-muted-foreground" />
+                                                              </Button>
+                                                          </div>
                                                       </TableCell>
                                                   </TableRow>
                                               );
@@ -257,6 +324,63 @@ export default function FinancePage() {
           <TabsContent value="investors"><InvestorsPortfolioTab /></TabsContent>
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
+
+      {/* Internal Book Edit Dialog */}
+      <Dialog open={!!selectedLoanForEdit} onOpenChange={(o) => !o && setSelectedLoanForEdit(null)}>
+          <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                  <DialogTitle>Edit Ledger Entry: {selectedLoanForEdit?.customerName}</DialogTitle>
+                  <DialogDescription>Modify primary financial data for Loan #{selectedLoanForEdit?.loanNumber}.</DialogDescription>
+              </DialogHeader>
+              <Form {...editForm}>
+                  <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6 pt-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editForm.control} name="disbursementDate" render={({field}) => (
+                              <FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>
+                          )} />
+                          <FormField control={editForm.control} name="assignedStaffId" render={({field}) => (
+                              <FormItem className="col-span-2">
+                                  <FormLabel>Staff Member</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Select staff"/></SelectTrigger></FormControl>
+                                      <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                  </Select>
+                              </FormItem>
+                          )} />
+                          <FormField control={editForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={editForm.control} name="registrationFee" render={({field}) => (<FormItem><FormLabel>Reg Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={editForm.control} name="processingFee" render={({field}) => (<FormItem><FormLabel>Proc Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={editForm.control} name="carTrackInstallationFee" render={({field}) => (<FormItem><FormLabel>Car Track Fee</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={editForm.control} name="chargingCost" render={({field}) => (<FormItem><FormLabel>Charging Cost</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={editForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
+                          <FormField control={editForm.control} name="paymentFrequency" render={({ field }) => (
+                              <FormItem>
+                                  <FormLabel>Frequency</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                      <FormControl><SelectTrigger><SelectValue placeholder="Frequency" /></SelectTrigger></FormControl>
+                                      <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
+                                  </Select>
+                              </FormItem>
+                          )} />
+                          <FormField control={editForm.control} name="totalRepayableAmount" render={({field}) => (
+                              <FormItem className="col-span-2">
+                                  <FormLabel className="font-bold text-primary">Total Repayable (Override)</FormLabel>
+                                  <FormControl><Input type="number" {...field} className="font-bold border-primary/50 bg-primary/5"/></FormControl>
+                                  <FormDescription className="text-[10px]">Enter the total amount the client should pay (Principal + Total Interest).</FormDescription>
+                              </FormItem>
+                          )} />
+                      </div>
+                      <DialogFooter>
+                          <Button type="button" variant="outline" onClick={() => setSelectedLoanForEdit(null)}>Cancel</Button>
+                          <Button type="submit" disabled={isSubmitting}>
+                              {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : <Settings2 className="mr-2 h-4 w-4"/>}
+                              Update Ledger
+                          </Button>
+                      </DialogFooter>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
 
       {/* Repayment History Dialog */}
       <Dialog open={!!selectedLoanForHistory} onOpenChange={(open) => !open && setSelectedLoanForHistory(null)}>
