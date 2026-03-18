@@ -72,7 +72,8 @@ export default function ApplicationFormPage() {
         <div id="printable-area" className="p-8 text-black">
           {/* Page 1 */}
           <div>
-            <div className="text-center mb-4">
+            <div className="flex flex-col items-center text-center mb-4">
+              <img src="/pezeka_logo_transparent.png" alt="Pezeka Logo" className="h-20 w-20 mb-2 object-contain" />
               <h1 className="text-xl font-bold uppercase">Pezeka Limited</h1>
               <p className="font-semibold">Affordable Credit, Real Opportunities</p>
               <p className="text-sm">Email: pezekalimited@gmail.com | Phone: +254 757 664047</p>

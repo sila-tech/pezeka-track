@@ -72,7 +72,8 @@ export default function LogbookLoanFormPage() {
         <div id="printable-area" className="p-8 text-black text-xs">
           {/* Page 1 */}
           <div>
-            <div className="text-center mb-4">
+            <div className="flex flex-col items-center text-center mb-4">
+              <img src="/pezeka_logo_transparent.png" alt="Pezeka Logo" className="h-16 w-16 mb-2 object-contain" />
               <h1 className="text-xl font-bold uppercase">Pezeka Limited</h1>
               <p className="font-semibold">Affordable Credit, Real Opportunities</p>
               <p className="text-sm">Logbook Loan Application Form</p>
