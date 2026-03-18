@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -41,7 +40,6 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -137,6 +135,7 @@ interface Customer {
   name: string;
   phone: string;
   idNumber?: string;
+  accountNumber?: string;
 }
 
 interface Staff {
@@ -192,7 +191,8 @@ export default function LoansPage() {
             loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             loan.customerPhone.includes(searchTerm) ||
-            loan.idNumber?.includes(searchTerm);
+            loan.idNumber?.includes(searchTerm) ||
+            loan.accountNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
     });
   }, [loans, searchTerm, statusFilter]);
@@ -251,25 +251,41 @@ export default function LoansPage() {
       let customerId = values.customerId;
       let customerName = '';
       let customerPhone = '';
+      let accountNumber = '';
 
       if (values.customerType === 'new') {
         const newCustomerData = { name: values.newCustomerName!, phone: values.newCustomerPhone!, idNumber: values.idNumber };
         const newCustomerDocRef = await addCustomer(firestore, newCustomerData);
+        const newSnap = await getDoc(newCustomerDocRef);
         customerId = newCustomerDocRef.id;
         customerName = newCustomerData.name;
         customerPhone = newCustomerData.phone;
+        accountNumber = newSnap.data()?.accountNumber || '';
       } else {
         const selectedCustomer = customers?.find(c => c.id === customerId);
         if (!selectedCustomer) throw new Error("Selected customer not found.");
         customerName = selectedCustomer.name;
         customerPhone = selectedCustomer.phone;
+        accountNumber = selectedCustomer.accountNumber || '';
       }
       
       const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
       const { instalmentAmount, totalRepayableAmount } = calculateAmortization(values.principalAmount, values.interestRate, values.numberOfInstalments, values.paymentFrequency);
 
       const loanData = {
-        ...values, customerId: customerId!, customerName, customerPhone, alternativeNumber: values.alternativeNumber || "", idNumber: values.idNumber, assignedStaffId: values.assignedStaffId, assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown", disbursementDate: new Date(values.disbursementDate), totalRepayableAmount, instalmentAmount, totalPaid: 0,
+        ...values, 
+        customerId: customerId!, 
+        customerName, 
+        customerPhone, 
+        accountNumber, // Record Member Number
+        alternativeNumber: values.alternativeNumber || "", 
+        idNumber: values.idNumber, 
+        assignedStaffId: values.assignedStaffId, 
+        assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown", 
+        disbursementDate: new Date(values.disbursementDate), 
+        totalRepayableAmount, 
+        instalmentAmount, 
+        totalPaid: 0,
       };
       
       delete (loanData as any).customerType;
@@ -291,7 +307,18 @@ export default function LoansPage() {
   const handleManageApplication = (loan: Loan) => {
       setApplicationToManage(loan);
       approvalForm.reset({
-          disbursementDate: format(new Date(), 'yyyy-MM-dd'), principalAmount: loan.principalAmount || 0, interestRate: loan.interestRate || 0, processingFee: loan.processingFee || 0, registrationFee: loan.registrationFee || 0, carTrackInstallationFee: loan.carTrackInstallationFee || 0, chargingCost: loan.chargingCost || 0, numberOfInstalments: loan.numberOfInstalments || 1, paymentFrequency: loan.paymentFrequency || 'monthly', idNumber: loan.idNumber || "", alternativeNumber: loan.alternativeNumber || "", assignedStaffId: loan.assignedStaffId || "",
+          disbursementDate: format(new Date(), 'yyyy-MM-dd'), 
+          principalAmount: loan.principalAmount || 0, 
+          interestRate: loan.interestRate || 0, 
+          processingFee: loan.processingFee || 0, 
+          registrationFee: loan.registrationFee || 0, 
+          carTrackInstallationFee: loan.carTrackInstallationFee || 0, 
+          chargingCost: loan.chargingCost || 0, 
+          numberOfInstalments: loan.numberOfInstalments || 1, 
+          paymentFrequency: loan.paymentFrequency || 'monthly', 
+          idNumber: loan.idNumber || "", 
+          alternativeNumber: loan.alternativeNumber || "", 
+          assignedStaffId: loan.assignedStaffId || "",
       });
   };
 
@@ -461,7 +488,7 @@ export default function LoansPage() {
                             <FormLabel>Customer</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
-                              <SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                              <SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}</SelectContent>
                             </Select>
                           </FormItem>
                       )} />
@@ -517,12 +544,23 @@ export default function LoansPage() {
             <Card>
                 <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle>Portfolio Ledger</CardTitle>
-                    <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[250px]" /></div>
+                    <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone, ID or Member No..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[350px]" /></div>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[60vh]">
                       <Table>
-                          <TableHeader className="sticky top-0 bg-card"><TableRow><TableHead>No.</TableHead><TableHead>Customer</TableHead><TableHead>Staff Assigned</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Balance</TableHead><TableHead className="text-center">Status</TableHead></TableRow></TableHeader>
+                          <TableHeader className="sticky top-0 bg-card">
+                            <TableRow>
+                                <TableHead>No.</TableHead>
+                                <TableHead>Member No</TableHead>
+                                <TableHead>Customer Identity</TableHead>
+                                <TableHead>Phone</TableHead>
+                                <TableHead>Staff Assigned</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Balance</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
                           <TableBody>
                               {filteredLoans.map((loan) => {
                                   const dDate = loan.disbursementDate?.seconds 
@@ -531,12 +569,17 @@ export default function LoansPage() {
                                   
                                   return (
                                     <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
-                                        <TableCell className="font-medium">{loan.loanNumber}</TableCell>
-                                        <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
-                                        <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-sm">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
-                                        <TableCell>{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
-                                        <TableCell className="text-right font-bold">{((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
-                                        <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'}>{loan.status}</Badge></TableCell>
+                                        <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
+                                        <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
+                                        <TableCell>
+                                            <div className="font-bold text-sm">{loan.customerName}</div>
+                                            <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">{loan.customerPhone}</TableCell>
+                                        <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
+                                        <TableCell className="text-xs">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
+                                        <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
+                                        <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'} className="text-[10px] uppercase">{loan.status}</Badge></TableCell>
                                     </TableRow>
                                   );
                               })}
@@ -551,13 +594,27 @@ export default function LoansPage() {
                 <CardHeader><CardTitle>Review Applications</CardTitle></CardHeader>
                 <CardContent>
                     <Table>
-                        <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Type</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Member No</TableHead>
+                                <TableHead>Customer Identity</TableHead>
+                                <TableHead>Phone</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
                         <TableBody>
                             {applicationLoans.map((loan) => (
                                 <TableRow key={loan.id}>
-                                    <TableCell><div>{loan.customerName}</div><div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || "N/A"}</div></TableCell>
-                                    <TableCell>{loan.loanType}</TableCell>
-                                    <TableCell className="font-bold">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
+                                    <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
+                                    <TableCell>
+                                        <div className="font-bold text-sm">{loan.customerName}</div>
+                                        <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
+                                    </TableCell>
+                                    <TableCell className="text-xs">{loan.customerPhone}</TableCell>
+                                    <TableCell className="text-xs">{loan.loanType}</TableCell>
+                                    <TableCell className="font-bold text-right tabular-nums">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
@@ -579,8 +636,10 @@ export default function LoansPage() {
               {viewingApplication && (
                   <div className="space-y-6 py-4">
                       <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
+                          <div className="text-muted-foreground">Member Number:</div><div className="font-bold">{viewingApplication.accountNumber || 'N/A'}</div>
                           <div className="text-muted-foreground">Customer:</div><div className="font-medium">{viewingApplication.customerName}</div>
-                          <div className="text-muted-foreground">National ID:</div><div className="font-medium">{viewingApplication.idNumber || 'N/A'}</div>
+                          <div className="text-muted-foreground">Phone Number:</div><div className="font-medium">{viewingApplication.customerPhone}</div>
+                          <div className="text-muted-foreground">National ID:</div><div className="font-bold text-primary">{viewingApplication.idNumber || 'N/A'}</div>
                           <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {(viewingApplication.principalAmount || 0).toLocaleString()}</div>
                           <div className="text-muted-foreground">Loan Product:</div><div className="font-medium">{viewingApplication.loanType}</div>
                       </div>
@@ -698,6 +757,8 @@ export default function LoansPage() {
                                     </CardHeader>
                                     <CardContent className="space-y-4 text-sm">
                                         <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                        <div className="flex justify-between"><span>Member No:</span><span className="font-bold text-primary">{loanToEdit.accountNumber || 'N/A'}</span></div>
+                                        <div className="flex justify-between"><span>Phone:</span><span className="font-medium">{loanToEdit.customerPhone}</span></div>
                                         <div className="flex justify-between"><span>Assigned:</span><span className="font-medium">{loanToEdit.assignedStaffName || 'Unassigned'}</span></div>
                                         <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
                                         <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {((loanToEdit.totalRepayableAmount || 0) - (loanToEdit.totalPaid || 0)).toLocaleString()}</span></div>

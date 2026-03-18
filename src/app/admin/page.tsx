@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -36,6 +35,7 @@ interface DashboardLoan {
   loanNumber: string;
   customerName: string;
   customerPhone: string;
+  accountNumber?: string; // Member Number
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementDate: { seconds: number; nanoseconds: number } | any;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
@@ -93,6 +93,7 @@ export default function Dashboard() {
         customerId: user.uid,
         customerName: user.name || user.email?.split('@')[0] || "Staff",
         customerPhone: "Internal Staff",
+        accountNumber: "STAFF",
         disbursementDate: new Date(),
         principalAmount: values.amount,
         interestRate: 0, 
@@ -288,7 +289,8 @@ export default function Dashboard() {
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-card z-10">
                                             <TableRow>
-                                                <TableHead>Customer</TableHead>
+                                                <TableHead>Customer Identity</TableHead>
+                                                <TableHead>Member No</TableHead>
                                                 <TableHead>Next Due</TableHead>
                                                 <TableHead className="text-right">Due Amt</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -300,9 +302,11 @@ export default function Dashboard() {
                                                 return (
                                                     <TableRow key={loan.id}>
                                                         <TableCell>
-                                                            <div className="font-medium text-xs">{loan.customerName}</div>
-                                                            <div className="text-[10px] text-muted-foreground flex items-center gap-1"><CalendarDays className="h-2 w-2"/> {loan.paymentFrequency}</div>
+                                                            <div className="font-bold text-xs">{loan.customerName}</div>
+                                                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">Ph: {loan.customerPhone}</div>
+                                                            <div className="text-[10px] text-muted-foreground font-medium uppercase">ID: {loan.idNumber || 'N/A'}</div>
                                                         </TableCell>
+                                                        <TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell>
                                                         <TableCell>
                                                             <div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div>
                                                             <Badge variant={daysDue < 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `LATE ${Math.abs(daysDue)}d` : (daysDue === 0 ? 'TODAY' : `In ${daysDue}d`)}</Badge>
@@ -324,6 +328,7 @@ export default function Dashboard() {
                                         <TableHeader className="sticky top-0 bg-card z-10">
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
+                                                <TableHead>Member No</TableHead>
                                                 <TableHead>Next Due</TableHead>
                                                 <TableHead className="text-right">Due Amt</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -333,6 +338,7 @@ export default function Dashboard() {
                                             {dailyDue.map((loan) => (
                                                 <TableRow key={loan.id}>
                                                     <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
+                                                    <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
                                                     <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
@@ -350,6 +356,7 @@ export default function Dashboard() {
                                         <TableHeader className="sticky top-0 bg-card z-10">
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
+                                                <TableHead>Member No</TableHead>
                                                 <TableHead>Next Due</TableHead>
                                                 <TableHead className="text-right">Due Amt</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -359,6 +366,7 @@ export default function Dashboard() {
                                             {weeklyDue.map((loan) => (
                                                 <TableRow key={loan.id}>
                                                     <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
+                                                    <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
                                                     <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
@@ -386,7 +394,7 @@ export default function Dashboard() {
                     </Link>
                 </Button>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden">
+            <CardContent className="flex-1 overflow-hidden p-0">
                 {newApplications.length === 0 ? (
                     <div className="p-6 text-center">
                         <Alert><AlertTitle>No Pending Applications</AlertTitle></Alert>
@@ -396,8 +404,8 @@ export default function Dashboard() {
                         <Table>
                             <TableHeader className="sticky top-0 bg-card z-10">
                                 <TableRow>
-                                    <TableHead>Customer</TableHead>
-                                    <TableHead>Type</TableHead>
+                                    <TableHead>Identity & Phone</TableHead>
+                                    <TableHead>Member No</TableHead>
                                     <TableHead className="text-right">Amount</TableHead>
                                     <TableHead className="w-[50px]"></TableHead>
                                 </TableRow>
@@ -406,12 +414,13 @@ export default function Dashboard() {
                                 {newApplications.map((loan) => (
                                     <TableRow key={loan.id} className="group">
                                         <TableCell>
-                                            <div className="font-medium text-xs">{loan.customerName}</div>
-                                            <div className="text-[10px] text-muted-foreground">{format(loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : new Date(), 'MMM dd, HH:mm')}</div>
+                                            <div className="font-bold text-xs">{loan.customerName}</div>
+                                            <div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div>
+                                            <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || 'N/A'}</div>
                                         </TableCell>
-                                        <TableCell className="text-xs">{loan.loanType}</TableCell>
-                                        <TableCell className="text-right font-bold text-xs">
-                                            Ksh {(loan.principalAmount || 0).toLocaleString()}
+                                        <TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell>
+                                        <TableCell className="text-right font-bold text-xs tabular-nums text-green-600">
+                                            KES {(loan.principalAmount || 0).toLocaleString()}
                                         </TableCell>
                                         <TableCell>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild>

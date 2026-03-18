@@ -23,6 +23,7 @@ export interface Loan {
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
+  accountNumber?: string; // Member Number
   alternativeNumber?: string;
   idNumber?: string;
   loanType?: string;

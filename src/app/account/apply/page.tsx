@@ -68,13 +68,15 @@ export default function ApplyPage() {
     },
   });
 
-  // Pre-fill phone number when profile data arrives
+  // Pre-fill fields when profile data arrives
   useEffect(() => {
-    if (profile?.phone && !form.getValues('customerPhone')) {
-      form.setValue('customerPhone', profile.phone);
-    }
-    if (profile?.idNumber && !form.getValues('idNumber')) {
-        form.setValue('idNumber', profile.idNumber);
+    if (profile) {
+        if (profile.phone && !form.getValues('customerPhone')) {
+            form.setValue('customerPhone', profile.phone);
+        }
+        if (profile.idNumber && !form.getValues('idNumber')) {
+            form.setValue('idNumber', profile.idNumber);
+        }
     }
   }, [profile, form]);
 
@@ -85,6 +87,7 @@ export default function ApplyPage() {
       const applicationData = {
         ...values,
         customerName: profile?.name || user.displayName || 'Customer',
+        accountNumber: profile?.accountNumber || 'N/A', // Record Member Number
       };
       
       await submitCustomerApplication(firestore, user.uid, applicationData);
