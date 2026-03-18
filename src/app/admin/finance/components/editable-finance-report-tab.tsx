@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, FileDown, Loader2, PenSquare, Trash2, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, FileDown, Loader2, PenSquare, Trash2, Search, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportToCsv } from '@/lib/excel';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -99,7 +99,7 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
   const filteredEntries = useMemo(() => {
     if (!entries) return [];
     
-    let filtered = entries;
+    let filtered = [...entries];
 
     if (date?.from) {
         filtered = filtered.filter((entry) => {
@@ -134,12 +134,28 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
         );
     }
 
-    return filtered;
+    // Sort by date descending (Newest first)
+    return filtered.sort((a, b) => {
+        let dateA = 0;
+        let dateB = 0;
+        if (typeof a.date === 'string') dateA = new Date(a.date).getTime();
+        else if (a.date instanceof Date) dateA = a.date.getTime();
+        else if (a.date && 'seconds' in a.date) dateA = a.date.seconds * 1000;
+
+        if (typeof b.date === 'string') dateB = new Date(b.date).getTime();
+        else if (b.date instanceof Date) dateB = b.date.getTime();
+        else if (b.date && 'seconds' in b.date) dateB = b.date.seconds * 1000;
+
+        return dateB - dateA;
+    });
   }, [entries, date, searchTerm]);
 
-  const totalAmount = useMemo(() => {
+  const netTotal = useMemo(() => {
     if (!filteredEntries) return 0;
-    return filteredEntries.reduce((acc, entry) => acc + (Number(entry.amount) || 0), 0);
+    return filteredEntries.reduce((acc, entry) => {
+        const val = Number(entry.amount) || 0;
+        return entry.type === 'receipt' ? acc + val : acc - val;
+    }, 0);
   }, [filteredEntries]);
 
   const handleExport = () => {
@@ -158,8 +174,9 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
 
         const record: {[key: string]: any} = {
             'Date': format(entryDate, 'PPP'),
+            'Type': entry.type.toUpperCase(),
             'Description': entry.description,
-            'Amount (Ksh)': entry.amount,
+            'Amount (Ksh)': entry.type === 'receipt' ? entry.amount : -entry.amount,
             'Recorded By': entry.recordedBy || 'System'
         };
         const category = entry.expenseCategory || entry.receiptCategory || entry.payoutCategory;
@@ -238,9 +255,10 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
         {!loading && filteredEntries && filteredEntries.length > 0 && (
           <ScrollArea className="h-[60vh]">
             <Table>
-                <TableHeader className="sticky top-0 bg-card">
+                <TableHeader className="sticky top-0 bg-card z-10">
                 <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Direction</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Recorded By</TableHead>
@@ -261,21 +279,37 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                         entryDate = new Date();
                     }
 
+                    const isInflow = entry.type === 'receipt';
+
                     return (
                         <TableRow key={`${entry.id}-${index}`}>
-                        <TableCell>{format(entryDate, 'dd/MM/yyyy')}</TableCell>
+                        <TableCell className="text-xs">{format(entryDate, 'dd/MM/yyyy')}</TableCell>
                         <TableCell>
-                            <div className="font-medium">{entry.description || '-'}</div>
+                            <div className={cn(
+                                "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tighter",
+                                isInflow ? "text-green-600" : "text-destructive"
+                            )}>
+                                {isInflow ? <ArrowDownLeft className="h-3 w-3" /> : <ArrowUpRight className="h-3 w-3" />}
+                                {isInflow ? "In" : "Out"}
+                            </div>
                         </TableCell>
                         <TableCell>
-                            {entry.expenseCategory && <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-none">{entry.expenseCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
-                            {entry.receiptCategory && <Badge variant="outline" className="border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
-                            {entry.payoutCategory && <Badge variant="destructive" className="bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                            <div className="font-medium text-xs">{entry.description || '-'}</div>
                         </TableCell>
                         <TableCell>
-                            <span className="text-xs italic text-muted-foreground">{entry.recordedBy || 'System'}</span>
+                            {entry.expenseCategory && <Badge variant="secondary" className="text-[9px] bg-orange-100 text-orange-800 border-none">{entry.expenseCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                            {entry.receiptCategory && <Badge variant="outline" className="text-[9px] border-green-600 text-green-600">{entry.receiptCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                            {entry.payoutCategory && <Badge variant="destructive" className="text-[9px] bg-red-100 text-red-800 border-none">{entry.payoutCategory.replace(/_/g, ' ').toUpperCase()}</Badge>}
                         </TableCell>
-                        <TableCell className="text-right font-bold">{entry.amount.toLocaleString()}</TableCell>
+                        <TableCell>
+                            <span className="text-[10px] italic text-muted-foreground">{entry.recordedBy || 'System'}</span>
+                        </TableCell>
+                        <TableCell className={cn(
+                            "text-right font-black tabular-nums text-sm",
+                            isInflow ? "text-green-600" : "text-destructive"
+                        )}>
+                            {isInflow ? '+' : '-'}{entry.amount.toLocaleString()}
+                        </TableCell>
                         {isEditable && onEdit && onDelete && (
                             <TableCell className="text-right">
                             <Button variant="ghost" size="sm" onClick={() => onEdit(entry)}>
@@ -292,8 +326,13 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
                 </TableBody>
                 <TableFooter>
                     <TableRow className="font-bold bg-muted/50">
-                        <TableCell colSpan={4} className="text-right">Total</TableCell>
-                        <TableCell className="text-right">{totalAmount.toLocaleString()}</TableCell>
+                        <TableCell colSpan={5} className="text-right">Net Flow for Period</TableCell>
+                        <TableCell className={cn(
+                            "text-right font-black",
+                            netTotal >= 0 ? "text-green-600" : "text-destructive"
+                        )}>
+                            Ksh {netTotal.toLocaleString()}
+                        </TableCell>
                         {isEditable && <TableCell />}
                     </TableRow>
                 </TableFooter>

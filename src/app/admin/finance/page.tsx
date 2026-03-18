@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -125,6 +126,7 @@ export default function FinancePage() {
           <TabsList className="mb-4">
               <TabsTrigger value="loanbook">Internal Loan Book</TabsTrigger>
               <TabsTrigger value="reports">Portfolio Reports</TabsTrigger>
+              <TabsTrigger value="cashflow">Cash Flow Ledger</TabsTrigger>
               <TabsTrigger value="receipts">Receipts</TabsTrigger>
               <TabsTrigger value="payouts">Payouts & Expenses</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
@@ -249,6 +251,7 @@ export default function FinancePage() {
               </Card>
           </TabsContent>
           <TabsContent value="reports"><PortfolioReportsTab loans={loans} /></TabsContent>
+          <TabsContent value="cashflow"><EditableFinanceReportTab title="Cash Flow Ledger" description="Comprehensive record of all incoming and outgoing funds." entries={financeEntries} loading={financeEntriesLoading} /></TabsContent>
           <TabsContent value="receipts"><EditableFinanceReportTab title="Receipts" description="Incoming cash flow." entries={financialData.allReceipts} loading={financeEntriesLoading} /></TabsContent>
           <TabsContent value="payouts"><EditableFinanceReportTab title="Payouts" description="Outgoing cash flow." entries={financialData.allPayouts} loading={financeEntriesLoading} /></TabsContent>
           <TabsContent value="investors"><InvestorsPortfolioTab /></TabsContent>
