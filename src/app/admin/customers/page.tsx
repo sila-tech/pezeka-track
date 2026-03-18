@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal, Share2 } from 'lucide-react';
+import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal, Share2, Phone, ShieldCheck } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -77,9 +77,10 @@ export default function CustomersPage() {
     if (!customers) return [];
     return customers.filter(c => 
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.phone.includes(searchTerm) ||
+        c.phone?.includes(searchTerm) ||
         c.idNumber?.includes(searchTerm) ||
-        c.referralCode?.toLowerCase().includes(searchTerm.toLowerCase())
+        c.referralCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   }, [customers, searchTerm]);
 
@@ -121,56 +122,88 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Customers</h1>
-        <Button onClick={() => { setCustomerToEdit(null); form.reset({ name: '', phone: '', idNumber: '' }); setAddCustomerOpen(true); }}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Customer
+        <h1 className="text-3xl font-bold tracking-tight text-primary">Members & Customers</h1>
+        <Button onClick={() => { setCustomerToEdit(null); form.reset({ name: '', phone: '', idNumber: '' }); setAddCustomerOpen(true); }} className="font-bold">
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Member
         </Button>
       </div>
 
-      <Card>
+      <Card className="shadow-sm border-muted">
         <CardHeader>
-            <div className="flex items-center justify-between">
-                <CardTitle>Customer List</CardTitle>
-                <div className="relative"><Search className="absolute left-2 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone, ID or code..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[350px]" /></div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle>Master Customer Ledger</CardTitle>
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search name, phone, ID or PZ number..." 
+                        value={searchTerm} 
+                        onChange={(e) => setSearchTerm(e.target.value)} 
+                        className="pl-8 w-full sm:w-[350px]" 
+                    />
+                </div>
             </div>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 border-t">
             <ScrollArea className="h-[60vh]">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Phone</TableHead>
+                            <TableHead>Customer Name</TableHead>
+                            <TableHead>Phone Number</TableHead>
                             <TableHead>National ID</TableHead>
-                            <TableHead>Account No.</TableHead>
+                            <TableHead>Member No.</TableHead>
                             <TableHead>Referral Code</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {sortedCustomers.map((c) => (
-                            <TableRow key={c.id}>
-                                <TableCell className="font-bold">{c.name}</TableCell>
-                                <TableCell>{c.phone}</TableCell>
-                                <TableCell className="text-xs">{c.idNumber || '-'}</TableCell>
-                                <TableCell className="font-mono text-xs">{c.accountNumber}</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-1.5">
-                                        <Share2 className="h-3 w-3 text-primary" />
-                                        <span className="font-bold text-xs uppercase tracking-wider">{c.referralCode || '-'}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => { setCustomerToEdit(c); form.reset({ name: c.name, phone: c.phone, idNumber: c.idNumber || '' }); setEditCustomerOpen(true); }}>Edit</DropdownMenuItem>
-                                            {canEdit && <DropdownMenuItem onClick={() => { setCustomerToDelete(c); setDeleteConfirmOpen(true); }} className="text-destructive">Delete</DropdownMenuItem>}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                        {sortedCustomers.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground italic">
+                                    {customersLoading ? 'Loading member data...' : 'No matching customers found.'}
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        ) : (
+                            sortedCustomers.map((c) => (
+                                <TableRow key={c.id} className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="font-black text-sm">{c.name}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <div className="bg-primary/10 p-1.5 rounded-full">
+                                                <Phone className="h-3 w-3 text-primary" />
+                                            </div>
+                                            <span className="font-bold text-primary text-sm">{c.phone}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                            <ShieldCheck className="h-3.5 w-3.5" />
+                                            {c.idNumber || 'N/A'}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className="font-mono text-[10px] bg-muted/50 border-primary/20 text-primary">
+                                            {c.accountNumber}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5">
+                                            <Share2 className="h-3 w-3 text-primary/60" />
+                                            <span className="font-black text-xs uppercase tracking-wider text-[#1B2B33]">{c.referralCode || '-'}</span>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => { setCustomerToEdit(c); form.reset({ name: c.name, phone: c.phone, idNumber: c.idNumber || '' }); setEditCustomerOpen(true); }}>Edit Profile</DropdownMenuItem>
+                                                {canEdit && <DropdownMenuItem onClick={() => { setCustomerToDelete(c); setDeleteConfirmOpen(true); }} className="text-destructive font-bold">Delete Member</DropdownMenuItem>}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
                     </TableBody>
                 </Table>
             </ScrollArea>
@@ -178,23 +211,58 @@ export default function CustomersPage() {
       </Card>
 
       <Dialog open={addCustomerOpen || editCustomerOpen} onOpenChange={(o) => { if (!o) { setAddCustomerOpen(false); setEditCustomerOpen(false); } }}>
-          <DialogContent>
-              <DialogHeader><DialogTitle>{customerToEdit ? 'Edit Customer' : 'Add Customer'}</DialogTitle></DialogHeader>
+          <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                  <DialogTitle className="text-2xl font-black">{customerToEdit ? 'Edit Member Profile' : 'Register New Member'}</DialogTitle>
+                  <DialogDescription>Ensure all KYC information is accurate before saving.</DialogDescription>
+              </DialogHeader>
               <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-                      <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
-                        <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem><FormLabel>National ID</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>)} />
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-4">
+                      <FormField control={form.control} name="name" render={({ field }) => (
+                          <FormItem>
+                              <FormLabel className="font-bold">Full Legal Name</FormLabel>
+                              <FormControl><Input placeholder="As per ID Card" {...field} className="h-12 rounded-xl border-primary/20" /></FormControl>
+                              <FormMessage />
+                          </FormItem>
+                      )} />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="phone" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="font-bold">Phone Number</FormLabel>
+                                <FormControl><Input placeholder="07XX XXX XXX" {...field} className="h-12 rounded-xl border-primary/20" /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="idNumber" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="font-bold">National ID</FormLabel>
+                                <FormControl><Input placeholder="ID Card Number" {...field} className="h-12 rounded-xl border-primary/20" /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                       </div>
-                      <Button type="submit" className="w-full h-11" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Customer</Button>
+                      <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95" disabled={isSubmitting}>
+                          {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                          {customerToEdit ? 'Save Member Changes' : 'Register Member'}
+                      </Button>
                   </form>
               </Form>
           </DialogContent>
       </Dialog>
 
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Customer?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Member Account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This will permanently remove <strong>{customerToDelete?.name}</strong> and all their associated records. This action cannot be undone.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90 font-bold">Delete Permanently</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
     </div>
   );

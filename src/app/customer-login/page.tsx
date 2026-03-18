@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -59,11 +58,12 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
+        // Enforce mandatory fields during sign-up
         if (!values.firstName || !values.lastName || !values.phone || !values.idNumber || !values.password) {
           toast({ 
             variant: 'destructive', 
-            title: 'Missing Information', 
-            description: 'Full name, phone number, National ID, and password are required.' 
+            title: 'Incomplete Registration', 
+            description: 'Full name, phone number, National ID, and password are required to create an account.' 
           });
           setIsSubmitting(false); 
           return;
@@ -134,58 +134,78 @@ export default function CustomerLoginPage() {
       <div className="mb-6">
         <img src="/pezeka_logo_transparent.png" alt="Pezeka Logo" className="h-20 w-20 object-contain" />
       </div>
-      <Card className="w-full shadow-lg border-t-4 border-t-primary">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Customer Portal</CardTitle>
-          <CardDescription>{isSignUp ? 'Create your account to start your application' : 'Sign in to manage your loans'}</CardDescription>
+      <Card className="w-full shadow-lg border-t-4 border-t-primary rounded-3xl overflow-hidden">
+        <CardHeader className="text-center bg-muted/20 pb-8">
+          <CardTitle className="text-2xl font-black text-[#1B2B33]">{isSignUp ? 'Join Pezeka' : 'Member Sign In'}</CardTitle>
+          <CardDescription className="font-medium">{isSignUp ? 'Complete your profile to start applying for loans' : 'Access your dashboard and manage repayments'}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
+            <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-5">
               {isSignUp && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="firstName" render={({ field }) => (
-                      <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">First Name</FormLabel>
+                        <FormControl><Input placeholder="John" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )} />
                     <FormField control={form.control} name="lastName" render={({ field }) => (
-                      <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Last Name</FormLabel>
+                        <FormControl><Input placeholder="Doe" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="phone" render={({ field }) => (
-                      <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="0712 345 678" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-widest text-primary">Phone Number</FormLabel>
+                        <FormControl><Input placeholder="07XX XXX XXX" {...field} className="h-12 rounded-xl border-primary/30 focus:ring-primary" value={field.value ?? ''} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )} />
                     <FormField control={form.control} name="idNumber" render={({ field }) => (
-                      <FormItem><FormLabel>National ID</FormLabel><FormControl><Input placeholder="ID Card No" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                      <FormItem>
+                        <FormLabel className="font-bold text-xs uppercase tracking-widest text-primary">National ID</FormLabel>
+                        <FormControl><Input placeholder="ID Card No" {...field} className="h-12 rounded-xl border-primary/30 focus:ring-primary" value={field.value ?? ''} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )} />
                   </div>
                 </>
               )}
               <FormField control={form.control} name="email" render={({ field }) => (
-                <FormItem><FormLabel>Email</FormLabel><FormControl><Input placeholder="email@example.com" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Email Address</FormLabel>
+                  <FormControl><Input placeholder="email@example.com" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem>
                   <div className="flex items-center justify-between">
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Password</FormLabel>
                       {!isSignUp && (
-                          <Button type="button" variant="link" className="px-0 font-normal h-auto text-xs" onClick={handleForgotPassword} disabled={isResetting}>
+                          <Button type="button" variant="link" className="px-0 font-bold h-auto text-xs text-primary" onClick={handleForgotPassword} disabled={isResetting}>
                               {isResetting ? 'Sending...' : 'Forgot Password?'}
                           </Button>
                       )}
                   </div>
-                  <FormControl><Input type="password" {...field} value={field.value ?? ''} /></FormControl>
+                  <FormControl><Input type="password" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-              <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSignUp ? 'Create Account' : 'Sign In'}
+              <Button type="submit" className="w-full h-14 rounded-full font-black text-lg bg-primary hover:bg-primary/90 text-white shadow-xl shadow-primary/20 transition-all active:scale-95" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
+                {isSignUp ? 'Create Member Account' : 'Sign In to Portal'}
               </Button>
-              <div className="text-center text-sm flex flex-col gap-2">
-                <Button type="button" variant="link" onClick={() => setIsSignUp(!isSignUp)}>
-                  {isSignUp ? 'Already have an account? Sign in' : 'Don\'t have an account? Sign up'}
+              <div className="text-center pt-2">
+                <Button type="button" variant="ghost" className="font-bold text-sm hover:bg-transparent hover:text-primary" onClick={() => setIsSignUp(!isSignUp)}>
+                  {isSignUp ? 'Already a member? Sign in here' : 'New to Pezeka? Register here'}
                 </Button>
               </div>
             </form>
