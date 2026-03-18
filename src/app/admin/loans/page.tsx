@@ -8,6 +8,7 @@ import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, History, Trash2 } from 'lucide-react';
+import { getDoc } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +41,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -380,7 +382,7 @@ export default function LoansPage() {
           numberOfInstalments: loan.numberOfInstalments || 1,
           paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
-          disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
+          disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
           totalRepayableAmount: loan.totalRepayableAmount || 0,
       });
       setIsEditingTerms(true);
