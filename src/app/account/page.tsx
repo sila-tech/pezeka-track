@@ -170,7 +170,10 @@ export default function AccountPage() {
   const { data: customerLoans } = useCollection<Loan>(customerLoansQuery);
 
   const fullName = useMemo(() => {
-      return customerProfile?.name || user?.displayName || "Valued Member";
+      // Prioritize the name from the Firestore profile
+      if (customerProfile?.name) return customerProfile.name;
+      if (user?.displayName) return user.displayName;
+      return "Valued Member";
   }, [customerProfile, user]);
 
   const firstName = useMemo(() => {

@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark } from 'lucide-react';
+import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark, AlertCircle } from 'lucide-react';
+import { collection, query, where } from 'firebase/firestore';
 
-import { useUser, useFirestore, useDoc } from '@/firebase';
+import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
 import { submitCustomerApplication } from '@/lib/firestore';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,6 +31,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 const applySchema = z.object({
   loanType: z.string().min(1, 'Please select a loan product.'),
@@ -54,6 +56,17 @@ export default function ApplyPage() {
   const [submittedType, setSubmittedType] = useState('');
 
   const { data: profile } = useDoc<any>(user ? `customers/${user.uid}` : null);
+
+  const userLoansQuery = useMemo(() => {
+      if (!user || !firestore) return null;
+      return query(collection(firestore, 'loans'), where('customerId', '==', user.uid));
+  }, [user, firestore]);
+
+  const { data: customerLoans, loading: loansLoading } = useCollection<any>(userLoansQuery);
+
+  const hasPendingApplication = useMemo(() => {
+      return customerLoans?.some(l => l.status === 'application');
+  }, [customerLoans]);
 
   const form = useForm<z.infer<typeof applySchema>>({
     resolver: zodResolver(applySchema),
@@ -129,6 +142,59 @@ export default function ApplyPage() {
       const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, '_blank');
   };
+
+  if (loansLoading) {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-[#F8FAFB]">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+      );
+  }
+
+  if (hasPendingApplication) {
+      return (
+          <div className="min-h-screen bg-[#F8FAFB] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-500">
+              <div className="w-full max-w-md space-y-8">
+                  <div className="space-y-4">
+                      <div className="w-24 h-24 bg-amber-100 rounded-[2rem] flex items-center justify-center mx-auto shadow-sm">
+                          <AlertCircle className="h-12 w-12 text-amber-600" />
+                      </div>
+                      <div className="space-y-2">
+                          <h1 className="text-3xl font-black text-[#1B2B33] tracking-tight">Application Pending</h1>
+                          <p className="text-muted-foreground font-medium leading-relaxed px-4">
+                              You already have a loan application in progress. To ensure the best service, we process one application at a time.
+                          </p>
+                      </div>
+                  </div>
+
+                  <Card className="rounded-[2.5rem] border-none shadow-xl overflow-hidden bg-white">
+                      <CardContent className="p-8 space-y-6">
+                          <div className="space-y-2 py-4 bg-[#F8FAFB] rounded-2xl border border-muted/50">
+                              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Current Status</p>
+                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-none font-black text-xs px-4 py-1 uppercase tracking-tighter">
+                                  Under Review
+                              </Badge>
+                          </div>
+                          
+                          <div className="text-left bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3 items-start">
+                              <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                              <p className="text-xs font-bold text-blue-800/80 leading-relaxed italic">
+                                  "Our credit team is currently reviewing your previous submission. You'll be notified via SMS/Email once a decision is made."
+                              </p>
+                          </div>
+
+                          <Button 
+                            onClick={() => router.push('/account')} 
+                            className="w-full h-16 rounded-full bg-[#1B2B33] hover:bg-[#1B2B33]/90 text-white text-lg font-black shadow-lg shadow-navy-900/20"
+                          >
+                              Back to My Dashboard
+                          </Button>
+                      </CardContent>
+                  </Card>
+              </div>
+          </div>
+      );
+  }
 
   if (isSuccess) {
       return (
