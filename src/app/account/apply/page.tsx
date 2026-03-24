@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark, AlertCircle, Info } from 'lucide-react';
 import { collection, query, where } from 'firebase/firestore';
 
 import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
