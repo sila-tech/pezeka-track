@@ -171,17 +171,25 @@ export default function AccountPage() {
 
   const fullName = useMemo(() => {
       // Prioritize the name from the Firestore profile, ensuring it's not a placeholder
-      if (customerProfile?.name && customerProfile.name !== 'Pezeka Member') return customerProfile.name;
-      if (user?.displayName && user.displayName !== 'Pezeka Member') return user.displayName;
+      const profileName = customerProfile?.name;
+      const authName = user?.displayName;
+      
+      const isPlaceholder = (n: string | null | undefined) => 
+          !n || n.toLowerCase().includes('pezeka') || n.toLowerCase().includes('valued member');
+
+      if (profileName && !isPlaceholder(profileName)) return profileName;
+      if (authName && !isPlaceholder(authName)) return authName;
+      
       return "Member";
   }, [customerProfile, user]);
 
   const firstName = useMemo(() => {
       const name = fullName.split(' ')[0];
-      return name === 'Valued' ? 'Member' : name;
+      return name === 'Valued' || name === 'Member' ? 'there' : name;
   }, [fullName]);
 
   const initials = useMemo(() => {
+      if (fullName === 'Member') return 'PZ';
       return fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   }, [fullName]);
 

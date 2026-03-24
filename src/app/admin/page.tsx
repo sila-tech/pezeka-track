@@ -35,7 +35,8 @@ interface DashboardLoan {
   loanNumber: string;
   customerName: string;
   customerPhone: string;
-  accountNumber?: string; // Member Number
+  customerId: string;
+  accountNumber?: string; 
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementDate: { seconds: number; nanoseconds: number } | any;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
@@ -74,6 +75,7 @@ export default function Dashboard() {
   const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'staff' || user.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') : false;
   
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
+  const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
 
   const staffLoanForm = useForm<z.infer<typeof staffLoanSchema>>({
     resolver: zodResolver(staffLoanSchema),
@@ -157,11 +159,21 @@ export default function Dashboard() {
       return { activeCount: activeLoans.length, totalDisbursed, totalCollected };
   }, [myPortfolio]);
 
+  const processedLoans = useMemo(() => {
+      if (!loans) return [];
+      return loans.map(loan => {
+          const currentCustomer = customers?.find(c => c.id === loan.customerId);
+          return {
+              ...loan,
+              displayName: currentCustomer?.name || loan.customerName
+          };
+      });
+  }, [loans, customers]);
+
   const dueLoans = useMemo(() => {
-    if (!loans) return [];
     const today = startOfToday();
     
-    return loans.filter(loan => 
+    return processedLoans.filter(loan => 
         loan.status !== 'paid' && 
         loan.status !== 'application' && 
         loan.status !== 'rejected' &&
@@ -193,19 +205,18 @@ export default function Dashboard() {
           const offset = loan.paymentFrequency === 'monthly' ? 7 : 2;
           return daysUntil <= offset;
       }).sort((a, b) => a.nextDueDate.getTime() - b.nextDueDate.getTime());
-  }, [loans]);
+  }, [processedLoans]);
 
   const dailyDue = useMemo(() => dueLoans.filter(l => l.paymentFrequency === 'daily'), [dueLoans]);
   const weeklyDue = useMemo(() => dueLoans.filter(l => l.paymentFrequency === 'weekly'), [dueLoans]);
 
   const newApplications = useMemo(() => {
-    if (!loans) return [];
-    return loans.filter(loan => loan.status === 'application').sort((a, b) => {
+    return processedLoans.filter(loan => loan.status === 'application').sort((a, b) => {
         const tsA = a.disbursementDate?.seconds || 0;
         const tsB = b.disbursementDate?.seconds || 0;
         return tsB - tsA;
     });
-  }, [loans]);
+  }, [processedLoans]);
   
   if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
@@ -302,7 +313,7 @@ export default function Dashboard() {
                                                 return (
                                                     <TableRow key={loan.id}>
                                                         <TableCell>
-                                                            <div className="font-bold text-xs">{loan.customerName}</div>
+                                                            <div className="font-bold text-xs">{loan.displayName}</div>
                                                             <div className="text-[10px] text-muted-foreground flex items-center gap-1">Ph: {loan.customerPhone}</div>
                                                             <div className="text-[10px] text-muted-foreground font-medium uppercase">ID: {loan.idNumber || 'N/A'}</div>
                                                         </TableCell>
@@ -312,7 +323,7 @@ export default function Dashboard() {
                                                             <Badge variant={daysDue < 0 ? 'destructive' : 'secondary'} className="text-[9px]">{daysDue < 0 ? `LATE ${Math.abs(daysDue)}d` : (daysDue === 0 ? 'TODAY' : `In ${daysDue}d`)}</Badge>
                                                         </TableCell>
                                                         <TableCell className="text-right font-bold text-xs text-blue-600">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
-                                                        <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
+                                                        <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                     </TableRow>
                                                 )
                                             })}
@@ -337,11 +348,11 @@ export default function Dashboard() {
                                         <TableBody>
                                             {dailyDue.map((loan) => (
                                                 <TableRow key={loan.id}>
-                                                    <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
+                                                    <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
                                                     <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
                                                     <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
+                                                    <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
@@ -365,11 +376,11 @@ export default function Dashboard() {
                                         <TableBody>
                                             {weeklyDue.map((loan) => (
                                                 <TableRow key={loan.id}>
-                                                    <TableCell><div className="font-medium text-xs">{loan.customerName}</div></TableCell>
+                                                    <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
                                                     <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
                                                     <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
+                                                    <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
@@ -414,7 +425,7 @@ export default function Dashboard() {
                                 {newApplications.map((loan) => (
                                     <TableRow key={loan.id} className="group">
                                         <TableCell>
-                                            <div className="font-bold text-xs">{loan.customerName}</div>
+                                            <div className="font-bold text-xs">{loan.displayName}</div>
                                             <div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div>
                                             <div className="text-[10px] text-muted-foreground">ID: {loan.idNumber || 'N/A'}</div>
                                         </TableCell>

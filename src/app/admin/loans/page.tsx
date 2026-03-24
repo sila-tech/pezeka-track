@@ -175,7 +175,6 @@ export default function LoansPage() {
   const isStaff = userRole === 'staff';
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
-  // ONLY Finance/Admin can add loans, record payments, apply penalties, or approve applications.
   const canEdit = isSuperAdmin || isFinance; 
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
@@ -185,7 +184,6 @@ export default function LoansPage() {
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => {
-        // Rollover facilities are considered closed/historical in the Active Debt tab
         if (loan.status === 'application' || loan.status === 'rejected' || loan.status === 'rollover') return false;
         
         const statusMatch = statusFilter === 'all' || loan.status === statusFilter;
@@ -279,7 +277,7 @@ export default function LoansPage() {
         customerId: customerId!, 
         customerName, 
         customerPhone, 
-        accountNumber, // Record Member Number
+        accountNumber, 
         alternativeNumber: values.alternativeNumber || "", 
         idNumber: values.idNumber, 
         assignedStaffId: values.assignedStaffId, 
@@ -393,8 +391,6 @@ export default function LoansPage() {
       setIsUpdating(true);
       try {
           const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
-          
-          // Manual input for Total Repayable is respected. Recalculate instalment based on manual total.
           const instalmentAmount = values.numberOfInstalments > 0 ? values.totalRepayableAmount / values.numberOfInstalments : 0;
 
           const updateData = {
@@ -419,7 +415,6 @@ export default function LoansPage() {
       await deleteLoan(firestore, loanToDelete.id);
       toast({ title: 'Loan Deleted', description: `Loan #${loanToDelete.loanNumber} has been permanently removed.` });
       
-      // If the management dialog was open for this same loan, close it
       if (loanToEdit?.id === loanToDelete.id) {
           setLoanToEdit(null);
       }
@@ -569,12 +564,15 @@ export default function LoansPage() {
                                     ? new Date(loan.disbursementDate.seconds * 1000) 
                                     : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
                                   
+                                  const currentCustomer = customers?.find(c => c.id === loan.customerId);
+                                  const displayName = currentCustomer?.name || loan.customerName;
+
                                   return (
                                     <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                                         <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
                                         <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
                                         <TableCell>
-                                            <div className="font-bold text-sm">{loan.customerName}</div>
+                                            <div className="font-bold text-sm">{displayName}</div>
                                             <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
                                         </TableCell>
                                         <TableCell className="text-xs">{loan.customerPhone}</TableCell>
@@ -607,24 +605,29 @@ export default function LoansPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {applicationLoans.map((loan) => (
-                                <TableRow key={loan.id}>
-                                    <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
-                                    <TableCell>
-                                        <div className="font-bold text-sm">{loan.customerName}</div>
-                                        <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
-                                    </TableCell>
-                                    <TableCell className="text-xs">{loan.customerPhone}</TableCell>
-                                    <TableCell className="text-xs">{loan.loanType}</TableCell>
-                                    <TableCell className="font-bold text-right tabular-nums">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
-                                            {canEdit && <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>}
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {applicationLoans.map((loan) => {
+                                const currentCustomer = customers?.find(c => c.id === loan.customerId);
+                                const displayName = currentCustomer?.name || loan.customerName;
+
+                                return (
+                                    <TableRow key={loan.id}>
+                                        <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
+                                        <TableCell>
+                                            <div className="font-bold text-sm">{displayName}</div>
+                                            <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
+                                        </TableCell>
+                                        <TableCell className="text-xs">{loan.customerPhone}</TableCell>
+                                        <TableCell className="text-xs">{loan.loanType}</TableCell>
+                                        <TableCell className="font-bold text-right tabular-nums">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
+                                                {canEdit && <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -758,7 +761,7 @@ export default function LoansPage() {
                                         {canEdit && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3.5 w-3.5" /></Button>}
                                     </CardHeader>
                                     <CardContent className="space-y-4 text-sm">
-                                        <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                        <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{(customers?.find(c => c.id === loanToEdit.customerId)?.name) || loanToEdit.customerName}</span></div>
                                         <div className="flex justify-between"><span>Member No:</span><span className="font-bold text-primary">{loanToEdit.accountNumber || 'N/A'}</span></div>
                                         <div className="flex justify-between"><span>Phone:</span><span className="font-medium">{loanToEdit.customerPhone}</span></div>
                                         <div className="flex justify-between"><span>Assigned:</span><span className="font-medium">{loanToEdit.assignedStaffName || 'Unassigned'}</span></div>
