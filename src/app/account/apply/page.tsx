@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { ChevronLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark } from 'lucide-react';
 
 import { useUser, useFirestore, useDoc } from '@/firebase';
 import { submitCustomerApplication } from '@/lib/firestore';
@@ -40,7 +40,7 @@ const applySchema = z.object({
   customerPhone: z.string().min(10, 'Valid phone number is required.'),
   alternativeNumber: z.string().optional(),
   agreedToTerms: z.boolean().refine(val => val === true, {
-    message: 'You must agree to the terms and conditions.',
+    message: 'You must agree to the terms and data protection policy.',
   }),
 });
 
@@ -51,6 +51,7 @@ export default function ApplyPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submittedType, setSubmittedType] = useState('');
 
   const { data: profile } = useDoc<any>(user ? `customers/${user.uid}` : null);
 
@@ -68,7 +69,6 @@ export default function ApplyPage() {
     },
   });
 
-  // Pre-fill fields when profile data arrives
   useEffect(() => {
     if (profile) {
         if (profile.phone && !form.getValues('customerPhone')) {
@@ -87,10 +87,11 @@ export default function ApplyPage() {
       const applicationData = {
         ...values,
         customerName: profile?.name || user.displayName || 'Customer',
-        accountNumber: profile?.accountNumber || 'N/A', // Record Member Number
+        accountNumber: profile?.accountNumber || 'N/A',
       };
       
       await submitCustomerApplication(firestore, user.uid, applicationData);
+      setSubmittedType(values.loanType);
       setIsSuccess(true);
       toast({ title: 'Application Submitted', description: 'We have received your loan request.' });
     } catch (error: any) {
@@ -100,19 +101,94 @@ export default function ApplyPage() {
     }
   }
 
+  const getRequirements = (type: string) => {
+      const items = [
+          "Original ID Card (Front & Back) - Mandatory",
+          "M-Pesa Statement (6 Months PDF) - Mandatory",
+          "M-Pesa Statement Password - Mandatory"
+      ];
+
+      if (type.includes('Salary')) {
+          items.push("Latest 3 Months Payslips");
+      } else if (type.includes('Business')) {
+          items.push("Business Permit / License");
+          items.push("Business Physical Location Description");
+      } else if (type.includes('Logbook')) {
+          items.push("Copy of Vehicle Logbook");
+      }
+
+      return items;
+  };
+
+  const handleWhatsAppSubmission = () => {
+      const phoneNumber = "254757664047";
+      const requirements = getRequirements(submittedType);
+      const reqList = requirements.map(r => `• ${r}`).join('\n');
+      const message = `Hello Pezeka Credit Team,\n\nI have just submitted my application for a *${submittedType}* via the portal.\n\nHere are my supporting documents:\n${reqList}\n\nMy Name: ${profile?.name || user?.displayName || 'Member'}\nMember No: ${profile?.accountNumber || 'N/A'}`;
+      
+      const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+  };
+
   if (isSuccess) {
       return (
-          <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center space-y-6">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="h-10 w-10 text-green-600" />
+          <div className="min-h-screen bg-[#F8FAFB] flex flex-col items-center justify-center p-6 pb-12">
+              <div className="w-full max-w-lg space-y-8">
+                  <div className="text-center space-y-4">
+                      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                          <CheckCircle2 className="h-10 w-10 text-green-600" />
+                      </div>
+                      <div className="space-y-2">
+                          <h1 className="text-3xl font-black text-[#1B2B33] tracking-tight">Application Received!</h1>
+                          <p className="text-muted-foreground font-medium px-4">To help us approve your <strong>{submittedType}</strong> faster, kindly forward the following documents via WhatsApp:</p>
+                      </div>
+                  </div>
+
+                  <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden">
+                      <CardContent className="p-8 space-y-6">
+                          <div className="space-y-4">
+                              <h3 className="text-xs font-black uppercase tracking-widest text-[#5BA9D0] flex items-center gap-2">
+                                  <FileText className="h-4 w-4" /> Required Checklist
+                              </h3>
+                              <div className="space-y-3">
+                                  {getRequirements(submittedType).map((req, i) => (
+                                      <div key={i} className="flex items-start gap-3 bg-[#F8FAFB] p-4 rounded-2xl border border-muted/50 transition-all hover:border-[#5BA9D0]/30">
+                                          <div className="h-5 w-5 rounded-full bg-white border-2 border-[#5BA9D0] flex-shrink-0 mt-0.5"></div>
+                                          <span className="text-sm font-bold text-[#1B2B33]">{req}</span>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+
+                          <div className="bg-[#1B2B33] rounded-2xl p-6 text-white space-y-4">
+                              <div className="flex items-center gap-2 text-[#5BA9D0]">
+                                  <ShieldCheck className="h-5 w-5" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest">Data Protection Guaranteed</span>
+                              </div>
+                              <p className="text-xs text-white/70 leading-relaxed italic">
+                                  "Your information is handled in strict compliance with the Data Protection Act. We only use these documents for credit scoring and identity verification."
+                              </p>
+                          </div>
+
+                          <div className="space-y-3 pt-2">
+                              <Button 
+                                onClick={handleWhatsAppSubmission} 
+                                className="w-full h-16 rounded-full bg-[#25D366] hover:bg-[#25D366]/90 text-white font-black text-lg shadow-lg shadow-green-500/20 group"
+                              >
+                                  <Share2 className="mr-2 h-5 w-5 transition-transform group-hover:scale-110" />
+                                  Submit Documents on WhatsApp
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                onClick={() => router.push('/account')} 
+                                className="w-full text-muted-foreground font-bold"
+                              >
+                                  Return to My Dashboard
+                              </Button>
+                          </div>
+                      </CardContent>
+                  </Card>
               </div>
-              <div className="space-y-2">
-                  <h1 className="text-2xl font-black text-[#1B2B33]">Application Successful!</h1>
-                  <p className="text-muted-foreground max-w-xs mx-auto">Your request has been received. Our team will review it and get back to you shortly.</p>
-              </div>
-              <Button onClick={() => router.push('/account')} className="w-full max-w-xs bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 font-bold h-12 rounded-xl">
-                  Return to Dashboard
-              </Button>
           </div>
       );
   }
@@ -278,10 +354,10 @@ export default function ApplyPage() {
                                               </FormControl>
                                               <div className="space-y-1 leading-none">
                                                   <FormLabel className="text-sm font-bold text-[#1B2B33]">
-                                                      I agree to the terms and conditions of Pezeka Credit Ltd.
+                                                      I agree to the terms and conditions and I am aware of the Data Protection Act of Pezeka Credit Ltd.
                                                   </FormLabel>
                                                   <p className="text-[10px] text-muted-foreground font-medium">
-                                                      By submitting this form, you authorize our team to verify your information.
+                                                      By submitting this form, you authorize our team to verify your information in compliance with Kenyan law.
                                                   </p>
                                                   <FormMessage />
                                               </div>
