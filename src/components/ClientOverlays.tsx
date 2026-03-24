@@ -1,13 +1,11 @@
+
 'use client';
 
-import dynamic from 'next/dynamic';
-
-const WhatsAppButton = dynamic(() => import('@/components/landing/WhatsAppButton'), { ssr: false });
+/**
+ * @fileOverview Manages client-side only overlays and floating UI elements.
+ */
 
 export default function ClientOverlays() {
-  return (
-    <>
-      <WhatsAppButton />
-    </>
-  );
+  // Removed WhatsAppButton to clear floating agent/chat indicators from the landing page.
+  return null;
 }
