@@ -141,7 +141,7 @@ export default function AccountPage() {
       if (user && !profileLoading && firestore) {
           if (!customerProfile) {
               upsertCustomer(firestore, user.uid, {
-                  name: user.displayName || 'Pezeka Member',
+                  name: user.displayName || 'Valued Member',
                   email: user.email || '',
                   phone: '',
               });
@@ -170,14 +170,15 @@ export default function AccountPage() {
   const { data: customerLoans } = useCollection<Loan>(customerLoansQuery);
 
   const fullName = useMemo(() => {
-      // Prioritize the name from the Firestore profile
-      if (customerProfile?.name) return customerProfile.name;
-      if (user?.displayName) return user.displayName;
-      return "Valued Member";
+      // Prioritize the name from the Firestore profile, ensuring it's not a placeholder
+      if (customerProfile?.name && customerProfile.name !== 'Pezeka Member') return customerProfile.name;
+      if (user?.displayName && user.displayName !== 'Pezeka Member') return user.displayName;
+      return "Member";
   }, [customerProfile, user]);
 
   const firstName = useMemo(() => {
-      return fullName.split(' ')[0];
+      const name = fullName.split(' ')[0];
+      return name === 'Valued' ? 'Member' : name;
   }, [fullName]);
 
   const initials = useMemo(() => {
