@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark, AlertCircle, Info } from 'lucide-react';
 import { collection, query, where } from 'firebase/firestore';
 
-import { useUser, useFirestore, useDoc, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { submitCustomerApplication } from '@/lib/firestore';
 import { Button } from '@/components/ui/button';
 import {
@@ -57,12 +57,12 @@ export default function ApplyPage() {
 
   const { data: profile } = useDoc<any>(user ? `customers/${user.uid}` : null);
 
-  const userLoansQuery = useMemo(() => {
+  const userLoansQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
       return query(collection(firestore, 'loans'), where('customerId', '==', user.uid));
   }, [user, firestore]);
 
-  const { data: customerLoans, loading: loansLoading } = useCollection<any>(userLoansQuery);
+  const { data: customerLoans, isLoading: loansLoading } = useCollection<any>(userLoansQuery);
 
   const hasPendingApplication = useMemo(() => {
       return customerLoans?.some(l => l.status === 'application');

@@ -7,9 +7,11 @@ import {
   DocumentData,
   FirestoreError,
   DocumentSnapshot,
+  doc,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { useFirestore, useMemoFirebase } from '../provider';
 
 /** Utility type to add an 'id' field to a given type T. */
 type WithId<T> = T & { id: string };
@@ -26,21 +28,30 @@ export interface UseDocResult<T> {
 
 /**
  * React hook to subscribe to a single Firestore document in real-time.
- * Handles nullable references.
+ * Handles nullable references or string paths.
  * 
- * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
- * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
- * references
- *
+ * IMPORTANT! If passing a DocumentReference created inline, YOU MUST MEMOIZE it
+ * using useMemoFirebase.
  *
  * @template T Optional type for document data. Defaults to any.
- * @param {DocumentReference<DocumentData> | null | undefined} docRef -
- * The Firestore DocumentReference. Waits if null/undefined.
+ * @param {DocumentReference<DocumentData> | string | null | undefined} refOrPath -
+ * The Firestore DocumentReference or string path.
  * @returns {UseDocResult<T>} Object with data, isLoading, error.
  */
 export function useDoc<T = any>(
-  memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
+  refOrPath: ((DocumentReference<DocumentData>) & {__memo?: boolean}) | string | null | undefined,
 ): UseDocResult<T> {
+  const firestore = useFirestore();
+  
+  // Stabilize the reference. If it's a string, we handle the creation and memoization here.
+  const memoizedDocRef = useMemoFirebase(() => {
+    if (!refOrPath || !firestore) return null;
+    if (typeof refOrPath === 'string') {
+        return doc(firestore, refOrPath);
+    }
+    return refOrPath;
+  }, [refOrPath, firestore]);
+
   type StateDataType = WithId<T> | null;
 
   const [data, setData] = useState<StateDataType>(null);
@@ -57,7 +68,6 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,
@@ -68,7 +78,7 @@ export function useDoc<T = any>(
           // Document does not exist
           setData(null);
         }
-        setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
+        setError(null); // Clear any previous error on successful snapshot
         setIsLoading(false);
       },
       (error: FirestoreError) => {
@@ -87,7 +97,12 @@ export function useDoc<T = any>(
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+  }, [memoizedDocRef]);
+
+  // Enforce memoization for non-string inputs to prevent infinite loops
+  if(refOrPath && typeof refOrPath !== 'string' && !refOrPath.__memo) {
+    throw new Error('DocumentReference was not properly memoized using useMemoFirebase');
+  }
 
   return { data, isLoading, error };
 }

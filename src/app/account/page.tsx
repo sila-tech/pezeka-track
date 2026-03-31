@@ -1,5 +1,5 @@
 'use client';
-import { useUser, useCollection, useFirestore, useDoc, useAuth } from '@/firebase';
+import { useUser, useCollection, useFirestore, useDoc, useAuth, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { 
   Search, 
@@ -162,7 +162,7 @@ export default function AccountPage() {
       }
   }, [customerProfile, profileForm]);
 
-  const customerLoansQuery = useMemo(() => {
+  const customerLoansQuery = useMemoFirebase(() => {
     if (userLoading || !firestore || !user?.uid) return null;
     return query(collection(firestore, 'loans'), where('customerId', '==', user.uid));
   }, [firestore, user?.uid, userLoading]);
