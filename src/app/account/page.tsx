@@ -62,7 +62,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { differenceInDays, startOfToday, addDays, addWeeks, addMonths, format } from 'date-fns';
+import { differenceInDays, differenceInMonths, startOfToday, addDays, addWeeks, addMonths, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface Loan {
@@ -226,10 +226,11 @@ export default function AccountPage() {
         if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
         else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
         else if (loan.paymentFrequency === 'monthly') {
-            cyclesPassed = (today.getFullYear() - baseDate.getFullYear()) * 12 + (today.getMonth() - baseDate.getMonth());
+            cyclesPassed = differenceInMonths(today, baseDate);
         }
 
-        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed + 1;
+        // Only count full cycles that have already passed their scheduled date
+        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
         
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
         const advanceCount = Math.max(0, actualInstalmentsPaid - expectedByNow);
@@ -469,21 +470,31 @@ export default function AccountPage() {
                                             <p className="text-muted-foreground text-[10px] font-black uppercase tracking-wider">Outstanding: KES {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</p>
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
-                                            <div className="bg-[#27AE60]/10 text-[#27AE60] text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border border-[#27AE60]/20">
-                                                Active
-                                            </div>
+                                            {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
+                                                <div className="bg-destructive/10 text-destructive text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border border-destructive/20">
+                                                    Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
+                                                </div>
+                                            ) : loan.daysUntil === 0 ? (
+                                                <div className="bg-primary/10 text-primary text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border border-primary/20">
+                                                    Due Today
+                                                </div>
+                                            ) : (
+                                                <div className="bg-[#27AE60]/10 text-[#27AE60] text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border border-[#27AE60]/20">
+                                                    Active
+                                                </div>
+                                            )}
                                             <span className="text-[10px] font-bold text-muted-foreground italic">Next: {format(loan.nextDueDate, 'MMM dd')}</span>
                                         </div>
                                     </div>
                                     
-                                    {loan.arrearsBalance > 0 && (
+                                    {loan.arrearsBalance > 0 && loan.daysUntil < 0 && (
                                         <div className="bg-red-50 border border-red-100 p-3 rounded-2xl flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <AlertCircle className="h-4 w-4 text-red-600" />
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Payment Overdue</span>
                                                     <span className="text-xs font-bold text-red-800">
-                                                        Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'days' : (loan.paymentFrequency === 'weekly' ? 'weeks' : 'months')}
+                                                        Unpaid installments identified.
                                                     </span>
                                                 </div>
                                             </div>
@@ -501,7 +512,7 @@ export default function AccountPage() {
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Good Standing</span>
                                                     <span className="text-xs font-bold text-green-800">
-                                                        Paid ahead by {loan.advanceCount.toFixed(1)} {loan.paymentFrequency === 'daily' ? 'days' : (loan.paymentFrequency === 'weekly' ? 'weeks' : 'months')}
+                                                        Paid ahead by {loan.advanceCount.toFixed(1)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
                                                     </span>
                                                 </div>
                                             </div>

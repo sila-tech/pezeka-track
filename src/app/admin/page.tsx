@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2, Upload, ImagePlus, Calendar, AlertTriangle, FastForward } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
+import { addDays, addWeeks, addMonths, differenceInDays, differenceInMonths, format, startOfToday } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -300,10 +300,12 @@ export default function Dashboard() {
         if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
         else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
         else if (loan.paymentFrequency === 'monthly') {
-            cyclesPassed = (today.getFullYear() - baseDate.getFullYear()) * 12 + (today.getMonth() - baseDate.getMonth());
+            cyclesPassed = differenceInMonths(today, baseDate);
         }
 
-        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed + 1;
+        // expectedByNow is full cycles elapsed. On the due date, cyclesPassed is 0, so expected is 0.
+        // This means it's not "Late" until the next day.
+        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
         
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
         const advanceCount = Math.max(0, actualInstalmentsPaid - expectedByNow);
@@ -314,7 +316,6 @@ export default function Dashboard() {
         else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
         else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
 
-        // Arrears balance should not exceed the current outstanding balance of the customer
         const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
         const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
 
@@ -330,6 +331,7 @@ export default function Dashboard() {
         };
       }).filter(loan => {
           const offset = loan.paymentFrequency === 'monthly' ? 7 : (loan.paymentFrequency === 'weekly' ? 3 : 1);
+          // Only show if it's due soon, due today, or actually late
           return loan.arrearsCount > 0 || loan.daysUntil <= offset;
       }).sort((a, b) => {
           if (b.arrearsCount !== a.arrearsCount) return b.arrearsCount - a.arrearsCount;
@@ -579,7 +581,7 @@ export default function Dashboard() {
                                                             {format(loan.nextDueDate, 'dd/MM/yyyy')}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {loan.arrearsCount > 0 ? (
+                                                            {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
                                                                 <Badge variant="destructive" className="text-[9px] w-fit font-black uppercase tracking-tighter">
                                                                     Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
                                                                 </Badge>
@@ -589,7 +591,7 @@ export default function Dashboard() {
                                                                 </Badge>
                                                             ) : (
                                                                 <Badge variant="secondary" className="text-[9px] w-fit font-black uppercase tracking-tighter">
-                                                                    Due {loan.daysUntil === 0 ? 'Today' : `in ${loan.daysUntil}d`}
+                                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil}d`}
                                                                 </Badge>
                                                             )}
                                                         </TableCell>
@@ -627,10 +629,12 @@ export default function Dashboard() {
                                                     <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
                                                     <TableCell className="text-xs font-bold">{format(loan.nextDueDate, 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell>
-                                                        {loan.arrearsCount > 0 ? (
+                                                        {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}d</Badge>
                                                         ) : (
-                                                            <Badge className="text-[9px] font-black uppercase bg-green-100 text-green-800">Ahead {loan.advanceCount.toFixed(1)}d</Badge>
+                                                            <Badge className={cn("text-[9px] font-black uppercase", loan.advanceCount > 0 ? "bg-green-100 text-green-800" : "bg-secondary text-secondary-foreground")}>
+                                                                {loan.daysUntil === 0 ? 'Due Today' : (loan.advanceCount > 0 ? `Ahead ${loan.advanceCount.toFixed(1)}d` : `Due ${loan.daysUntil}d`)}
+                                                            </Badge>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-bold text-xs text-destructive">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell>
@@ -666,10 +670,12 @@ export default function Dashboard() {
                                                     </TableCell>
                                                     <TableCell className="text-xs font-bold">{format(loan.nextDueDate, 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell>
-                                                        {loan.arrearsCount > 0 ? (
+                                                        {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}w</Badge>
                                                         ) : (
-                                                            <Badge className="text-[9px] font-black uppercase bg-green-100 text-green-800">Ahead {loan.advanceCount.toFixed(1)}w</Badge>
+                                                            <Badge className={cn("text-[9px] font-black uppercase", loan.advanceCount > 0 ? "bg-green-100 text-green-800" : "bg-secondary text-secondary-foreground")}>
+                                                                {loan.daysUntil === 0 ? 'Due Today' : (loan.advanceCount > 0 ? `Ahead ${loan.advanceCount.toFixed(1)}w` : `Due ${loan.daysUntil}d`)}
+                                                            </Badge>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right font-bold text-xs text-destructive">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -13,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getStaffAIAdvice } from '@/app/actions/ai-actions';
-import { differenceInDays, startOfToday, addDays, addWeeks, addMonths } from 'date-fns';
+import { differenceInDays, differenceInMonths, startOfToday, addDays, addWeeks, addMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -61,10 +60,11 @@ export function AINotificationBell() {
         if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
         else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
         else if (loan.paymentFrequency === 'monthly') {
-            cyclesPassed = (today.getFullYear() - baseDate.getFullYear()) * 12 + (today.getMonth() - baseDate.getMonth());
+            cyclesPassed = differenceInMonths(today, baseDate);
         }
 
-        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed + 1;
+        // Only count installments strictly in the past
+        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
         const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
         const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
@@ -78,7 +78,6 @@ export function AINotificationBell() {
     setIsUpdating(true);
     
     // SANITIZATION: Server Actions only accept plain objects. 
-    // We must manually map necessary fields and exclude Firestore Timestamps or other non-serializable objects.
     const plainLoans = dueLoans.slice(0, 10).map(l => ({
         customerName: l.customerName || 'Valued Member',
         loanNumber: l.loanNumber || 'N/A',
