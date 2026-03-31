@@ -1,5 +1,5 @@
 'use client';
-import { useUser, useCollection, useFirestore, useDoc, useAuth, useMemoFirebase, useStorage } from '@/firebase';
+import { useUser, useCollection, useFirestore, useDoc, useAuth, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { 
   Bell, 
@@ -12,28 +12,16 @@ import {
   CreditCard,
   Wallet,
   LogOut,
-  Info,
-  CheckCircle2,
   ChevronRight,
-  ShieldCheck,
-  Phone,
-  Mail,
-  UserCircle,
   Loader2,
   Users,
   Share2,
   Copy,
-  TrendingUp,
-  Lightbulb,
   Zap,
-  Star,
   AlertCircle,
-  Camera,
-  Upload,
   FileText,
-  Image as ImageIcon
 } from 'lucide-react';
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { signOut } from 'firebase/auth';
@@ -42,17 +30,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { updateCustomer, generateReferralCode, upsertCustomer, uploadKYCDocument } from '@/lib/firestore';
+import { updateCustomer, generateReferralCode, upsertCustomer } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -102,11 +86,6 @@ const profileSchema = z.object({
   idNumber: z.string().min(5, 'National ID is required.'),
 });
 
-const kycSchema = z.object({
-    type: z.enum(['owner_id', 'guarantor_id', 'loan_form', 'security_attachment']),
-    fileName: z.string().min(1, 'Label is required'),
-});
-
 const LOAN_PRODUCTS = [
     { title: 'Quick Pesa', description: 'Instant 1-month credit for emergency needs.', rate: '10% Interest' },
     { title: 'Salary Advance', description: 'Access funds ahead of your payday.', rate: '10% Interest' },
@@ -125,7 +104,6 @@ export default function AccountPage() {
   const { user, loading: userLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
-  const storage = useStorage();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -136,13 +114,6 @@ export default function AccountPage() {
   const [isReferOpen, setIsReferOpen] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [randomTip, setRandomTip] = useState('');
-
-  const [isKYCOpen, setIsKYCOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -158,11 +129,6 @@ export default function AccountPage() {
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
     defaultValues: { name: '', phone: '', idNumber: '', }
-  });
-
-  const kycForm = useForm<z.infer<typeof kycSchema>>({
-      resolver: zodResolver(kycSchema),
-      defaultValues: { type: 'owner_id', fileName: '' }
   });
 
   useEffect(() => {
@@ -231,10 +197,6 @@ export default function AccountPage() {
     customerLoans?.filter(l => l.status !== 'application' && l.status !== 'paid' && l.status !== 'rejected' && l.status !== 'rollover') || [], 
   [customerLoans]);
 
-  const pendingApplications = useMemo(() => 
-    customerLoans?.filter(l => l.status === 'application') || [], 
-  [customerLoans]);
-
   const processedActiveLoans = useMemo(() => {
     const today = startOfToday();
     return activeLoans.map(loan => {
@@ -267,8 +229,6 @@ export default function AccountPage() {
         const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
         
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
-        const advanceCount = Math.max(0, actualInstalmentsPaid - expectedByNow);
-        
         const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
         const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
 
@@ -282,7 +242,6 @@ export default function AccountPage() {
             ...loan, 
             nextDueDate, 
             arrearsCount, 
-            advanceCount,
             arrearsBalance,
             daysUntil: differenceInDays(nextDueDate, today)
         };
@@ -296,11 +255,6 @@ export default function AccountPage() {
   const totalArrears = useMemo(() => {
       return processedActiveLoans.reduce((acc, loan) => acc + loan.arrearsBalance, 0);
   }, [processedActiveLoans]);
-
-  const nextInstalment = useMemo(() => {
-      if (activeLoans.length === 0) return 0;
-      return activeLoans[0].instalmentAmount;
-  }, [activeLoans]);
 
   const handleLogout = async () => {
       await signOut(auth);
@@ -320,55 +274,6 @@ export default function AccountPage() {
           setIsUpdatingProfile(false);
       }
   };
-
-  const startCamera = async () => {
-      try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          if (videoRef.current) videoRef.current.srcObject = stream;
-          setShowCamera(true);
-          setCapturedImage(null);
-      } catch (e) {
-          toast({ variant: 'destructive', title: 'Camera Error' });
-      }
-  };
-
-  const capturePhoto = () => {
-      if (videoRef.current) {
-          const canvas = document.createElement('canvas');
-          canvas.width = videoRef.current.videoWidth;
-          canvas.height = videoRef.current.videoHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-              ctx.drawImage(videoRef.current, 0, 0);
-              setCapturedImage(canvas.toDataURL('image/jpeg', 0.8));
-              const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-              tracks.forEach(t => t.stop());
-              setShowCamera(false);
-          }
-      }
-  };
-
-  async function onKYCSubmit(values: z.infer<typeof kycSchema>) {
-      if (!user || !capturedImage) return;
-      setIsUploading(true);
-      try {
-          await uploadKYCDocument(firestore, storage, {
-              ...values,
-              customerId: user.uid,
-              customerName: fullName,
-              fileUrl: capturedImage,
-              uploadedBy: 'Member'
-          });
-          toast({ title: 'Document Uploaded' });
-          setIsKYCOpen(false);
-          setCapturedImage(null);
-          kycForm.reset();
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'Upload Failed' });
-      } finally {
-          setIsUploading(false);
-      }
-  }
 
   const referralLink = useMemo(() => {
       const code = customerProfile?.referralCode || 'INVITE';
@@ -484,14 +389,9 @@ export default function AccountPage() {
             <div className="space-y-6">
                 <Card className="rounded-[2.5rem] bg-white border-none shadow-xl overflow-hidden">
                     <CardHeader className="bg-[#1B2B33] text-white p-8">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-white">KYC Vault</CardTitle>
-                                <CardDescription className="text-white/50">Stored documents for verification.</CardDescription>
-                            </div>
-                            <Button onClick={() => setIsKYCOpen(true)} className="bg-[#5BA9D0] hover:bg-[#5BA9D0]/90 rounded-full h-12 w-12 p-0 shadow-lg">
-                                <Plus className="h-6 w-6" />
-                            </Button>
+                        <div>
+                            <CardTitle className="text-white">KYC Vault</CardTitle>
+                            <CardDescription className="text-white/50">Stored documents for verification.</CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent className="p-8">
@@ -501,7 +401,7 @@ export default function AccountPage() {
                             <div className="text-center py-12 space-y-4">
                                 <div className="bg-muted h-16 w-16 rounded-full flex items-center justify-center mx-auto"><FileText className="h-8 w-8 text-muted-foreground" /></div>
                                 <p className="text-sm text-muted-foreground font-medium">Your KYC vault is empty.</p>
-                                <Button onClick={() => setIsKYCOpen(true)} variant="outline" className="rounded-full">Upload Documents</Button>
+                                <p className="text-[10px] text-muted-foreground px-8 italic">Ask a Pezeka staff member to record your ID and collateral photos.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-4">
@@ -548,47 +448,6 @@ export default function AccountPage() {
             </div>
         )}
       </main>
-
-      <Dialog open={isKYCOpen} onOpenChange={setIsKYCOpen}>
-          <DialogContent className="sm:max-w-md rounded-[2.5rem]">
-              <DialogHeader><DialogTitle className="text-2xl font-black">Upload Document</DialogTitle><DialogDescription>Select document type and capture or select a photo.</DialogDescription></DialogHeader>
-              <div className="space-y-6 pt-4">
-                  <Form {...kycForm}>
-                      <form id="kyc-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4">
-                          <FormField control={kycForm.control} name="type" render={({ field }) => (
-                              <FormItem><FormLabel>Document Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="owner_id">ID Card (Front/Back)</SelectItem><SelectItem value="security_attachment">Security/Collateral Photo</SelectItem><SelectItem value="loan_form">Signed Application Form</SelectItem></SelectContent></Select></FormItem>
-                          )}/>
-                          <FormField control={kycForm.control} name="fileName" render={({ field }) => (
-                              <FormItem><FormLabel>Label</FormLabel><FormControl><Input placeholder="e.g. My ID Card" {...field} /></FormControl></FormItem>
-                          )}/>
-                          <div className="relative min-h-[200px] bg-muted rounded-2xl overflow-hidden flex items-center justify-center border-2 border-dashed border-primary/20">
-                              {!showCamera && !capturedImage && (
-                                  <div className="flex flex-col gap-2 p-6">
-                                      <Button type="button" onClick={() => fileRef.current?.click()} variant="outline"><Upload className="mr-2 h-4 w-4" /> Select File</Button>
-                                      <Button type="button" onClick={startCamera}><Camera className="mr-2 h-4 w-4" /> Use Camera</Button>
-                                      <input type="file" ref={fileRef} className="hidden" accept="image/*" onChange={(e) => {
-                                          const file = e.target.files?.[0];
-                                          if (file) {
-                                              const reader = new FileReader();
-                                              reader.onloadend = () => setCapturedImage(reader.result as string);
-                                              reader.readAsDataURL(file);
-                                          }
-                                      }} />
-                                  </div>
-                              )}
-                              {showCamera && <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />}
-                              {capturedImage && <img src={capturedImage} className="w-full h-full object-cover" />}
-                          </div>
-                          {showCamera && <Button type="button" onClick={capturePhoto} className="w-full">Capture Photo</Button>}
-                          {capturedImage && <Button type="button" onClick={() => setCapturedImage(null)} variant="ghost" className="w-full">Retake Photo</Button>}
-                      </form>
-                  </Form>
-              </div>
-              <DialogFooter><Button form="kyc-form" disabled={isUploading || !capturedImage} className="w-full h-14 rounded-full bg-[#5BA9D0]">
-                  {isUploading ? <Loader2 className="animate-spin" /> : 'Record Document'}
-              </Button></DialogFooter>
-          </DialogContent>
-      </Dialog>
 
       <Dialog open={isReferOpen} onOpenChange={setIsReferOpen}>
           <DialogContent className="sm:max-w-md rounded-[2.5rem]">

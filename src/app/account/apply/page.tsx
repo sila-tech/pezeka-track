@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, AlertCircle, Info, Upload } from 'lucide-react';
+import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, AlertCircle, Info, Phone } from 'lucide-react';
 import { collection, query, where } from 'firebase/firestore';
 
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
@@ -126,7 +126,7 @@ export default function ApplyPage() {
       const items = [
           "Original ID Card (Front & Back)",
           "M-Pesa Statement (6 Months PDF)",
-          "M-Pesa Statement Password"
+          "Security Item Photos (Collateral)"
       ];
       if (type.includes('Salary')) items.push("Latest 3 Months Payslips");
       else if (type.includes('Business')) { items.push("Business Permit"); items.push("Location Description"); }
@@ -136,7 +136,7 @@ export default function ApplyPage() {
 
   const handleWhatsAppSubmission = () => {
       const phoneNumber = "254757664047";
-      const message = `Hello Pezeka Team, I've applied for a ${submittedType}. My Member ID is ${profile?.accountNumber || 'N/A'}. I'm sending my documents now.`;
+      const message = `Hello Pezeka Team, I've applied for a ${submittedType}. My Member ID is ${profile?.accountNumber || 'N/A'}. When can I meet an officer for KYC verification?`;
       window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -161,14 +161,15 @@ export default function ApplyPage() {
               <div className="w-full max-w-lg space-y-8">
                   <div className="text-center space-y-4">
                       <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto shadow-sm"><CheckCircle2 className="h-10 w-10 text-green-600" /></div>
-                      <h1 className="text-3xl font-black text-[#1B2B33]">Almost Done!</h1>
-                      <p className="text-muted-foreground font-medium px-4">To speed up your <strong>{submittedType}</strong> approval, please upload your KYC documents in the member portal.</p>
+                      <h1 className="text-3xl font-black text-[#1B2B33]">Application Received</h1>
+                      <p className="text-muted-foreground font-medium px-4">Your application for <strong>{submittedType}</strong> is now being processed. A credit officer will contact you shortly.</p>
                   </div>
 
                   <Card className="rounded-[2rem] border-none shadow-xl bg-white overflow-hidden">
                       <CardContent className="p-8 space-y-6">
                           <div className="space-y-4">
-                              <h3 className="text-xs font-black uppercase tracking-widest text-[#5BA9D0] flex items-center gap-2"><FileText className="h-4 w-4" /> Required Checklist</h3>
+                              <h3 className="text-xs font-black uppercase tracking-widest text-[#5BA9D0] flex items-center gap-2"><FileText className="h-4 w-4" /> Next Steps: Verification</h3>
+                              <p className="text-xs font-medium text-muted-foreground">Please have the following documents ready for our staff to verify and record in your portal:</p>
                               <div className="space-y-3">
                                   {getRequirements(submittedType).map((req, i) => (
                                       <div key={i} className="flex items-center gap-3 bg-[#F8FAFB] p-4 rounded-2xl border border-muted/50 transition-all">
@@ -180,11 +181,11 @@ export default function ApplyPage() {
                           </div>
 
                           <div className="space-y-3 pt-2">
-                              <Button onClick={() => router.push('/account')} className="w-full h-16 rounded-full bg-[#5BA9D0] text-white font-black text-lg shadow-lg group">
-                                  <Upload className="mr-2 h-5 w-5" /> Upload in Portal Now
+                              <Button onClick={() => router.push('/account')} className="w-full h-16 rounded-full bg-[#1B2B33] text-white font-black text-lg shadow-lg group">
+                                  Go to Dashboard
                               </Button>
                               <Button variant="ghost" onClick={handleWhatsAppSubmission} className="w-full text-[#25D366] font-black h-14">
-                                  <Share2 className="mr-2 h-5 w-5" /> Share on WhatsApp
+                                  <Share2 className="mr-2 h-5 w-5" /> Coordinate with Officer
                               </Button>
                           </div>
                       </CardContent>
