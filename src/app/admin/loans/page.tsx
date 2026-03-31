@@ -422,7 +422,7 @@ export default function LoansPage() {
               ...values,
               disbursementDate: new Date(values.disbursementDate),
               firstPaymentDate: new Date(values.firstPaymentDate),
-              assignedStaffName: staff?.name || staff?.email || "Unknown",
+              assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
               instalmentAmount,
               totalRepayableAmount: values.totalRepayableAmount,
           };
