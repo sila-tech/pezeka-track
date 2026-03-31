@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Image as ImageIcon } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Image as ImageIcon, Lock } from 'lucide-react';
 import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -198,19 +198,20 @@ export default function LoansPage() {
   const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
   const userRole = user?.role?.toLowerCase();
   const isFinance = userRole === 'finance';
-  const isStaff = userRole === 'staff';
+  const isStaff = userRole === 'staff' || isFinance;
   
   const isAuthorized = isSuperAdmin || isFinance || isStaff;
   const canEdit = isSuperAdmin || isFinance; 
+  const canViewKYC = isSuperAdmin || isFinance;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: staffList, loading: staffLoading } = useCollection<Staff>(isAuthorized ? 'users' : null);
 
   const kycQuery = useMemoFirebase(() => {
-      if (!loanToEdit || !firestore) return null;
+      if (!loanToEdit || !firestore || !canViewKYC) return null;
       return query(collection(firestore, 'kyc_documents'), where('customerId', '==', loanToEdit.customerId));
-  }, [loanToEdit?.customerId, firestore]);
+  }, [loanToEdit?.customerId, firestore, canViewKYC]);
 
   const { data: kycDocs, isLoading: kycLoading } = useCollection<KYCDoc>(kycQuery);
 
@@ -823,7 +824,7 @@ export default function LoansPage() {
                             <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
                             <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
                             <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
-                                <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                                <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></Select></FormItem>
                             )}/>
                             {editTermsForm.watch('paymentFrequency') === 'weekly' && (
                                 <FormField control={editTermsForm.control} name="preferredPaymentDay" render={({ field }) => (
@@ -958,35 +959,43 @@ export default function LoansPage() {
                                                     <Camera className="h-3 w-3 mr-1" /> Capture New
                                                 </Button>
                                             </div>
-                                            <ScrollArea className="h-[350px]">
-                                                {kycLoading ? (
-                                                    <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
-                                                ) : !kycDocs || kycDocs.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl">
-                                                        <FileText className="h-8 w-8 text-muted-foreground mb-2 opacity-20" />
-                                                        <p className="text-xs font-medium text-muted-foreground italic">No KYC documents uploaded yet.</p>
-                                                    </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-2 gap-3 pb-4">
-                                                        {kycDocs.map(doc => (
-                                                            <div 
-                                                                key={doc.id} 
-                                                                className="group relative aspect-video rounded-lg overflow-hidden border bg-muted cursor-pointer hover:border-primary/50 transition-all"
-                                                                onClick={() => setViewingKYC(doc)}
-                                                            >
-                                                                <img src={doc.fileUrl} alt={doc.fileName} className="w-full h-full object-cover" />
-                                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
-                                                                    <p className="text-[10px] font-black uppercase tracking-tighter text-center">{TYPE_LABELS[doc.type] || 'Document'}</p>
-                                                                    <Eye className="h-4 w-4 mt-1" />
+                                            {!canViewKYC ? (
+                                                <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl bg-muted/30">
+                                                    <Lock className="h-8 w-8 text-muted-foreground mb-2 opacity-40" />
+                                                    <p className="text-xs font-bold text-muted-foreground">Privacy Restriction</p>
+                                                    <p className="text-[10px] text-muted-foreground mt-1">Viewing KYC documents is restricted to Finance staff. You may still upload new materials.</p>
+                                                </div>
+                                            ) : (
+                                                <ScrollArea className="h-[350px]">
+                                                    {kycLoading ? (
+                                                        <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
+                                                    ) : !kycDocs || kycDocs.length === 0 ? (
+                                                        <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl">
+                                                            <FileText className="h-8 w-8 text-muted-foreground mb-2 opacity-20" />
+                                                            <p className="text-xs font-medium text-muted-foreground italic">No KYC documents uploaded yet.</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid grid-cols-2 gap-3 pb-4">
+                                                            {kycDocs.map(doc => (
+                                                                <div 
+                                                                    key={doc.id} 
+                                                                    className="group relative aspect-video rounded-lg overflow-hidden border bg-muted cursor-pointer hover:border-primary/50 transition-all"
+                                                                    onClick={() => setViewingKYC(doc)}
+                                                                >
+                                                                    <img src={doc.fileUrl} alt={doc.fileName} className="w-full h-full object-cover" />
+                                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
+                                                                        <p className="text-[10px] font-black uppercase tracking-tighter text-center">{TYPE_LABELS[doc.type] || 'Document'}</p>
+                                                                        <Eye className="h-4 w-4 mt-1" />
+                                                                    </div>
+                                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm p-1">
+                                                                        <p className="text-[8px] text-white font-bold truncate px-1">{doc.fileName}</p>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm p-1">
-                                                                    <p className="text-[8px] text-white font-bold truncate px-1">{doc.fileName}</p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </ScrollArea>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </ScrollArea>
+                                            )}
                                         </div>
                                     </TabsContent>
                                     <TabsContent value="penalties">

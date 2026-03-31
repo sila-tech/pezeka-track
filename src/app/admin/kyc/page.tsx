@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -7,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, Download, X } from 'lucide-react';
+import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, Download, X, Lock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -18,17 +17,16 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from '@/components/ui/dialog';
 
 interface KYCDocument {
@@ -60,6 +58,7 @@ export default function KYCRepositoryPage() {
     const [viewingDoc, setViewingDoc] = useState<KYCDocument | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    // Strictly restricted to Finance role or Super Admin for viewing the repository
     const isAuthorized = user && (user.role === 'finance' || user.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2');
 
     const { data: documents, loading: docsLoading } = useCollection<KYCDocument>(isAuthorized ? 'kyc_documents' : null);
@@ -105,10 +104,17 @@ export default function KYCRepositoryPage() {
 
     if (!isAuthorized) {
         return (
-            <div className="p-12 text-center bg-card rounded-xl border border-dashed">
-                <ShieldCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h2 className="text-xl font-bold">Finance Authorization Required</h2>
-                <p className="text-muted-foreground mt-2">Only the Finance team can view and manage the KYC Document repository.</p>
+            <div className="p-12 text-center bg-card rounded-xl border border-dashed flex flex-col items-center justify-center space-y-4">
+                <div className="bg-destructive/10 p-4 rounded-full">
+                    <Lock className="h-12 w-12 text-destructive" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-black text-[#1B2B33]">Finance Authorization Required</h2>
+                    <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                        This repository contains sensitive personal identification and security materials. Viewing and managing these documents is strictly restricted to the Finance department.
+                    </p>
+                </div>
+                <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>
             </div>
         );
     }

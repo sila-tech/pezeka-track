@@ -106,11 +106,12 @@ service cloud.firestore {
 
     /**
      * @description KYC Document Repository. 
-     * STRICTLY STAFF ONLY. Customers cannot view their documents.
+     * Staff can upload (create). 
+     * ONLY Finance can view (get/list) or delete.
      */
     match /kyc_documents/{docId} {
       allow create: if isStaff();
-      allow get, list: if isStaff();
+      allow get, list: if isFinance();
       allow update, delete: if isFinance();
     }
 
