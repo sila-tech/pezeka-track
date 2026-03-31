@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getStaffAIAdvice } from '@/app/actions/ai-actions';
-import { differenceInDays, differenceInMonths, startOfToday, addDays, addWeeks, addMonths } from 'date-fns';
+import { differenceInDays, differenceInMonths, startOfToday, addDays, addWeeks, addMonths, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -83,8 +83,7 @@ export function AINotificationBell() {
     if (!user) return;
     setIsUpdating(true);
     
-    // We must ensure the objects passed to the Server Action are "plain"
-    // Firestore Timestamps are class instances and cause serialization errors in Next.js Server Actions.
+    // Sanitize data for Server Action
     const plainLoans = activeLoans.slice(0, 15).map(l => ({
         customerName: l.customerName || 'Valued Member',
         loanNumber: l.loanNumber || 'N/A',
@@ -93,7 +92,7 @@ export function AINotificationBell() {
         followUpNotes: (l.followUpNotes || []).map((n: any) => ({
             content: String(n.content || ''),
             staffName: String(n.staffName || 'Staff'),
-            // Map the date to a plain object containing only primitives
+            // Map the date to a plain object containing only primitives to avoid serialization errors
             date: n.date?.seconds ? { seconds: n.date.seconds, nanoseconds: n.date.nanoseconds } : null
         }))
     }));
