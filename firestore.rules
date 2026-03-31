@@ -5,13 +5,13 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model tailored for internal staff at Pezeka Credit Ltd. 
-     * Access is partitioned between 'GeneralStaff' and 'Finance' roles.
+     * Access is partitioned between 'staff' and 'finance' roles.
      * 
      * DATA STRUCTURE
      * - /users/{userId}: Internal staff profiles containing the authoritative 'role' field.
      * - /customers/{customerId}: Global list of loan applicants/clients.
      * - /customers/.../loans/.../repayments: Hierarchical tree for financial tracking.
-     * - /dailyExpenses, /dailyPayouts, /dailyReceipts: Top-level collections restricted to the Finance role.
+     * - /dailyExpenses, /dailyPayouts, /dailyReceipts: Top-level collections restricted to the finance role.
      * 
      * KEY SECURITY DECISIONS
      * - Authorization Independence: The 'role' field is denormalized onto the User document to allow 
@@ -41,15 +41,13 @@ service cloud.firestore {
 
     /** @description Checks if the user is a recognized staff member (General or Finance). */
     function isStaff() {
-      return hasRole('GeneralStaff') || hasRole('Finance');
+      return hasRole('staff') || hasRole('finance');
     }
 
     /** @description Checks if the user is the owner of the document based on UID. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    // The function `isExistingOwner` was removed as it was unused and contained an invalid variable name 'resource'.
 
     // --- Collection Rules ---
 
@@ -63,8 +61,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isStaff();
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
       allow delete: if false; // Profiles are historically significant; no deletion allowed in prototype.
     }
 
@@ -77,7 +75,7 @@ service cloud.firestore {
      */
     match /customers/{customerId} {
       allow get, list: if isStaff();
-      allow create: if isStaff() && request.resource.data.id == customerId;
+      allow create: if isStaff();
       allow update: if isStaff() && resource != null;
       allow delete: if isStaff() && resource != null;
     }
@@ -91,7 +89,7 @@ service cloud.firestore {
      */
     match /customers/{customerId}/loans/{loanId} {
       allow get, list: if isStaff();
-      allow create: if isStaff() && request.resource.data.customerId == customerId && request.resource.data.id == loanId;
+      allow create: if isStaff() && request.resource.data.customerId == customerId;
       allow update: if isStaff() && resource != null && request.resource.data.customerId == resource.data.customerId;
       allow delete: if isStaff() && resource != null;
 
@@ -103,50 +101,92 @@ service cloud.firestore {
        */
       match /repayments/{repaymentId} {
         allow get, list: if isStaff();
-        allow create: if isStaff() && request.resource.data.loanId == loanId && request.resource.data.id == repaymentId;
+        allow create: if isStaff() && request.resource.data.loanId == loanId;
         allow update: if isStaff() && resource != null && request.resource.data.loanId == resource.data.loanId;
         allow delete: if isStaff() && resource != null;
       }
     }
 
     /**
-     * @description Daily operational expenses. Restricted to Finance staff.
+     * @description Top level loans collection for unified querying.
+     */
+    match /loans/{loanId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if hasRole('finance');
+    }
+
+    /**
+     * @description KYC Document Repository. 
+     * Staff can upload (create), but only Finance/Admin can list and view.
+     */
+    match /kyc_documents/{docId} {
+      allow create: if isStaff();
+      allow get, list, update, delete: if hasRole('finance');
+    }
+
+    /**
+     * @description Daily operational expenses. Restricted to finance staff.
      * @path /dailyExpenses/{expenseId}
-     * @allow (create) User with role 'Finance' records an expense.
-     * @deny (list) User with role 'GeneralStaff' attempts to view expenses.
+     * @allow (create) User with role 'finance' records an expense.
+     * @deny (list) User with role 'staff' attempts to view expenses.
      * @principle Strict role-based segregation for sensitive financial data.
      */
     match /dailyExpenses/{expenseId} {
-      allow get, list: if hasRole('Finance');
-      allow create: if hasRole('Finance') && request.resource.data.recordedByUserId == request.auth.uid;
-      allow update: if hasRole('Finance') && resource != null;
-      allow delete: if hasRole('Finance') && resource != null;
+      allow get, list: if hasRole('finance');
+      allow create: if hasRole('finance') && request.resource.data.recordedByUserId == request.auth.uid;
+      allow update: if hasRole('finance') && resource != null;
+      allow delete: if hasRole('finance') && resource != null;
     }
 
     /**
-     * @description Daily disbursement summaries. Restricted to Finance staff.
+     * @description Daily disbursement summaries. Restricted to finance staff.
      * @path /dailyPayouts/{payoutId}
-     * @allow (list) Finance staff checking daily totals.
+     * @allow (list) finance staff checking daily totals.
      * @principle Structural segregation of summary data.
      */
     match /dailyPayouts/{payoutId} {
-      allow get, list: if hasRole('Finance');
-      allow create: if hasRole('Finance') && request.resource.data.recordedByUserId == request.auth.uid;
-      allow update: if hasRole('Finance') && resource != null;
-      allow delete: if hasRole('Finance') && resource != null;
+      allow get, list: if hasRole('finance');
+      allow create: if hasRole('finance') && request.resource.data.recordedByUserId == request.auth.uid;
+      allow update: if hasRole('finance') && resource != null;
+      allow delete: if hasRole('finance') && resource != null;
     }
 
     /**
-     * @description Daily receipt summaries (repayments). Restricted to Finance staff.
+     * @description Daily receipt summaries (repayments). Restricted to finance staff.
      * @path /dailyReceipts/{receiptId}
-     * @allow (create) Finance staff finalizing the daily tally.
+     * @allow (create) finance staff finalizing the daily tally.
      * @principle Audit trail enforcement via recordedByUserId.
      */
     match /dailyReceipts/{receiptId} {
-      allow get, list: if hasRole('Finance');
-      allow create: if hasRole('Finance') && request.resource.data.recordedByUserId == request.auth.uid;
-      allow update: if hasRole('Finance') && resource != null;
-      allow delete: if hasRole('Finance') && resource != null;
+      allow get, list: if hasRole('finance');
+      allow create: if hasRole('finance') && request.resource.data.recordedByUserId == request.auth.uid;
+      allow update: if hasRole('finance') && resource != null;
+      allow delete: if hasRole('finance') && resource != null;
+    }
+
+    /**
+     * @description Finance entries ledger. Restricted to finance staff.
+     */
+    match /financeEntries/{entryId} {
+      allow get, list, create, update, delete: if hasRole('finance');
+    }
+
+    /**
+     * @description Investor portfolios. Restricted to finance staff.
+     */
+    match /investors/{investorId} {
+      allow get: if isSignedIn() && (request.auth.uid == investorId || hasRole('finance'));
+      allow list, create, update, delete: if hasRole('finance');
+    }
+
+    /**
+     * @description Mail logs for communication tracking. Restricted to finance staff.
+     */
+    match /mail_logs/{logId} {
+      allow get, list, create: if hasRole('finance');
+      allow update, delete: if false;
     }
   }
 }
