@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Image as ImageIcon, Lock } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock } from 'lucide-react';
 import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -200,8 +200,9 @@ export default function LoansPage() {
   const isFinance = userRole === 'finance';
   const isStaff = userRole === 'staff' || isFinance;
   
-  const isAuthorized = isSuperAdmin || isFinance || isStaff;
+  const isAuthorized = isSuperAdmin || isStaff;
   const canEdit = isSuperAdmin || isFinance; 
+  // KYC management is strictly Finance only
   const canViewKYC = isSuperAdmin || isFinance;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
@@ -942,7 +943,7 @@ export default function LoansPage() {
                                     <TabsList className="grid grid-cols-4 w-full">
                                         <TabsTrigger value="payments">Payments</TabsTrigger>
                                         <TabsTrigger value="followups">Notes</TabsTrigger>
-                                        <TabsTrigger value="kyc" className="gap-1.5"><ShieldCheck className="h-3 w-3" /> KYC Vault</TabsTrigger>
+                                        {canViewKYC && <TabsTrigger value="kyc" className="gap-1.5"><ShieldCheck className="h-3 w-3" /> KYC Vault</TabsTrigger>}
                                         <TabsTrigger value="penalties">Penalties</TabsTrigger>
                                     </TabsList>
                                     <TabsContent value="payments">
@@ -995,21 +996,15 @@ export default function LoansPage() {
                                             </div>
                                         </ScrollArea>
                                     </TabsContent>
-                                    <TabsContent value="kyc">
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Verification Materials</h4>
-                                                <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold" onClick={() => window.location.href='/admin'}>
-                                                    <Camera className="h-3 w-3 mr-1" /> Capture New
-                                                </Button>
-                                            </div>
-                                            {!canViewKYC ? (
-                                                <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl bg-muted/30">
-                                                    <Lock className="h-8 w-8 text-muted-foreground mb-2 opacity-40" />
-                                                    <p className="text-xs font-bold text-muted-foreground">Privacy Restriction</p>
-                                                    <p className="text-[10px] text-muted-foreground mt-1">Viewing KYC documents is restricted to Finance staff. You may still upload new materials.</p>
+                                    {canViewKYC && (
+                                        <TabsContent value="kyc">
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Verification Materials</h4>
+                                                    <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold" onClick={() => window.location.href='/admin'}>
+                                                        <Camera className="h-3 w-3 mr-1" /> Capture New
+                                                    </Button>
                                                 </div>
-                                            ) : (
                                                 <ScrollArea className="h-[350px]">
                                                     {kycLoading ? (
                                                         <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
@@ -1039,9 +1034,9 @@ export default function LoansPage() {
                                                         </div>
                                                     )}
                                                 </ScrollArea>
-                                            )}
-                                        </div>
-                                    </TabsContent>
+                                            </div>
+                                        </TabsContent>
+                                    )}
                                     <TabsContent value="penalties">
                                         {canEdit && penaltyCalculation.daysLate > 0 && (
                                             <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">

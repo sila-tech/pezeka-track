@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2, Upload, ImagePlus, Calendar, AlertTriangle, FastForward } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, ArrowRight, Clock } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, differenceInMonths, format, startOfToday } from 'date-fns';
@@ -86,12 +86,17 @@ export default function Dashboard() {
 
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'staff' || user.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') : false;
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isFinance = user?.role?.toLowerCase() === 'finance';
+  const isStaff = user?.role?.toLowerCase() === 'staff' || isFinance;
+  const isAuthorized = user && (isSuperAdmin || isStaff);
   
+  // KYC functionality is strictly Finance only
+  const canManageKYC = isSuperAdmin || isFinance;
+
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
   const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
 
@@ -113,7 +118,6 @@ export default function Dashboard() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      setHasCameraPermission(true);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -121,7 +125,6 @@ export default function Dashboard() {
       setCapturedImage(null);
     } catch (error) {
       console.error('Error accessing camera:', error);
-      setHasCameraPermission(false);
       toast({
         variant: 'destructive',
         title: 'Camera Access Denied',
@@ -166,7 +169,7 @@ export default function Dashboard() {
   };
 
   async function onKYCSubmit(values: z.infer<typeof kycUploadSchema>) {
-      if (!user) return;
+      if (!user || !canManageKYC) return;
       if (!capturedImage) {
           toast({ variant: 'destructive', title: 'Photo Required', description: 'Please capture or select a photo of the document before saving.' });
           return;
@@ -363,114 +366,116 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
         <div className="flex gap-2">
-            <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { 
-                setIsKYCUploadOpen(open); 
-                if(!open) { 
-                    stopCamera(); 
-                    setCapturedImage(null); 
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                } 
-            }}>
-                <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
-                <DialogContent className="sm:max-w-md p-0 overflow-hidden">
-                    <DialogHeader className="p-6 pb-0">
-                        <DialogTitle>Customer KYC Capture</DialogTitle>
-                        <DialogDescription>Select an image from gallery or take a new photo.</DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[70vh] px-6 py-4">
-                        <Form {...kycForm}>
-                            <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4">
-                                <FormField control={kycForm.control} name="customerId" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Select Customer</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormItem>
-                                )}/>
-                                <FormField control={kycForm.control} name="type" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Document Category</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="owner_id">Owner ID Card</SelectItem>
-                                                <SelectItem value="guarantor_id">Guarantor ID Card</SelectItem>
-                                                <SelectItem value="loan_form">Physical Loan Form</SelectItem>
-                                                <SelectItem value="security_attachment">Security Photos/Docs</SelectItem>
-                                                <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormItem>
-                                )}/>
-                                <FormField control={kycForm.control} name="fileName" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Document Label/Note</FormLabel>
-                                        <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
-                                    </FormItem>
-                                )}/>
+            {canManageKYC && (
+                <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { 
+                    setIsKYCUploadOpen(open); 
+                    if(!open) { 
+                        stopCamera(); 
+                        setCapturedImage(null); 
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                    } 
+                }}>
+                    <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
+                    <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+                        <DialogHeader className="p-6 pb-0">
+                            <DialogTitle>Customer KYC Capture</DialogTitle>
+                            <DialogDescription>Select an image from gallery or take a new photo.</DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="max-h-[70vh] px-6 py-4">
+                            <Form {...kycForm}>
+                                <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4">
+                                    <FormField control={kycForm.control} name="customerId" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Select Customer</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}/>
+                                    <FormField control={kycForm.control} name="type" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Document Category</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="owner_id">Owner ID Card</SelectItem>
+                                                    <SelectItem value="guarantor_id">Guarantor ID Card</SelectItem>
+                                                    <SelectItem value="loan_form">Physical Loan Form</SelectItem>
+                                                    <SelectItem value="security_attachment">Security Photos/Docs</SelectItem>
+                                                    <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )}/>
+                                    <FormField control={kycForm.control} name="fileName" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Document Label/Note</FormLabel>
+                                            <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
+                                        </FormItem>
+                                    )}/>
 
-                                <div className="space-y-4 pt-2">
-                                    <div className="relative min-h-[200px] max-h-[300px] bg-zinc-900 rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
-                                        {!showCamera && !capturedImage && (
-                                            <div className="text-center space-y-4 p-6">
-                                                <div className="flex flex-col items-center gap-2">
-                                                    <ImagePlus className="h-10 w-10 text-muted-foreground" />
-                                                    <p className="text-xs text-muted-foreground">No document image selected</p>
+                                    <div className="space-y-4 pt-2">
+                                        <div className="relative min-h-[200px] max-h-[300px] bg-zinc-900 rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
+                                            {!showCamera && !capturedImage && (
+                                                <div className="text-center space-y-4 p-6">
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <ImagePlus className="h-10 w-10 text-muted-foreground" />
+                                                        <p className="text-xs text-muted-foreground">No document image selected</p>
+                                                    </div>
+                                                    <div className="flex flex-col gap-2">
+                                                        <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                                            <Upload className="mr-2 h-4 w-4" /> Select from Gallery
+                                                        </Button>
+                                                        <Button type="button" variant="outline" size="sm" onClick={startCamera}>
+                                                            <Camera className="mr-2 h-4 w-4" /> Take Photo
+                                                        </Button>
+                                                    </div>
+                                                    <input 
+                                                        type="file" 
+                                                        ref={fileInputRef} 
+                                                        className="hidden" 
+                                                        accept="image/*" 
+                                                        onChange={handleFileChange} 
+                                                    />
                                                 </div>
-                                                <div className="flex flex-col gap-2">
-                                                    <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-                                                        <Upload className="mr-2 h-4 w-4" /> Select from Gallery
-                                                    </Button>
-                                                    <Button type="button" variant="outline" size="sm" onClick={startCamera}>
-                                                        <Camera className="mr-2 h-4 w-4" /> Take Photo
-                                                    </Button>
-                                                </div>
-                                                <input 
-                                                    type="file" 
-                                                    ref={fileInputRef} 
-                                                    className="hidden" 
-                                                    accept="image/*" 
-                                                    onChange={handleFileChange} 
-                                                />
+                                            )}
+                                            <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+                                            {capturedImage && (
+                                                <img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />
+                                            )}
+                                        </div>
+
+                                        {showCamera && (
+                                            <div className="flex gap-2">
+                                                <Button type="button" className="flex-1" size="sm" onClick={capturePhoto}>Capture Photo</Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={stopCamera}>Cancel</Button>
                                             </div>
                                         )}
-                                        <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+
                                         {capturedImage && (
-                                            <img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />
+                                            <div className="flex gap-2">
+                                                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => fileInputRef.current?.click()}>
+                                                    <Upload className="h-4 w-4 mr-2" /> Change File
+                                                </Button>
+                                                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={startCamera}>
+                                                    <Camera className="h-4 w-4 mr-2" /> Retake Photo
+                                                </Button>
+                                            </div>
                                         )}
                                     </div>
-
-                                    {showCamera && (
-                                        <div className="flex gap-2">
-                                            <Button type="button" className="flex-1" size="sm" onClick={capturePhoto}>Capture Photo</Button>
-                                            <Button type="button" variant="outline" size="sm" onClick={stopCamera}>Cancel</Button>
-                                        </div>
-                                    )}
-
-                                    {capturedImage && (
-                                        <div className="flex gap-2">
-                                            <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => fileInputRef.current?.click()}>
-                                                <Upload className="h-4 w-4 mr-2" /> Change File
-                                            </Button>
-                                            <Button type="button" variant="outline" size="sm" className="flex-1" onClick={startCamera}>
-                                                <Camera className="h-4 w-4 mr-2" /> Retake Photo
-                                            </Button>
-                                        </div>
-                                    )}
-                                </div>
-                            </form>
-                        </Form>
-                    </ScrollArea>
-                    <DialogFooter className="p-6 pt-2">
-                        <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                        <Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record Document</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                                </form>
+                            </Form>
+                        </ScrollArea>
+                        <DialogFooter className="p-6 pt-2">
+                            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                            <Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record Document</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
 
             <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
             <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
@@ -482,35 +487,35 @@ export default function Dashboard() {
                 <ScrollArea className="max-h-[60vh] px-6 py-4">
                     <Form {...staffLoanForm}>
                         <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4">
-                        <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Amount (Ksh)</FormLabel>
-                                <FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}/>
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>ID Number</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
+                            <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Amount (Ksh)</FormLabel>
+                                    <FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
-                            <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Alt. Phone</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                            </FormItem>
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>ID Number</FormLabel>
+                                        <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}/>
+                                <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Alt. Phone</FormLabel>
+                                        <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                    </FormItem>
+                                )}/>
+                            </div>
+                            <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Reason</FormLabel>
+                                    <FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
-                        </div>
-                        <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Reason</FormLabel>
-                                <FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}/>
                         </form>
                     </Form>
                 </ScrollArea>
@@ -520,7 +525,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {(user?.role?.toLowerCase() === 'staff' || user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') && (
+      {(isSuperAdmin || user?.role?.toLowerCase() === 'staff') && (
           <div className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary</h3>
               <div className="grid gap-4 md:grid-cols-3">
@@ -532,7 +537,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-         {(user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') && (
+         {(isSuperAdmin || isFinance) && (
            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Realized Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh 0</div></CardContent></Card>
          )}
          <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Loans Disbursed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.disbursedCount || 0}</div></CardContent></Card>
