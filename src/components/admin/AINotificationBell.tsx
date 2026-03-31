@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -14,6 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { getStaffAIAdvice } from '@/app/actions/ai-actions';
 import { differenceInDays, startOfToday, addDays, addWeeks, addMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 interface Loan {
   id: string;
@@ -74,12 +76,31 @@ export function AINotificationBell() {
   const fetchAIAdvice = async () => {
     if (dueLoans.length === 0) return;
     setIsUpdating(true);
-    const result = await getStaffAIAdvice(dueLoans.slice(0, 10)); // Analyze top 10 relevant loans
-    if (result.success) {
-        setAiAlerts(result.alerts);
-        setLastAnalysis(new Date());
+    
+    // SANITIZATION: Server Actions only accept plain objects. 
+    // We must manually map necessary fields and exclude Firestore Timestamps or other non-serializable objects.
+    const plainLoans = dueLoans.slice(0, 10).map(l => ({
+        customerName: l.customerName || 'Valued Member',
+        loanNumber: l.loanNumber || 'N/A',
+        status: l.status || 'active',
+        arrearsCount: Number(l.arrearsCount) || 0,
+        arrearsBalance: Number(l.arrearsBalance) || 0,
+        followUpNotes: (l.followUpNotes || []).map((n: any) => ({
+            content: String(n.content || '')
+        }))
+    }));
+
+    try {
+        const result = await getStaffAIAdvice(plainLoans);
+        if (result.success) {
+            setAiAlerts(result.alerts);
+            setLastAnalysis(new Date());
+        }
+    } catch (err) {
+        console.error("AI Analysis Error:", err);
+    } finally {
+        setIsUpdating(false);
     }
-    setIsUpdating(false);
   };
 
   return (
@@ -173,8 +194,10 @@ export function AINotificationBell() {
             <span className="text-[9px] font-bold text-muted-foreground italic">
                 {lastAnalysis ? `Last updated: ${lastAnalysis.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not yet analyzed'}
             </span>
-            <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black uppercase tracking-widest text-[#5BA9D0] hover:bg-[#5BA9D0]/10">
-                View Loan Book <ChevronRight className="ml-1 h-3 w-3" />
+            <Button variant="ghost" size="sm" className="h-7 text-[10px] font-black uppercase tracking-widest text-[#5BA9D0] hover:bg-[#5BA9D0]/10" asChild>
+                <Link href="/admin/loans">
+                    View Loan Book <ChevronRight className="ml-1 h-3 w-3" />
+                </Link>
             </Button>
         </div>
       </PopoverContent>
