@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -315,12 +314,16 @@ export default function Dashboard() {
         else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
         else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
 
+        // Arrears balance should not exceed the current outstanding balance of the customer
+        const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
+        const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
+
         return { 
             ...loan, 
             nextDueDate, 
             arrearsCount, 
             advanceCount,
-            arrearsBalance: arrearsCount * instalmentAmt,
+            arrearsBalance,
             actualInstalmentsPaid,
             expectedByNow,
             daysUntil: differenceInDays(nextDueDate, today)
