@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, History, Trash2, CalendarDays } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2 } from 'lucide-react';
 import { getDoc } from 'firebase/firestore';
 import {
   Dialog,
@@ -67,11 +67,15 @@ import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+const DAYS_OF_WEEK = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+];
 
 const loanSchema = z.object({
   customerId: z.string().optional(),
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
   firstPaymentDate: z.string().min(1, 'First payment date is required.'),
+  preferredPaymentDay: z.string().optional(),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
   interestRate: z.coerce.number().min(0, 'Interest rate must be a positive number.'),
   registrationFee: z.coerce.number().optional(),
@@ -101,6 +105,7 @@ const loanSchema = z.object({
 const approvalSchema = z.object({
     disbursementDate: z.string().min(1, 'Disbursement date is required.'),
     firstPaymentDate: z.string().min(1, 'First payment date is required.'),
+    preferredPaymentDay: z.string().optional(),
     principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
     interestRate: z.coerce.number().min(0, 'Interest rate is required.'),
     processingFee: z.coerce.number().min(0, 'Processing fee is required.'),
@@ -119,6 +124,7 @@ const editTermsSchema = z.object({
     principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
     numberOfInstalments: z.coerce.number().int().min(1),
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+    preferredPaymentDay: z.string().optional(),
     assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
     disbursementDate: z.string().min(1, 'Disbursement date is required.'),
     firstPaymentDate: z.string().min(1, 'First payment date is required.'),
@@ -214,7 +220,7 @@ export default function LoansPage() {
   const form = useForm<z.infer<typeof loanSchema>>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
-      customerId: '', principalAmount: 0, interestRate: 0, registrationFee: 0, processingFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', status: 'active', customerType: 'existing', loanType: 'Quick Pesa', newCustomerName: '', newCustomerPhone: '', alternativeNumber: '', idNumber: '', assignedStaffId: '', disbursementDate: format(new Date(), 'yyyy-MM-dd'), firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd')
+      customerId: '', principalAmount: 0, interestRate: 0, registrationFee: 0, processingFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', preferredPaymentDay: '', status: 'active', customerType: 'existing', loanType: 'Quick Pesa', newCustomerName: '', newCustomerPhone: '', alternativeNumber: '', idNumber: '', assignedStaffId: '', disbursementDate: format(new Date(), 'yyyy-MM-dd'), firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd')
     },
   });
 
@@ -306,7 +312,7 @@ export default function LoansPage() {
 
   const approvalForm = useForm<z.infer<typeof approvalSchema>>({
       resolver: zodResolver(approvalSchema),
-      defaultValues: { disbursementDate: format(new Date(), 'yyyy-MM-dd'), firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd'), principalAmount: 0, interestRate: 0, processingFee: 0, registrationFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', idNumber: '', alternativeNumber: '', assignedStaffId: '', }
+      defaultValues: { disbursementDate: format(new Date(), 'yyyy-MM-dd'), firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd'), preferredPaymentDay: '', principalAmount: 0, interestRate: 0, processingFee: 0, registrationFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', idNumber: '', alternativeNumber: '', assignedStaffId: '', }
   });
 
   const handleManageApplication = (loan: Loan) => {
@@ -314,6 +320,7 @@ export default function LoansPage() {
       approvalForm.reset({
           disbursementDate: format(new Date(), 'yyyy-MM-dd'), 
           firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd'),
+          preferredPaymentDay: loan.preferredPaymentDay || '',
           principalAmount: loan.principalAmount || 0, 
           interestRate: loan.interestRate || 0, 
           processingFee: loan.processingFee || 0, 
@@ -395,6 +402,7 @@ export default function LoansPage() {
           principalAmount: loan.principalAmount || 0,
           numberOfInstalments: loan.numberOfInstalments || 1,
           paymentFrequency: loan.paymentFrequency || 'monthly',
+          preferredPaymentDay: loan.preferredPaymentDay || '',
           assignedStaffId: loan.assignedStaffId || '',
           disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
           firstPaymentDate: isNaN(fDate.getTime()) ? format(addMonths(new Date(), 1), 'yyyy-MM-dd') : format(fDate, 'yyyy-MM-dd'),
@@ -539,6 +547,21 @@ export default function LoansPage() {
                         </Select>
                       </FormItem>
                     )} />
+                    
+                    {watch('paymentFrequency') === 'weekly' && (
+                        <FormField control={form.control} name="preferredPaymentDay" render={({ field }) => (
+                            <FormItem className="col-span-2">
+                                <FormLabel>Preferred Weekly Payment Day</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </FormItem>
+                        )} />
+                    )}
+
                     <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
                       <div className="flex justify-between"><span className="text-sm">Instalment</span><span className="font-bold">Ksh {calculatedValues.instalmentAmount}</span></div>
                       <div className="flex justify-between"><span className="text-sm">Total</span><span className="font-bold">Ksh {calculatedValues.totalRepayableAmount}</span></div>
@@ -669,6 +692,9 @@ export default function LoansPage() {
                           <div className="text-muted-foreground">National ID:</div><div className="font-bold text-primary">{viewingApplication.idNumber || 'N/A'}</div>
                           <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {(viewingApplication.principalAmount || 0).toLocaleString()}</div>
                           <div className="text-muted-foreground">Loan Product:</div><div className="font-medium">{viewingApplication.loanType}</div>
+                          {viewingApplication.paymentFrequency === 'weekly' && (
+                              <><div className="text-muted-foreground">Preferred Day:</div><div className="font-bold text-blue-600">{viewingApplication.preferredPaymentDay || 'N/A'}</div></>
+                          )}
                       </div>
                   </ScrollArea>
               )}
@@ -713,6 +739,19 @@ export default function LoansPage() {
                                       </Select>
                                     </FormItem>
                                 )}/>
+                                {approvalForm.watch('paymentFrequency') === 'weekly' && (
+                                    <FormField control={approvalForm.control} name="preferredPaymentDay" render={({ field }) => (
+                                        <FormItem className="col-span-2">
+                                            <FormLabel>Preferred Weekly Payment Day</FormLabel>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )} />
+                                )}
                             </form>
                         </Form>
                     </ScrollArea>
@@ -763,6 +802,19 @@ export default function LoansPage() {
                             <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
                                 <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                             )}/>
+                            {editTermsForm.watch('paymentFrequency') === 'weekly' && (
+                                <FormField control={editTermsForm.control} name="preferredPaymentDay" render={({ field }) => (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel>Preferred Weekly Payment Day</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                )} />
+                            )}
                             <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (
                                     <FormItem className="col-span-2">
                                         <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
@@ -800,6 +852,9 @@ export default function LoansPage() {
                                         <div className="flex justify-between"><span>Phone:</span><span className="font-medium">{loanToEdit.customerPhone}</span></div>
                                         <div className="flex justify-between"><span>Assigned:</span><span className="font-medium">{loanToEdit.assignedStaffName || 'Unassigned'}</span></div>
                                         <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
+                                        {loanToEdit.paymentFrequency === 'weekly' && (
+                                            <div className="flex justify-between"><span>Weekly Day:</span><span className="font-bold text-blue-600">{loanToEdit.preferredPaymentDay || 'N/A'}</span></div>
+                                        )}
                                         <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {((loanToEdit.totalRepayableAmount || 0) - (loanToEdit.totalPaid || 0)).toLocaleString()}</span></div>
                                     </CardContent>
                                 </Card>

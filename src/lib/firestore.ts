@@ -33,6 +33,7 @@ export interface Loan {
   assignedStaffName?: string;
   disbursementDate: { seconds: number, nanoseconds: number } | Date;
   firstPaymentDate?: { seconds: number, nanoseconds: number } | Date; // Custom start date
+  preferredPaymentDay?: string; // For weekly: Monday, Tuesday etc.
   principalAmount: number;
   interestRate?: number;
   registrationFee: number;

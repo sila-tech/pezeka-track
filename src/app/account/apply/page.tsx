@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, Landmark, AlertCircle, Info } from 'lucide-react';
+import { ChevronLeft, Loader2, CheckCircle2, Share2, FileText, ShieldCheck, AlertCircle, Info } from 'lucide-react';
 import { collection, query, where } from 'firebase/firestore';
 
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
@@ -33,12 +34,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
+const DAYS_OF_WEEK = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+];
+
 const applySchema = z.object({
   loanType: z.string().min(1, 'Please select a loan product.'),
   principalAmount: z.coerce.number().min(500, 'Minimum amount is Ksh 500.'),
   idNumber: z.string().min(5, 'National ID is required.'),
   numberOfInstalments: z.coerce.number().int().min(1, 'At least 1 instalment is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
+  preferredPaymentDay: z.string().optional(),
   customerPhone: z.string().min(10, 'Valid phone number is required.'),
   alternativeNumber: z.string().optional(),
   agreedToTerms: z.boolean().refine(val => val === true, {
@@ -76,11 +82,14 @@ export default function ApplyPage() {
       idNumber: '',
       numberOfInstalments: 1,
       paymentFrequency: 'monthly',
+      preferredPaymentDay: '',
       customerPhone: '',
       alternativeNumber: '',
       agreedToTerms: false,
     },
   });
+
+  const frequencyWatch = form.watch('paymentFrequency');
 
   useEffect(() => {
     if (profile) {
@@ -261,7 +270,6 @@ export default function ApplyPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFB] flex flex-col">
-      {/* Header Area - Static */}
       <div className="bg-[#1B2B33] text-white px-6 pt-12 pb-14 shrink-0">
           <Button 
             variant="ghost" 
@@ -276,7 +284,6 @@ export default function ApplyPage() {
           <p className="text-white/60 text-sm mt-1">Get instant capital for your personal or business needs.</p>
       </div>
 
-      {/* Form Body - Scrollable Container */}
       <div className="px-6 -mt-8 flex-1 overflow-hidden flex flex-col pb-6">
           <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-navy-900/10 overflow-hidden flex-1 flex flex-col">
               <CardContent className="p-0 flex-1 overflow-hidden">
@@ -284,7 +291,6 @@ export default function ApplyPage() {
                       <div className="p-8 pb-12">
                           <Form {...form}>
                               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                                  {/* Loan Product */}
                                   <FormField
                                       control={form.control}
                                       name="loanType"
@@ -376,6 +382,31 @@ export default function ApplyPage() {
                                       />
                                   </div>
 
+                                  {frequencyWatch === 'weekly' && (
+                                      <FormField
+                                          control={form.control}
+                                          name="preferredPaymentDay"
+                                          render={({ field }) => (
+                                              <FormItem className="animate-in slide-in-from-top-2 duration-300">
+                                                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-[#5BA9D0]">Preferred Weekly Payment Day</FormLabel>
+                                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                      <FormControl>
+                                                          <SelectTrigger className="h-14 rounded-xl border-[#5BA9D0]/40 bg-[#5BA9D0]/5 shadow-sm focus:ring-[#5BA9D0]">
+                                                              <SelectValue placeholder="Select day of week" />
+                                                          </SelectTrigger>
+                                                      </FormControl>
+                                                      <SelectContent>
+                                                          {DAYS_OF_WEEK.map(day => (
+                                                              <SelectItem key={day} value={day}>{day}</SelectItem>
+                                                          ))}
+                                                      </SelectContent>
+                                                  </Select>
+                                                  <FormMessage />
+                                              </FormItem>
+                                          )}
+                                      />
+                                  )}
+
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                       <FormField
                                           control={form.control}
@@ -405,7 +436,6 @@ export default function ApplyPage() {
                                       />
                                   </div>
 
-                                  {/* Terms Checkbox */}
                                   <FormField
                                       control={form.control}
                                       name="agreedToTerms"
