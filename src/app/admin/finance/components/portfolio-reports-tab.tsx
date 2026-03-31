@@ -13,6 +13,7 @@ interface Loan {
   customerName: string;
   customerPhone: string;
   disbursementDate: any;
+  firstPaymentDate?: any;
   principalAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
@@ -31,19 +32,31 @@ export function PortfolioReportsTab({ loans }: PortfolioReportsTabProps) {
   
   const getNextDueDate = (loan: Loan) => {
     try {
-        let dDate: Date;
-        if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
-        else if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
-        else dDate = loan.disbursementDate ? new Date(loan.disbursementDate) : new Date();
+        // BaseDate is the First Payment Date promised by user.
+        let baseDate: Date;
+        if (loan.firstPaymentDate?.seconds) {
+            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        } else if (loan.firstPaymentDate instanceof Date) {
+            baseDate = loan.firstPaymentDate;
+        } else {
+            // Fallback for legacy: First payment is 1 cycle after disbursement
+            const dDate = loan.disbursementDate?.seconds 
+                ? new Date(loan.disbursementDate.seconds * 1000) 
+                : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
+            
+            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+            else baseDate = addMonths(dDate, 1);
+        }
 
-        if (isNaN(dDate.getTime())) return new Date();
+        if (isNaN(baseDate.getTime())) return new Date();
 
         const paidInstalments = Math.floor((loan.totalPaid || 0) / (loan.instalmentAmount || 1));
-        const nextIdx = paidInstalments + 1;
+        const nextIdx = paidInstalments; // nextIdx is the count of cycles from baseDate
         
-        if (loan.paymentFrequency === 'daily') return addDays(dDate, nextIdx);
-        if (loan.paymentFrequency === 'weekly') return addWeeks(dDate, nextIdx);
-        return addMonths(dDate, nextIdx);
+        if (loan.paymentFrequency === 'daily') return addDays(baseDate, nextIdx);
+        if (loan.paymentFrequency === 'weekly') return addWeeks(baseDate, nextIdx);
+        return addMonths(baseDate, nextIdx);
     } catch (e) {
         return new Date();
     }
@@ -89,7 +102,6 @@ export function PortfolioReportsTab({ loans }: PortfolioReportsTabProps) {
         filename = 'all_disbursed_loans';
         break;
       case 'active':
-        // Rollover facilities are historically refinanced, so they are excluded from current "Active Debt" reporting
         filtered = loans.filter(l => ['active', 'due', 'overdue'].includes(l.status));
         filename = 'active_portfolio';
         break;

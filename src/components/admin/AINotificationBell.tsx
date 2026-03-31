@@ -47,10 +47,20 @@ export function AINotificationBell() {
         l.status !== 'rejected' &&
         l.status !== 'rollover'
     ).map(loan => {
+        // Core Priority: firstPaymentDate
         let baseDate: Date;
-        if (loan.firstPaymentDate?.seconds) baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
-        else if (loan.disbursementDate?.seconds) baseDate = new Date(loan.disbursementDate.seconds * 1000);
-        else baseDate = new Date();
+        if (loan.firstPaymentDate?.seconds) {
+            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        } else {
+            // Fallback for legacy: First payment is 1 cycle after disbursement
+            const dDate = loan.disbursementDate?.seconds 
+                ? new Date(loan.disbursementDate.seconds * 1000) 
+                : new Date();
+            
+            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+            else baseDate = addMonths(dDate, 1);
+        }
 
         const instalmentAmt = loan.instalmentAmount || 1;
         const totalPaid = loan.totalPaid || 0;

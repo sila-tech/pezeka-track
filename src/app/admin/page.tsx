@@ -284,11 +284,23 @@ export default function Dashboard() {
         loan.status !== 'rejected' &&
         loan.status !== 'rollover'
     ).map(loan => {
+        // BaseDate is when payments were PROMISED to start.
         let baseDate: Date;
-        if (loan.firstPaymentDate?.seconds) baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
-        else if (loan.firstPaymentDate instanceof Date) baseDate = loan.firstPaymentDate;
-        else if (loan.disbursementDate?.seconds) baseDate = new Date(loan.disbursementDate.seconds * 1000);
-        else baseDate = loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date();
+        if (loan.firstPaymentDate?.seconds) {
+            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        } else if (loan.firstPaymentDate instanceof Date) {
+            baseDate = loan.firstPaymentDate;
+        } else {
+            // FALLBACK: If firstPaymentDate is missing, assume it starts 1 cycle after disbursement
+            // This prevents new disbursements from showing up as "Due Today" on day 0.
+            const dDate = loan.disbursementDate?.seconds 
+                ? new Date(loan.disbursementDate.seconds * 1000) 
+                : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
+            
+            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+            else baseDate = addMonths(dDate, 1);
+        }
 
         if (isNaN(baseDate.getTime())) baseDate = new Date();
         
@@ -304,7 +316,6 @@ export default function Dashboard() {
         }
 
         // expectedByNow is full cycles elapsed. On the due date, cyclesPassed is 0, so expected is 0.
-        // This means it's not "Late" until the next day.
         const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
         
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);

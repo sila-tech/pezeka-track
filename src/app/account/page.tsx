@@ -210,11 +210,22 @@ export default function AccountPage() {
   const processedActiveLoans = useMemo(() => {
     const today = startOfToday();
     return activeLoans.map(loan => {
+        // Correct base date logic: Priority is firstPaymentDate (when they promised to start)
         let baseDate: Date;
-        if (loan.firstPaymentDate?.seconds) baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
-        else if (loan.firstPaymentDate instanceof Date) baseDate = loan.firstPaymentDate;
-        else if (loan.disbursementDate?.seconds) baseDate = new Date(loan.disbursementDate.seconds * 1000);
-        else baseDate = loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date();
+        if (loan.firstPaymentDate?.seconds) {
+            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        } else if (loan.firstPaymentDate instanceof Date) {
+            baseDate = loan.firstPaymentDate;
+        } else {
+            // Fallback for legacy loans: First payment is 1 cycle after disbursement
+            const dDate = loan.disbursementDate?.seconds 
+                ? new Date(loan.disbursementDate.seconds * 1000) 
+                : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
+            
+            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+            else baseDate = addMonths(dDate, 1);
+        }
 
         if (isNaN(baseDate.getTime())) baseDate = new Date();
         
