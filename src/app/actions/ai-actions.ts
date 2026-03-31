@@ -10,24 +10,29 @@ import { format } from 'date-fns';
 /**
  * Aggregates loan data and requests AI advice for staff follow-ups.
  */
-export async function getStaffAIAdvice(loans: any[]) {
+export async function getStaffAIAdvice(loans: any[], userContext: { name: string, role: 'staff' | 'finance' }) {
     try {
-        if (!loans || loans.length === 0) return { success: true, alerts: [] };
+        if (!loans) return { success: true, alerts: [] };
 
         const input = {
+            userName: userContext.name,
+            userRole: userContext.role,
+            currentTime: format(new Date(), 'PPpp'),
             loans: loans.map(l => ({
                 customerName: l.customerName,
                 loanNumber: l.loanNumber,
                 status: l.status,
-                daysLate: l.arrearsCount || 0,
                 arrears: l.arrearsBalance || 0,
-                lastNotes: (l.followUpNotes || []).slice(-3).map((n: any) => n.content),
-                currentTime: format(new Date(), 'PPpp')
+                lastNotes: (l.followUpNotes || []).slice(-3).map((n: any) => ({
+                    staffName: n.staffName || 'Staff',
+                    content: n.content,
+                    date: n.date?.seconds ? format(new Date(n.date.seconds * 1000), 'p') : 'N/A'
+                })),
             })),
         };
 
         const result = await generateLoanAlerts(input);
-        return { success: true, alerts: result.alerts };
+        return { success: true, ...result };
     } catch (error) {
         console.error("[AI ADVICE ERROR]:", error);
         return { success: false, alerts: [], error: 'Failed to generate AI advice' };
