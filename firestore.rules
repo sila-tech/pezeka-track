@@ -15,29 +15,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    /** @description Checks if the user is the Super Admin. */
-    function isSuperAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'simon@pezeka.com' ||
-        request.auth.token.email == 'simon@finance.pezeka.com' ||
-        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
-      );
-    }
-
-    /** @description Checks if the authenticated user has a specific role in their profile. */
-    function hasRole(role) {
-      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
-      return isSignedIn() && 
-             exists(userPath) && 
-             get(userPath).data.role.lower() == role.lower();
-    }
-
     /** @description Robust check for Finance authorization. */
     function isFinance() {
       return isSignedIn() && (
-        isSuperAdmin() ||
-        hasRole('finance') ||
-        (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com'))
+        request.auth.token.email == 'simon@pezeka.com' ||
+        request.auth.token.email == 'simon@finance.pezeka.com' ||
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+        (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com')) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() == 'finance')
       );
     }
 
@@ -45,8 +31,9 @@ service cloud.firestore {
     function isStaff() {
       return isSignedIn() && (
         isFinance() ||
-        hasRole('staff') ||
-        (request.auth.token.email != null && request.auth.token.email.endsWith('@staff.pezeka.com'))
+        (request.auth.token.email != null && request.auth.token.email.endsWith('@staff.pezeka.com')) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() in ['staff', 'finance'])
       );
     }
 
@@ -64,8 +51,8 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isStaff();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow update: if isOwner(userId) || isFinance();
+      allow delete: if isFinance();
     }
 
     /**
