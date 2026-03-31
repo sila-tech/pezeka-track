@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck } from 'lucide-react';
+import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, Download, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from '@/components/ui/dialog';
 
 interface KYCDocument {
     id: string;
@@ -30,6 +37,7 @@ interface KYCDocument {
     customerName: string;
     type: 'owner_id' | 'guarantor_id' | 'loan_form' | 'security_attachment' | 'guarantor_undertaking';
     fileName: string;
+    fileUrl: string;
     uploadedBy: string;
     uploadedAt: any;
 }
@@ -49,6 +57,7 @@ export default function KYCRepositoryPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [docToDelete, setDocToDelete] = useState<KYCDocument | null>(null);
+    const [viewingDoc, setViewingDoc] = useState<KYCDocument | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const isAuthorized = user && (user.role === 'finance' || user.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2');
@@ -112,7 +121,7 @@ export default function KYCRepositoryPage() {
                         <FileText className="h-8 w-8" />
                         KYC Repository
                     </h1>
-                    <p className="text-muted-foreground mt-1">Central repository for all verified member identity and security documents.</p>
+                    <p className="text-muted-foreground mt-1">Review captured member identity and security documents.</p>
                 </div>
                 <div className="relative">
                     <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
@@ -125,16 +134,17 @@ export default function KYCRepositoryPage() {
                 </div>
             </div>
 
-            <Card className="rounded-xl shadow-sm border-muted">
+            <Card className="rounded-xl shadow-sm border-muted overflow-hidden">
                 <CardHeader>
-                    <CardTitle>Master KYC Ledger</CardTitle>
-                    <CardDescription>Chronological log of all uploaded verification materials.</CardDescription>
+                    <CardTitle>Captured Verification materials</CardTitle>
+                    <CardDescription>Visual log of all captured KYC photos.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-[65vh]">
                         <Table>
                             <TableHeader className="bg-muted/50 sticky top-0 z-10">
                                 <TableRow>
+                                    <TableHead className="w-[80px]">Preview</TableHead>
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Document Type</TableHead>
                                     <TableHead>Label / Note</TableHead>
@@ -146,7 +156,7 @@ export default function KYCRepositoryPage() {
                             <TableBody>
                                 {filteredDocs.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center py-12 text-muted-foreground italic">
+                                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground italic">
                                             No KYC documents found matching your search.
                                         </TableCell>
                                     </TableRow>
@@ -156,7 +166,19 @@ export default function KYCRepositoryPage() {
                                             ? new Date(doc.uploadedAt.seconds * 1000) 
                                             : new Date();
                                         return (
-                                            <TableRow key={doc.id}>
+                                            <TableRow key={doc.id} className="group hover:bg-muted/30 transition-colors">
+                                                <TableCell>
+                                                    <div 
+                                                        className="h-12 w-12 rounded border bg-muted flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                                        onClick={() => setViewingDoc(doc)}
+                                                    >
+                                                        {doc.fileUrl ? (
+                                                            <img src={doc.fileUrl} alt="Thumbnail" className="h-full w-full object-cover" />
+                                                        ) : (
+                                                            <FileText className="h-6 w-6 text-muted-foreground" />
+                                                        )}
+                                                    </div>
+                                                </TableCell>
                                                 <TableCell className="font-black text-sm">{doc.customerName}</TableCell>
                                                 <TableCell>
                                                     <Badge variant="outline" className="font-bold text-[10px] uppercase border-primary/20 text-primary bg-primary/5">
@@ -179,9 +201,14 @@ export default function KYCRepositoryPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteClick(doc)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <div className="flex justify-end gap-1">
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingDoc(doc)}>
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteClick(doc)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -193,12 +220,41 @@ export default function KYCRepositoryPage() {
                 </CardContent>
             </Card>
 
+            {/* View Image Dialog */}
+            <Dialog open={!!viewingDoc} onOpenChange={(open) => !open && setViewingDoc(null)}>
+                <DialogContent className="max-w-4xl p-0 overflow-hidden border-none bg-black">
+                    <div className="relative w-full aspect-auto min-h-[400px] flex items-center justify-center bg-zinc-900">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-4 right-4 z-50 text-white bg-black/50 hover:bg-black/80 rounded-full"
+                            onClick={() => setViewingDoc(null)}
+                        >
+                            <X className="h-6 w-6" />
+                        </Button>
+                        
+                        {viewingDoc?.fileUrl && (
+                            <img src={viewingDoc.fileUrl} alt="Full Resolution KYC" className="max-w-full max-h-[85vh] object-contain" />
+                        )}
+
+                        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white">
+                            <h3 className="font-black text-xl">{viewingDoc?.customerName}</h3>
+                            <p className="text-sm opacity-80">{TYPE_LABELS[viewingDoc?.type || '']} • {viewingDoc?.fileName}</p>
+                            <div className="flex gap-4 mt-2 text-xs opacity-60">
+                                <span>Uploaded by {viewingDoc?.uploadedBy}</span>
+                                <span>{viewingDoc?.uploadedAt?.seconds ? format(new Date(viewingDoc.uploadedAt.seconds * 1000), 'PPP p') : ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Remove KYC Record?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will remove the metadata entry for <strong>{docToDelete?.fileName}</strong>. Note: This action only removes the database record, not the physical files stored externally.
+                            This will permanently delete the visual record for <strong>{docToDelete?.fileName}</strong>. This action cannot be undone and the photo will be lost.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

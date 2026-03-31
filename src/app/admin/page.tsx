@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -81,6 +81,12 @@ export default function Dashboard() {
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
 
+  // Camera States
+  const [showCamera, setShowCamera] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'staff' || user.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') : false;
   
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
@@ -100,6 +106,75 @@ export default function Dashboard() {
       resolver: zodResolver(kycUploadSchema),
       defaultValues: { customerId: '', type: 'owner_id', fileName: '' },
   });
+
+  // Camera logic
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setHasCameraPermission(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setShowCamera(true);
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setHasCameraPermission(false);
+      toast({
+        variant: 'destructive',
+        title: 'Camera Access Denied',
+        description: 'Please enable camera permissions in your browser settings to capture KYC photos.',
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setCapturedImage(dataUrl);
+        stopCamera();
+      }
+    }
+  };
+
+  async function onKYCSubmit(values: z.infer<typeof kycUploadSchema>) {
+      if (!user) return;
+      if (!capturedImage) {
+          toast({ variant: 'destructive', title: 'Photo Required', description: 'Please capture a photo of the document before saving.' });
+          return;
+      }
+      setIsSubmitting(true);
+      try {
+          const customer = customers?.find(c => c.id === values.customerId);
+          await uploadKYCDocument(firestore, {
+              ...values,
+              customerName: customer?.name || "Unknown",
+              fileUrl: capturedImage,
+              uploadedBy: user.name || user.email || "Staff"
+          });
+          toast({ title: "Document Captured", description: "Image metadata saved to the Finance repository." });
+          kycForm.reset();
+          setCapturedImage(null);
+          setIsKYCUploadOpen(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Upload Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
+  }
 
   async function onStaffLoanSubmit(values: z.infer<typeof staffLoanSchema>) {
     if (!user) return;
@@ -133,26 +208,6 @@ export default function Dashboard() {
       staffLoanForm.reset();
       setIsStaffLoanOpen(false);
     } catch (e: any) { toast({ variant: "destructive", title: "Failed", description: e.message }); } finally { setIsSubmitting(false); }
-  }
-
-  async function onKYCSubmit(values: z.infer<typeof kycUploadSchema>) {
-      if (!user) return;
-      setIsSubmitting(true);
-      try {
-          const customer = customers?.find(c => c.id === values.customerId);
-          await uploadKYCDocument(firestore, {
-              ...values,
-              customerName: customer?.name || "Unknown",
-              uploadedBy: user.name || user.email || "Staff"
-          });
-          toast({ title: "Document Recorded", description: "Metadata saved to the Finance repository." });
-          kycForm.reset();
-          setIsKYCUploadOpen(false);
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'Upload Failed', description: e.message });
-      } finally {
-          setIsSubmitting(false);
-      }
   }
 
   async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
@@ -259,12 +314,12 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
         <div className="flex gap-2">
-            <Dialog open={isKYCUploadOpen} onOpenChange={setIsKYCUploadOpen}>
+            <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { setIsKYCUploadOpen(open); if(!open) { stopCamera(); setCapturedImage(null); } }}>
                 <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Customer KYC Upload</DialogTitle>
-                        <DialogDescription>Select a customer and upload their identity or security documents.</DialogDescription>
+                        <DialogTitle>Customer KYC Capture</DialogTitle>
+                        <DialogDescription>Take a photo of the member's identity or security document.</DialogDescription>
                     </DialogHeader>
                     <Form {...kycForm}>
                         <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4 py-2">
@@ -300,14 +355,41 @@ export default function Dashboard() {
                                     <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
                                 </FormItem>
                             )}/>
-                            <div className="bg-muted/50 p-4 rounded-lg border border-dashed text-center">
-                                <p className="text-xs text-muted-foreground italic">Note: Only metadata is recorded here. Ensure physical files are stored in the shared drive or attached to the customer record.</p>
+
+                            <div className="space-y-4 pt-2">
+                                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
+                                    {!showCamera && !capturedImage && (
+                                        <div className="text-center space-y-2">
+                                            <Camera className="h-12 w-12 text-muted-foreground mx-auto" />
+                                            <Button type="button" variant="secondary" onClick={startCamera}>Start Camera</Button>
+                                        </div>
+                                    )}
+                                    <video ref={videoRef} className={`w-full h-full object-cover ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+                                    {capturedImage && (
+                                        <img src={capturedImage} alt="Captured KYC" className="w-full h-full object-cover" />
+                                    )}
+                                </div>
+
+                                {showCamera && (
+                                    <div className="flex gap-2">
+                                        <Button type="button" className="flex-1" onClick={capturePhoto}>Capture Document</Button>
+                                        <Button type="button" variant="outline" onClick={stopCamera}>Cancel</Button>
+                                    </div>
+                                )}
+
+                                {capturedImage && (
+                                    <div className="flex gap-2">
+                                        <Button type="button" variant="outline" className="flex-1" onClick={startCamera}>
+                                            <RefreshCw className="h-4 w-4 mr-2" /> Retake Photo
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </form>
                     </Form>
                     <DialogFooter>
                         <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                        <Button type="submit" form="kyc-upload-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record KYC</Button>
+                        <Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record KYC Document</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -341,7 +423,7 @@ export default function Dashboard() {
                     )}/>
                     </form>
                 </ScrollArea>
-                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
+                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
                 </Form>
             </DialogContent>
             </Dialog>

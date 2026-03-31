@@ -174,6 +174,7 @@ export async function uploadKYCDocument(db: Firestore, data: {
     customerName: string, 
     type: string, 
     fileName: string, 
+    fileUrl: string,
     uploadedBy: string 
 }) {
     const kycCollection = collection(db, 'kyc_documents');
@@ -522,7 +523,7 @@ export async function deleteUserProfile(db: Firestore, userId: string) {
     try {
         await deleteDoc(userRef);
     } catch (serverError) {
-        const permissionError = new FirestorePermissionError({ path: userRef.path, operation: 'delete' });
+        const permissionError = new FirestorePermissionError({ path: entryRef.path, operation: 'delete' });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
     }

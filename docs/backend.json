@@ -50,13 +50,14 @@
     },
     "KYCDocument": {
       "title": "KYC Document",
-      "description": "Metadata for customer KYC documents.",
+      "description": "Metadata and image data for customer KYC documents.",
       "type": "object",
       "properties": {
         "customerId": { "type": "string" },
         "customerName": { "type": "string" },
         "type": { "type": "string", "enum": ["owner_id", "guarantor_id", "loan_form", "security_attachment", "guarantor_undertaking"] },
         "fileName": { "type": "string" },
+        "fileUrl": { "type": "string", "description": "Data URI or URL of the captured image." },
         "uploadedBy": { "type": "string" },
         "uploadedAt": { "type": "string", "format": "date-time" }
       }
