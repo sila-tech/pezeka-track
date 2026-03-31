@@ -27,7 +27,8 @@ import {
   TrendingUp,
   Lightbulb,
   Zap,
-  Star
+  Star,
+  AlertCircle
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
@@ -61,6 +62,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { differenceInDays, startOfToday, addDays, addWeeks, addMonths, format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface Loan {
   id: string;
@@ -74,6 +77,10 @@ interface Loan {
   instalmentAmount: number;
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   loanType?: string;
+  paymentFrequency: 'daily' | 'weekly' | 'monthly';
+  firstPaymentDate?: any;
+  disbursementDate?: any;
+  numberOfInstalments: number;
 }
 
 interface Customer {
@@ -170,7 +177,6 @@ export default function AccountPage() {
   const { data: customerLoans } = useCollection<Loan>(customerLoansQuery);
 
   const fullName = useMemo(() => {
-      // Prioritize the name from the Firestore profile, ensuring it's not a placeholder
       const profileName = customerProfile?.name;
       const authName = user?.displayName;
       
@@ -201,9 +207,60 @@ export default function AccountPage() {
     customerLoans?.filter(l => l.status === 'application') || [], 
   [customerLoans]);
 
+  const processedActiveLoans = useMemo(() => {
+    const today = startOfToday();
+    return activeLoans.map(loan => {
+        let baseDate: Date;
+        if (loan.firstPaymentDate?.seconds) baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        else if (loan.firstPaymentDate instanceof Date) baseDate = loan.firstPaymentDate;
+        else if (loan.disbursementDate?.seconds) baseDate = new Date(loan.disbursementDate.seconds * 1000);
+        else baseDate = loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date();
+
+        if (isNaN(baseDate.getTime())) baseDate = new Date();
+        
+        const instalmentAmt = loan.instalmentAmount || 1;
+        const totalPaid = loan.totalPaid || 0;
+        const actualInstalmentsPaid = totalPaid / instalmentAmt;
+
+        let cyclesPassed = 0;
+        if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
+        else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
+        else if (loan.paymentFrequency === 'monthly') {
+            cyclesPassed = (today.getFullYear() - baseDate.getFullYear()) * 12 + (today.getMonth() - baseDate.getMonth());
+        }
+
+        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed + 1;
+        
+        const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
+        const advanceCount = Math.max(0, actualInstalmentsPaid - expectedByNow);
+        
+        const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
+        const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
+
+        const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
+        let nextDueDate: Date;
+        if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextInstalmentIndex);
+        else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
+        else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
+
+        return { 
+            ...loan, 
+            nextDueDate, 
+            arrearsCount, 
+            advanceCount,
+            arrearsBalance,
+            daysUntil: differenceInDays(nextDueDate, today)
+        };
+    });
+  }, [activeLoans]);
+
   const totalBalance = useMemo(() => {
       return activeLoans.reduce((acc, loan) => acc + (loan.totalRepayableAmount - loan.totalPaid), 0);
   }, [activeLoans]);
+
+  const totalArrears = useMemo(() => {
+      return processedActiveLoans.reduce((acc, loan) => acc + loan.arrearsBalance, 0);
+  }, [processedActiveLoans]);
 
   const nextInstalment = useMemo(() => {
       if (activeLoans.length === 0) return 0;
@@ -283,14 +340,19 @@ export default function AccountPage() {
             <>
                 {/* Balance Card - Premium Fintech Design */}
                 <div className="relative overflow-hidden rounded-[2.5rem] p-8 min-h-[240px] bg-[#1B2B33] text-white shadow-2xl shadow-[#1B2B33]/30 flex flex-col justify-between group">
-                    {/* Texture/Pattern Overlay */}
                     <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }}></div>
                     
                     <div className="flex justify-between items-start relative z-10">
                         <div className="space-y-1">
                             <p className="text-white/50 text-[10px] font-black uppercase tracking-widest">Total Outstanding</p>
                             <h2 className="text-4xl font-black tabular-nums">KES {totalBalance.toLocaleString()}</h2>
-                            {activeLoans.length > 0 && (
+                            {totalArrears > 0 && (
+                                <div className="flex items-center gap-1.5 mt-2 bg-destructive/20 w-fit px-3 py-1 rounded-full backdrop-blur-md border border-destructive/30">
+                                    <AlertCircle className="h-3 w-3 text-red-400" />
+                                    <span className="text-[10px] font-bold text-red-200">Arrears: KES {totalArrears.toLocaleString()}</span>
+                                </div>
+                            )}
+                            {activeLoans.length > 0 && totalArrears <= 0 && (
                                 <div className="flex items-center gap-1.5 mt-2 bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-md">
                                     <TrendingUp className="h-3 w-3 text-[#5BA9D0]" />
                                     <span className="text-[10px] font-bold text-white/80">Next: KES {nextInstalment.toLocaleString()}</span>
@@ -313,7 +375,6 @@ export default function AccountPage() {
                         </div>
                     </div>
                     
-                    {/* Background Glows */}
                     <div className="absolute -bottom-20 -right-20 w-60 h-60 bg-[#5BA9D0]/20 rounded-full blur-[80px] group-hover:scale-110 transition-transform duration-700"></div>
                     <div className="absolute top-0 left-0 w-20 h-20 bg-white/5 rounded-full blur-[40px]"></div>
                 </div>
@@ -384,7 +445,7 @@ export default function AccountPage() {
                 {/* Active Loans Section */}
                 <section className="space-y-4">
                     <h3 className="text-lg font-black text-[#1B2B33] tracking-tight">Active Portfolio</h3>
-                    {activeLoans.length === 0 ? (
+                    {processedActiveLoans.length === 0 ? (
                         <div className="bg-[#1B2B33] rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl">
                             <div className="relative z-10 space-y-4">
                                 <div className="flex items-center gap-2">
@@ -400,15 +461,52 @@ export default function AccountPage() {
                         </div>
                     ) : (
                         <div className="space-y-3 pb-10">
-                            {activeLoans.map(loan => (
-                                <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex items-center justify-between group transition-all hover:shadow-md">
-                                    <div className="space-y-1">
-                                        <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
-                                        <p className="text-muted-foreground text-[10px] font-black uppercase tracking-wider">Remaining: KES {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</p>
+                            {processedActiveLoans.map(loan => (
+                                <div key={loan.id} className="bg-white border border-muted rounded-3xl p-5 flex flex-col gap-4 group transition-all hover:shadow-md">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <p className="font-black text-base text-[#1B2B33]">{loan.loanType || 'Quick Pesa'}</p>
+                                            <p className="text-muted-foreground text-[10px] font-black uppercase tracking-wider">Outstanding: KES {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className="bg-[#27AE60]/10 text-[#27AE60] text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border border-[#27AE60]/20">
+                                                Active
+                                            </div>
+                                            <span className="text-[10px] font-bold text-muted-foreground italic">Next: {format(loan.nextDueDate, 'MMM dd')}</span>
+                                        </div>
                                     </div>
-                                    <div className="bg-[#27AE60]/10 text-[#27AE60] text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest border border-[#27AE60]/20">
-                                        Active
-                                    </div>
+                                    
+                                    {loan.arrearsBalance > 0 && (
+                                        <div className="bg-red-50 border border-red-100 p-3 rounded-2xl flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <AlertCircle className="h-4 w-4 text-red-600" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-black text-red-600 uppercase tracking-widest">Payment Overdue</span>
+                                                    <span className="text-xs font-bold text-red-800">
+                                                        Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'days' : (loan.paymentFrequency === 'weekly' ? 'weeks' : 'months')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[9px] font-black text-red-400 uppercase block">Arrears</span>
+                                                <span className="text-sm font-black text-red-600">KES {loan.arrearsBalance.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {loan.advanceCount > 0 && (
+                                        <div className="bg-green-50 border border-green-100 p-3 rounded-2xl flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-black text-green-600 uppercase tracking-widest">Good Standing</span>
+                                                    <span className="text-xs font-bold text-green-800">
+                                                        Paid ahead by {loan.advanceCount.toFixed(1)} {loan.paymentFrequency === 'daily' ? 'days' : (loan.paymentFrequency === 'weekly' ? 'weeks' : 'months')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -550,7 +648,12 @@ export default function AccountPage() {
                           <span className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">Account Number</span>
                           <span className="text-xl font-black text-[#1B2B33]">1347823360</span>
                       </div>
-                      {nextInstalment > 0 && (
+                      {totalArrears > 0 ? (
+                          <div className="flex justify-between items-center pt-2">
+                              <span className="text-destructive text-[10px] font-black uppercase tracking-widest">Amount Overdue</span>
+                              <span className="text-2xl font-black text-destructive">KES {totalArrears.toLocaleString()}</span>
+                          </div>
+                      ) : nextInstalment > 0 && (
                           <div className="flex justify-between items-center pt-2">
                               <span className="text-[#5BA9D0] text-[10px] font-black uppercase tracking-widest">Next Instalment</span>
                               <span className="text-2xl font-black text-[#5BA9D0]">KES {nextInstalment.toLocaleString()}</span>
@@ -686,12 +789,21 @@ function NavItem({ icon, label, active = false, onClick }: { icon: React.ReactNo
     return (
         <button 
             onClick={onClick}
-            className={`flex flex-col items-center gap-1.5 transition-all outline-none relative group ${active ? 'text-[#5BA9D0]' : 'text-[#1B2B33]/30 hover:text-[#1B2B33]/50'}`}
+            className={cn(
+                "flex flex-col items-center gap-1.5 transition-all outline-none relative group",
+                active ? 'text-[#5BA9D0]' : 'text-[#1B2B33]/30 hover:text-[#1B2B33]/50'
+            )}
         >
-            <div className={`transition-all duration-300 ${active ? 'scale-110 -translate-y-1' : 'scale-100'}`}>
+            <div className={cn(
+                "transition-all duration-300",
+                active ? 'scale-110 -translate-y-1' : 'scale-100'
+            )}>
                 {icon}
             </div>
-            <span className={`text-[9px] font-black uppercase tracking-widest transition-opacity ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
+            <span className={cn(
+                "text-[9px] font-black uppercase tracking-widest transition-opacity",
+                active ? 'opacity-100' : 'opacity-60'
+            )}>{label}</span>
             {active && (
                 <div className="absolute -bottom-2 w-1.5 h-1.5 bg-[#5BA9D0] rounded-full animate-in zoom-in duration-300"></div>
             )}
