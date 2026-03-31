@@ -83,6 +83,8 @@ export function AINotificationBell() {
     if (!user) return;
     setIsUpdating(true);
     
+    // We must ensure the objects passed to the Server Action are "plain"
+    // Firestore Timestamps are class instances and cause serialization errors in Next.js Server Actions.
     const plainLoans = activeLoans.slice(0, 15).map(l => ({
         customerName: l.customerName || 'Valued Member',
         loanNumber: l.loanNumber || 'N/A',
@@ -91,7 +93,8 @@ export function AINotificationBell() {
         followUpNotes: (l.followUpNotes || []).map((n: any) => ({
             content: String(n.content || ''),
             staffName: String(n.staffName || 'Staff'),
-            date: n.date
+            // Map the date to a plain object containing only primitives
+            date: n.date?.seconds ? { seconds: n.date.seconds, nanoseconds: n.date.nanoseconds } : null
         }))
     }));
 
