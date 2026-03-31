@@ -12,14 +12,6 @@ service cloud.firestore {
      * - /customers/{customerId}: Global list of loan applicants/clients.
      * - /customers/.../loans/.../repayments: Hierarchical tree for financial tracking.
      * - /dailyExpenses, /dailyPayouts, /dailyReceipts: Top-level collections restricted to the finance role.
-     * 
-     * KEY SECURITY DECISIONS
-     * - Authorization Independence: The 'role' field is denormalized onto the User document to allow 
-     *   for single-lookup authorization checks without complex tree traversal.
-     * - Relational Integrity: On creation, we enforce that internal data fields (like customerId or loanId) 
-     *   match the document's path to prevent orphaned or mis-linked records.
-     * - Photo Support: Write access is granted to photo URL fields for authorized staff to allow 
-     *   referencing uploaded media (profile photos, receipts, payment proofs).
      */
 
     // --- Helper Functions ---
@@ -29,19 +21,33 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    /** @description Retrieves the user document for the currently authenticated user. */
+    /** @description Retrieves the user document for the currently authenticated user safely. */
     function getAuthUser() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : null;
     }
 
-    /** @description Checks if the authenticated user has a specific role. */
+    /** @description Checks if the authenticated user has a specific role (case-insensitive). */
     function hasRole(role) {
-      return isSignedIn() && getAuthUser().role == role;
+      let user = getAuthUser();
+      return isSignedIn() && user != null && 
+             (user.role.lower() == role.lower());
     }
 
-    /** @description Checks if the user is a recognized staff member (General or Finance). */
+    /** @description Checks if the user is a recognized staff member via profile or verified domain. */
     function isStaff() {
-      return hasRole('staff') || hasRole('finance');
+      // Primary check: Firestore profile role
+      if (hasRole('staff') || hasRole('finance')) {
+        return true;
+      }
+      
+      // Fallback check: Verified email domains for immediate access post-login
+      let email = request.auth.token.email;
+      return isSignedIn() && (
+        email.endsWith('@staff.pezeka.com') || 
+        email.endsWith('@finance.pezeka.com') || 
+        email == 'simon@pezeka.com'
+      );
     }
 
     /** @description Checks if the user is the owner of the document based on UID. */
@@ -52,69 +58,51 @@ service cloud.firestore {
     // --- Collection Rules ---
 
     /**
-     * @description Staff profile management. Users can create/view their own profiles; all staff can list others.
-     * @path /users/{userId}
-     * @allow (create) User 'abc' creates document 'abc'.
-     * @deny (create) User 'abc' attempts to create document 'xyz'.
-     * @principle Self-creation pattern with path-to-data consistency.
+     * @description Staff profile management.
      */
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isStaff();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId);
-      allow delete: if false; // Profiles are historically significant; no deletion allowed in prototype.
+      allow delete: if false;
     }
 
     /**
-     * @description Customer records. Accessible to all internal staff for management.
-     * @path /customers/{customerId}
-     * @allow (list) Any authenticated staff member.
-     * @deny (create) An unauthenticated user.
-     * @principle Role-based broad access for internal operational data.
+     * @description Customer records. Accessible to all internal staff.
      */
     match /customers/{customerId} {
       allow get, list: if isStaff();
       allow create: if isStaff();
-      allow update: if isStaff() && resource != null;
-      allow delete: if isStaff() && resource != null;
+      allow update: if isStaff();
+      allow delete: if isStaff();
     }
 
     /**
      * @description Loan records nested under customers.
-     * @path /customers/{customerId}/loans/{loanId}
-     * @allow (create) Staff creating a loan where data.customerId matches the path parameter.
-     * @deny (update) Staff attempting to change the customerId of an existing loan.
-     * @principle Relational integrity via path validation and field immutability.
      */
     match /customers/{customerId}/loans/{loanId} {
       allow get, list: if isStaff();
       allow create: if isStaff() && request.resource.data.customerId == customerId;
-      allow update: if isStaff() && resource != null && request.resource.data.customerId == resource.data.customerId;
-      allow delete: if isStaff() && resource != null;
+      allow update: if isStaff();
+      allow delete: if isStaff();
 
-      /**
-       * @description Repayment records for specific loans.
-       * @path /customers/{customerId}/loans/{loanId}/repayments/{repaymentId}
-       * @allow (create) Staff records a payment where loanId matches the parent path.
-       * @principle Path-based relational consistency.
-       */
       match /repayments/{repaymentId} {
         allow get, list: if isStaff();
         allow create: if isStaff() && request.resource.data.loanId == loanId;
-        allow update: if isStaff() && resource != null && request.resource.data.loanId == resource.data.loanId;
-        allow delete: if isStaff() && resource != null;
+        allow update: if isStaff();
+        allow delete: if isStaff();
       }
     }
 
     /**
-     * @description Top level loans collection for unified querying.
+     * @description Top level loans collection.
      */
     match /loans/{loanId} {
       allow get, list: if isStaff();
       allow create: if isStaff();
       allow update: if isStaff();
-      allow delete: if hasRole('finance');
+      allow delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
     /**
@@ -123,69 +111,37 @@ service cloud.firestore {
      */
     match /kyc_documents/{docId} {
       allow create: if isStaff();
-      allow get, list, update, delete: if hasRole('finance');
+      allow get, list, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
     /**
-     * @description Daily operational expenses. Restricted to finance staff.
-     * @path /dailyExpenses/{expenseId}
-     * @allow (create) User with role 'finance' records an expense.
-     * @deny (list) User with role 'staff' attempts to view expenses.
-     * @principle Strict role-based segregation for sensitive financial data.
+     * @description Financial collections restricted to finance staff.
      */
     match /dailyExpenses/{expenseId} {
-      allow get, list: if hasRole('finance');
-      allow create: if hasRole('finance') && request.resource.data.recordedByUserId == request.auth.uid;
-      allow update: if hasRole('finance') && resource != null;
-      allow delete: if hasRole('finance') && resource != null;
+      allow get, list: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow create: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
-    /**
-     * @description Daily disbursement summaries. Restricted to finance staff.
-     * @path /dailyPayouts/{payoutId}
-     * @allow (list) finance staff checking daily totals.
-     * @principle Structural segregation of summary data.
-     */
     match /dailyPayouts/{payoutId} {
-      allow get, list: if hasRole('finance');
-      allow create: if hasRole('finance') && request.resource.data.recordedByUserId == request.auth.uid;
-      allow update: if hasRole('finance') && resource != null;
-      allow delete: if hasRole('finance') && resource != null;
+      allow get, list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
-    /**
-     * @description Daily receipt summaries (repayments). Restricted to finance staff.
-     * @path /dailyReceipts/{receiptId}
-     * @allow (create) finance staff finalizing the daily tally.
-     * @principle Audit trail enforcement via recordedByUserId.
-     */
     match /dailyReceipts/{receiptId} {
-      allow get, list: if hasRole('finance');
-      allow create: if hasRole('finance') && request.resource.data.recordedByUserId == request.auth.uid;
-      allow update: if hasRole('finance') && resource != null;
-      allow delete: if hasRole('finance') && resource != null;
+      allow get, list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
-    /**
-     * @description Finance entries ledger. Restricted to finance staff.
-     */
     match /financeEntries/{entryId} {
-      allow get, list, create, update, delete: if hasRole('finance');
+      allow get, list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
-    /**
-     * @description Investor portfolios. Restricted to finance staff.
-     */
     match /investors/{investorId} {
-      allow get: if isSignedIn() && (request.auth.uid == investorId || hasRole('finance'));
-      allow list, create, update, delete: if hasRole('finance');
+      allow get: if isSignedIn() && (request.auth.uid == investorId || hasRole('finance') || request.auth.token.email == 'simon@pezeka.com');
+      allow list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
     }
 
-    /**
-     * @description Mail logs for communication tracking. Restricted to finance staff.
-     */
     match /mail_logs/{logId} {
-      allow get, list, create: if hasRole('finance');
+      allow get, list, create: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
       allow update, delete: if false;
     }
   }
