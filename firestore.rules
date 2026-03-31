@@ -5,7 +5,7 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model tailored for internal staff at Pezeka Credit Ltd. 
-     * Access is partitioned between 'staff' and 'finance' roles.
+     * Access is partitioned between 'staff' and 'finance' roles, with domain-based fallbacks for immediate access.
      */
 
     // --- Helper Functions ---
@@ -15,45 +15,44 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    /** @description Retrieves the user document path for the current user. */
-    function authUserPath() {
-      return /databases/$(database)/documents/users/$(request.auth.uid);
+    /** @description Checks if the user is the Super Admin. */
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'simon@pezeka.com' ||
+        request.auth.token.email == 'simon@finance.pezeka.com' ||
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
+      );
     }
 
-    /** @description Checks if the authenticated user has a specific role (case-insensitive). */
+    /** @description Checks if the authenticated user has a specific role in their profile. */
     function hasRole(role) {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
       return isSignedIn() && 
-             exists(authUserPath()) && 
-             get(authUserPath()).data.role.lower() == role.lower();
+             exists(userPath) && 
+             get(userPath).data.role.lower() == role.lower();
     }
 
-    /** @description Checks if the user is a recognized staff member via profile or verified domain. */
+    /** @description Robust check for Finance authorization. */
+    function isFinance() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        hasRole('finance') ||
+        (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com'))
+      );
+    }
+
+    /** @description Robust check for Staff authorization. */
     function isStaff() {
       return isSignedIn() && (
-        hasRole('staff') || 
-        hasRole('finance') ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.endsWith('@staff.pezeka.com') || 
-          request.auth.token.email.endsWith('@finance.pezeka.com') || 
-          request.auth.token.email == 'simon@pezeka.com'
-        ))
+        isFinance() ||
+        hasRole('staff') ||
+        (request.auth.token.email != null && request.auth.token.email.endsWith('@staff.pezeka.com'))
       );
     }
 
     /** @description Checks if the user is the owner of the document based on UID. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /** @description Checks if the user has finance level access. */
-    function isFinance() {
-      return isSignedIn() && (
-        hasRole('finance') || 
-        (request.auth.token.email != null && (
-          request.auth.token.email.endsWith('@finance.pezeka.com') || 
-          request.auth.token.email == 'simon@pezeka.com'
-        ))
-      );
     }
 
     // --- Collection Rules ---
@@ -65,8 +64,8 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if isStaff();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if false;
+      allow update: if isOwner(userId) || isSuperAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     /**
@@ -76,7 +75,7 @@ service cloud.firestore {
       allow get, list: if isStaff();
       allow create: if isStaff();
       allow update: if isStaff();
-      allow delete: if isStaff();
+      allow delete: if isFinance();
     }
 
     /**
@@ -86,13 +85,13 @@ service cloud.firestore {
       allow get, list: if isStaff();
       allow create: if isStaff() && request.resource.data.customerId == customerId;
       allow update: if isStaff();
-      allow delete: if isStaff();
+      allow delete: if isFinance();
 
       match /repayments/{repaymentId} {
         allow get, list: if isStaff();
         allow create: if isStaff() && request.resource.data.loanId == loanId;
         allow update: if isStaff();
-        allow delete: if isStaff();
+        allow delete: if isFinance();
       }
     }
 
