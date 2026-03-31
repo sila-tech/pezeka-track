@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2, Upload, ImagePlus } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2, Upload, ImagePlus, Calendar } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -42,6 +42,7 @@ interface DashboardLoan {
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementDate: { seconds: number; nanoseconds: number } | any;
   firstPaymentDate?: { seconds: number; nanoseconds: number } | any;
+  preferredPaymentDay?: string;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
   instalmentAmount: number;
@@ -283,7 +284,6 @@ export default function Dashboard() {
         loan.status !== 'rejected' &&
         loan.status !== 'rollover'
     ).map(loan => {
-        // Base calculation from firstPaymentDate if it exists, otherwise disbursementDate
         let baseDate: Date;
         if (loan.firstPaymentDate?.seconds) baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
         else if (loan.firstPaymentDate instanceof Date) baseDate = loan.firstPaymentDate;
@@ -299,8 +299,6 @@ export default function Dashboard() {
         if (allInstalmentsPaid) {
             nextDueDate = new Date(8640000000000000); 
         } else {
-            // The first payment is due on exactly 'baseDate' (instalment index 0)
-            // The index of the NEXT installment is 'paidInstalments'
             const nextIdx = paidInstalments; 
             if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextIdx);
             else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextIdx);
@@ -535,6 +533,11 @@ export default function Dashboard() {
                                                             <div className="font-bold text-xs">{loan.displayName}</div>
                                                             <div className="text-[10px] text-muted-foreground flex items-center gap-1">Ph: {loan.customerPhone}</div>
                                                             <div className="text-[10px] text-muted-foreground font-medium uppercase">ID: {loan.idNumber || 'N/A'}</div>
+                                                            {loan.paymentFrequency === 'weekly' && (
+                                                                <Badge variant="outline" className="text-[9px] mt-1 text-blue-600 border-blue-200">
+                                                                    {loan.preferredPaymentDay || format(loan.nextDueDate, 'EEEE')}
+                                                                </Badge>
+                                                            )}
                                                         </TableCell>
                                                         <TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell>
                                                         <TableCell>
@@ -587,6 +590,7 @@ export default function Dashboard() {
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
                                                 <TableHead>Member No</TableHead>
+                                                <TableHead>Due Day</TableHead>
                                                 <TableHead>Next Due</TableHead>
                                                 <TableHead className="text-right">Due Amt</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -597,6 +601,11 @@ export default function Dashboard() {
                                                 <TableRow key={loan.id}>
                                                     <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
                                                     <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-tight bg-blue-50 text-blue-700">
+                                                            {loan.preferredPaymentDay || format(loan.nextDueDate, 'EEEE')}
+                                                        </Badge>
+                                                    </TableCell>
                                                     <TableCell><div className="text-xs font-semibold">{format(loan.nextDueDate, 'dd/MM/yy')}</div></TableCell>
                                                     <TableCell className="text-right font-bold text-xs">Ksh {(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
