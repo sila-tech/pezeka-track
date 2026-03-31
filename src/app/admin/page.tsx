@@ -378,7 +378,7 @@ export default function Dashboard() {
                             )}/>
 
                             <div className="space-y-4 pt-2">
-                                <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
+                                <div className="relative min-h-[240px] max-h-[400px] bg-zinc-900 rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
                                     {!showCamera && !capturedImage && (
                                         <div className="text-center space-y-4 p-6">
                                             <div className="flex flex-col items-center gap-2">
@@ -402,9 +402,9 @@ export default function Dashboard() {
                                             />
                                         </div>
                                     )}
-                                    <video ref={videoRef} className={`w-full h-full object-cover ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+                                    <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
                                     {capturedImage && (
-                                        <img src={capturedImage} alt="Captured KYC" className="w-full h-full object-cover" />
+                                        <img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />
                                     )}
                                 </div>
 
