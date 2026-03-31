@@ -71,9 +71,9 @@ service cloud.firestore {
      * @description Customer records. Accessible to all internal staff.
      */
     match /customers/{customerId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff();
-      allow update: if isStaff();
+      allow get, list: if isStaff() || isOwner(customerId);
+      allow create: if isStaff() || isSignedIn();
+      allow update: if isStaff() || isOwner(customerId);
       allow delete: if isFinance();
     }
 
@@ -81,13 +81,13 @@ service cloud.firestore {
      * @description Loan records nested under customers.
      */
     match /customers/{customerId}/loans/{loanId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff();
+      allow get, list: if isStaff() || isOwner(customerId);
+      allow create: if isStaff() || isOwner(customerId);
       allow update: if isStaff();
       allow delete: if isFinance();
 
       match /repayments/{repaymentId} {
-        allow get, list: if isStaff();
+        allow get, list: if isStaff() || isOwner(customerId);
         allow create: if isStaff();
         allow update: if isStaff();
         allow delete: if isFinance();
@@ -98,20 +98,22 @@ service cloud.firestore {
      * @description Top level loans collection for aggregate queries.
      */
     match /loans/{loanId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff();
+      allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
       allow update: if isStaff();
       allow delete: if isFinance();
     }
 
     /**
      * @description KYC Document Repository. 
-     * ALL STAFF can upload (create) documents for verification.
-     * ONLY FINANCE can view (list/get), edit, or delete them.
+     * Staff and the specific customer can upload.
+     * ONLY STAFF (Finance specifically for management) can see the full list.
      */
     match /kyc_documents/{docId} {
-      allow create: if isStaff();
-      allow get, list, update, delete: if isFinance();
+      allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
+      allow get: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow list: if isStaff() || (isSignedIn() && request.query.filters.customerId == request.auth.uid);
+      allow update, delete: if isFinance();
     }
 
     /**

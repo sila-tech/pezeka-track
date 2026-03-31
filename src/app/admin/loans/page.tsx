@@ -1,15 +1,14 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useFirestore, useCollection, useAppUser } from '@/firebase';
+import { useFirestore, useCollection, useAppUser, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2 } from 'lucide-react';
-import { getDoc } from 'firebase/firestore';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Image as ImageIcon } from 'lucide-react';
+import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -158,6 +157,22 @@ interface Staff {
     email?: string;
 }
 
+interface KYCDoc {
+    id: string;
+    customerId: string;
+    type: string;
+    fileName: string;
+    fileUrl: string;
+    uploadedAt: any;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+    owner_id: 'Owner ID',
+    guarantor_id: 'Guarantor ID',
+    loan_form: 'Loan Form',
+    security_attachment: 'Security',
+    guarantor_undertaking: 'Undertaking'
+};
 
 export default function LoansPage() {
   const [open, setOpen] = useState(false);
@@ -174,6 +189,7 @@ export default function LoansPage() {
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [viewingKYC, setViewingKYC] = useState<KYCDoc | null>(null);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -190,6 +206,13 @@ export default function LoansPage() {
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: staffList, loading: staffLoading } = useCollection<Staff>(isAuthorized ? 'users' : null);
+
+  const kycQuery = useMemoFirebase(() => {
+      if (!loanToEdit || !firestore) return null;
+      return query(collection(firestore, 'kyc_documents'), where('customerId', '==', loanToEdit.customerId));
+  }, [loanToEdit?.customerId, firestore]);
+
+  const { data: kycDocs, isLoading: kycLoading } = useCollection<KYCDoc>(kycQuery);
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
@@ -837,7 +860,13 @@ export default function LoansPage() {
           <DialogContent className="sm:max-w-5xl p-0 overflow-hidden">
               {loanToEdit && (
                   <>
-                    <DialogHeader className="p-6 pb-0"><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><DialogDescription>Review interactions, record payments, and track history.</DialogDescription></DialogHeader>
+                    <DialogHeader className="p-6 pb-0">
+                        <div className="flex items-center justify-between">
+                            <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
+                            <Badge className="mr-8">{loanToEdit.status.toUpperCase()}</Badge>
+                        </div>
+                        <DialogDescription>Review interactions, record payments, and track history.</DialogDescription>
+                    </DialogHeader>
                     <ScrollArea className="max-h-[75vh]">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
                             <div className="space-y-4 md:col-span-1">
@@ -871,7 +900,12 @@ export default function LoansPage() {
                             </div>
                             <div className="md:col-span-2 space-y-6">
                                 <Tabs defaultValue="payments">
-                                    <TabsList className="grid grid-cols-3 w-full"><TabsTrigger value="payments">Payments</TabsTrigger><TabsTrigger value="followups">Follow-ups</TabsTrigger><TabsTrigger value="penalties">Penalties</TabsTrigger></TabsList>
+                                    <TabsList className="grid grid-cols-4 w-full">
+                                        <TabsTrigger value="payments">Payments</TabsTrigger>
+                                        <TabsTrigger value="followups">Notes</TabsTrigger>
+                                        <TabsTrigger value="kyc" className="gap-1.5"><ShieldCheck className="h-3 w-3" /> KYC Vault</TabsTrigger>
+                                        <TabsTrigger value="penalties">Penalties</TabsTrigger>
+                                    </TabsList>
                                     <TabsContent value="payments">
                                         {canEdit && (
                                             <Form {...paymentForm}>
@@ -916,6 +950,45 @@ export default function LoansPage() {
                                             </div>
                                         </ScrollArea>
                                     </TabsContent>
+                                    <TabsContent value="kyc">
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Verification Materials</h4>
+                                                <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold" onClick={() => window.location.href='/admin'}>
+                                                    <Camera className="h-3 w-3 mr-1" /> Capture New
+                                                </Button>
+                                            </div>
+                                            <ScrollArea className="h-[350px]">
+                                                {kycLoading ? (
+                                                    <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
+                                                ) : !kycDocs || kycDocs.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl">
+                                                        <FileText className="h-8 w-8 text-muted-foreground mb-2 opacity-20" />
+                                                        <p className="text-xs font-medium text-muted-foreground italic">No KYC documents uploaded yet.</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-2 gap-3 pb-4">
+                                                        {kycDocs.map(doc => (
+                                                            <div 
+                                                                key={doc.id} 
+                                                                className="group relative aspect-video rounded-lg overflow-hidden border bg-muted cursor-pointer hover:border-primary/50 transition-all"
+                                                                onClick={() => setViewingKYC(doc)}
+                                                            >
+                                                                <img src={doc.fileUrl} alt={doc.fileName} className="w-full h-full object-cover" />
+                                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
+                                                                    <p className="text-[10px] font-black uppercase tracking-tighter text-center">{TYPE_LABELS[doc.type] || 'Document'}</p>
+                                                                    <Eye className="h-4 w-4 mt-1" />
+                                                                </div>
+                                                                <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm p-1">
+                                                                    <p className="text-[8px] text-white font-bold truncate px-1">{doc.fileName}</p>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </ScrollArea>
+                                        </div>
+                                    </TabsContent>
                                     <TabsContent value="penalties">
                                         {canEdit && penaltyCalculation.daysLate > 0 && (
                                             <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
@@ -951,6 +1024,19 @@ export default function LoansPage() {
                     <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
+          </DialogContent>
+      </Dialog>
+
+      {/* KYC Viewer */}
+      <Dialog open={!!viewingKYC} onOpenChange={(o) => !o && setViewingKYC(null)}>
+          <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none">
+              <div className="relative w-full h-full min-h-[400px] flex items-center justify-center">
+                  <img src={viewingKYC?.fileUrl} className="max-w-full max-h-[85vh] object-contain" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent text-white">
+                      <h3 className="text-xl font-black">{TYPE_LABELS[viewingKYC?.type || ''] || 'Document'}</h3>
+                      <p className="text-sm opacity-70">{viewingKYC?.fileName}</p>
+                  </div>
+              </div>
           </DialogContent>
       </Dialog>
 
