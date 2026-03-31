@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/admin/NotificationBell';
+import { AINotificationBell } from '@/components/admin/AINotificationBell';
 import { cn } from '@/lib/utils';
 
 const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }) => {
@@ -179,7 +179,8 @@ export default function AdminLayout({
                 </div>
               </SheetContent>
             </Sheet>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-4">
+                <AINotificationBell />
                 <NotificationBell />
             </div>
             </header>
