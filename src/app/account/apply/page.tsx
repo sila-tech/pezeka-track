@@ -169,7 +169,7 @@ export default function ApplyPage() {
                       <CardContent className="p-8 space-y-6">
                           <div className="space-y-4">
                               <h3 className="text-xs font-black uppercase tracking-widest text-[#5BA9D0] flex items-center gap-2"><FileText className="h-4 w-4" /> Next Steps: Verification</h3>
-                              <p className="text-xs font-medium text-muted-foreground">Please have the following documents ready for our staff to verify and record in your portal:</p>
+                              <p className="text-xs font-medium text-muted-foreground">Please have the following documents ready for our staff to verify and record in your file:</p>
                               <div className="space-y-3">
                                   {getRequirements(submittedType).map((req, i) => (
                                       <div key={i} className="flex items-center gap-3 bg-[#F8FAFB] p-4 rounded-2xl border border-muted/50 transition-all">

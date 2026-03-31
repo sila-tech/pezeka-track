@@ -163,13 +163,6 @@ export default function AccountPage() {
 
   const { data: customerLoans } = useCollection<Loan>(customerLoansQuery);
 
-  const kycDocsQuery = useMemoFirebase(() => {
-      if (userLoading || !firestore || !user?.uid) return null;
-      return query(collection(firestore, 'kyc_documents'), where('customerId', '==', user.uid));
-  }, [firestore, user?.uid, userLoading]);
-
-  const { data: kycDocs, isLoading: kycLoading } = useCollection<any>(kycDocsQuery);
-
   const fullName = useMemo(() => {
       const profileName = customerProfile?.name;
       const authName = user?.displayName;
@@ -296,7 +289,7 @@ export default function AccountPage() {
             </Avatar>
             <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{greeting}</span>
-                <span className="text-lg font-black text-[#1B2B33]">{activeTab === 'Profile' ? 'Settings' : (activeTab === 'Documents' ? 'My Vault' : `${firstName} 👋`)}</span>
+                <span className="text-lg font-black text-[#1B2B33]">{activeTab === 'Profile' ? 'Settings' : `${firstName} 👋`}</span>
             </div>
         </div>
         <div className="flex items-center gap-2">
@@ -335,12 +328,11 @@ export default function AccountPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-5 gap-3 px-1">
+                <div className="grid grid-cols-4 gap-3 px-1">
                     <ActionCircle icon={<SendHorizontal className="h-6 w-6" />} label="Send" status="SOON" />
                     <ActionCircle icon={<Wallet className="h-6 w-6" />} label="Pay" onClick={() => setIsPayOpen(true)} />
                     <ActionCircle icon={<Landmark className="h-6 w-6" />} label="Loans" onClick={() => setIsLoansOpen(true)} />
                     <ActionCircle icon={<Users className="h-6 w-6" />} label="Refer" onClick={() => setIsReferOpen(true)} />
-                    <ActionCircle icon={<Folder className="h-6 w-6" />} label="Vault" onClick={() => setActiveTab('Documents')} />
                 </div>
 
                 <section className="space-y-4">
@@ -385,41 +377,6 @@ export default function AccountPage() {
             </>
         )}
 
-        {activeTab === 'Documents' && (
-            <div className="space-y-6">
-                <Card className="rounded-[2.5rem] bg-white border-none shadow-xl overflow-hidden">
-                    <CardHeader className="bg-[#1B2B33] text-white p-8">
-                        <div>
-                            <CardTitle className="text-white">KYC Vault</CardTitle>
-                            <CardDescription className="text-white/50">Stored documents for verification.</CardDescription>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-8">
-                        {kycLoading ? (
-                            <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
-                        ) : !kycDocs || kycDocs.length === 0 ? (
-                            <div className="text-center py-12 space-y-4">
-                                <div className="bg-muted h-16 w-16 rounded-full flex items-center justify-center mx-auto"><FileText className="h-8 w-8 text-muted-foreground" /></div>
-                                <p className="text-sm text-muted-foreground font-medium">Your KYC vault is empty.</p>
-                                <p className="text-[10px] text-muted-foreground px-8 italic">Ask a Pezeka staff member to record your ID and collateral photos.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-2 gap-4">
-                                {kycDocs.map(doc => (
-                                    <div key={doc.id} className="group relative aspect-square rounded-2xl overflow-hidden border bg-muted">
-                                        <img src={doc.fileUrl} className="w-full h-full object-cover" />
-                                        <div className="absolute inset-0 bg-black/40 p-3 flex flex-col justify-end">
-                                            <p className="text-[10px] text-white font-black uppercase">{doc.fileName}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-        )}
-
         {activeTab === 'Profile' && (
             <div className="space-y-6 pb-10">
                 <Card className="rounded-[2.5rem] bg-white shadow-xl overflow-hidden border-none">
@@ -448,6 +405,12 @@ export default function AccountPage() {
             </div>
         )}
       </main>
+
+      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t px-8 flex items-center justify-between z-50">
+          <NavItem icon={<Home className="h-6 w-6" />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
+          <NavItem icon={<Plus className="h-6 w-6" />} label="Apply" onClick={() => router.push('/account/apply')} />
+          <NavItem icon={<User className="h-6 w-6" />} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
+      </nav>
 
       <Dialog open={isReferOpen} onOpenChange={setIsReferOpen}>
           <DialogContent className="sm:max-w-md rounded-[2.5rem]">
@@ -494,13 +457,6 @@ export default function AccountPage() {
               </div>
           </DialogContent>
       </Dialog>
-
-      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t px-8 flex items-center justify-between z-50">
-          <NavItem icon={<Home className="h-6 w-6" />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
-          <NavItem icon={<Plus className="h-6 w-6" />} label="Apply" onClick={() => router.push('/account/apply')} />
-          <NavItem icon={<FileText className="h-6 w-6" />} label="Docs" active={activeTab === 'Documents'} onClick={() => setActiveTab('Documents')} />
-          <NavItem icon={<User className="h-6 w-6" />} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
-      </nav>
     </div>
   );
 }
