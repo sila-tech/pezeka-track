@@ -6,12 +6,6 @@ service cloud.firestore {
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model tailored for internal staff at Pezeka Credit Ltd. 
      * Access is partitioned between 'staff' and 'finance' roles.
-     * 
-     * DATA STRUCTURE
-     * - /users/{userId}: Internal staff profiles containing the authoritative 'role' field.
-     * - /customers/{customerId}: Global list of loan applicants/clients.
-     * - /customers/.../loans/.../repayments: Hierarchical tree for financial tracking.
-     * - /dailyExpenses, /dailyPayouts, /dailyReceipts: Top-level collections restricted to the finance role.
      */
 
     // --- Helper Functions ---
@@ -21,38 +15,45 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    /** @description Retrieves the user document for the currently authenticated user safely. */
-    function getAuthUser() {
-      let path = /databases/$(database)/documents/users/$(request.auth.uid);
-      return exists(path) ? get(path).data : null;
+    /** @description Retrieves the user document path for the current user. */
+    function authUserPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
     /** @description Checks if the authenticated user has a specific role (case-insensitive). */
     function hasRole(role) {
-      let user = getAuthUser();
-      return isSignedIn() && user != null && 
-             (user.role.lower() == role.lower());
+      return isSignedIn() && 
+             exists(authUserPath()) && 
+             get(authUserPath()).data.role.lower() == role.lower();
     }
 
     /** @description Checks if the user is a recognized staff member via profile or verified domain. */
     function isStaff() {
-      // Primary check: Firestore profile role
-      if (hasRole('staff') || hasRole('finance')) {
-        return true;
-      }
-      
-      // Fallback check: Verified email domains for immediate access post-login
-      let email = request.auth.token.email;
       return isSignedIn() && (
-        email.endsWith('@staff.pezeka.com') || 
-        email.endsWith('@finance.pezeka.com') || 
-        email == 'simon@pezeka.com'
+        hasRole('staff') || 
+        hasRole('finance') ||
+        (request.auth.token.email != null && (
+          request.auth.token.email.endsWith('@staff.pezeka.com') || 
+          request.auth.token.email.endsWith('@finance.pezeka.com') || 
+          request.auth.token.email == 'simon@pezeka.com'
+        ))
       );
     }
 
     /** @description Checks if the user is the owner of the document based on UID. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Checks if the user has finance level access. */
+    function isFinance() {
+      return isSignedIn() && (
+        hasRole('finance') || 
+        (request.auth.token.email != null && (
+          request.auth.token.email.endsWith('@finance.pezeka.com') || 
+          request.auth.token.email == 'simon@pezeka.com'
+        ))
+      );
     }
 
     // --- Collection Rules ---
@@ -96,13 +97,13 @@ service cloud.firestore {
     }
 
     /**
-     * @description Top level loans collection.
+     * @description Top level loans collection for aggregate queries.
      */
     match /loans/{loanId} {
       allow get, list: if isStaff();
       allow create: if isStaff();
       allow update: if isStaff();
-      allow delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow delete: if isFinance();
     }
 
     /**
@@ -111,37 +112,35 @@ service cloud.firestore {
      */
     match /kyc_documents/{docId} {
       allow create: if isStaff();
-      allow get, list, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get, list, update, delete: if isFinance();
     }
 
     /**
      * @description Financial collections restricted to finance staff.
      */
     match /dailyExpenses/{expenseId} {
-      allow get, list: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
-      allow create: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
-      allow update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get, list, create, update, delete: if isFinance();
     }
 
     match /dailyPayouts/{payoutId} {
-      allow get, list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get, list, create, update, delete: if isFinance();
     }
 
     match /dailyReceipts/{receiptId} {
-      allow get, list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get, list, create, update, delete: if isFinance();
     }
 
     match /financeEntries/{entryId} {
-      allow get, list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get, list, create, update, delete: if isFinance();
     }
 
     match /investors/{investorId} {
-      allow get: if isSignedIn() && (request.auth.uid == investorId || hasRole('finance') || request.auth.token.email == 'simon@pezeka.com');
-      allow list, create, update, delete: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get: if isSignedIn() && (request.auth.uid == investorId || isFinance());
+      allow list, create, update, delete: if isFinance();
     }
 
     match /mail_logs/{logId} {
-      allow get, list, create: if hasRole('finance') || request.auth.token.email == 'simon@pezeka.com';
+      allow get, list, create: if isFinance();
       allow update, delete: if false;
     }
   }
