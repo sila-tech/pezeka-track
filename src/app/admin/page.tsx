@@ -5,7 +5,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2, Upload, ImagePlus } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -81,11 +81,12 @@ export default function Dashboard() {
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  // Camera States
+  // Camera & File States
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAuthorized = user ? (user.email?.toLowerCase() === 'simon@pezeka.com' || user.role?.toLowerCase() === 'staff' || user.role?.toLowerCase() === 'finance' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') : false;
   
@@ -116,6 +117,7 @@ export default function Dashboard() {
         videoRef.current.srcObject = stream;
       }
       setShowCamera(true);
+      setCapturedImage(null); // Clear existing if switching to camera
     } catch (error) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
@@ -150,10 +152,22 @@ export default function Dashboard() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCapturedImage(reader.result as string);
+        stopCamera(); // Ensure camera is off if we pick a file
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   async function onKYCSubmit(values: z.infer<typeof kycUploadSchema>) {
       if (!user) return;
       if (!capturedImage) {
-          toast({ variant: 'destructive', title: 'Photo Required', description: 'Please capture a photo of the document before saving.' });
+          toast({ variant: 'destructive', title: 'Photo Required', description: 'Please capture or select a photo of the document before saving.' });
           return;
       }
       setIsSubmitting(true);
@@ -314,12 +328,19 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
         <div className="flex gap-2">
-            <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { setIsKYCUploadOpen(open); if(!open) { stopCamera(); setCapturedImage(null); } }}>
+            <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { 
+                setIsKYCUploadOpen(open); 
+                if(!open) { 
+                    stopCamera(); 
+                    setCapturedImage(null); 
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                } 
+            }}>
                 <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Customer KYC Capture</DialogTitle>
-                        <DialogDescription>Take a photo of the member's identity or security document.</DialogDescription>
+                        <DialogDescription>Select an image from gallery or take a new photo.</DialogDescription>
                     </DialogHeader>
                     <Form {...kycForm}>
                         <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4 py-2">
@@ -359,9 +380,26 @@ export default function Dashboard() {
                             <div className="space-y-4 pt-2">
                                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
                                     {!showCamera && !capturedImage && (
-                                        <div className="text-center space-y-2">
-                                            <Camera className="h-12 w-12 text-muted-foreground mx-auto" />
-                                            <Button type="button" variant="secondary" onClick={startCamera}>Start Camera</Button>
+                                        <div className="text-center space-y-4 p-6">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <ImagePlus className="h-12 w-12 text-muted-foreground" />
+                                                <p className="text-sm text-muted-foreground">No document image selected</p>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
+                                                    <Upload className="mr-2 h-4 w-4" /> Select from Gallery
+                                                </Button>
+                                                <Button type="button" variant="outline" onClick={startCamera}>
+                                                    <Camera className="mr-2 h-4 w-4" /> Take Photo
+                                                </Button>
+                                            </div>
+                                            <input 
+                                                type="file" 
+                                                ref={fileInputRef} 
+                                                className="hidden" 
+                                                accept="image/*" 
+                                                onChange={handleFileChange} 
+                                            />
                                         </div>
                                     )}
                                     <video ref={videoRef} className={`w-full h-full object-cover ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
@@ -372,15 +410,18 @@ export default function Dashboard() {
 
                                 {showCamera && (
                                     <div className="flex gap-2">
-                                        <Button type="button" className="flex-1" onClick={capturePhoto}>Capture Document</Button>
+                                        <Button type="button" className="flex-1" onClick={capturePhoto}>Capture Photo</Button>
                                         <Button type="button" variant="outline" onClick={stopCamera}>Cancel</Button>
                                     </div>
                                 )}
 
                                 {capturedImage && (
                                     <div className="flex gap-2">
+                                        <Button type="button" variant="outline" className="flex-1" onClick={() => fileInputRef.current?.click()}>
+                                            <Upload className="h-4 w-4 mr-2" /> Change File
+                                        </Button>
                                         <Button type="button" variant="outline" className="flex-1" onClick={startCamera}>
-                                            <RefreshCw className="h-4 w-4 mr-2" /> Retake Photo
+                                            <Camera className="h-4 w-4 mr-2" /> Retake Photo
                                         </Button>
                                     </div>
                                 )}
