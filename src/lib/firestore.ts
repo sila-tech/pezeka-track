@@ -1,7 +1,7 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL, FirebaseStorage } from 'firebase/storage';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { calculateInterestForOneInstalment, calculateAmortization } from './utils';
@@ -169,7 +169,7 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
   }
 }
 
-export async function uploadKYCDocument(db: Firestore, data: { 
+export async function uploadKYCDocument(db: Firestore, storage: FirebaseStorage, data: { 
     customerId: string, 
     customerName: string, 
     type: string, 
@@ -178,17 +178,31 @@ export async function uploadKYCDocument(db: Firestore, data: {
     uploadedBy: string 
 }) {
     const kycCollection = collection(db, 'kyc_documents');
-    const newDoc = {
-        ...data,
-        uploadedAt: serverTimestamp()
-    };
+    
     try {
+        // 1. Upload the base64 image to Firebase Storage
+        const fileExtension = 'jpg';
+        const storagePath = `kyc/${data.customerId}/${Date.now()}_${data.fileName.replace(/\s+/g, '_')}.${fileExtension}`;
+        const storageRef = ref(storage, storagePath);
+        
+        // uploadString handles data URIs automatically (data:image/jpeg;base64,...)
+        await uploadString(storageRef, data.fileUrl, 'data_url');
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        // 2. Save metadata to Firestore referencing the Storage URL
+        const newDoc = {
+            ...data,
+            fileUrl: downloadUrl, // Use the public cloud URL
+            storagePath: storagePath,
+            uploadedAt: serverTimestamp()
+        };
+
         return await addDoc(kycCollection, newDoc);
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({
             path: kycCollection.path,
             operation: 'create',
-            requestResourceData: newDoc,
+            requestResourceData: { ...data, fileUrl: '[STORAGE_URL]' },
         });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;

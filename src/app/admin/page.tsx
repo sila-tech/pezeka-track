@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useAppUser, useCollection, useFirestore } from '@/firebase';
+import { useAppUser, useCollection, useFirestore, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck, Camera, RefreshCw, CheckCircle2, Upload, ImagePlus } from 'lucide-react';
@@ -73,6 +72,7 @@ const kycUploadSchema = z.object({
 export default function Dashboard() {
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
   
   const [isStaffLoanOpen, setIsStaffLoanOpen] = useState(false);
@@ -173,7 +173,8 @@ export default function Dashboard() {
       setIsSubmitting(true);
       try {
           const customer = customers?.find(c => c.id === values.customerId);
-          await uploadKYCDocument(firestore, {
+          // Pass firestore AND storage to the upload utility
+          await uploadKYCDocument(firestore, storage, {
               ...values,
               customerName: customer?.name || "Unknown",
               fileUrl: capturedImage,
