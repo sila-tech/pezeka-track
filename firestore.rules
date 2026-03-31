@@ -1,106 +1,152 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =====================================================================
-    // Helper Functions
-    // =====================================================================
-    
-    function isAuthenticated() {
+    /**
+     * CORE PHILOSOPHY
+     * This ruleset enforces a Role-Based Access Control (RBAC) model tailored for internal staff at Pezeka Credit Ltd. 
+     * Access is partitioned between 'GeneralStaff' and 'Finance' roles.
+     * 
+     * DATA STRUCTURE
+     * - /users/{userId}: Internal staff profiles containing the authoritative 'role' field.
+     * - /customers/{customerId}: Global list of loan applicants/clients.
+     * - /customers/.../loans/.../repayments: Hierarchical tree for financial tracking.
+     * - /dailyExpenses, /dailyPayouts, /dailyReceipts: Top-level collections restricted to the Finance role.
+     * 
+     * KEY SECURITY DECISIONS
+     * - Authorization Independence: The 'role' field is denormalized onto the User document to allow 
+     *   for single-lookup authorization checks without complex tree traversal.
+     * - Relational Integrity: On creation, we enforce that internal data fields (like customerId or loanId) 
+     *   match the document's path to prevent orphaned or mis-linked records.
+     * - Photo Support: Write access is granted to photo URL fields for authorized staff to allow 
+     *   referencing uploaded media (profile photos, receipts, payment proofs).
+     */
+
+    // --- Helper Functions ---
+
+    /** @description Checks if the user is authenticated. */
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Check if the user is the Super Admin (Simon)
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.get('email', '').lower() == 'simon@pezeka.com' || 
-        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
-      );
+    /** @description Retrieves the user document for the currently authenticated user. */
+    function getAuthUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
-    // Safely check for a specific role in the user's profile document
-    function hasRole(roleName) {
-      return isAuthenticated() && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'none') == roleName;
+    /** @description Checks if the authenticated user has a specific role. */
+    function hasRole(role) {
+      return isSignedIn() && getAuthUser().role == role;
     }
 
-    // Finance Role: Includes Simon and designated Finance users
-    function isFinance() {
-      return isSuperAdmin() || hasRole('finance');
-    }
-
-    // Staff Role: Includes Finance and designated Staff users
+    /** @description Checks if the user is a recognized staff member (General or Finance). */
     function isStaff() {
-      return isFinance() || hasRole('staff');
+      return hasRole('GeneralStaff') || hasRole('Finance');
     }
-    
-    // Check if the user is the owner of the document
+
+    /** @description Checks if the user is the owner of the document based on UID. */
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Simplified validation for loan applications
-    function isValidCustomerApplication() {
-      return isAuthenticated() && 
-             request.resource.data.get('customerId', '') == request.auth.uid &&
-             request.resource.data.get('status', '').lower() == 'application';
-    }
+    // The function `isExistingOwner` was removed as it was unused and contained an invalid variable name 'resource'.
 
-    // =====================================================================
-    // Collection Rules
-    // =====================================================================
+    // --- Collection Rules ---
 
+    /**
+     * @description Staff profile management. Users can create/view their own profiles; all staff can list others.
+     * @path /users/{userId}
+     * @allow (create) User 'abc' creates document 'abc'.
+     * @deny (create) User 'abc' attempts to create document 'xyz'.
+     * @principle Self-creation pattern with path-to-data consistency.
+     */
     match /users/{userId} {
-      allow get: if isStaff() || isOwner(userId);
+      allow get: if isSignedIn();
       allow list: if isStaff();
-      allow write: if isSuperAdmin() || isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if false; // Profiles are historically significant; no deletion allowed in prototype.
     }
 
+    /**
+     * @description Customer records. Accessible to all internal staff for management.
+     * @path /customers/{customerId}
+     * @allow (list) Any authenticated staff member.
+     * @deny (create) An unauthenticated user.
+     * @principle Role-based broad access for internal operational data.
+     */
     match /customers/{customerId} {
-      allow get: if isStaff() || isOwner(customerId);
-      allow list: if isStaff() || isOwner(customerId);
-      allow create: if isStaff() || isOwner(customerId) || isAuthenticated();
-      allow update: if isFinance() || isOwner(customerId);
-      allow delete: if isFinance();
+      allow get, list: if isStaff();
+      allow create: if isStaff() && request.resource.data.id == customerId;
+      allow update: if isStaff() && resource != null;
+      allow delete: if isStaff() && resource != null;
     }
 
-    match /kyc_documents/{docId} {
-      // ONLY Finance can see and list KYC docs
-      allow read: if isFinance();
-      // Staff can UPLOAD (create), but not read back
-      allow create: if isStaff();
-      // ONLY Finance can edit/delete
-      allow update, delete: if isFinance();
+    /**
+     * @description Loan records nested under customers.
+     * @path /customers/{customerId}/loans/{loanId}
+     * @allow (create) Staff creating a loan where data.customerId matches the path parameter.
+     * @deny (update) Staff attempting to change the customerId of an existing loan.
+     * @principle Relational integrity via path validation and field immutability.
+     */
+    match /customers/{customerId}/loans/{loanId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && request.resource.data.customerId == customerId && request.resource.data.id == loanId;
+      allow update: if isStaff() && resource != null && request.resource.data.customerId == resource.data.customerId;
+      allow delete: if isStaff() && resource != null;
+
+      /**
+       * @description Repayment records for specific loans.
+       * @path /customers/{customerId}/loans/{loanId}/repayments/{repaymentId}
+       * @allow (create) Staff records a payment where loanId matches the parent path.
+       * @principle Path-based relational consistency.
+       */
+      match /repayments/{repaymentId} {
+        allow get, list: if isStaff();
+        allow create: if isStaff() && request.resource.data.loanId == loanId && request.resource.data.id == repaymentId;
+        allow update: if isStaff() && resource != null && request.resource.data.loanId == resource.data.loanId;
+        allow delete: if isStaff() && resource != null;
+      }
     }
 
-    match /loans/{loanId} {
-      allow read: if isStaff() || (isAuthenticated() && (resource == null || resource.data.customerId == request.auth.uid));
-      allow create: if isFinance() || isValidCustomerApplication();
-      allow update: if isFinance() || (isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followUpNotes', 'updatedAt']));
-      allow delete: if isFinance();
+    /**
+     * @description Daily operational expenses. Restricted to Finance staff.
+     * @path /dailyExpenses/{expenseId}
+     * @allow (create) User with role 'Finance' records an expense.
+     * @deny (list) User with role 'GeneralStaff' attempts to view expenses.
+     * @principle Strict role-based segregation for sensitive financial data.
+     */
+    match /dailyExpenses/{expenseId} {
+      allow get, list: if hasRole('Finance');
+      allow create: if hasRole('Finance') && request.resource.data.recordedByUserId == request.auth.uid;
+      allow update: if hasRole('Finance') && resource != null;
+      allow delete: if hasRole('Finance') && resource != null;
     }
 
-    match /financeEntries/{entryId} {
-      allow read: if isStaff();
-      allow write: if isFinance();
+    /**
+     * @description Daily disbursement summaries. Restricted to Finance staff.
+     * @path /dailyPayouts/{payoutId}
+     * @allow (list) Finance staff checking daily totals.
+     * @principle Structural segregation of summary data.
+     */
+    match /dailyPayouts/{payoutId} {
+      allow get, list: if hasRole('Finance');
+      allow create: if hasRole('Finance') && request.resource.data.recordedByUserId == request.auth.uid;
+      allow update: if hasRole('Finance') && resource != null;
+      allow delete: if hasRole('Finance') && resource != null;
     }
 
-    match /mail_logs/{logId} {
-      allow read: if isFinance();
-      allow write: if isAuthenticated();
-    }
-
-    match /investors/{investorId} {
-      allow read: if isFinance() || isOwner(investorId);
-      allow write: if isFinance();
-    }
-
-    match /system_config/{configId} {
-      allow read: if true;
-      allow write: if isSuperAdmin();
+    /**
+     * @description Daily receipt summaries (repayments). Restricted to Finance staff.
+     * @path /dailyReceipts/{receiptId}
+     * @allow (create) Finance staff finalizing the daily tally.
+     * @principle Audit trail enforcement via recordedByUserId.
+     */
+    match /dailyReceipts/{receiptId} {
+      allow get, list: if hasRole('Finance');
+      allow create: if hasRole('Finance') && request.resource.data.recordedByUserId == request.auth.uid;
+      allow update: if hasRole('Finance') && resource != null;
+      allow delete: if hasRole('Finance') && resource != null;
     }
   }
 }

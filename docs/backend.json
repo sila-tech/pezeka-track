@@ -1,110 +1,489 @@
-
 {
   "entities": {
-    "UserProfile": {
-      "title": "User Profile",
-      "description": "Stores user-specific information and role for staff and finance.",
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
       "type": "object",
+      "description": "Represents an internal staff member of Pezeka Credit Ltd, used for tracking who performed certain actions and for managing access roles (roles managed by an external authentication system).",
       "properties": {
-        "uid": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["staff", "finance"] },
-        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "default": "approved" },
-        "name": { "type": "string" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "A unique identifier for the user within the system, often used for login (though authentication details are external)."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the staff member."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the staff member."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the staff member within the company (e.g., 'Finance', 'GeneralStaff')."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the staff member.",
+          "format": "email"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was created.",
+          "format": "date-time"
+        }
       },
-      "required": ["uid", "email", "role"]
+      "required": [
+        "id",
+        "username",
+        "firstName",
+        "lastName",
+        "role",
+        "email",
+        "createdAt"
+      ]
     },
     "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
-      "description": "Represents a customer of Pezeka Credit Ltd.",
       "type": "object",
+      "description": "Stores detailed information about a customer who has applied for or received a loan.",
       "properties": {
-        "accountNumber": { "type": "string", "description": "Unique account number for the customer." },
-        "name": { "type": "string" },
-        "phone": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "idNumber": { "type": "string" },
-        "referralCode": { "type": "string", "description": "Unique code for this customer to refer others." },
-        "referredBy": { "type": "string", "description": "The referral code of the person who invited this customer." },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Customer entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the customer."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the customer."
+        },
+        "nationalIdNumber": {
+          "type": "string",
+          "description": "The unique national identification number (e.g., ID card, passport number) of the customer."
+        },
+        "contactNumber": {
+          "type": "string",
+          "description": "The primary contact phone number of the customer."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the customer (optional).",
+          "format": "email"
+        },
+        "address": {
+          "type": "string",
+          "description": "The physical address of the customer (optional)."
+        },
+        "dateRegistered": {
+          "type": "string",
+          "description": "The date and time when the customer's record was first registered.",
+          "format": "date-time"
+        },
+        "profilePhotoUrl": {
+          "type": "string",
+          "description": "URL to the customer's profile photo, used for identification.",
+          "format": "uri"
+        }
       },
-      "required": ["name", "phone", "idNumber"]
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "nationalIdNumber",
+        "contactNumber",
+        "dateRegistered"
+      ]
     },
     "Loan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Loan",
-      "description": "Represents a loan disbursed to a customer.",
       "type": "object",
+      "description": "Records details of an individual loan disbursed to a customer, including its terms, current status, and financial breakdown.",
       "properties": {
-        "loanNumber": { "type": "string" },
-        "customerId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "customerPhone": { "type": "string" },
-        "status": { "type": "string", "enum": ["active", "due", "overdue", "paid", "rollover", "application", "rejected"] },
-        "principalAmount": { "type": "number" },
-        "interestRate": { "type": "number" },
-        "totalRepayableAmount": { "type": "number" },
-        "totalPaid": { "type": "number", "default": 0 },
-        "totalPenalties": { "type": "number", "default": 0 }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Loan entity."
+        },
+        "customerId": {
+          "type": "string",
+          "description": "Reference to the Customer who received this loan. (Relationship: Customer 1:N Loan)"
+        },
+        "amountDisbursed": {
+          "type": "number",
+          "description": "The principal amount of money disbursed to the customer."
+        },
+        "disbursementDate": {
+          "type": "string",
+          "description": "The date and time when the loan amount was disbursed.",
+          "format": "date-time"
+        },
+        "interestRate": {
+          "type": "number",
+          "description": "The annual interest rate applied to the loan (e.g., 0.10 for 10%)."
+        },
+        "loanTermInDays": {
+          "type": "number",
+          "description": "The total duration of the loan in days."
+        },
+        "repaymentFrequency": {
+          "type": "string",
+          "description": "How often the customer is expected to make payments (e.g., 'Daily', 'Weekly', 'Monthly')."
+        },
+        "totalAmountDue": {
+          "type": "number",
+          "description": "The total amount expected to be repaid by the customer, including principal, interest, and all fees."
+        },
+        "outstandingBalance": {
+          "type": "number",
+          "description": "The current remaining balance on the loan."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the loan (e.g., 'Active', 'Fully Paid', 'Overdue', 'Defaulted', 'Pending')."
+        },
+        "facilitationFee": {
+          "type": "number",
+          "description": "Any fee charged for processing or facilitating the loan."
+        },
+        "transactionCost": {
+          "type": "number",
+          "description": "Any additional transaction costs associated with the loan disbursement or management."
+        },
+        "nextPaymentDueDate": {
+          "type": "string",
+          "description": "The due date for the next scheduled payment for this loan.",
+          "format": "date-time"
+        },
+        "nextPaymentAmount": {
+          "type": "number",
+          "description": "The amount expected for the next scheduled payment."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the loan record was created in the system.",
+          "format": "date-time"
+        },
+        "supportingDocumentUrls": {
+          "type": "array",
+          "description": "URLs to supporting documents or images related to the loan application, collateral, or agreements (e.g., customer ID photos, signed agreements).",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "customerId",
+        "amountDisbursed",
+        "disbursementDate",
+        "interestRate",
+        "loanTermInDays",
+        "repaymentFrequency",
+        "totalAmountDue",
+        "outstandingBalance",
+        "status",
+        "facilitationFee",
+        "transactionCost",
+        "nextPaymentDueDate",
+        "nextPaymentAmount",
+        "createdAt"
+      ]
     },
-    "KYCDocument": {
-      "title": "KYC Document",
-      "description": "Metadata and image data for customer KYC documents.",
+    "Repayment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Repayment",
       "type": "object",
+      "description": "Records an individual payment made by a customer towards a specific loan.",
       "properties": {
-        "customerId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "type": { "type": "string", "enum": ["owner_id", "guarantor_id", "loan_form", "security_attachment", "guarantor_undertaking"] },
-        "fileName": { "type": "string" },
-        "fileUrl": { "type": "string", "description": "Data URI or URL of the captured image." },
-        "uploadedBy": { "type": "string" },
-        "uploadedAt": { "type": "string", "format": "date-time" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Repayment entity."
+        },
+        "loanId": {
+          "type": "string",
+          "description": "Reference to the Loan this payment is applied to. (Relationship: Loan 1:N Repayment)"
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "The amount of money paid by the customer."
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "The date and time when the payment was received.",
+          "format": "date-time"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "The method used for the payment (e.g., 'Cash', 'Bank Transfer', 'Mobile Money')."
+        },
+        "isLate": {
+          "type": "boolean",
+          "description": "Indicates if the payment was made after its due date."
+        },
+        "paymentProofPhotoUrl": {
+          "type": "string",
+          "description": "URL to the photo of the customer's payment proof (e.g., bank slip, mobile money screenshot). Optional.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "loanId",
+        "amountPaid",
+        "paymentDate",
+        "paymentMethod",
+        "isLate"
+      ]
     },
-    "MailLog": {
-      "title": "Mail Log",
-      "description": "Records of emails sent by the system or staff.",
+    "DailyExpense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyExpense",
       "type": "object",
+      "description": "Records daily operational expenses incurred by the company, such as facilitation costs or office supplies.",
       "properties": {
-        "recipient": { "type": "string" },
-        "subject": { "type": "string" },
-        "body": { "type": "string" },
-        "type": { "type": "string" },
-        "sentAt": { "type": "string", "format": "date-time" },
-        "sender": { "type": "string" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DailyExpense entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The specific date on which the expense occurred.",
+          "format": "date"
+        },
+        "category": {
+          "type": "string",
+          "description": "The category of the expense (e.g., 'Facilitation', 'Office Supplies', 'Utilities')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the expense."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the expense."
+        },
+        "recordedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this expense. (Relationship: User 1:N DailyExpense)"
+        },
+        "receiptPhotoUrl": {
+          "type": "string",
+          "description": "URL to the photo of the expense receipt for verification.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "category",
+        "description",
+        "amount",
+        "recordedByUserId"
+      ]
+    },
+    "DailyPayout": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyPayout",
+      "type": "object",
+      "description": "Summarizes the total amount of money disbursed to customers and associated costs on a given day.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DailyPayout entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The specific date for which the payout summary is recorded.",
+          "format": "date"
+        },
+        "totalDisbursedPrincipal": {
+          "type": "number",
+          "description": "The aggregate principal amount of all loans disbursed on this date."
+        },
+        "totalAssociatedFees": {
+          "type": "number",
+          "description": "The aggregate of facilitation fees and transaction costs for all loans disbursed on this date."
+        },
+        "recordedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this daily payout summary. (Relationship: User 1:N DailyPayout)"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "totalDisbursedPrincipal",
+        "totalAssociatedFees",
+        "recordedByUserId"
+      ]
+    },
+    "DailyReceipt": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyReceipt",
+      "type": "object",
+      "description": "Summarizes the total amount of money received from customer repayments on a given day.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DailyReceipt entity."
+        },
+        "date": {
+          "type": "string",
+          "description": "The specific date for which the receipt summary is recorded.",
+          "format": "date"
+        },
+        "totalAmountReceived": {
+          "type": "number",
+          "description": "The aggregate amount of all customer repayments received on this date."
+        },
+        "recordedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this daily receipt summary. (Relationship: User 1:N DailyReceipt)"
+        }
+      },
+      "required": [
+        "id",
+        "date",
+        "totalAmountReceived",
+        "recordedByUserId"
+      ]
     }
   },
   "auth": {
-    "providers": ["password", "phone"]
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Stores user profiles."
-    },
-    "/customers/{customerId}": {
-      "schema": { "$ref": "#/entities/Customer" },
-      "description": "Stores all customer records."
-    },
-    "/kyc_documents/{docId}": {
-      "schema": { "$ref": "#/entities/KYCDocument" },
-      "description": "Master repository for all customer KYC documents."
-    },
-    "/loans/{loanId}": {
-      "schema": { "$ref": "#/entities/Loan" },
-      "description": "Stores all loan records."
-    },
-    "/financeEntries/{entryId}": {
-      "description": "Stores all financial entries."
-    },
-    "/mail_logs/{logId}": {
-      "schema": { "$ref": "#/entities/MailLog" },
-      "description": "Logs of sent emails."
-    },
-    "/system_config/{configId}": {
-      "description": "General application configuration and metadata."
-    }
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores internal staff member profiles and their roles, used for authorization. Each document's ID is the Firebase Authentication UID. This collection provides authorization independence via the denormalized 'role' field."
+        }
+      },
+      {
+        "path": "/customers/{customerId}",
+        "definition": {
+          "entityName": "Customer",
+          "schema": {
+            "$ref": "#/backend/entities/Customer"
+          },
+          "description": "Stores detailed information about customers. Includes `profilePhotoUrl` for identification. Access for staff is granted based on their role from the `/users` collection, supporting QAPs for listing all customers.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for the customer."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/customers/{customerId}/loans/{loanId}",
+        "definition": {
+          "entityName": "Loan",
+          "schema": {
+            "$ref": "#/backend/entities/Loan"
+          },
+          "description": "Records individual loans disbursed to a specific customer. This subcollection maintains authorization independence as `customerId` is available in the path. Includes `supportingDocumentUrls` for related documents.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for the parent customer."
+            },
+            {
+              "name": "loanId",
+              "description": "The unique identifier for the loan."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/customers/{customerId}/loans/{loanId}/repayments/{repaymentId}",
+        "definition": {
+          "entityName": "Repayment",
+          "schema": {
+            "$ref": "#/backend/entities/Repayment"
+          },
+          "description": "Records individual payments made by a customer towards a specific loan. This subcollection maintains authorization independence as `customerId` and `loanId` are available in the path. Includes `paymentProofPhotoUrl` for verification.",
+          "params": [
+            {
+              "name": "customerId",
+              "description": "The unique identifier for the grandparent customer."
+            },
+            {
+              "name": "loanId",
+              "description": "The unique identifier for the parent loan."
+            },
+            {
+              "name": "repaymentId",
+              "description": "The unique identifier for the repayment."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/dailyExpenses/{expenseId}",
+        "definition": {
+          "entityName": "DailyExpense",
+          "schema": {
+            "$ref": "#/backend/entities/DailyExpense"
+          },
+          "description": "Records daily operational expenses incurred by the company. Includes `recordedByUserId` for tracking and `receiptPhotoUrl` for verification. Access is strictly controlled by the 'Finance' role, supporting QAPs for listing all expenses.",
+          "params": [
+            {
+              "name": "expenseId",
+              "description": "The unique identifier for the daily expense."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/dailyPayouts/{payoutId}",
+        "definition": {
+          "entityName": "DailyPayout",
+          "schema": {
+            "$ref": "#/backend/entities/DailyPayout"
+          },
+          "description": "Summarizes daily loan disbursements and associated costs. Includes `recordedByUserId` for tracking. Access is strictly controlled by the 'Finance' role, supporting QAPs for listing all payouts.",
+          "params": [
+            {
+              "name": "payoutId",
+              "description": "The unique identifier for the daily payout summary."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/dailyReceipts/{receiptId}",
+        "definition": {
+          "entityName": "DailyReceipt",
+          "schema": {
+            "$ref": "#/backend/entities/DailyReceipt"
+          },
+          "description": "Summarizes daily customer repayments received. Includes `recordedByUserId` for tracking. Access is strictly controlled by the 'Finance' role, supporting QAPs for listing all receipts.",
+          "params": [
+            {
+              "name": "receiptId",
+              "description": "The unique identifier for the daily receipt summary."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure prioritizes secure, scalable, and debuggable access by adhering to the core design principles, especially Authorization Independence and Structural Segregation.\n\n**Authorization Independence (CRITICAL) via Denormalization:**\n1.  **User Roles (`/users/{userId}`):** The primary mechanism for authorization is the `role` field directly within each `User` document. This means that to check a user's role (e.g., 'Finance' or 'GeneralStaff'), security rules only need to perform a `get()` operation on `users/$(request.auth.uid)`. This is a single, atomic operation that does not rely on hierarchical data dependencies for authorization, completely eliminating complex `get()` calls in subcollection rules based on parent data. The `request.auth.uid` directly identifies the requesting staff member, making this lookup efficient and clear.\n2.  **Customer, Loan, Repayment Hierarchy:** For customer-related data (`/customers/{customerId}`, `/customers/{customerId}/loans/{loanId}`, `/customers/{customerId}/loans/{loanId}/repayments/{repaymentId}`), the hierarchical path inherently denormalizes the parent IDs. For example, when evaluating a rule for a `Loan` document, the `customerId` is directly available as a wildcard in the path (`{customerId}`), removing the need for `get(/customers/$(customerId))`. Similarly, for `Repayment` documents, both `customerId` and `loanId` are available in the path. While the `Loan` schema also includes `customerId` and `Repayment` includes `loanId`, their presence in the path is what enables `request.auth.uid` (via role checks on `users/{userId}`) to be combined with path-based identification for secure, atomic operations. The `recordedByUserId` in `DailyExpense`, `DailyPayout`, and `DailyReceipt` serves as an audit trail rather than an authorization field, with access being determined by the *current* user's role, as defined in `/users/{userId}`.\n\n**QAPs (Rules are not Filters) via Structural Segregation:**\nEach collection and subcollection is designed with a homogeneous security posture, ensuring that `list` operations return a consistent set of data without requiring client-side filtering or complex rule-based data exclusion:\n1.  **`/users/{userId}`:** This collection stores individual staff profiles. 'Finance' staff might be allowed to list all users, or each user can only read their own, depending on more granular requirements. The critical aspect is that *all* documents in this collection (or a subset based on a simple query like `role == 'Finance'`) will be accessible to an authorized `list` caller, without filtering by rules.\n2.  **`/customers`:** All authenticated staff (General Staff and Finance) can likely read/list all `Customer` documents. The rule set will grant broad read access to authenticated staff based on their `role` from `/users/{uid}`, ensuring that a `list` operation on `/customers` returns all customers without internal filtering.\n3.  **`/customers/{customerId}/loans`:** A `list` operation on this subcollection will securely return *all* loans for the specified `{customerId}` to authorized staff. All `Loan` documents under a given customer share the same access requirements, satisfying QAPs.\n4.  **`/customers/{customerId}/loans/{loanId}/repayments`:** Similarly, a `list` operation here will return *all* repayments for the specified `{loanId}` to authorized staff. All `Repayment` documents for a given loan share the same access requirements.\n5.  **`/dailyExpenses`, `/dailyPayouts`, `/dailyReceipts`:** These top-level collections are exclusively for 'Finance' staff. A `list` operation by a 'Finance' user will retrieve *all* documents within these collections, providing a complete financial overview without rules acting as filters. General Staff would be entirely denied access to these collections for any operation, including `list`.\n\nThis structure makes security rules concise and explicit, leveraging path-based parameters and the denormalized `role` field to make authorization decisions independent of complex cross-document `get()` calls, thereby enhancing debuggability and system integrity."
   }
 }
