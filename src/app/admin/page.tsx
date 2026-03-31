@@ -297,7 +297,6 @@ export default function Dashboard() {
         const totalPaid = loan.totalPaid || 0;
         const actualInstalmentsPaid = totalPaid / instalmentAmt;
 
-        // Cycles passed since baseDate
         let cyclesPassed = 0;
         if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
         else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
@@ -305,13 +304,11 @@ export default function Dashboard() {
             cyclesPassed = (today.getFullYear() - baseDate.getFullYear()) * 12 + (today.getMonth() - baseDate.getMonth());
         }
 
-        // Expected installments by TODAY
         const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed + 1;
         
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
         const advanceCount = Math.max(0, actualInstalmentsPaid - expectedByNow);
         
-        // Next Due Date logic: Find the first installment index that hasn't been fully covered
         const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
         let nextDueDate: Date;
         if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextInstalmentIndex);
@@ -329,11 +326,9 @@ export default function Dashboard() {
             daysUntil: differenceInDays(nextDueDate, today)
         };
       }).filter(loan => {
-          // Keep if arrears > 0 OR next due is within a small window
           const offset = loan.paymentFrequency === 'monthly' ? 7 : (loan.paymentFrequency === 'weekly' ? 3 : 1);
           return loan.arrearsCount > 0 || loan.daysUntil <= offset;
       }).sort((a, b) => {
-          // Priority: Arrears count first (highest debt first), then chronological
           if (b.arrearsCount !== a.arrearsCount) return b.arrearsCount - a.arrearsCount;
           return a.nextDueDate.getTime() - b.nextDueDate.getTime();
       });
@@ -477,11 +472,19 @@ export default function Dashboard() {
                     <Form {...staffLoanForm}>
                         <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4">
                         <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
-                            <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Amount (Ksh)</FormLabel>
+                                <FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )}/>
                         <div className="grid grid-cols-2 gap-4">
                             <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
-                            <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>ID Number</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
                             )}/>
                             <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
                             <FormItem>
@@ -491,7 +494,11 @@ export default function Dashboard() {
                             )}/>
                         </div>
                         <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
-                            <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                            <FormItem>
+                                <FormLabel>Reason</FormLabel>
+                                <FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
                         )}/>
                         </form>
                     </Form>
@@ -545,6 +552,7 @@ export default function Dashboard() {
                                             <TableRow>
                                                 <TableHead>Customer Identity</TableHead>
                                                 <TableHead>Member No</TableHead>
+                                                <TableHead>Due Date</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Arrears Balance</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -564,23 +572,18 @@ export default function Dashboard() {
                                                             )}
                                                         </TableCell>
                                                         <TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell>
+                                                        <TableCell className="text-xs font-black">
+                                                            {format(loan.nextDueDate, 'dd/MM/yyyy')}
+                                                        </TableCell>
                                                         <TableCell>
                                                             {loan.arrearsCount > 0 ? (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <Badge variant="destructive" className="text-[9px] w-fit font-black uppercase tracking-tighter">
-                                                                        <AlertTriangle className="h-2.5 w-2.5 mr-1" />
-                                                                        Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'Days' : (loan.paymentFrequency === 'weekly' ? 'Weeks' : 'Months')}
-                                                                    </Badge>
-                                                                    <span className="text-[9px] text-muted-foreground italic">Expected: {loan.expectedByNow.toFixed(1)} instalments</span>
-                                                                </div>
+                                                                <Badge variant="destructive" className="text-[9px] w-fit font-black uppercase tracking-tighter">
+                                                                    Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
+                                                                </Badge>
                                                             ) : loan.advanceCount > 0 ? (
-                                                                <div className="flex flex-col gap-1">
-                                                                    <Badge className="text-[9px] w-fit font-black uppercase tracking-tighter bg-green-100 text-green-800 border-none">
-                                                                        <FastForward className="h-2.5 w-2.5 mr-1" />
-                                                                        Ahead {loan.advanceCount.toFixed(1)} {loan.paymentFrequency === 'daily' ? 'Days' : (loan.paymentFrequency === 'weekly' ? 'Weeks' : 'Months')}
-                                                                    </Badge>
-                                                                    <span className="text-[9px] text-muted-foreground italic">Next Due: {format(loan.nextDueDate, 'dd/MM')}</span>
-                                                                </div>
+                                                                <Badge className="text-[9px] w-fit font-black uppercase tracking-tighter bg-green-100 text-green-800 border-none">
+                                                                    Ahead {loan.advanceCount.toFixed(1)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
+                                                                </Badge>
                                                             ) : (
                                                                 <Badge variant="secondary" className="text-[9px] w-fit font-black uppercase tracking-tighter">
                                                                     Due {loan.daysUntil === 0 ? 'Today' : `in ${loan.daysUntil}d`}
@@ -609,7 +612,7 @@ export default function Dashboard() {
                                         <TableHeader className="sticky top-0 bg-card z-10">
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
-                                                <TableHead>Member No</TableHead>
+                                                <TableHead>Due Date</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Arrears</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -619,7 +622,7 @@ export default function Dashboard() {
                                             {dailyDue.map((loan) => (
                                                 <TableRow key={loan.id}>
                                                     <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
-                                                    <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
+                                                    <TableCell className="text-xs font-bold">{format(loan.nextDueDate, 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell>
                                                         {loan.arrearsCount > 0 ? (
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}d</Badge>
@@ -643,7 +646,7 @@ export default function Dashboard() {
                                         <TableHeader className="sticky top-0 bg-card z-10">
                                             <TableRow>
                                                 <TableHead>Customer</TableHead>
-                                                <TableHead>Member No</TableHead>
+                                                <TableHead>Due Date</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Arrears</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
@@ -652,8 +655,13 @@ export default function Dashboard() {
                                         <TableBody>
                                             {weeklyDue.map((loan) => (
                                                 <TableRow key={loan.id}>
-                                                    <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
-                                                    <TableCell className="text-xs font-bold">{loan.accountNumber}</TableCell>
+                                                    <TableCell>
+                                                        <div className="font-medium text-xs">{loan.displayName}</div>
+                                                        <Badge variant="outline" className="text-[9px] text-blue-600 border-blue-200">
+                                                            {loan.preferredPaymentDay || format(loan.nextDueDate, 'EEEE')}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-xs font-bold">{format(loan.nextDueDate, 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell>
                                                         {loan.arrearsCount > 0 ? (
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}w</Badge>
