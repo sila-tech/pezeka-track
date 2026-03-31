@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, History, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, History, Trash2, CalendarDays } from 'lucide-react';
 import { getDoc } from 'firebase/firestore';
 import {
   Dialog,
@@ -71,6 +71,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 const loanSchema = z.object({
   customerId: z.string().optional(),
   disbursementDate: z.string().min(1, 'Disbursement date is required.'),
+  firstPaymentDate: z.string().min(1, 'First payment date is required.'),
   principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
   interestRate: z.coerce.number().min(0, 'Interest rate must be a positive number.'),
   registrationFee: z.coerce.number().optional(),
@@ -99,6 +100,7 @@ const loanSchema = z.object({
 
 const approvalSchema = z.object({
     disbursementDate: z.string().min(1, 'Disbursement date is required.'),
+    firstPaymentDate: z.string().min(1, 'First payment date is required.'),
     principalAmount: z.coerce.number().min(1, 'Principal amount is required.'),
     interestRate: z.coerce.number().min(0, 'Interest rate is required.'),
     processingFee: z.coerce.number().min(0, 'Processing fee is required.'),
@@ -119,6 +121,7 @@ const editTermsSchema = z.object({
     paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
     assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
     disbursementDate: z.string().min(1, 'Disbursement date is required.'),
+    firstPaymentDate: z.string().min(1, 'First payment date is required.'),
     totalRepayableAmount: z.coerce.number().min(0, 'Amount to pay is required'),
 });
 
@@ -211,7 +214,7 @@ export default function LoansPage() {
   const form = useForm<z.infer<typeof loanSchema>>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
-      customerId: '', principalAmount: 0, interestRate: 0, registrationFee: 0, processingFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', status: 'active', customerType: 'existing', loanType: 'Quick Pesa', newCustomerName: '', newCustomerPhone: '', alternativeNumber: '', idNumber: '', assignedStaffId: '', disbursementDate: format(new Date(), 'yyyy-MM-dd')
+      customerId: '', principalAmount: 0, interestRate: 0, registrationFee: 0, processingFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', status: 'active', customerType: 'existing', loanType: 'Quick Pesa', newCustomerName: '', newCustomerPhone: '', alternativeNumber: '', idNumber: '', assignedStaffId: '', disbursementDate: format(new Date(), 'yyyy-MM-dd'), firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd')
     },
   });
 
@@ -284,6 +287,7 @@ export default function LoansPage() {
         assignedStaffId: values.assignedStaffId, 
         assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown", 
         disbursementDate: new Date(values.disbursementDate), 
+        firstPaymentDate: new Date(values.firstPaymentDate),
         totalRepayableAmount, 
         instalmentAmount, 
         totalPaid: 0,
@@ -302,13 +306,14 @@ export default function LoansPage() {
 
   const approvalForm = useForm<z.infer<typeof approvalSchema>>({
       resolver: zodResolver(approvalSchema),
-      defaultValues: { disbursementDate: format(new Date(), 'yyyy-MM-dd'), principalAmount: 0, interestRate: 0, processingFee: 0, registrationFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', idNumber: '', alternativeNumber: '', assignedStaffId: '', }
+      defaultValues: { disbursementDate: format(new Date(), 'yyyy-MM-dd'), firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd'), principalAmount: 0, interestRate: 0, processingFee: 0, registrationFee: 0, carTrackInstallationFee: 0, chargingCost: 0, numberOfInstalments: 1, paymentFrequency: 'monthly', idNumber: '', alternativeNumber: '', assignedStaffId: '', }
   });
 
   const handleManageApplication = (loan: Loan) => {
       setApplicationToManage(loan);
       approvalForm.reset({
           disbursementDate: format(new Date(), 'yyyy-MM-dd'), 
+          firstPaymentDate: format(addMonths(new Date(), 1), 'yyyy-MM-dd'),
           principalAmount: loan.principalAmount || 0, 
           interestRate: loan.interestRate || 0, 
           processingFee: loan.processingFee || 0, 
@@ -328,7 +333,13 @@ export default function LoansPage() {
     setIsUpdatingStatus(true);
     try {
         const assignedStaff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
-        const updateData = { ...values, assignedStaffId: values.assignedStaffId, assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown", disbursementDate: new Date(values.disbursementDate), };
+        const updateData = { 
+            ...values, 
+            assignedStaffId: values.assignedStaffId, 
+            assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown", 
+            disbursementDate: new Date(values.disbursementDate),
+            firstPaymentDate: new Date(values.firstPaymentDate)
+        };
         await approveLoanApplication(firestore, applicationToManage, updateData);
         toast({ title: 'Application Approved' });
         setApplicationToManage(null);
@@ -374,6 +385,10 @@ export default function LoansPage() {
       const dDate = loan.disbursementDate?.seconds 
           ? new Date(loan.disbursementDate.seconds * 1000) 
           : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+      
+      const fDate = loan.firstPaymentDate?.seconds
+          ? new Date(loan.firstPaymentDate.seconds * 1000)
+          : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : addMonths(dDate, 1));
 
       editTermsForm.reset({
           interestRate: loan.interestRate || 0,
@@ -382,6 +397,7 @@ export default function LoansPage() {
           paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
           disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
+          firstPaymentDate: isNaN(fDate.getTime()) ? format(addMonths(new Date(), 1), 'yyyy-MM-dd') : format(fDate, 'yyyy-MM-dd'),
           totalRepayableAmount: loan.totalRepayableAmount || 0,
       });
       setIsEditingTerms(true);
@@ -397,7 +413,8 @@ export default function LoansPage() {
           const updateData = {
               ...values,
               disbursementDate: new Date(values.disbursementDate),
-              assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
+              firstPaymentDate: new Date(values.firstPaymentDate),
+              assignedStaffName: staff?.name || staff?.email || "Unknown",
               instalmentAmount,
               totalRepayableAmount: values.totalRepayableAmount,
           };
@@ -435,16 +452,16 @@ export default function LoansPage() {
       const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
       const dailyRate = oneInstInterest / daysInFreq;
       
-      let dDate = loanToEdit.disbursementDate?.seconds 
-        ? new Date(loanToEdit.disbursementDate.seconds * 1000) 
-        : (loanToEdit.disbursementDate ? new Date(loanToEdit.disbursementDate as any) : new Date());
+      let dDate = loanToEdit.firstPaymentDate?.seconds 
+        ? new Date(loanToEdit.firstPaymentDate.seconds * 1000) 
+        : (loanToEdit.firstPaymentDate ? new Date(loanToEdit.firstPaymentDate as any) : new Date());
       
       if (isNaN(dDate.getTime())) return { dailyRate: 0, daysLate: 0, suggested: 0 };
 
       let finalDueDate: Date;
-      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, loanToEdit.numberOfInstalments || 1);
-      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, loanToEdit.numberOfInstalments || 1);
-      else finalDueDate = addDays(dDate, loanToEdit.numberOfInstalments || 1);
+      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, (loanToEdit.numberOfInstalments || 1) - 1);
+      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, (loanToEdit.numberOfInstalments || 1) - 1);
+      else finalDueDate = addDays(dDate, (loanToEdit.numberOfInstalments || 1) - 1);
       
       const daysLate = differenceInDays(new Date(), finalDueDate);
       return { dailyRate, daysLate: daysLate > 0 ? daysLate : 0, suggested: Math.round((daysLate > 0 ? daysLate : 0) * dailyRate) };
@@ -506,6 +523,10 @@ export default function LoansPage() {
                           </Select>
                         </FormItem>
                     )} />
+                    
+                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (<FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="firstPaymentDate" render={({ field }) => (<FormItem><FormLabel className="text-primary font-bold">First Payment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl></FormItem>)} />
+
                     <FormField control={form.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                     <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
@@ -554,16 +575,16 @@ export default function LoansPage() {
                                 <TableHead>Customer Identity</TableHead>
                                 <TableHead>Phone</TableHead>
                                 <TableHead>Staff Assigned</TableHead>
-                                <TableHead>Date</TableHead>
+                                <TableHead>First Pay</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
                                 <TableHead className="text-center">Status</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                               {filteredLoans.map((loan) => {
-                                  const dDate = loan.disbursementDate?.seconds 
-                                    ? new Date(loan.disbursementDate.seconds * 1000) 
-                                    : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+                                  const fDate = loan.firstPaymentDate?.seconds 
+                                    ? new Date(loan.firstPaymentDate.seconds * 1000) 
+                                    : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
                                   
                                   const currentCustomer = customers?.find(c => c.id === loan.customerId);
                                   const displayName = currentCustomer?.name || loan.customerName;
@@ -578,7 +599,7 @@ export default function LoansPage() {
                                         </TableCell>
                                         <TableCell className="text-xs">{loan.customerPhone}</TableCell>
                                         <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
-                                        <TableCell className="text-xs">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
+                                        <TableCell className="text-xs font-medium text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
                                         <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
                                         <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'} className="text-[10px] uppercase">{loan.status}</Badge></TableCell>
                                     </TableRow>
@@ -670,6 +691,7 @@ export default function LoansPage() {
                         <Form {...approvalForm}>
                             <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4">
                                 <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel className="text-primary font-bold">First Payment Date (Customer Agreed)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
                                     <FormItem className="col-span-2">
                                       <FormLabel>Assign Staff</FormLabel>
@@ -708,7 +730,7 @@ export default function LoansPage() {
           <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
               <DialogHeader className="p-6 pb-0">
                 <DialogTitle>Update Loan Terms</DialogTitle>
-                <DialogDescription>Modify primary financial terms. You can manually override the "Amount to Pay".</DialogDescription>
+                <DialogDescription>Modify primary financial terms and repayment schedule.</DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[60vh] px-6 py-4">
                 <Form {...editTermsForm}>
@@ -724,9 +746,15 @@ export default function LoansPage() {
                                 </FormItem>
                             )} />
                             <FormField control={editTermsForm.control} name="disbursementDate" render={({field}) => (
-                                <FormItem className="col-span-2">
+                                <FormItem>
                                     <FormLabel>Disbursement Date</FormLabel>
                                     <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                                </FormItem>
+                            )}/>
+                            <FormField control={editTermsForm.control} name="firstPaymentDate" render={({field}) => (
+                                <FormItem>
+                                    <FormLabel className="text-primary font-bold">First Payment Date</FormLabel>
+                                    <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30"/></FormControl>
                                 </FormItem>
                             )}/>
                             <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>

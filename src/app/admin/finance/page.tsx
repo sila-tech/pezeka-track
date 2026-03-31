@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2 } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -39,6 +39,7 @@ const editLoanSchema = z.object({
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
   assignedStaffId: z.string().min(1, 'Assign staff.'),
   disbursementDate: z.string().min(1, 'Date is required.'),
+  firstPaymentDate: z.string().min(1, 'Payment date required.'),
   totalRepayableAmount: z.coerce.number().min(0, 'Total to pay is required.'),
 });
 
@@ -58,6 +59,7 @@ interface Loan {
   assignedStaffId?: string;
   assignedStaffName?: string;
   disbursementDate: any;
+  firstPaymentDate?: any;
   principalAmount: number;
   registrationFee?: number;
   processingFee?: number;
@@ -130,6 +132,10 @@ export default function FinancePage() {
     const dDate = loan.disbursementDate?.seconds 
         ? new Date(loan.disbursementDate.seconds * 1000) 
         : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+    
+    const fDate = loan.firstPaymentDate?.seconds
+        ? new Date(loan.firstPaymentDate.seconds * 1000)
+        : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : addMonths(dDate, 1));
 
     editForm.reset({
         principalAmount: loan.principalAmount || 0,
@@ -141,6 +147,7 @@ export default function FinancePage() {
         paymentFrequency: loan.paymentFrequency || 'monthly',
         assignedStaffId: loan.assignedStaffId || '',
         disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
+        firstPaymentDate: isNaN(fDate.getTime()) ? format(addMonths(new Date(), 1), 'yyyy-MM-dd') : format(fDate, 'yyyy-MM-dd'),
         totalRepayableAmount: loan.totalRepayableAmount || 0,
     });
   };
@@ -150,13 +157,12 @@ export default function FinancePage() {
     setIsSubmitting(true);
     try {
         const staff = staffList?.find(s => (s.uid || s.id) === values.assignedStaffId);
-        
-        // Recalculate instalment based on total repayable
         const instalmentAmount = values.numberOfInstalments > 0 ? values.totalRepayableAmount / values.numberOfInstalments : 0;
 
         const updateData = {
             ...values,
             disbursementDate: new Date(values.disbursementDate),
+            firstPaymentDate: new Date(values.firstPaymentDate),
             assignedStaffName: staff?.name || staff?.email || "Unknown",
             instalmentAmount,
         };
@@ -229,7 +235,8 @@ export default function FinancePage() {
                                               <TableHead className="w-[150px]">Phone</TableHead>
                                               <TableHead className="w-[150px]">Staff</TableHead>
                                               <TableHead className="w-[120px]">Loan No.</TableHead>
-                                              <TableHead className="w-[120px]">Date</TableHead>
+                                              <TableHead className="w-[120px]">Disb. Date</TableHead>
+                                              <TableHead className="w-[120px] text-primary">First Pay</TableHead>
                                               <TableHead className="text-right w-[140px]">Principal</TableHead>
                                               <TableHead className="text-right w-[120px]">Reg Fee</TableHead>
                                               <TableHead className="text-right w-[120px]">Proc Fee</TableHead>
@@ -253,6 +260,10 @@ export default function FinancePage() {
                                                 ? new Date(loan.disbursementDate.seconds * 1000) 
                                                 : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
                                               
+                                              const fDate = loan.firstPaymentDate?.seconds
+                                                ? new Date(loan.firstPaymentDate.seconds * 1000)
+                                                : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
+
                                               const regFee = Number(loan.registrationFee) || 0;
                                               const procFee = Number(loan.processingFee) || 0;
                                               const trackFee = Number(loan.carTrackInstallationFee) || 0;
@@ -271,6 +282,7 @@ export default function FinancePage() {
                                                       <TableCell className="text-xs italic">{loan.assignedStaffName || 'Unassigned'}</TableCell>
                                                       <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
                                                       <TableCell className="text-xs">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
+                                                      <TableCell className="text-xs font-bold text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
                                                       <TableCell className="text-right font-medium">{loan.principalAmount.toLocaleString()}</TableCell>
                                                       <TableCell className="text-right text-muted-foreground">{regFee.toLocaleString()}</TableCell>
                                                       <TableCell className="text-right text-muted-foreground">{procFee.toLocaleString()}</TableCell>
@@ -325,18 +337,20 @@ export default function FinancePage() {
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
 
-      {/* Internal Book Edit Dialog */}
       <Dialog open={!!selectedLoanForEdit} onOpenChange={(o) => !o && setSelectedLoanForEdit(null)}>
           <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                   <DialogTitle>Edit Ledger Entry: {selectedLoanForEdit?.customerName}</DialogTitle>
-                  <DialogDescription>Modify primary financial data for Loan #{selectedLoanForEdit?.loanNumber}.</DialogDescription>
+                  <DialogDescription>Modify primary financial data and repayment day.</DialogDescription>
               </DialogHeader>
               <Form {...editForm}>
                   <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6 pt-4">
                       <div className="grid grid-cols-2 gap-4">
                           <FormField control={editForm.control} name="disbursementDate" render={({field}) => (
-                              <FormItem className="col-span-2"><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>
+                              <FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>
+                          )} />
+                          <FormField control={editForm.control} name="firstPaymentDate" render={({field}) => (
+                              <FormItem><FormLabel className="text-primary font-bold">First Payment Date</FormLabel><FormControl><Input type="date" {...field} className="border-primary/30"/></FormControl></FormItem>
                           )} />
                           <FormField control={editForm.control} name="assignedStaffId" render={({field}) => (
                               <FormItem className="col-span-2">
@@ -382,7 +396,6 @@ export default function FinancePage() {
           </DialogContent>
       </Dialog>
 
-      {/* Repayment History Dialog */}
       <Dialog open={!!selectedLoanForHistory} onOpenChange={(open) => !open && setSelectedLoanForHistory(null)}>
           <DialogContent className="sm:max-w-xl">
               <DialogHeader>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -40,6 +41,7 @@ interface DashboardLoan {
   accountNumber?: string; 
   status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
   disbursementDate: { seconds: number; nanoseconds: number } | any;
+  firstPaymentDate?: { seconds: number; nanoseconds: number } | any;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
   numberOfInstalments: number;
   instalmentAmount: number;
@@ -81,7 +83,6 @@ export default function Dashboard() {
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
 
-  // Camera & File States
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
@@ -108,7 +109,6 @@ export default function Dashboard() {
       defaultValues: { customerId: '', type: 'owner_id', fileName: '' },
   });
 
-  // Camera logic
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -117,7 +117,7 @@ export default function Dashboard() {
         videoRef.current.srcObject = stream;
       }
       setShowCamera(true);
-      setCapturedImage(null); // Clear existing if switching to camera
+      setCapturedImage(null);
     } catch (error) {
       console.error('Error accessing camera:', error);
       setHasCameraPermission(false);
@@ -158,7 +158,7 @@ export default function Dashboard() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setCapturedImage(reader.result as string);
-        stopCamera(); // Ensure camera is off if we pick a file
+        stopCamera();
       };
       reader.readAsDataURL(file);
     }
@@ -173,7 +173,6 @@ export default function Dashboard() {
       setIsSubmitting(true);
       try {
           const customer = customers?.find(c => c.id === values.customerId);
-          // Pass firestore AND storage to the upload utility
           await uploadKYCDocument(firestore, storage, {
               ...values,
               customerName: customer?.name || "Unknown",
@@ -201,6 +200,7 @@ export default function Dashboard() {
         customerPhone: "Internal Staff",
         accountNumber: "STAFF",
         disbursementDate: new Date(),
+        firstPaymentDate: addMonths(new Date(), 1),
         principalAmount: values.amount,
         interestRate: 0, 
         registrationFee: 0,
@@ -283,12 +283,14 @@ export default function Dashboard() {
         loan.status !== 'rejected' &&
         loan.status !== 'rollover'
     ).map(loan => {
-        let dDate: Date;
-        if (loan.disbursementDate?.seconds) dDate = new Date(loan.disbursementDate.seconds * 1000);
-        else if (loan.disbursementDate instanceof Date) dDate = loan.disbursementDate;
-        else dDate = loan.disbursementDate ? new Date(loan.disbursementDate) : new Date();
+        // Base calculation from firstPaymentDate if it exists, otherwise disbursementDate
+        let baseDate: Date;
+        if (loan.firstPaymentDate?.seconds) baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        else if (loan.firstPaymentDate instanceof Date) baseDate = loan.firstPaymentDate;
+        else if (loan.disbursementDate?.seconds) baseDate = new Date(loan.disbursementDate.seconds * 1000);
+        else baseDate = loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date();
 
-        if (isNaN(dDate.getTime())) dDate = new Date();
+        if (isNaN(baseDate.getTime())) baseDate = new Date();
         
         const paidInstalments = Math.floor((loan.totalPaid || 0) / (loan.instalmentAmount || 1));
         const allInstalmentsPaid = (loan.totalPaid || 0) >= (loan.totalRepayableAmount || 0) || (loan.numberOfInstalments > 0 && paidInstalments >= loan.numberOfInstalments);
@@ -297,10 +299,12 @@ export default function Dashboard() {
         if (allInstalmentsPaid) {
             nextDueDate = new Date(8640000000000000); 
         } else {
-            const nextIdx = paidInstalments + 1;
-            if (loan.paymentFrequency === 'daily') nextDueDate = addDays(dDate, nextIdx);
-            else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(dDate, nextIdx);
-            else nextDueDate = addMonths(dDate, nextIdx);
+            // The first payment is due on exactly 'baseDate' (instalment index 0)
+            // The index of the NEXT installment is 'paidInstalments'
+            const nextIdx = paidInstalments; 
+            if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextIdx);
+            else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextIdx);
+            else nextDueDate = addMonths(baseDate, nextIdx);
         }
 
         return { ...loan, nextDueDate };
@@ -496,7 +500,7 @@ export default function Dashboard() {
         <Card className="flex flex-col h-[600px]">
             <CardHeader className="pb-2">
                 <CardTitle>Due Loans & Follow-ups</CardTitle>
-                <CardDescription>Accounts requiring immediate attention.</CardDescription>
+                <CardDescription>Accounts requiring immediate attention based on their payment day.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
                 <Tabs defaultValue="all" className="h-full flex flex-col">

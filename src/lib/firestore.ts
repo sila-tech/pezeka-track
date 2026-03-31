@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
@@ -31,6 +32,7 @@ export interface Loan {
   assignedStaffId?: string;
   assignedStaffName?: string;
   disbursementDate: { seconds: number, nanoseconds: number } | Date;
+  firstPaymentDate?: { seconds: number, nanoseconds: number } | Date; // Custom start date
   principalAmount: number;
   interestRate?: number;
   registrationFee: number;
@@ -180,19 +182,16 @@ export async function uploadKYCDocument(db: Firestore, storage: FirebaseStorage,
     const kycCollection = collection(db, 'kyc_documents');
     
     try {
-        // 1. Upload the base64 image to Firebase Storage
         const fileExtension = 'jpg';
         const storagePath = `kyc/${data.customerId}/${Date.now()}_${data.fileName.replace(/\s+/g, '_')}.${fileExtension}`;
         const storageRef = ref(storage, storagePath);
         
-        // uploadString handles data URIs automatically (data:image/jpeg;base64,...)
         await uploadString(storageRef, data.fileUrl, 'data_url');
         const downloadUrl = await getDownloadURL(storageRef);
 
-        // 2. Save metadata to Firestore referencing the Storage URL
         const newDoc = {
             ...data,
-            fileUrl: downloadUrl, // Use the public cloud URL
+            fileUrl: downloadUrl,
             storagePath: storagePath,
             uploadedAt: serverTimestamp()
         };
@@ -359,7 +358,13 @@ export async function approveLoanApplication(db: Firestore, loan: Loan, updateDa
         updateData.numberOfInstalments || loan.numberOfInstalments,
         updateData.paymentFrequency || loan.paymentFrequency
     );
-    const finalUpdate = { ...updateData, status: 'active', instalmentAmount, totalRepayableAmount: totalRepayableAmount + (loan.totalPenalties || 0), updatedAt: serverTimestamp() };
+    const finalUpdate = { 
+        ...updateData, 
+        status: 'active', 
+        instalmentAmount, 
+        totalRepayableAmount: totalRepayableAmount + (loan.totalPenalties || 0), 
+        updatedAt: serverTimestamp() 
+    };
     await updateDoc(loanRef, finalUpdate);
     const loanSnap = await getDoc(loanRef);
     if (loanSnap.exists()) await recordDisbursement(db, { ...loanSnap.data(), id: loan.id });
@@ -537,7 +542,7 @@ export async function deleteUserProfile(db: Firestore, userId: string) {
     try {
         await deleteDoc(userRef);
     } catch (serverError) {
-        const permissionError = new FirestorePermissionError({ path: entryRef.path, operation: 'delete' });
+        const permissionError = new FirestorePermissionError({ path: 'delete_user', operation: 'delete' });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
     }
