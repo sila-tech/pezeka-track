@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -380,7 +381,7 @@ export default function LoansPage() {
           numberOfInstalments: loan.numberOfInstalments || 1,
           paymentFrequency: loan.paymentFrequency || 'monthly',
           assignedStaffId: loan.assignedStaffId || '',
-          disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+          disbursementDate: isNaN(dDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dDate, 'yyyy-MM-dd'),
           totalRepayableAmount: loan.totalRepayableAmount || 0,
       });
       setIsEditingTerms(true);
@@ -465,11 +466,11 @@ export default function LoansPage() {
         {canEdit && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Loan</Button></DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader><DialogTitle>Add a New Loan</DialogTitle><DialogDescription>Input specific terms to disburse a new credit facility.</DialogDescription></DialogHeader>
+            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-0"><DialogTitle>Add a New Loan</DialogTitle><DialogDescription>Input specific terms to disburse a new credit facility.</DialogDescription></DialogHeader>
               <Form {...form}>
-                <ScrollArea className="max-h-[65vh] pr-4">
-                  <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 py-2">
+                <ScrollArea className="max-h-[65vh] px-6 py-2">
+                  <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 pb-4">
                     <FormField control={form.control} name="customerType" render={({ field }) => (
                         <FormItem className="col-span-2">
                           <FormLabel>Customer Type</FormLabel>
@@ -523,7 +524,7 @@ export default function LoansPage() {
                     </div>
                   </form>
                 </ScrollArea>
-                <DialogFooter className="mt-4">
+                <DialogFooter className="p-6 pt-2">
                     <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
                     <Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button>
                 </DialogFooter>
@@ -636,10 +637,10 @@ export default function LoansPage() {
       </Tabs>
 
       <Dialog open={!!viewingApplication} onOpenChange={(isOpen) => !isOpen && setViewingApplication(null)}>
-          <DialogContent className="sm:max-w-2xl">
-              <DialogHeader><DialogTitle>Application Details</DialogTitle><DialogDescription>Full summary of the customer's self-submitted application.</DialogDescription></DialogHeader>
+          <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-0"><DialogTitle>Application Details</DialogTitle><DialogDescription>Full summary of the customer's self-submitted application.</DialogDescription></DialogHeader>
               {viewingApplication && (
-                  <div className="space-y-6 py-4">
+                  <ScrollArea className="max-h-[60vh] p-6">
                       <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
                           <div className="text-muted-foreground">Member Number:</div><div className="font-bold">{viewingApplication.accountNumber || 'N/A'}</div>
                           <div className="text-muted-foreground">Customer:</div><div className="font-medium">{viewingApplication.customerName}</div>
@@ -648,9 +649,9 @@ export default function LoansPage() {
                           <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {(viewingApplication.principalAmount || 0).toLocaleString()}</div>
                           <div className="text-muted-foreground">Loan Product:</div><div className="font-medium">{viewingApplication.loanType}</div>
                       </div>
-                  </div>
+                  </ScrollArea>
               )}
-              <DialogFooter>
+              <DialogFooter className="p-6 pt-2">
                   <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                   {canEdit && <Button onClick={() => { const app = viewingApplication; setViewingApplication(null); if (app) handleManageApplication(app); }}>Process Application</Button>}
               </DialogFooter>
@@ -658,16 +659,16 @@ export default function LoansPage() {
       </Dialog>
 
       <Dialog open={!!applicationToManage} onOpenChange={(isOpen) => !isOpen && setApplicationToManage(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
             {applicationToManage && (
                 <>
-                    <DialogHeader>
+                    <DialogHeader className="p-6 pb-0">
                         <DialogTitle>Process Application</DialogTitle>
                         <DialogDescription>Finalize terms and assign a follow-up staff member.</DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[65vh] pr-4">
+                    <ScrollArea className="max-h-[65vh] px-6 py-4">
                         <Form {...approvalForm}>
-                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4 mt-4 py-2">
+                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4">
                                 <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
                                     <FormItem className="col-span-2">
@@ -677,7 +678,7 @@ export default function LoansPage() {
                                         <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
                                       </Select>
                                     </FormItem>
-                                )} />
+                                )}/>
                                 <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
                                 <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
@@ -689,11 +690,11 @@ export default function LoansPage() {
                                         <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
                                       </Select>
                                     </FormItem>
-                                )} />
+                                )}/>
                             </form>
                         </Form>
                     </ScrollArea>
-                    <DialogFooter className="mt-6">
+                    <DialogFooter className="p-6 pt-2">
                         <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={handleReject}>Reject</Button>
                         <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>Approve & Disburse</Button>
@@ -704,56 +705,61 @@ export default function LoansPage() {
       </Dialog>
 
       <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
-          <DialogContent className="sm:max-w-xl">
-              <DialogHeader>
+          <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
+              <DialogHeader className="p-6 pb-0">
                 <DialogTitle>Update Loan Terms</DialogTitle>
                 <DialogDescription>Modify primary financial terms. You can manually override the "Amount to Pay".</DialogDescription>
               </DialogHeader>
-              <Form {...editTermsForm}>
-                  <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <FormField control={editTermsForm.control} name="assignedStaffId" render={({ field }) => (
-                              <FormItem className="col-span-2">
-                                <FormLabel>Assign Staff</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                  <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                                  <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
-                                </Select>
-                              </FormItem>
-                          )} />
-                          <FormField control={editTermsForm.control} name="disbursementDate" render={({field}) => (
-                              <FormItem className="col-span-2">
-                                  <FormLabel>Disbursement Date</FormLabel>
-                                  <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
-                              </FormItem>
-                          )}/>
-                          <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                          <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
-                          <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                          <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
-                              <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
-                          )}/>
-                          <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (
+              <ScrollArea className="max-h-[60vh] px-6 py-4">
+                <Form {...editTermsForm}>
+                    <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={editTermsForm.control} name="assignedStaffId" render={({ field }) => (
                                 <FormItem className="col-span-2">
-                                    <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
-                                    <FormControl><Input type="number" {...field} className="border-primary/50 bg-primary/5 font-bold" /></FormControl>
-                                    <FormDescription className="text-[10px]">Manual override for corrections. Installments will automatically sync.</FormDescription>
+                                    <FormLabel>Assign Staff</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                    <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                    </Select>
                                 </FormItem>
                             )} />
-                      </div>
-                      <Button type="submit" className="w-full" disabled={isUpdating}>Save & Update Totals</Button>
-                  </form>
-              </Form>
+                            <FormField control={editTermsForm.control} name="disbursementDate" render={({field}) => (
+                                <FormItem className="col-span-2">
+                                    <FormLabel>Disbursement Date</FormLabel>
+                                    <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                                </FormItem>
+                            )}/>
+                            <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                            <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
+                            <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
+                            <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
+                                <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                            )}/>
+                            <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
+                                        <FormControl><Input type="number" {...field} className="border-primary/50 bg-primary/5 font-bold" /></FormControl>
+                                        <FormDescription className="text-[10px]">Manual override for corrections. Installments will automatically sync.</FormDescription>
+                                    </FormItem>
+                                )} />
+                        </div>
+                        <Button type="submit" className="w-full" disabled={isUpdating}>Save & Update Totals</Button>
+                    </form>
+                </Form>
+              </ScrollArea>
+              <DialogFooter className="p-6 pt-2">
+                  <DialogClose asChild><Button variant="ghost">Close</Button></DialogClose>
+              </DialogFooter>
           </DialogContent>
       </Dialog>
 
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
-          <DialogContent className="sm:max-w-5xl">
+          <DialogContent className="sm:max-w-5xl p-0 overflow-hidden">
               {loanToEdit && (
                   <>
-                    <DialogHeader><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><DialogDescription>Review interactions, record payments, and track history.</DialogDescription></DialogHeader>
+                    <DialogHeader className="p-6 pb-0"><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><DialogDescription>Review interactions, record payments, and track history.</DialogDescription></DialogHeader>
                     <ScrollArea className="max-h-[75vh]">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
                             <div className="space-y-4 md:col-span-1">
                                 <Card>
                                     <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
@@ -844,7 +850,7 @@ export default function LoansPage() {
                                         <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => {
                                             const penaltyDate = (p.date as any)?.seconds 
                                                 ? new Date((p.date as any).seconds * 1000) 
-                                                : (p.date instanceof Date ? p.date : new Date());
+                                                : (p.date instanceof Date ? penaltyDate : new Date());
                                             
                                             return (
                                                 <TableRow key={p.penaltyId || i}>
@@ -859,7 +865,7 @@ export default function LoansPage() {
                             </div>
                         </div>
                     </ScrollArea>
-                    <DialogFooter><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
+                    <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
           </DialogContent>

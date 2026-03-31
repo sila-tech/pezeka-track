@@ -337,135 +337,137 @@ export default function Dashboard() {
                 } 
             }}>
                 <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
+                <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+                    <DialogHeader className="p-6 pb-0">
                         <DialogTitle>Customer KYC Capture</DialogTitle>
                         <DialogDescription>Select an image from gallery or take a new photo.</DialogDescription>
                     </DialogHeader>
-                    <Form {...kycForm}>
-                        <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4 py-2">
-                            <FormField control={kycForm.control} name="customerId" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Select Customer</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            )}/>
-                            <FormField control={kycForm.control} name="type" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Document Category</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="owner_id">Owner ID Card</SelectItem>
-                                            <SelectItem value="guarantor_id">Guarantor ID Card</SelectItem>
-                                            <SelectItem value="loan_form">Physical Loan Form</SelectItem>
-                                            <SelectItem value="security_attachment">Security Photos/Docs</SelectItem>
-                                            <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            )}/>
-                            <FormField control={kycForm.control} name="fileName" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Document Label/Note</FormLabel>
-                                    <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
-                                </FormItem>
-                            )}/>
+                    <ScrollArea className="max-h-[70vh] px-6 py-4">
+                        <Form {...kycForm}>
+                            <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4">
+                                <FormField control={kycForm.control} name="customerId" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Select Customer</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                )}/>
+                                <FormField control={kycForm.control} name="type" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Document Category</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="owner_id">Owner ID Card</SelectItem>
+                                                <SelectItem value="guarantor_id">Guarantor ID Card</SelectItem>
+                                                <SelectItem value="loan_form">Physical Loan Form</SelectItem>
+                                                <SelectItem value="security_attachment">Security Photos/Docs</SelectItem>
+                                                <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                )}/>
+                                <FormField control={kycForm.control} name="fileName" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Document Label/Note</FormLabel>
+                                        <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
+                                    </FormItem>
+                                )}/>
 
-                            <div className="space-y-4 pt-2">
-                                <div className="relative min-h-[240px] max-h-[400px] bg-zinc-900 rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
-                                    {!showCamera && !capturedImage && (
-                                        <div className="text-center space-y-4 p-6">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <ImagePlus className="h-12 w-12 text-muted-foreground" />
-                                                <p className="text-sm text-muted-foreground">No document image selected</p>
+                                <div className="space-y-4 pt-2">
+                                    <div className="relative min-h-[200px] max-h-[300px] bg-zinc-900 rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
+                                        {!showCamera && !capturedImage && (
+                                            <div className="text-center space-y-4 p-6">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <ImagePlus className="h-10 w-10 text-muted-foreground" />
+                                                    <p className="text-xs text-muted-foreground">No document image selected</p>
+                                                </div>
+                                                <div className="flex flex-col gap-2">
+                                                    <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
+                                                        <Upload className="mr-2 h-4 w-4" /> Select from Gallery
+                                                    </Button>
+                                                    <Button type="button" variant="outline" size="sm" onClick={startCamera}>
+                                                        <Camera className="mr-2 h-4 w-4" /> Take Photo
+                                                    </Button>
+                                                </div>
+                                                <input 
+                                                    type="file" 
+                                                    ref={fileInputRef} 
+                                                    className="hidden" 
+                                                    accept="image/*" 
+                                                    onChange={handleFileChange} 
+                                                />
                                             </div>
-                                            <div className="flex flex-col sm:flex-row gap-2">
-                                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>
-                                                    <Upload className="mr-2 h-4 w-4" /> Select from Gallery
-                                                </Button>
-                                                <Button type="button" variant="outline" onClick={startCamera}>
-                                                    <Camera className="mr-2 h-4 w-4" /> Take Photo
-                                                </Button>
-                                            </div>
-                                            <input 
-                                                type="file" 
-                                                ref={fileInputRef} 
-                                                className="hidden" 
-                                                accept="image/*" 
-                                                onChange={handleFileChange} 
-                                            />
+                                        )}
+                                        <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+                                        {capturedImage && (
+                                            <img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />
+                                        )}
+                                    </div>
+
+                                    {showCamera && (
+                                        <div className="flex gap-2">
+                                            <Button type="button" className="flex-1" size="sm" onClick={capturePhoto}>Capture Photo</Button>
+                                            <Button type="button" variant="outline" size="sm" onClick={stopCamera}>Cancel</Button>
                                         </div>
                                     )}
-                                    <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+
                                     {capturedImage && (
-                                        <img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />
+                                        <div className="flex gap-2">
+                                            <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => fileInputRef.current?.click()}>
+                                                <Upload className="h-4 w-4 mr-2" /> Change File
+                                            </Button>
+                                            <Button type="button" variant="outline" size="sm" className="flex-1" onClick={startCamera}>
+                                                <Camera className="h-4 w-4 mr-2" /> Retake Photo
+                                            </Button>
+                                        </div>
                                     )}
                                 </div>
-
-                                {showCamera && (
-                                    <div className="flex gap-2">
-                                        <Button type="button" className="flex-1" onClick={capturePhoto}>Capture Photo</Button>
-                                        <Button type="button" variant="outline" onClick={stopCamera}>Cancel</Button>
-                                    </div>
-                                )}
-
-                                {capturedImage && (
-                                    <div className="flex gap-2">
-                                        <Button type="button" variant="outline" className="flex-1" onClick={() => fileInputRef.current?.click()}>
-                                            <Upload className="h-4 w-4 mr-2" /> Change File
-                                        </Button>
-                                        <Button type="button" variant="outline" className="flex-1" onClick={startCamera}>
-                                            <Camera className="h-4 w-4 mr-2" /> Retake Photo
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </form>
-                    </Form>
-                    <DialogFooter>
+                            </form>
+                        </Form>
+                    </ScrollArea>
+                    <DialogFooter className="p-6 pt-2">
                         <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                        <Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record KYC Document</Button>
+                        <Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record Document</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
             <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
+            <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+                <DialogHeader className="p-6 pb-0">
                 <DialogTitle>Staff Loan Application</DialogTitle>
                 <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
                 </DialogHeader>
-                <Form {...staffLoanForm}>
-                <ScrollArea className="max-h-[70vh] pr-4">
-                    <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
-                    <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
-                        <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
-                        <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                <ScrollArea className="max-h-[60vh] px-6 py-4">
+                    <Form {...staffLoanForm}>
+                        <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4">
+                        <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
+                            <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
-                        <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Alt. Phone</FormLabel>
-                            <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                        </FormItem>
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
+                            <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Alt. Phone</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                            </FormItem>
+                            )}/>
+                        </div>
+                        <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
+                            <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )}/>
-                    </div>
-                    <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
-                        <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    </form>
+                        </form>
+                    </Form>
                 </ScrollArea>
-                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
-                </Form>
+                <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit Application</Button></DialogFooter>
             </DialogContent>
             </Dialog>
         </div>
@@ -663,21 +665,21 @@ export default function Dashboard() {
       </div>
 
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md p-0 overflow-hidden">
               {selectedLoanForNotes && (
                   <>
-                    <DialogHeader>
+                    <DialogHeader className="p-6 pb-0">
                         <DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle>
                         <DialogDescription>Record customer interactions and check recent history.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 mt-2">
+                    <div className="space-y-4 px-6 py-4">
                         <Form {...noteForm}>
                             <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2">
                                 <FormField control={noteForm.control} name="content" render={({field}) => (<FormItem><FormControl><Textarea placeholder="Notes..." className="h-16 text-sm" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
                                 <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>Save Note</Button>
                             </form>
                         </Form>
-                        <ScrollArea className="h-48 border rounded-md p-3">
+                        <ScrollArea className="h-40 border rounded-md p-3">
                             {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions.</p>) : (
                                 <div className="space-y-3">{[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => {
                                         let nDate: Date;
@@ -692,7 +694,7 @@ export default function Dashboard() {
                             )}
                         </ScrollArea>
                     </div>
-                    <DialogFooter><DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose></DialogFooter>
+                    <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
           </DialogContent>
