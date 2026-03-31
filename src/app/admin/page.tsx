@@ -284,15 +284,12 @@ export default function Dashboard() {
         loan.status !== 'rejected' &&
         loan.status !== 'rollover'
     ).map(loan => {
-        // BaseDate is when payments were PROMISED to start.
         let baseDate: Date;
         if (loan.firstPaymentDate?.seconds) {
             baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
         } else if (loan.firstPaymentDate instanceof Date) {
             baseDate = loan.firstPaymentDate;
         } else {
-            // FALLBACK: If firstPaymentDate is missing, assume it starts 1 cycle after disbursement
-            // This prevents new disbursements from showing up as "Due Today" on day 0.
             const dDate = loan.disbursementDate?.seconds 
                 ? new Date(loan.disbursementDate.seconds * 1000) 
                 : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
@@ -315,7 +312,6 @@ export default function Dashboard() {
             cyclesPassed = differenceInMonths(today, baseDate);
         }
 
-        // expectedByNow is full cycles elapsed. On the due date, cyclesPassed is 0, so expected is 0.
         const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
         
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
@@ -342,7 +338,6 @@ export default function Dashboard() {
         };
       }).filter(loan => {
           const offset = loan.paymentFrequency === 'monthly' ? 7 : (loan.paymentFrequency === 'weekly' ? 3 : 1);
-          // Only show if it's due soon, due today, or actually late
           return loan.arrearsCount > 0 || loan.daysUntil <= offset;
       }).sort((a, b) => {
           if (b.arrearsCount !== a.arrearsCount) return b.arrearsCount - a.arrearsCount;
@@ -771,7 +766,13 @@ export default function Dashboard() {
                     <div className="space-y-4 px-6 py-4">
                         <Form {...noteForm}>
                             <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2">
-                                <FormField control={noteForm.control} name="content" render={({field}) => (<FormItem><FormControl><Textarea placeholder="Notes..." className="h-16 text-sm" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
+                                <FormField control={noteForm.control} name="content" render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl>
+                                            <Textarea placeholder="Notes..." className="h-16 text-sm" {...field} value={field.value ?? ''} />
+                                        </FormControl>
+                                    </FormItem>
+                                )}/>
                                 <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>Save Note</Button>
                             </form>
                         </Form>

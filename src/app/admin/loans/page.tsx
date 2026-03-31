@@ -740,8 +740,18 @@ export default function LoansPage() {
                     <ScrollArea className="max-h-[65vh] px-6 py-4">
                         <Form {...approvalForm}>
                             <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4">
-                                <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Approved Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({field}) => (<FormItem className="col-span-2"><FormLabel className="text-primary font-bold">First Payment Date (Customer Agreed)</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel>Approved Date</FormLabel>
+                                        <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                                    </FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({field}) => (
+                                    <FormItem className="col-span-2">
+                                        <FormLabel className="text-primary font-bold">First Payment Date (Customer Agreed)</FormLabel>
+                                        <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
+                                    </FormItem>
+                                )} />
                                 <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
                                     <FormItem className="col-span-2">
                                       <FormLabel>Assign Staff</FormLabel>
@@ -751,9 +761,15 @@ export default function LoansPage() {
                                       </Select>
                                     </FormItem>
                                 )}/>
-                                <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                                <FormField control={approvalForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                                <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (
+                                    <FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="interestRate" render={({field}) => (
+                                    <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>
+                                )} />
+                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (
+                                    <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>
+                                )} />
                                 <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
                                     <FormItem>
                                       <FormLabel>Frequency</FormLabel>
@@ -803,8 +819,8 @@ export default function LoansPage() {
                                 <FormItem className="col-span-2">
                                     <FormLabel>Assign Staff</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                                    <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
+                                        <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </FormItem>
                             )} />
@@ -820,18 +836,40 @@ export default function LoansPage() {
                                     <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30"/></FormControl>
                                 </FormItem>
                             )}/>
-                            <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                            <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>)}/>
-                            <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)}/>
-                            <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
-                                <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></Select></FormItem>
+                            <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (
+                                <FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
                             )}/>
+                            <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (
+                                <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>
+                            )}/>
+                            <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (
+                                <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                            )}/>
+                            
+                            <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Frequency</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="daily">Daily</SelectItem>
+                                            <SelectItem value="weekly">Weekly</SelectItem>
+                                            <SelectItem value="monthly">Monthly</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}/>
+
                             {editTermsForm.watch('paymentFrequency') === 'weekly' && (
                                 <FormField control={editTermsForm.control} name="preferredPaymentDay" render={({ field }) => (
                                     <FormItem className="col-span-2">
                                         <FormLabel>Preferred Weekly Payment Day</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                            <FormControl><SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger></FormControl>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger>
+                                            </FormControl>
                                             <SelectContent>
                                                 {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
                                             </SelectContent>
@@ -910,7 +948,13 @@ export default function LoansPage() {
                                     <TabsContent value="payments">
                                         {canEdit && (
                                             <Form {...paymentForm}>
-                                                <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4"><div className="flex gap-2"><FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /><Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button></div></form>
+                                                <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
+                                                    <div className="flex gap-2">
+                                                        <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                        <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                        <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
+                                                    </div>
+                                                </form>
                                             </Form>
                                         )}
                                         <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => {
@@ -1007,7 +1051,14 @@ export default function LoansPage() {
                                         )}
                                         {canEdit ? (
                                             <Form {...penaltyForm}>
-                                                <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4"><div className="grid grid-cols-2 gap-2"><FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} /><FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} /></div><FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} /><Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button></form>
+                                                <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
+                                                        <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                    </div>
+                                                    <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} />
+                                                    <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button>
+                                                </form>
                                             </Form>
                                         ) : (
                                             <p className="text-sm text-muted-foreground text-center py-8">Penalties can only be managed by Finance/Admin.</p>
