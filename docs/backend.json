@@ -48,6 +48,19 @@
         "totalPenalties": { "type": "number", "default": 0 }
       }
     },
+    "KYCDocument": {
+      "title": "KYC Document",
+      "description": "Metadata for customer KYC documents.",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "type": { "type": "string", "enum": ["owner_id", "guarantor_id", "loan_form", "security_attachment", "guarantor_undertaking"] },
+        "fileName": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" }
+      }
+    },
     "MailLog": {
       "title": "Mail Log",
       "description": "Records of emails sent by the system or staff.",
@@ -73,6 +86,10 @@
     "/customers/{customerId}": {
       "schema": { "$ref": "#/entities/Customer" },
       "description": "Stores all customer records."
+    },
+    "/kyc_documents/{docId}": {
+      "schema": { "$ref": "#/entities/KYCDocument" },
+      "description": "Master repository for all customer KYC documents."
     },
     "/loans/{loanId}": {
       "schema": { "$ref": "#/entities/Loan" },

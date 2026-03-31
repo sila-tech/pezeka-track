@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
 import { useAppUser, useCollection, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight } from 'lucide-react';
+import { Loader2, UserCheck, Send, MessageSquare, Briefcase, CalendarDays, ExternalLink, ArrowRight, FileUp, ShieldCheck } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { addDays, addWeeks, addMonths, differenceInDays, format, startOfToday } from 'date-fns';
@@ -17,9 +18,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { addLoan, addFollowUpNoteToLoan } from '@/lib/firestore';
+import { addLoan, addFollowUpNoteToLoan, uploadKYCDocument } from '@/lib/firestore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 
 interface FollowUpNote {
@@ -62,12 +64,19 @@ const followUpNoteSchema = z.object({
     content: z.string().min(5, "Note must be at least 5 characters long."),
 });
 
+const kycUploadSchema = z.object({
+    customerId: z.string().min(1, "Please select a customer."),
+    type: z.enum(['owner_id', 'guarantor_id', 'loan_form', 'security_attachment', 'guarantor_undertaking']),
+    fileName: z.string().min(1, "Enter a label for this document."),
+});
+
 export default function Dashboard() {
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   
   const [isStaffLoanOpen, setIsStaffLoanOpen] = useState(false);
+  const [isKYCUploadOpen, setIsKYCUploadOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
@@ -85,6 +94,11 @@ export default function Dashboard() {
   const noteForm = useForm<z.infer<typeof followUpNoteSchema>>({
       resolver: zodResolver(followUpNoteSchema),
       defaultValues: { content: '' },
+  });
+
+  const kycForm = useForm<z.infer<typeof kycUploadSchema>>({
+      resolver: zodResolver(kycUploadSchema),
+      defaultValues: { customerId: '', type: 'owner_id', fileName: '' },
   });
 
   async function onStaffLoanSubmit(values: z.infer<typeof staffLoanSchema>) {
@@ -119,6 +133,26 @@ export default function Dashboard() {
       staffLoanForm.reset();
       setIsStaffLoanOpen(false);
     } catch (e: any) { toast({ variant: "destructive", title: "Failed", description: e.message }); } finally { setIsSubmitting(false); }
+  }
+
+  async function onKYCSubmit(values: z.infer<typeof kycUploadSchema>) {
+      if (!user) return;
+      setIsSubmitting(true);
+      try {
+          const customer = customers?.find(c => c.id === values.customerId);
+          await uploadKYCDocument(firestore, {
+              ...values,
+              customerName: customer?.name || "Unknown",
+              uploadedBy: user.name || user.email || "Staff"
+          });
+          toast({ title: "Document Recorded", description: "Metadata saved to the Finance repository." });
+          kycForm.reset();
+          setIsKYCUploadOpen(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Upload Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
   }
 
   async function onAddNoteSubmit(values: z.infer<typeof followUpNoteSchema>) {
@@ -224,39 +258,94 @@ export default function Dashboard() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
-        <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
-          <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Staff Loan Application</DialogTitle>
-              <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
-            </DialogHeader>
-            <Form {...staffLoanForm}>
-              <ScrollArea className="max-h-[70vh] pr-4">
-                <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
-                  <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
-                    <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                  )}/>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
-                      <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+        <div className="flex gap-2">
+            <Dialog open={isKYCUploadOpen} onOpenChange={setIsKYCUploadOpen}>
+                <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Customer KYC Upload</DialogTitle>
+                        <DialogDescription>Select a customer and upload their identity or security documents.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...kycForm}>
+                        <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4 py-2">
+                            <FormField control={kycForm.control} name="customerId" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Select Customer</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                            {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}/>
+                            <FormField control={kycForm.control} name="type" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Document Category</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="owner_id">Owner ID Card</SelectItem>
+                                            <SelectItem value="guarantor_id">Guarantor ID Card</SelectItem>
+                                            <SelectItem value="loan_form">Physical Loan Form</SelectItem>
+                                            <SelectItem value="security_attachment">Security Photos/Docs</SelectItem>
+                                            <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FormItem>
+                            )}/>
+                            <FormField control={kycForm.control} name="fileName" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Document Label/Note</FormLabel>
+                                    <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
+                                </FormItem>
+                            )}/>
+                            <div className="bg-muted/50 p-4 rounded-lg border border-dashed text-center">
+                                <p className="text-xs text-muted-foreground italic">Note: Only metadata is recorded here. Ensure physical files are stored in the shared drive or attached to the customer record.</p>
+                            </div>
+                        </form>
+                    </Form>
+                    <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                        <Button type="submit" form="kyc-upload-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record KYC</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
+            <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                <DialogTitle>Staff Loan Application</DialogTitle>
+                <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
+                </DialogHeader>
+                <Form {...staffLoanForm}>
+                <ScrollArea className="max-h-[70vh] pr-4">
+                    <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4 py-2">
+                    <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
+                        <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
-                    <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Alt. Phone</FormLabel>
-                        <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                      </FormItem>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
+                        <FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Alt. Phone</FormLabel>
+                            <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                        </FormItem>
+                        )}/>
+                    </div>
+                    <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
+                        <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )}/>
-                  </div>
-                  <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
-                    <FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                  )}/>
-                </form>
-              </ScrollArea>
-              <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                    </form>
+                </ScrollArea>
+                <DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="staff-loan-form" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit</Button></DialogFooter>
+                </Form>
+            </DialogContent>
+            </Dialog>
+        </div>
       </div>
 
       {(user?.role?.toLowerCase() === 'staff' || user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2') && (

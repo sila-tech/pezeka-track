@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
@@ -166,6 +167,45 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
     errorEmitter.emit('permission-error', permissionError);
     throw serverError;
   }
+}
+
+export async function uploadKYCDocument(db: Firestore, data: { 
+    customerId: string, 
+    customerName: string, 
+    type: string, 
+    fileName: string, 
+    uploadedBy: string 
+}) {
+    const kycCollection = collection(db, 'kyc_documents');
+    const newDoc = {
+        ...data,
+        uploadedAt: serverTimestamp()
+    };
+    try {
+        return await addDoc(kycCollection, newDoc);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: kycCollection.path,
+            operation: 'create',
+            requestResourceData: newDoc,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function deleteKYCDocument(db: Firestore, docId: string) {
+    const kycRef = doc(db, 'kyc_documents', docId);
+    try {
+        await deleteDoc(kycRef);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({
+            path: kycRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
 }
 
 type FinanceEntryData = {

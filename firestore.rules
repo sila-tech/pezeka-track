@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -64,6 +65,15 @@ service cloud.firestore {
       allow create: if isStaff() || isOwner(customerId) || isAuthenticated();
       allow update: if isFinance() || isOwner(customerId);
       allow delete: if isFinance();
+    }
+
+    match /kyc_documents/{docId} {
+      // ONLY Finance can see and list KYC docs
+      allow read: if isFinance();
+      // Staff can UPLOAD (create), but not read back
+      allow create: if isStaff();
+      // ONLY Finance can edit/delete
+      allow update, delete: if isFinance();
     }
 
     match /loans/{loanId} {

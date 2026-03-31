@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
-import { Loader2, LogOut, LayoutDashboard, Users, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail, Share2 } from 'lucide-react';
+import { Loader2, LogOut, LayoutDashboard, Users, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail, Share2, FolderKey } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
@@ -53,6 +53,11 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
 
             {canSeeSensitive && (
                 <>
+                    <Link href="/admin/kyc" className={linkClass("/admin/kyc")} onClick={onLinkClick}>
+                        <FolderKey className="h-4 w-4" />
+                        KYC Repository
+                    </Link>
+
                     <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
                         <FileDown className="h-4 w-4" />
                         Finance
