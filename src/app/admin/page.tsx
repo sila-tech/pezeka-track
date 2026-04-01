@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState, useRef } from 'react';
@@ -95,7 +94,8 @@ export default function Dashboard() {
   const isStaff = user?.role?.toLowerCase() === 'staff' || isFinance;
   const isAuthorized = user && (isSuperAdmin || isStaff);
   
-  const canManageKYC = isSuperAdmin || isFinance;
+  // KYC management is now enabled for all authorized admin staff
+  const canManageKYC = isAuthorized;
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
   const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
@@ -183,7 +183,7 @@ export default function Dashboard() {
               fileUrl: capturedImage,
               uploadedBy: user.name || user.email || "Staff"
           });
-          toast({ title: "Document Captured", description: "Image metadata saved to the Finance repository." });
+          toast({ title: "Document Captured", description: "Image metadata saved to the Repository." });
           kycForm.reset();
           setCapturedImage(null);
           setIsKYCUploadOpen(false);
@@ -328,7 +328,6 @@ export default function Dashboard() {
       });
   }, [loans, customers]);
 
-  // "Priority" list for the ALL tab (Threshold filtered)
   const priorityDueLoans = useMemo(() => {
       return processedLoansWithTimeline.filter(loan => {
           const offset = loan.paymentFrequency === 'monthly' ? 14 : (loan.paymentFrequency === 'weekly' ? 7 : 3);
@@ -339,7 +338,6 @@ export default function Dashboard() {
       }).sort((a, b) => a.daysUntil - b.daysUntil);
   }, [processedLoansWithTimeline]);
 
-  // Comprehensive lists for specific frequency tabs
   const dailyDue = useMemo(() => processedLoansWithTimeline.filter(l => l.paymentFrequency === 'daily').sort((a, b) => a.daysUntil - b.daysUntil), [processedLoansWithTimeline]);
   const weeklyDue = useMemo(() => processedLoansWithTimeline.filter(l => l.paymentFrequency === 'weekly').sort((a, b) => a.daysUntil - b.daysUntil), [processedLoansWithTimeline]);
 
@@ -371,7 +369,7 @@ export default function Dashboard() {
                         if (fileInputRef.current) fileInputRef.current.value = '';
                     } 
                 }}>
-                    <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Upload KYC</Button></DialogTrigger>
+                    <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Capture KYC</Button></DialogTrigger>
                     <DialogContent className="sm:max-w-md p-0 overflow-hidden">
                         <DialogHeader className="p-6 pb-0">
                             <DialogTitle>Customer KYC Capture</DialogTitle>

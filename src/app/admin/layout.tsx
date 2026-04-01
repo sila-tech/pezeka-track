@@ -51,13 +51,14 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
                 Application Forms
             </Link>
 
+            {/* KYC Repository is now visible to all authorized administrators */}
+            <Link href="/admin/kyc" className={linkClass("/admin/kyc")} onClick={onLinkClick}>
+                <FolderKey className="h-4 w-4" />
+                KYC Repository
+            </Link>
+
             {canSeeSensitive && (
                 <>
-                    <Link href="/admin/kyc" className={linkClass("/admin/kyc")} onClick={onLinkClick}>
-                        <FolderKey className="h-4 w-4" />
-                        KYC Repository
-                    </Link>
-
                     <Link href="/admin/finance" className={linkClass("/admin/finance")} onClick={onLinkClick}>
                         <FileDown className="h-4 w-4" />
                         Finance

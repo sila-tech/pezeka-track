@@ -106,10 +106,10 @@ service cloud.firestore {
 
     /**
      * @description KYC Document Repository. 
-     * Restricted to Finance only for all operations.
+     * Now accessible to all Staff and Finance for verification.
      */
     match /kyc_documents/{docId} {
-      allow get, list, create, update, delete: if isFinance();
+      allow get, list, create, update, delete: if isStaff();
     }
 
     /**

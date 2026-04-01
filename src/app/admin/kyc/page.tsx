@@ -58,8 +58,13 @@ export default function KYCRepositoryPage() {
     const [viewingDoc, setViewingDoc] = useState<KYCDocument | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Strictly restricted to Finance role or Super Admin for viewing the repository
-    const isAuthorized = user && (user.role === 'finance' || user.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2');
+    // KYC is visible to all authorized admin staff
+    const isAuthorized = user && (
+        user.role === 'finance' || 
+        user.role === 'staff' || 
+        user.email === 'simon@pezeka.com' || 
+        user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
+    );
 
     const { data: documents, loading: docsLoading } = useCollection<KYCDocument>(isAuthorized ? 'kyc_documents' : null);
 
@@ -109,9 +114,9 @@ export default function KYCRepositoryPage() {
                     <Lock className="h-12 w-12 text-destructive" />
                 </div>
                 <div>
-                    <h2 className="text-xl font-black text-[#1B2B33]">Finance Authorization Required</h2>
+                    <h2 className="text-xl font-black text-[#1B2B33]">Admin Authorization Required</h2>
                     <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                        This repository contains sensitive personal identification and security materials. Viewing and managing these documents is strictly restricted to the Finance department.
+                        Unauthorized access to KYC repository.
                     </p>
                 </div>
                 <Button variant="outline" onClick={() => window.history.back()}>Go Back</Button>

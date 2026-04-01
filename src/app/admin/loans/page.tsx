@@ -203,7 +203,8 @@ export default function LoansPage() {
   
   const isAuthorized = isSuperAdmin || isStaff;
   const canEdit = isSuperAdmin || isFinance; 
-  const canViewKYC = isSuperAdmin || isFinance;
+  // KYC is now visible to all authorized administrators
+  const canViewKYC = isAuthorized;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
@@ -448,7 +449,7 @@ export default function LoansPage() {
               ...values,
               disbursementDate: new Date(values.disbursementDate),
               firstPaymentDate: new Date(values.firstPaymentDate),
-              assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
+              assignedStaffName: staff?.name || staff?.email || "Unknown",
               instalmentAmount,
               totalRepayableAmount: values.totalRepayableAmount,
           };
@@ -543,11 +544,27 @@ export default function LoansPage() {
                       )} />
                     ) : (
                       <>
-                        <FormField control={form.control} name="newCustomerName" render={({ field }) => (<FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                        <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (<FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                        <FormField control={form.control} name="newCustomerName" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''}/></FormControl>
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Phone</FormLabel>
+                                <FormControl><Input {...field} value={field.value ?? ''}/></FormControl>
+                            </FormItem>
+                        )} />
                       </>
                     )}
-                    <FormField control={form.control} name="idNumber" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID" {...field} value={field.value ?? ''}/></FormControl><FormMessage/></FormItem>)} />
+                    <FormField control={form.control} name="idNumber" render={({ field }) => (
+                        <FormItem className="col-span-2">
+                            <FormLabel>ID Number</FormLabel>
+                            <FormControl><Input placeholder="Customer ID" {...field} value={field.value ?? ''}/></FormControl>
+                            <FormMessage/>
+                        </FormItem>
+                    )} />
                     <FormField control={form.control} name="assignedStaffId" render={({ field }) => (
                         <FormItem className="col-span-2">
                           <FormLabel>Assign Staff Follow-up</FormLabel>
@@ -558,12 +575,37 @@ export default function LoansPage() {
                         </FormItem>
                     )} />
                     
-                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (<FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="firstPaymentDate" render={({ field }) => (<FormItem><FormLabel className="text-primary font-bold">First Payment Date</FormLabel><FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Disbursement Date</FormLabel>
+                            <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="firstPaymentDate" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="text-primary font-bold">First Payment Date</FormLabel>
+                            <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
+                        </FormItem>
+                    )} />
 
-                    <FormField control={form.control} name="principalAmount" render={({ field }) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
-                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>)} />
+                    <FormField control={form.control} name="principalAmount" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Principal</FormLabel>
+                            <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="interestRate" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Interest %</FormLabel>
+                            <FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl>
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Instalments</FormLabel>
+                            <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
+                        </FormItem>
+                    )} />
                     <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Frequency</FormLabel>
