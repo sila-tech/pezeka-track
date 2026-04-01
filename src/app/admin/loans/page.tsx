@@ -203,7 +203,6 @@ export default function LoansPage() {
   
   const isAuthorized = isSuperAdmin || isStaff;
   const canEdit = isSuperAdmin || isFinance; 
-  // KYC is now visible to all authorized administrators
   const canViewKYC = isAuthorized;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);

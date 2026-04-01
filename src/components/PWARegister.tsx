@@ -2,19 +2,31 @@
 
 import { useEffect } from 'react';
 
+/**
+ * Handles Service Worker registration for PWA functionality.
+ * This component runs only on the client and does not block hydration.
+ */
 export function PWARegister() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
+      const registerSW = () => {
         navigator.serviceWorker.register('/sw.js').then(
-          function(registration) {
-            console.log('Service Worker registration successful with scope: ', registration.scope);
+          (registration) => {
+            console.log('PWA: ServiceWorker registered successfully with scope: ', registration.scope);
           },
-          function(err) {
-            console.log('Service Worker registration failed: ', err);
+          (err) => {
+            console.error('PWA: ServiceWorker registration failed: ', err);
           }
         );
-      });
+      };
+
+      // Register after the page has fully loaded to avoid impacting initial performance
+      if (document.readyState === 'complete') {
+        registerSW();
+      } else {
+        window.addEventListener('load', registerSW);
+        return () => window.removeEventListener('load', registerSW);
+      }
     }
   }, []);
 

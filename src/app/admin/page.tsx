@@ -94,7 +94,6 @@ export default function Dashboard() {
   const isStaff = user?.role?.toLowerCase() === 'staff' || isFinance;
   const isAuthorized = user && (isSuperAdmin || isStaff);
   
-  // KYC management is now enabled for all authorized admin staff
   const canManageKYC = isAuthorized;
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
