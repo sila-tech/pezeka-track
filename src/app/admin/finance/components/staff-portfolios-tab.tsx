@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -11,7 +10,7 @@ import { User, BarChart2, Calendar as CalendarIcon, HandCoins, TrendingUp, Walle
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { DateRange } from 'react-day-picker';
-import { startOfMonth, endOfMonth, isWithinInterval, startOfToday, endOfToday, startOfWeek, endOfWeek, format } from 'date-fns';
+import { startOfMonth, endOfMonth, isWithinInterval, startOfToday, endOfToday, startOfWeek, endOfWeek, format, addDays, addWeeks, addMonths, differenceInDays, differenceInMonths } from 'date-fns';
 import { DatePickerWithRange } from './editable-finance-report-tab';
 
 interface Payment {
@@ -22,14 +21,18 @@ interface Payment {
 
 interface Loan {
   id: string;
-  customerName: string; // Added customerName
+  loanNumber: string;
+  customerName: string;
   assignedStaffId?: string;
   assignedStaffName?: string;
   principalAmount: number;
   totalRepayableAmount: number;
   totalPaid: number;
+  instalmentAmount: number;
   status: string;
+  paymentFrequency: 'daily' | 'weekly' | 'monthly';
   disbursementDate: { seconds: number; nanoseconds: number } | Date;
+  firstPaymentDate?: { seconds: number; nanoseconds: number } | Date;
   payments?: Payment[];
 }
 
@@ -53,10 +56,11 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
   });
 
   const processedData = useMemo(() => {
-    if (!staffList || !loans) return { performance: [], collectionLog: [] };
+    if (!staffList || !loans) return { performance: [], collectionLog: [], timelines: {} as any };
 
     const fromDate = date?.from;
     const toDate = date?.to || date?.from;
+    const today = startOfToday();
     
     const interval = fromDate ? { 
         start: new Date(fromDate).setHours(0, 0, 0, 0), 
@@ -64,6 +68,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
     } : null;
 
     const collectionLog: any[] = [];
+    const timelines: Record<string, string> = {};
 
     const performance = staffList.map(staff => {
       const staffLoans = loans.filter(l => l.assignedStaffId === (staff.id) && l.status !== 'application' && l.status !== 'rejected');
@@ -72,6 +77,44 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
       let periodCollected = 0;
       
       staffLoans.forEach(loan => {
+          // Calculate Timeline for display
+          let baseDate: Date;
+          if (loan.firstPaymentDate && 'seconds' in loan.firstPaymentDate) {
+              baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+          } else if (loan.firstPaymentDate instanceof Date) {
+              baseDate = loan.firstPaymentDate;
+          } else {
+              const dDate = loan.disbursementDate && 'seconds' in loan.disbursementDate 
+                  ? new Date(loan.disbursementDate.seconds * 1000) 
+                  : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
+              
+              if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+              else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+              else baseDate = addMonths(dDate, 1);
+          }
+
+          const actualPaid = (loan.totalPaid || 0) / (loan.instalmentAmount || 1);
+          const nextIdx = Math.floor(actualPaid);
+          let nextDue: Date;
+          if (loan.paymentFrequency === 'daily') nextDue = addDays(baseDate, nextIdx);
+          else if (loan.paymentFrequency === 'weekly') nextDue = addWeeks(baseDate, nextIdx);
+          else nextDue = addMonths(baseDate, nextIdx);
+
+          const daysUntil = differenceInDays(nextDue, today);
+          
+          let cyclesPassed = 0;
+          if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
+          else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
+          else if (loan.paymentFrequency === 'monthly') cyclesPassed = differenceInMonths(today, baseDate);
+
+          const arrears = Math.max(0, cyclesPassed - actualPaid);
+
+          if (loan.status === 'paid') timelines[loan.id] = "PAID";
+          else if (arrears > 0 && daysUntil < 0) timelines[loan.id] = `LATE ${Math.ceil(arrears)}${loan.paymentFrequency[0]}`;
+          else if (daysUntil === 0) timelines[loan.id] = "DUE TODAY";
+          else timelines[loan.id] = `DUE IN ${daysUntil}D`;
+
+          // Period stats
           const dDate = loan.disbursementDate instanceof Date 
               ? loan.disbursementDate 
               : new Date((loan.disbursementDate as any).seconds * 1000);
@@ -117,7 +160,8 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
 
     return { 
         performance, 
-        collectionLog: collectionLog.sort((a, b) => b.date.getTime() - a.date.getTime()) 
+        collectionLog: collectionLog.sort((a, b) => b.date.getTime() - a.date.getTime()),
+        timelines
     };
   }, [loans, staffList, date]);
 

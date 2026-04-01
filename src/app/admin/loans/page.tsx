@@ -59,12 +59,13 @@ import {
   type Loan
 } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format, addDays, addWeeks, addMonths, differenceInDays } from 'date-fns';
+import { format, addDays, addWeeks, addMonths, differenceInDays, startOfToday, differenceInMonths } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { calculateAmortization, calculateInterestForOneInstalment } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 const DAYS_OF_WEEK = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
@@ -202,7 +203,6 @@ export default function LoansPage() {
   
   const isAuthorized = isSuperAdmin || isStaff;
   const canEdit = isSuperAdmin || isFinance; 
-  // KYC management is strictly Finance only
   const canViewKYC = isSuperAdmin || isFinance;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
@@ -218,6 +218,8 @@ export default function LoansPage() {
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
+    const today = startOfToday();
+
     return loans.filter(loan => {
         if (loan.status === 'application' || loan.status === 'rejected' || loan.status === 'rollover') return false;
         
@@ -229,6 +231,44 @@ export default function LoansPage() {
             loan.idNumber?.includes(searchTerm) ||
             loan.accountNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
+    }).map(loan => {
+        // Timeline Calculation Logic
+        let baseDate: Date;
+        if (loan.firstPaymentDate?.seconds) {
+            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        } else {
+            const dDate = loan.disbursementDate?.seconds 
+                ? new Date(loan.disbursementDate.seconds * 1000) 
+                : new Date();
+            
+            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+            else baseDate = addMonths(dDate, 1);
+        }
+
+        if (isNaN(baseDate.getTime())) baseDate = new Date();
+        
+        const instalmentAmt = loan.instalmentAmount || 1;
+        const totalPaid = loan.totalPaid || 0;
+        const actualInstalmentsPaid = totalPaid / instalmentAmt;
+
+        let cyclesPassed = 0;
+        if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
+        else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
+        else if (loan.paymentFrequency === 'monthly') cyclesPassed = differenceInMonths(today, baseDate);
+
+        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
+        const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
+        
+        const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
+        let nextDueDate: Date;
+        if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextInstalmentIndex);
+        else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
+        else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
+
+        const daysUntil = differenceInDays(nextDueDate, today);
+
+        return { ...loan, nextDueDate, arrearsCount, daysUntil };
     });
   }, [loans, searchTerm, statusFilter]);
   
@@ -625,11 +665,11 @@ export default function LoansPage() {
                                 <TableHead>Staff Assigned</TableHead>
                                 <TableHead>First Pay</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
-                                <TableHead className="text-center">Status</TableHead>
+                                <TableHead className="text-center">Timeline</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                              {filteredLoans.map((loan) => {
+                              {filteredLoans.map((loan: any) => {
                                   const fDate = loan.firstPaymentDate?.seconds 
                                     ? new Date(loan.firstPaymentDate.seconds * 1000) 
                                     : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
@@ -649,7 +689,17 @@ export default function LoansPage() {
                                         <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                         <TableCell className="text-xs font-medium text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
                                         <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
-                                        <TableCell className="text-center"><Badge variant={loan.status === 'paid' ? 'default' : (loan.status === 'due' || loan.status === 'overdue') ? 'destructive' : 'secondary'} className="text-[10px] uppercase">{loan.status}</Badge></TableCell>
+                                        <TableCell className="text-center">
+                                            {loan.status === 'paid' ? (
+                                                <Badge className="text-[9px] uppercase">PAID</Badge>
+                                            ) : (loan.arrearsCount > 0 && loan.daysUntil < 0) ? (
+                                                <Badge variant="destructive" className="text-[9px] uppercase font-black">Late {Math.ceil(loan.arrearsCount)}{loan.paymentFrequency[0]}</Badge>
+                                            ) : (
+                                                <Badge variant="secondary" className="text-[9px] uppercase font-black">
+                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil}d`}
+                                                </Badge>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                   );
                               })}
@@ -741,13 +791,13 @@ export default function LoansPage() {
                     <ScrollArea className="max-h-[65vh] px-6 py-4">
                         <Form {...approvalForm}>
                             <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4">
-                                <FormField control={approvalForm.control} name="disbursementDate" render={({field}) => (
+                                <FormField control={approvalForm.control} name="disbursementDate" render={({ field }) => (
                                     <FormItem className="col-span-2">
                                         <FormLabel>Approved Date</FormLabel>
-                                        <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                                        <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
                                     </FormItem>
                                 )} />
-                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({field}) => (
+                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({ field }) => (
                                     <FormItem className="col-span-2">
                                         <FormLabel className="text-primary font-bold">First Payment Date (Customer Agreed)</FormLabel>
                                         <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
@@ -762,14 +812,14 @@ export default function LoansPage() {
                                       </Select>
                                     </FormItem>
                                 )}/>
-                                <FormField control={approvalForm.control} name="principalAmount" render={({field}) => (
-                                    <FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>
+                                <FormField control={approvalForm.control} name="principalAmount" render={({ field }) => (
+                                    <FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>
                                 )} />
-                                <FormField control={approvalForm.control} name="interestRate" render={({field}) => (
-                                    <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl></FormItem>
+                                <FormField control={approvalForm.control} name="interestRate" render={({ field }) => (
+                                    <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''} /></FormControl></FormItem>
                                 )} />
-                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({field}) => (
-                                    <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl></FormItem>
+                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({ field }) => (
+                                    <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>
                                 )} />
                                 <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
                                     <FormItem>
@@ -825,26 +875,26 @@ export default function LoansPage() {
                                     </Select>
                                 </FormItem>
                             )} />
-                            <FormField control={editTermsForm.control} name="disbursementDate" render={({field}) => (
+                            <FormField control={editTermsForm.control} name="disbursementDate" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Disbursement Date</FormLabel>
-                                    <FormControl><Input type="date" {...field} value={field.value ?? ''}/></FormControl>
+                                    <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
                                 </FormItem>
                             )}/>
-                            <FormField control={editTermsForm.control} name="firstPaymentDate" render={({field}) => (
+                            <FormField control={editTermsForm.control} name="firstPaymentDate" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel className="text-primary font-bold">First Payment Date</FormLabel>
-                                    <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30"/></FormControl>
+                                    <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
                                 </FormItem>
                             )}/>
-                            <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (
-                                <FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                            <FormField control={editTermsForm.control} name="principalAmount" render={({ field }) => (
+                                <FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                             )}/>
-                            <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (
-                                <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field}/></FormControl></FormItem>
+                            <FormField control={editTermsForm.control} name="interestRate" render={({ field }) => (
+                                <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>
                             )}/>
-                            <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (
-                                <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>
+                            <FormField control={editTermsForm.control} name="numberOfInstalments" render={({ field }) => (
+                                <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                             )}/>
                             
                             <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
@@ -852,7 +902,7 @@ export default function LoansPage() {
                                     <FormLabel>Frequency</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl>
-                                            <SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger>
+                                            <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
                                             <SelectItem value="daily">Daily</SelectItem>
@@ -869,7 +919,7 @@ export default function LoansPage() {
                                         <FormLabel>Preferred Weekly Payment Day</FormLabel>
                                         <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                             <FormControl>
-                                                <SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger>
+                                                <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
                                             </FormControl>
                                             <SelectContent>
                                                 {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
@@ -878,7 +928,7 @@ export default function LoansPage() {
                                     </FormItem>
                                 )} />
                             )}
-                            <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (
+                            <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({ field }) => (
                                     <FormItem className="col-span-2">
                                         <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
                                         <FormControl><Input type="number" {...field} className="border-primary/50 bg-primary/5 font-bold" /></FormControl>
@@ -951,8 +1001,8 @@ export default function LoansPage() {
                                             <Form {...paymentForm}>
                                                 <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
                                                     <div className="flex gap-2">
-                                                        <FormField control={paymentForm.control} name="paymentAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
-                                                        <FormField control={paymentForm.control} name="paymentDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                        <FormField control={paymentForm.control} name="paymentAmount" render={({ field }) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''} />)} />
+                                                        <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => (<Input type="date" {...field} value={field.value ?? ''} />)} />
                                                         <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
                                                     </div>
                                                 </form>
@@ -1048,10 +1098,10 @@ export default function LoansPage() {
                                             <Form {...penaltyForm}>
                                                 <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        <FormField control={penaltyForm.control} name="penaltyAmount" render={({field}) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''}/>)} />
-                                                        <FormField control={penaltyForm.control} name="penaltyDate" render={({field}) => (<Input type="date" {...field} value={field.value ?? ''}/>)} />
+                                                        <FormField control={penaltyForm.control} name="penaltyAmount" render={({ field }) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''} />)} />
+                                                        <FormField control={penaltyForm.control} name="penaltyDate" render={({ field }) => (<Input type="date" {...field} value={field.value ?? ''} />)} />
                                                     </div>
-                                                    <FormField control={penaltyForm.control} name="penaltyDescription" render={({field}) => (<Input placeholder="Reason" {...field} value={field.value ?? ''}/>)} />
+                                                    <FormField control={penaltyForm.control} name="penaltyDescription" render={({ field }) => (<Input placeholder="Reason" {...field} value={field.value ?? ''} />)} />
                                                     <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button>
                                                 </form>
                                             </Form>
@@ -1061,7 +1111,7 @@ export default function LoansPage() {
                                         <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => {
                                             const penaltyDate = (p.date as any)?.seconds 
                                                 ? new Date((p.date as any).seconds * 1000) 
-                                                : (p.date instanceof Date ? penaltyDate : new Date());
+                                                : (p.date instanceof Date ? p.date : new Date());
                                             
                                             return (
                                                 <TableRow key={p.penaltyId || i}>
