@@ -537,7 +537,9 @@ export default function LoansPage() {
                             <FormLabel>Customer</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
-                              <SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}</SelectContent>
+                              <SelectContent>
+                                {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
+                              </SelectContent>
                             </Select>
                           </FormItem>
                       )} />
@@ -569,7 +571,9 @@ export default function LoansPage() {
                           <FormLabel>Assign Staff Follow-up</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                            <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                            <SelectContent>
+                                {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
+                            </SelectContent>
                           </Select>
                         </FormItem>
                     )} />
@@ -610,7 +614,11 @@ export default function LoansPage() {
                         <FormLabel>Frequency</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
-                          <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
+                          <SelectContent>
+                              <SelectItem value="daily">Daily</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                          </SelectContent>
                         </Select>
                       </FormItem>
                     )} />
@@ -809,7 +817,9 @@ export default function LoansPage() {
                                       <FormLabel>Assign Staff</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select staff"/></SelectTrigger></FormControl>
-                                        <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                        <SelectContent>
+                                            {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
+                                        </SelectContent>
                                       </Select>
                                     </FormItem>
                                 )}/>
@@ -827,7 +837,11 @@ export default function LoansPage() {
                                       <FormLabel>Frequency</FormLabel>
                                       <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
-                                        <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
+                                        <SelectContent>
+                                            <SelectItem value="daily">Daily</SelectItem>
+                                            <SelectItem value="weekly">Weekly</SelectItem>
+                                            <SelectItem value="monthly">Monthly</SelectItem>
+                                        </SelectContent>
                                       </Select>
                                     </FormItem>
                                 )}/>
@@ -872,7 +886,9 @@ export default function LoansPage() {
                                     <FormLabel>Assign Staff</FormLabel>
                                     <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                         <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                                        <SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent>
+                                        <SelectContent>
+                                            {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
+                                        </SelectContent>
                                     </Select>
                                 </FormItem>
                             )} />
@@ -1137,7 +1153,9 @@ export default function LoansPage() {
       <Dialog open={!!viewingKYC} onOpenChange={(o) => !o && setViewingKYC(null)}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none">
               <div className="relative w-full h-full min-h-[400px] flex items-center justify-center">
-                  <img src={viewingKYC?.fileUrl} className="max-w-full max-h-[85vh] object-contain" />
+                  {viewingKYC?.fileUrl && (
+                      <img src={viewingKYC.fileUrl} className="max-w-full max-h-[85vh] object-contain" alt="KYC Document" />
+                  )}
                   <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent text-white">
                       <h3 className="text-xl font-black">{TYPE_LABELS[viewingKYC?.type || ''] || 'Document'}</h3>
                       <p className="text-sm opacity-70">{viewingKYC?.fileName}</p>

@@ -1,15 +1,26 @@
 'use client';
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, ArrowRight, Clock } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/Alert';
+import { 
+    Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, 
+    ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
+    ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins
+} from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { addDays, addWeeks, addMonths, differenceInDays, differenceInMonths, format, startOfToday } from 'date-fns';
+import { 
+    addDays, addWeeks, addMonths, differenceInDays, differenceInMonths, 
+    format, startOfToday, endOfToday, startOfWeek, endOfWeek, 
+    startOfMonth, endOfMonth, isWithinInterval 
+} from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { 
+    Dialog, DialogContent, DialogDescription, DialogHeader, 
+    DialogTitle, DialogTrigger, DialogFooter, DialogClose 
+} from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +34,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { DateRange } from 'react-day-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 interface FollowUpNote {
     noteId: string;
@@ -53,6 +67,7 @@ interface DashboardLoan {
   assignedStaffId?: string;
   assignedStaffName?: string;
   followUpNotes?: FollowUpNote[];
+  payments?: { amount: number; date: any }[];
 }
 
 const staffLoanSchema = z.object({
@@ -72,6 +87,58 @@ const kycUploadSchema = z.object({
     fileName: z.string().min(1, "Enter a label for this document."),
 });
 
+function DatePickerWithRange({
+  className,
+  date,
+  setDate,
+}: {
+  className?: string;
+  date: DateRange | undefined;
+  setDate: (date: DateRange | undefined) => void;
+}) {
+  return (
+    <div className={cn('grid gap-2', className)}>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id="date"
+            variant={'outline'}
+            size="sm"
+            className={cn(
+              'w-full sm:w-[260px] justify-start text-left font-normal',
+              !date && 'text-muted-foreground'
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date?.from ? (
+              date.to ? (
+                <>
+                  {format(date.from, 'LLL dd, y')} -{' '}
+                  {format(date.to, 'LLL dd, y')}
+                </>
+              ) : (
+                format(date.from, 'LLL dd, y')
+              )
+            ) : (
+              <span>Pick a date range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            initialFocus
+            mode="range"
+            defaultMonth={date?.from}
+            selected={date}
+            onSelect={setDate}
+            numberOfMonths={2}
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -83,6 +150,12 @@ export default function Dashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  
+  // Date selection state
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
 
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -248,23 +321,48 @@ export default function Dashboard() {
       );
   }, [loans, user]);
 
-  const stats = useMemo(() => {
-    if (!loans) return { disbursedCount: 0 };
-    let disbursedCount = 0;
-    loans.forEach(loan => {
-        if (loan.status !== 'application' && loan.status !== 'rejected') {
-            disbursedCount++;
-        }
-    });
-    return { disbursedCount };
-  }, [loans]);
-
   const myPortfolioStats = useMemo(() => {
-      const activeLoans = myPortfolio.filter(l => l.status !== 'paid' && l.status !== 'rollover');
-      const totalDisbursed = myPortfolio.reduce((acc, l) => acc + (Number(l.principalAmount) || 0), 0);
-      const totalCollected = myPortfolio.reduce((acc, l) => acc + (Number(l.totalPaid) || 0), 0);
-      return { activeCount: activeLoans.length, totalDisbursed, totalCollected };
-  }, [myPortfolio]);
+      const fromDate = date?.from;
+      const toDate = date?.to || date?.from;
+      
+      const interval = fromDate ? { 
+          start: new Date(fromDate).setHours(0, 0, 0, 0), 
+          end: new Date(toDate!).setHours(23, 59, 59, 999) 
+      } : null;
+
+      let periodDisbursed = 0;
+      let periodCollected = 0;
+
+      myPortfolio.forEach(loan => {
+          // Check Disbursement
+          const dDate = loan.disbursementDate?.seconds 
+              ? new Date(loan.disbursementDate.seconds * 1000) 
+              : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
+          
+          if (!interval || isWithinInterval(dDate, interval)) {
+              periodDisbursed += Number(loan.principalAmount) || 0;
+          }
+
+          // Check Collections
+          (loan.payments || []).forEach(payment => {
+              const pDate = (payment.date as any)?.seconds 
+                  ? new Date((payment.date as any).seconds * 1000) 
+                  : new Date(payment.date as Date);
+              
+              if (!interval || isWithinInterval(pDate, interval)) {
+                  periodCollected += Number(payment.amount) || 0;
+              }
+          });
+      });
+
+      const activeLoansCount = myPortfolio.filter(l => l.status !== 'paid' && l.status !== 'rollover').length;
+
+      return { 
+          activeCount: activeLoansCount, 
+          totalDisbursed: periodDisbursed, 
+          totalCollected: periodCollected 
+      };
+  }, [myPortfolio, date]);
 
   const processedLoansWithTimeline = useMemo(() => {
       if (!loans) return [];
@@ -351,13 +449,26 @@ export default function Dashboard() {
         return tsB - tsA;
     });
   }, [loans, customers]);
+
+  const setDatePreset = (preset: 'today' | 'weekly' | 'monthly' | 'all') => {
+      const today = new Date();
+      if (preset === 'all') {
+          setDate(undefined);
+      } else if (preset === 'today') {
+          setDate({ from: startOfToday(), to: endOfToday() });
+      } else if (preset === 'weekly') {
+          setDate({ from: startOfWeek(today), to: endOfWeek(today) });
+      } else if (preset === 'monthly') {
+          setDate({ from: startOfMonth(today), to: endOfMonth(today) });
+      }
+  };
   
-  if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-primary">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
         <div className="flex gap-2">
             {canManageKYC && (
                 <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { 
@@ -380,7 +491,7 @@ export default function Dashboard() {
                                     <FormField control={kycForm.control} name="customerId" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Select Customer</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
@@ -391,7 +502,7 @@ export default function Dashboard() {
                                     <FormField control={kycForm.control} name="type" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Document Category</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     <SelectItem value="owner_id">Owner ID Card</SelectItem>
@@ -518,23 +629,58 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {(isSuperAdmin || user?.role?.toLowerCase() === 'staff') && (
+      {(isSuperAdmin || user?.role?.toLowerCase() === 'staff' || user?.role?.toLowerCase() === 'finance') && (
           <div className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary</h3>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><Briefcase className="h-5 w-5 text-primary" /> My Portfolio Summary</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1.5 mr-2">
+                          <Button variant="outline" size="sm" className="h-8 text-[10px] uppercase font-bold" onClick={() => setDatePreset('all')}>All</Button>
+                          <Button variant="outline" size="sm" className="h-8 text-[10px] uppercase font-bold" onClick={() => setDatePreset('today')}>Today</Button>
+                          <Button variant="outline" size="sm" className="h-8 text-[10px] uppercase font-bold" onClick={() => setDatePreset('weekly')}>Week</Button>
+                          <Button variant="outline" size="sm" className="h-8 text-[10px] uppercase font-bold" onClick={() => setDatePreset('monthly')}>Month</Button>
+                      </div>
+                      <DatePickerWithRange date={date} setDate={setDate} />
+                  </div>
+              </div>
+              
               <div className="grid gap-4 md:grid-cols-3">
-                  <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase">Assigned</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{myPortfolioStats.activeCount}</div></CardContent></Card>
-                  <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase">Disbursed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh {myPortfolioStats.totalDisbursed.toLocaleString()}</div></CardContent></Card>
-                  <Card><CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase">Collected</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">Ksh {myPortfolioStats.totalCollected.toLocaleString()}</div></CardContent></Card>
+                  <Card className="border-l-4 border-l-primary">
+                      <CardHeader className="pb-2">
+                          <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
+                              <ShieldCheck className="h-3 w-3" /> Active Debt
+                          </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                          <div className="text-2xl font-bold">{myPortfolioStats.activeCount}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1">Total assigned active loans</p>
+                      </CardContent>
+                  </Card>
+                  <Card className="border-l-4 border-l-blue-500">
+                      <CardHeader className="pb-2">
+                          <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
+                              <HandCoins className="h-3 w-3" /> Period Disbursed
+                          </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                          <div className="text-2xl font-bold">Ksh {myPortfolioStats.totalDisbursed.toLocaleString()}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1">Capital advanced in selected window</p>
+                      </CardContent>
+                  </Card>
+                  <Card className="border-l-4 border-l-green-500">
+                      <CardHeader className="pb-2">
+                          <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
+                              <TrendingUp className="h-3 w-3 text-green-600" /> Period Collected
+                          </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                          <div className="text-2xl font-bold text-green-600">Ksh {myPortfolioStats.totalCollected.toLocaleString()}</div>
+                          <p className="text-[10px] text-muted-foreground mt-1">Total payments processed in window</p>
+                      </CardContent>
+                  </Card>
               </div>
           </div>
       )}
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-         {(isSuperAdmin || isFinance) && (
-           <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Realized Revenue</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">Ksh 0</div></CardContent></Card>
-         )}
-         <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Loans Disbursed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.disbursedCount || 0}</div></CardContent></Card>
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="flex flex-col h-[600px]">
@@ -554,7 +700,12 @@ export default function Dashboard() {
                     
                     <div className="flex-1 overflow-hidden">
                         <TabsContent value="all" className="h-full m-0 p-0">
-                            {priorityDueLoans.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Due Payments</AlertTitle></Alert></div>) : (
+                            {priorityDueLoans.length === 0 ? (
+                                <div className="p-12 text-center h-full flex flex-col items-center justify-center">
+                                    <Clock className="h-12 w-12 text-muted-foreground/20 mb-4" />
+                                    <p className="text-muted-foreground font-medium">No urgent follow-ups required.</p>
+                                </div>
+                            ) : (
                                 <ScrollArea className="h-full">
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-card z-10">
@@ -617,7 +768,12 @@ export default function Dashboard() {
                             )}
                         </TabsContent>
                         <TabsContent value="daily" className="h-full m-0 p-0">
-                            {dailyDue.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Daily Payments</AlertTitle></Alert></div>) : (
+                            {dailyDue.length === 0 ? (
+                                <div className="p-12 text-center h-full flex flex-col items-center justify-center">
+                                    <Clock className="h-12 w-12 text-muted-foreground/20 mb-4" />
+                                    <p className="text-muted-foreground font-medium">No daily repayment loans found.</p>
+                                </div>
+                            ) : (
                                 <ScrollArea className="h-full">
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-card z-10">
@@ -658,7 +814,12 @@ export default function Dashboard() {
                             )}
                         </TabsContent>
                         <TabsContent value="weekly" className="h-full m-0 p-0">
-                            {weeklyDue.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Weekly Payments</AlertTitle></Alert></div>) : (
+                            {weeklyDue.length === 0 ? (
+                                <div className="p-12 text-center h-full flex flex-col items-center justify-center">
+                                    <Clock className="h-12 w-12 text-muted-foreground/20 mb-4" />
+                                    <p className="text-muted-foreground font-medium">No weekly repayment loans found.</p>
+                                </div>
+                            ) : (
                                 <ScrollArea className="h-full">
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-card z-10">
@@ -722,8 +883,9 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
                 {newApplications.length === 0 ? (
-                    <div className="p-6 text-center">
-                        <Alert><AlertTitle>No Pending Applications</AlertTitle></Alert>
+                    <div className="p-12 text-center h-full flex flex-col items-center justify-center">
+                        <AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" />
+                        <p className="text-muted-foreground font-medium">No pending applications.</p>
                     </div>
                 ) : (
                     <ScrollArea className="h-full">
@@ -787,21 +949,31 @@ export default function Dashboard() {
                             </form>
                         </Form>
                         <ScrollArea className="h-40 border rounded-md p-3">
-                            {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions.</p>) : (
-                                <div className="space-y-3">{[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => {
+                            {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions recorded.</p>) : (
+                                <div className="space-y-3">
+                                    {[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => {
                                         let nDate: Date;
                                         if ((note.date as any)?.seconds) nDate = new Date((note.date as any).seconds * 1000);
                                         else if (note.date instanceof Date) nDate = note.date;
                                         else nDate = note.date ? new Date(note.date) : new Date();
 
                                         return (
-                                            <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold">{note.staffName}</span><span className="text-[9px]">{isNaN(nDate.getTime()) ? 'N/A' : format(nDate, 'dd/MM HH:mm')}</span></div><p className="italic">"{note.content}"</p></div>
+                                            <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs">
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className="font-bold">{note.staffName}</span>
+                                                    <span className="text-[9px]">{isNaN(nDate.getTime()) ? 'N/A' : format(nDate, 'dd/MM HH:mm')}</span>
+                                                </div>
+                                                <p className="italic">"{note.content}"</p>
+                                            </div>
                                         );
-                                    })}</div>
+                                    })}
+                                </div>
                             )}
                         </ScrollArea>
                     </div>
-                    <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose></DialogFooter>
+                    <DialogFooter className="p-6 pt-2">
+                        <DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose>
+                    </DialogFooter>
                   </>
               )}
           </DialogContent>
