@@ -335,11 +335,9 @@ export default function Dashboard() {
             daysUntil: differenceInDays(nextDueDate, today)
         };
       }).filter(loan => {
-          // A loan is a dashboard priority if:
-          // 1. It is already late (daysUntil < 0)
-          // 2. It has positive arrears balance
-          // 3. It is due within the threshold (7 days for monthly, 3 for weekly, 1 for daily)
-          const offset = loan.paymentFrequency === 'monthly' ? 7 : (loan.paymentFrequency === 'weekly' ? 3 : 1);
+          // Visibility thresholds for dashboard follow-up
+          // Monthly: 14 days, Weekly: 7 days, Daily: 3 days
+          const offset = loan.paymentFrequency === 'monthly' ? 14 : (loan.paymentFrequency === 'weekly' ? 7 : 3);
           const isLate = loan.daysUntil < 0;
           const isDueSoon = loan.daysUntil >= 0 && loan.daysUntil <= offset;
           const hasArrears = loan.arrearsBalance > 0;
