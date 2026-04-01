@@ -267,98 +267,93 @@ export default function Dashboard() {
       return { activeCount: activeLoans.length, totalDisbursed, totalCollected };
   }, [myPortfolio]);
 
-  const processedLoans = useMemo(() => {
+  const processedLoansWithTimeline = useMemo(() => {
       if (!loans) return [];
-      return loans.map(loan => {
+      const today = startOfToday();
+
+      return loans.filter(loan => 
+          loan.status !== 'paid' && 
+          loan.status !== 'application' && 
+          loan.status !== 'rejected' &&
+          loan.status !== 'rollover'
+      ).map(loan => {
           const currentCustomer = customers?.find(c => c.id === loan.customerId);
-          return {
-              ...loan,
-              displayName: currentCustomer?.name || loan.customerName
+          
+          let baseDate: Date;
+          if (loan.firstPaymentDate?.seconds) {
+              baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+          } else if (loan.firstPaymentDate instanceof Date) {
+              baseDate = loan.firstPaymentDate;
+          } else {
+              const dDate = loan.disbursementDate?.seconds 
+                  ? new Date(loan.disbursementDate.seconds * 1000) 
+                  : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
+              
+              if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
+              else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
+              else baseDate = addMonths(dDate, 1);
+          }
+
+          if (isNaN(baseDate.getTime())) baseDate = new Date();
+          
+          const instalmentAmt = loan.instalmentAmount || 1;
+          const totalPaid = loan.totalPaid || 0;
+          const actualInstalmentsPaid = totalPaid / instalmentAmt;
+
+          let cyclesPassed = 0;
+          if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
+          else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
+          else if (loan.paymentFrequency === 'monthly') cyclesPassed = differenceInMonths(today, baseDate);
+
+          const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
+          const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
+          
+          const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
+          let nextDueDate: Date;
+          if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextInstalmentIndex);
+          else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
+          else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
+
+          const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
+          const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
+
+          return { 
+              ...loan, 
+              displayName: currentCustomer?.name || loan.customerName,
+              nextDueDate, 
+              arrearsCount, 
+              arrearsBalance,
+              daysUntil: differenceInDays(nextDueDate, today)
           };
       });
   }, [loans, customers]);
 
-  const dueLoans = useMemo(() => {
-    const today = startOfToday();
-    
-    return processedLoans.filter(loan => 
-        loan.status !== 'paid' && 
-        loan.status !== 'application' && 
-        loan.status !== 'rejected' &&
-        loan.status !== 'rollover'
-    ).map(loan => {
-        let baseDate: Date;
-        if (loan.firstPaymentDate?.seconds) {
-            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
-        } else if (loan.firstPaymentDate instanceof Date) {
-            baseDate = loan.firstPaymentDate;
-        } else {
-            const dDate = loan.disbursementDate?.seconds 
-                ? new Date(loan.disbursementDate.seconds * 1000) 
-                : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
-            
-            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
-            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
-            else baseDate = addMonths(dDate, 1);
-        }
-
-        if (isNaN(baseDate.getTime())) baseDate = new Date();
-        
-        const instalmentAmt = loan.instalmentAmount || 1;
-        const totalPaid = loan.totalPaid || 0;
-        const actualInstalmentsPaid = totalPaid / instalmentAmt;
-
-        let cyclesPassed = 0;
-        if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
-        else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
-        else if (loan.paymentFrequency === 'monthly') {
-            cyclesPassed = differenceInMonths(today, baseDate);
-        }
-
-        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
-        const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
-        
-        const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
-        let nextDueDate: Date;
-        if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextInstalmentIndex);
-        else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
-        else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
-
-        const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
-        const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
-
-        return { 
-            ...loan, 
-            nextDueDate, 
-            arrearsCount, 
-            arrearsBalance,
-            daysUntil: differenceInDays(nextDueDate, today)
-        };
-      }).filter(loan => {
-          // Visibility thresholds for dashboard follow-up
-          // Monthly: 14 days, Weekly: 7 days, Daily: 3 days
+  // "Priority" list for the ALL tab (Threshold filtered)
+  const priorityDueLoans = useMemo(() => {
+      return processedLoansWithTimeline.filter(loan => {
           const offset = loan.paymentFrequency === 'monthly' ? 14 : (loan.paymentFrequency === 'weekly' ? 7 : 3);
           const isLate = loan.daysUntil < 0;
           const isDueSoon = loan.daysUntil >= 0 && loan.daysUntil <= offset;
           const hasArrears = loan.arrearsBalance > 0;
-
           return isLate || isDueSoon || hasArrears;
-      }).sort((a, b) => {
-          if (a.daysUntil !== b.daysUntil) return a.daysUntil - b.daysUntil;
-          return b.arrearsBalance - a.arrearsBalance;
-      });
-  }, [processedLoans]);
+      }).sort((a, b) => a.daysUntil - b.daysUntil);
+  }, [processedLoansWithTimeline]);
 
-  const dailyDue = useMemo(() => dueLoans.filter(l => l.paymentFrequency === 'daily'), [dueLoans]);
-  const weeklyDue = useMemo(() => dueLoans.filter(l => l.paymentFrequency === 'weekly'), [dueLoans]);
+  // Comprehensive lists for specific frequency tabs
+  const dailyDue = useMemo(() => processedLoansWithTimeline.filter(l => l.paymentFrequency === 'daily').sort((a, b) => a.daysUntil - b.daysUntil), [processedLoansWithTimeline]);
+  const weeklyDue = useMemo(() => processedLoansWithTimeline.filter(l => l.paymentFrequency === 'weekly').sort((a, b) => a.daysUntil - b.daysUntil), [processedLoansWithTimeline]);
 
   const newApplications = useMemo(() => {
-    return processedLoans.filter(loan => loan.status === 'application').sort((a, b) => {
+    if (!loans) return [];
+    return loans.filter(loan => loan.status === 'application').map(loan => {
+        const currentCustomer = customers?.find(c => c.id === loan.customerId);
+        return { ...loan, displayName: currentCustomer?.name || loan.customerName };
+    }).sort((a, b) => {
         const tsA = a.disbursementDate?.seconds || 0;
         const tsB = b.disbursementDate?.seconds || 0;
         return tsB - tsA;
     });
-  }, [processedLoans]);
+  }, [loans, customers]);
   
   if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
@@ -548,13 +543,13 @@ export default function Dashboard() {
         <Card className="flex flex-col h-[600px]">
             <CardHeader className="pb-2">
                 <CardTitle>Due Loans & Follow-ups</CardTitle>
-                <CardDescription>Accounts requiring attention based on their payment schedule and arrears.</CardDescription>
+                <CardDescription>Comprehensive monitoring of repayment cycles and arrears.</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
                 <Tabs defaultValue="all" className="h-full flex flex-col">
                     <div className="px-6 pb-2">
                         <TabsList className="grid grid-cols-3 w-full">
-                            <TabsTrigger value="all" className="text-xs">All Due ({dueLoans.length})</TabsTrigger>
+                            <TabsTrigger value="all" className="text-xs">Priority Due ({priorityDueLoans.length})</TabsTrigger>
                             <TabsTrigger value="daily" className="text-xs">Daily ({dailyDue.length})</TabsTrigger>
                             <TabsTrigger value="weekly" className="text-xs">Weekly ({weeklyDue.length})</TabsTrigger>
                         </TabsList>
@@ -562,7 +557,7 @@ export default function Dashboard() {
                     
                     <div className="flex-1 overflow-hidden">
                         <TabsContent value="all" className="h-full m-0 p-0">
-                            {dueLoans.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Due Payments</AlertTitle></Alert></div>) : (
+                            {priorityDueLoans.length === 0 ? (<div className="p-6"><Alert><AlertTitle>No Due Payments</AlertTitle></Alert></div>) : (
                                 <ScrollArea className="h-full">
                                     <Table>
                                         <TableHeader className="sticky top-0 bg-card z-10">
@@ -576,7 +571,7 @@ export default function Dashboard() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {dueLoans.map((loan) => {
+                                            {priorityDueLoans.map((loan) => {
                                                 const isLate = loan.daysUntil < 0;
                                                 return (
                                                     <TableRow key={loan.id}>
@@ -647,7 +642,7 @@ export default function Dashboard() {
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.abs(loan.daysUntil)}d</Badge>
                                                         ) : (
                                                             <Badge className="text-[9px] font-black uppercase bg-secondary text-secondary-foreground">
-                                                                {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
+                                                                {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil}d`}
                                                             </Badge>
                                                         )}
                                                     </TableCell>
@@ -693,7 +688,7 @@ export default function Dashboard() {
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.abs(loan.daysUntil)}d</Badge>
                                                         ) : (
                                                             <Badge className="text-[9px] font-black uppercase bg-secondary text-secondary-foreground">
-                                                                {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
+                                                                {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil}d`}
                                                             </Badge>
                                                         )}
                                                     </TableCell>
