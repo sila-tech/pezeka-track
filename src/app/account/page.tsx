@@ -358,7 +358,9 @@ export default function AccountPage() {
                                             {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
                                                 <Badge variant="destructive" className="text-[9px] uppercase">Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency[0]}</Badge>
                                             ) : (
-                                                <Badge className="bg-green-100 text-green-800 text-[9px] uppercase border-none">{loan.daysUntil === 0 ? 'Due Today' : 'Active'}</Badge>
+                                                <Badge className="bg-green-100 text-green-800 text-[9px] uppercase border-none">
+                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
+                                                </Badge>
                                             )}
                                             <span className="text-[10px] font-bold text-muted-foreground italic">Next: {format(loan.nextDueDate, 'MMM dd')}</span>
                                         </div>

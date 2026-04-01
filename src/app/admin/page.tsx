@@ -596,13 +596,9 @@ export default function Dashboard() {
                                                                 <Badge variant="destructive" className="text-[9px] w-fit font-black uppercase tracking-tighter">
                                                                     Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
                                                                 </Badge>
-                                                            ) : loan.advanceCount > 0 ? (
-                                                                <Badge className="text-[9px] w-fit font-black uppercase tracking-tighter bg-green-100 text-green-800 border-none">
-                                                                    Ahead {loan.advanceCount.toFixed(1)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
-                                                                </Badge>
                                                             ) : (
                                                                 <Badge variant="secondary" className="text-[9px] w-fit font-black uppercase tracking-tighter">
-                                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil}d`}
+                                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
                                                                 </Badge>
                                                             )}
                                                         </TableCell>
@@ -643,8 +639,8 @@ export default function Dashboard() {
                                                         {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}d</Badge>
                                                         ) : (
-                                                            <Badge className={cn("text-[9px] font-black uppercase", loan.advanceCount > 0 ? "bg-green-100 text-green-800" : "bg-secondary text-secondary-foreground")}>
-                                                                {loan.daysUntil === 0 ? 'Due Today' : (loan.advanceCount > 0 ? `Ahead ${loan.advanceCount.toFixed(1)}d` : `Due ${loan.daysUntil}d`)}
+                                                            <Badge className="text-[9px] font-black uppercase bg-secondary text-secondary-foreground">
+                                                                {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
                                                             </Badge>
                                                         )}
                                                     </TableCell>
@@ -684,8 +680,8 @@ export default function Dashboard() {
                                                         {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
                                                             <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}w</Badge>
                                                         ) : (
-                                                            <Badge className={cn("text-[9px] font-black uppercase", loan.advanceCount > 0 ? "bg-green-100 text-green-800" : "bg-secondary text-secondary-foreground")}>
-                                                                {loan.daysUntil === 0 ? 'Due Today' : (loan.advanceCount > 0 ? `Ahead ${loan.advanceCount.toFixed(1)}w` : `Due ${loan.daysUntil}d`)}
+                                                            <Badge className="text-[9px] font-black uppercase bg-secondary text-secondary-foreground">
+                                                                {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
                                                             </Badge>
                                                         )}
                                                     </TableCell>
