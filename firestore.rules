@@ -5,60 +5,53 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model.
-     * We prioritize domain-based authorization for Pezeka staff to ensure 
-     * immediate access even if the database profile is still synchronizing.
+     * We prioritize domain-based authorization for Pezeka staff.
      */
 
     // --- Helper Functions ---
 
-    /** @description Checks if the user is authenticated. */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /** 
      * @description Robust check for Finance authorization. 
-     * Prioritizes direct email matches and the @finance domain.
      */
     function isFinance() {
       let email = request.auth.token.email;
-      let isSimon = email == 'simon@pezeka.com' || email == 'simon@finance.pezeka.com';
+      let uid = request.auth.uid;
+      // Explicitly grant Simon access by email and multiple known UIDs
+      let isSimon = email == 'simon@pezeka.com' || email == 'simon@finance.pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
       let isFinanceDomain = email != null && email.endsWith('@finance.pezeka.com');
-      let isFinanceUid = request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
       
-      // Check Firestore doc only if domain check fails
-      let hasFinanceRole = exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-                           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() == 'finance';
+      // Check Firestore doc only if domain/Simon check fails
+      let hasFinanceRole = exists(/databases/$(database)/documents/users/$(uid)) && 
+                           get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance';
       
-      return isSignedIn() && (isSimon || isFinanceDomain || isFinanceUid || hasFinanceRole);
+      return isSignedIn() && (isSimon || isFinanceDomain || hasFinanceRole);
     }
 
     /** 
      * @description Robust check for Staff authorization. 
-     * Includes everyone in Finance plus the @staff domain.
      */
     function isStaff() {
       let email = request.auth.token.email;
+      let uid = request.auth.uid;
+      let isSimon = email == 'simon@pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
       let isStaffDomain = email != null && (email.endsWith('@staff.pezeka.com') || email.endsWith('@finance.pezeka.com'));
-      let isSimon = email == 'simon@pezeka.com';
       
-      // Check Firestore doc only if domain check fails
-      let hasStaffRole = exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-                         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role.lower() in ['staff', 'finance'];
+      let hasStaffRole = exists(/databases/$(database)/documents/users/$(uid)) && 
+                         get(/databases/$(database)/documents/users/$(uid)).data.role.lower() in ['staff', 'finance'];
       
       return isSignedIn() && (isSimon || isStaffDomain || hasStaffRole);
     }
 
-    /** @description Checks if the user is the owner of the document based on UID. */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     // --- Collection Rules ---
 
-    /**
-     * @description Staff profile management.
-     */
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isStaff();
@@ -67,9 +60,6 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    /**
-     * @description Customer records. Accessible to all internal staff.
-     */
     match /customers/{customerId} {
       allow get, list: if isStaff() || isOwner(customerId);
       allow create: if isStaff() || isSignedIn();
@@ -77,9 +67,6 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    /**
-     * @description Loan records nested under customers.
-     */
     match /customers/{customerId}/loans/{loanId} {
       allow get, list: if isStaff() || isOwner(customerId);
       allow create: if isStaff() || isOwner(customerId);
@@ -94,9 +81,6 @@ service cloud.firestore {
       }
     }
 
-    /**
-     * @description Top level loans collection for aggregate queries.
-     */
     match /loans/{loanId} {
       allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
       allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
@@ -104,17 +88,11 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    /**
-     * @description KYC Document Repository. 
-     * Now accessible to all Staff and Finance for verification.
-     */
     match /kyc_documents/{docId} {
+      // All admins (Staff and Finance) can manage KYC documents
       allow get, list, create, update, delete: if isStaff();
     }
 
-    /**
-     * @description Financial collections strictly restricted to finance staff.
-     */
     match /dailyExpenses/{expenseId} {
       allow get, list, create, update, delete: if isFinance();
     }
