@@ -1,4 +1,3 @@
-
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
@@ -232,7 +231,7 @@ type FinanceEntryData = {
     loanId?: string;
     recordedBy?: string;
     expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
-    receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'investment' | 'other';
+    receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'registration_fee' | 'penalty_payment' | 'investor_deposit' | 'other';
     payoutCategory?: 'loan_disbursement' | 'investor_withdrawal' | 'other';
 }
 

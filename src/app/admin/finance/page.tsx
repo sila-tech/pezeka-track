@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -96,7 +95,7 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isAuthorized = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isAuthorized = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<any>(isAuthorized ? 'financeEntries' : null);
@@ -281,17 +280,19 @@ export default function FinancePage() {
                                     <SelectContent>
                                         {entryForm.watch('type') === 'receipt' ? (
                                             <>
-                                                <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
-                                                <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
-                                                <SelectItem value="investment">Investor Deposit</SelectItem>
-                                                <SelectItem value="other">Other Inflow</SelectItem>
+                                                <SelectItem value="loan_repayment">Loan Repayment (Manual)</SelectItem>
+                                                <SelectItem value="upfront_fees">Upfront Fees (Appraisal/Proc)</SelectItem>
+                                                <SelectItem value="registration_fee">Onboarding / Registration Fee</SelectItem>
+                                                <SelectItem value="penalty_payment">Penalty Collection</SelectItem>
+                                                <SelectItem value="investor_deposit">Investor Deposit</SelectItem>
+                                                <SelectItem value="other">Other Inflow / Misc Income</SelectItem>
                                             </>
                                         ) : (
                                             <>
-                                                <SelectItem value="facilitation_commission">Staff Commission</SelectItem>
-                                                <SelectItem value="office_purchase">Office / Utility Expense</SelectItem>
+                                                <SelectItem value="facilitation_commission">Staff Commission / Facilitation</SelectItem>
+                                                <SelectItem value="office_purchase">Office / Utility / Supply Expense</SelectItem>
                                                 <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
-                                                <SelectItem value="other">Other Outflow</SelectItem>
+                                                <SelectItem value="other">Other Outflow / General Expense</SelectItem>
                                             </>
                                         )}
                                     </SelectContent>
