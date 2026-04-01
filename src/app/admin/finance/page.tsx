@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addMonths } from "date-fns";
-import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2 } from "lucide-react";
+import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2, Wallet, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,6 +41,14 @@ const editLoanSchema = z.object({
   disbursementDate: z.string().min(1, 'Date is required.'),
   firstPaymentDate: z.string().min(1, 'Payment date required.'),
   totalRepayableAmount: z.coerce.number().min(0, 'Total to pay is required.'),
+});
+
+const financeEntrySchema = z.object({
+    type: z.enum(['receipt', 'expense', 'payout']),
+    amount: z.coerce.number().min(1, 'Amount must be greater than 0'),
+    date: z.string().min(1, 'Date is required'),
+    description: z.string().min(3, 'Provide a clear description'),
+    category: z.string().min(1, 'Select a category'),
 });
 
 interface Payment {
@@ -82,6 +90,7 @@ export default function FinancePage() {
   const [lbStatus, setLbStatus] = useState('all');
   const [selectedLoanForHistory, setSelectedLoanForHistory] = useState<Loan | null>(null);
   const [selectedLoanForEdit, setSelectedLoanForEdit] = useState<Loan | null>(null);
+  const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -95,6 +104,17 @@ export default function FinancePage() {
 
   const editForm = useForm<z.infer<typeof editLoanSchema>>({
     resolver: zodResolver(editLoanSchema),
+  });
+
+  const entryForm = useForm<z.infer<typeof financeEntrySchema>>({
+      resolver: zodResolver(financeEntrySchema),
+      defaultValues: {
+          type: 'receipt',
+          date: format(new Date(), 'yyyy-MM-dd'),
+          amount: 0,
+          description: '',
+          category: 'other'
+      }
   });
 
   const financialData = useMemo(() => {
@@ -177,6 +197,34 @@ export default function FinancePage() {
     }
   }
 
+  async function onEntrySubmit(values: z.infer<typeof financeEntrySchema>) {
+      setIsSubmitting(true);
+      try {
+          const entryData: any = {
+              type: values.type,
+              amount: values.amount,
+              date: new Date(values.date),
+              description: values.description,
+              recordedBy: user?.name || user?.email || 'Admin',
+          };
+
+          if (values.type === 'receipt') {
+              entryData.receiptCategory = values.category;
+          } else {
+              entryData.payoutCategory = values.category;
+          }
+
+          await addFinanceEntry(firestore, entryData);
+          toast({ title: 'Entry Recorded', description: 'The cash flow ledger has been updated.' });
+          entryForm.reset();
+          setIsAddEntryOpen(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+      } finally {
+          setIsSubmitting(false);
+      }
+  }
+
   if (userLoading || loansLoading || financeEntriesLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!isAuthorized) return <div className="p-12 text-center font-bold">Access Denied</div>;
 
@@ -184,6 +232,88 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Finance Ledger</h1>
+        <Dialog open={isAddEntryOpen} onOpenChange={setIsAddEntryOpen}>
+            <DialogTrigger asChild>
+                <Button className="h-11 font-bold shadow-md">
+                    <PlusCircle className="mr-2 h-5 w-5" />
+                    Add Finance Entry
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Record Financial Transaction</DialogTitle>
+                    <DialogDescription>Manually record non-automated income or expenditure.</DialogDescription>
+                </DialogHeader>
+                <Form {...entryForm}>
+                    <form onSubmit={entryForm.handleSubmit(onEntrySubmit)} className="space-y-4 pt-4">
+                        <FormField control={entryForm.control} name="type" render={({ field }) => (
+                            <FormItem className="space-y-3">
+                                <FormLabel>Transaction Direction</FormLabel>
+                                <FormControl>
+                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="receipt" /></FormControl>
+                                            <FormLabel className="font-bold text-green-600 flex items-center gap-1"><ArrowDownLeft className="h-3 w-3" /> Inflow (Receipt)</FormLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="payout" /></FormControl>
+                                            <FormLabel className="font-bold text-destructive flex items-center gap-1"><ArrowUpRight className="h-3 w-3" /> Outflow (Payout)</FormLabel>
+                                        </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                            </FormItem>
+                        )} />
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={entryForm.control} name="amount" render={({ field }) => (
+                                <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={entryForm.control} name="date" render={({ field }) => (
+                                <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+
+                        <FormField control={entryForm.control} name="category" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Category</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        {entryForm.watch('type') === 'receipt' ? (
+                                            <>
+                                                <SelectItem value="loan_repayment">Loan Repayment</SelectItem>
+                                                <SelectItem value="upfront_fees">Upfront Fees</SelectItem>
+                                                <SelectItem value="investment">Investor Deposit</SelectItem>
+                                                <SelectItem value="other">Other Inflow</SelectItem>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <SelectItem value="facilitation_commission">Staff Commission</SelectItem>
+                                                <SelectItem value="office_purchase">Office / Utility Expense</SelectItem>
+                                                <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
+                                                <SelectItem value="other">Other Outflow</SelectItem>
+                                            </>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+
+                        <FormField control={entryForm.control} name="description" render={({ field }) => (
+                            <FormItem><FormLabel>Notes / Description</FormLabel><FormControl><Textarea placeholder="Details of the entry..." {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+
+                        <DialogFooter>
+                            <Button type="submit" className="w-full h-12 text-lg font-bold" disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
+                                Save Entry
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
       </div>
       
       <Tabs defaultValue="loanbook" className="w-full">

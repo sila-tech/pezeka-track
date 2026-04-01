@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useRef, useEffect } from 'react';
@@ -946,7 +947,10 @@ export default function Dashboard() {
                                         </FormControl>
                                     </FormItem>
                                 )}/>
-                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>Save Note</Button>
+                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>
+                                    {isAddingNote ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                                    Save Note
+                                </Button>
                             </form>
                         </Form>
                         <ScrollArea className="h-40 border rounded-md p-3">
