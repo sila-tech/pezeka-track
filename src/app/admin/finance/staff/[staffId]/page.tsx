@@ -12,6 +12,7 @@ import { Loader2, ChevronLeft, Calendar as CalendarIcon, TrendingUp, Wallet, Han
 import { format, startOfToday, endOfToday, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, addDays, addWeeks, addMonths, differenceInDays, differenceInMonths } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { DatePickerWithRange } from '../../components/editable-finance-report-tab';
+import { cn } from '@/lib/utils';
 
 interface Payment {
     paymentId: string;
@@ -67,11 +68,9 @@ export default function StaffPerformancePage() {
             periodCollections: 0, 
             periodLoans: [],
             periodCollectionsList: [],
-            allTimePortfolio: [],
-            timelines: {} as Record<string, string>
+            allTimePortfolio: []
         };
 
-        const today = startOfToday();
         const disbursedLoans = loans.filter(l => l.status !== 'application' && l.status !== 'rejected');
         const staffLoans = disbursedLoans.filter(l => l.assignedStaffId === staffId);
         
@@ -87,46 +86,8 @@ export default function StaffPerformancePage() {
         let periodCollections = 0;
         const periodLoanEntries: any[] = [];
         const periodCollectionsList: any[] = [];
-        const timelines: Record<string, string> = {};
 
         staffLoans.forEach(loan => {
-            // Timeline Calculation Logic
-            let baseDate: Date;
-            if (loan.firstPaymentDate && 'seconds' in loan.firstPaymentDate) {
-                baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
-            } else if (loan.firstPaymentDate instanceof Date) {
-                baseDate = loan.firstPaymentDate;
-            } else {
-                const dDate = loan.disbursementDate && 'seconds' in loan.disbursementDate 
-                    ? new Date(loan.disbursementDate.seconds * 1000) 
-                    : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
-                
-                if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
-                else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
-                else baseDate = addMonths(dDate, 1);
-            }
-
-            const actualPaid = (loan.totalPaid || 0) / (loan.instalmentAmount || 1);
-            const nextIdx = Math.floor(actualPaid);
-            let nextDue: Date;
-            if (loan.paymentFrequency === 'daily') nextDue = addDays(baseDate, nextIdx);
-            else if (loan.paymentFrequency === 'weekly') nextDue = addWeeks(baseDate, nextIdx);
-            else nextDue = addMonths(baseDate, nextIdx);
-
-            const daysUntil = differenceInDays(nextDue, today);
-            
-            let cyclesPassed = 0;
-            if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
-            else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
-            else if (loan.paymentFrequency === 'monthly') cyclesPassed = differenceInMonths(today, baseDate);
-
-            const arrears = Math.max(0, cyclesPassed - actualPaid);
-
-            if (loan.status === 'paid') timelines[loan.id] = "PAID";
-            else if (arrears > 0 && daysUntil < 0) timelines[loan.id] = `LATE ${Math.ceil(arrears)}${loan.paymentFrequency[0]}`;
-            else if (daysUntil === 0) timelines[loan.id] = "DUE TODAY";
-            else timelines[loan.id] = `DUE IN ${daysUntil}D`;
-
             // Stats
             const dDate = loan.disbursementDate instanceof Date 
                 ? loan.disbursementDate 
@@ -160,8 +121,7 @@ export default function StaffPerformancePage() {
             periodCollections, 
             periodLoans: periodLoanEntries.sort((a,b) => b.date.getTime() - a.date.getTime()),
             periodCollectionsList: periodCollectionsList.sort((a,b) => b.date.getTime() - a.date.getTime()),
-            allTimePortfolio: staffLoans,
-            timelines
+            allTimePortfolio: staffLoans
         };
     }, [loans, staffId, date]);
 
@@ -347,7 +307,7 @@ export default function StaffPerformancePage() {
                                 <TableRow>
                                     <TableHead>Customer</TableHead>
                                     <TableHead className="text-right">Balance</TableHead>
-                                    <TableHead className="text-center">Timeline</TableHead>
+                                    <TableHead className="text-center">Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -361,8 +321,13 @@ export default function StaffPerformancePage() {
                                             Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}
                                         </TableCell>
                                         <TableCell className="text-center">
-                                            <Badge variant={performance.timelines[loan.id]?.startsWith('LATE') ? 'destructive' : 'outline'} className="text-[9px] uppercase font-black">
-                                                {performance.timelines[loan.id]}
+                                            <Badge className={cn("text-[9px] uppercase font-black px-3 py-1 rounded-full",
+                                                loan.status === 'active' ? "bg-blue-100 text-blue-800" :
+                                                loan.status === 'paid' ? "bg-green-100 text-green-800" :
+                                                loan.status === 'overdue' ? "bg-red-100 text-red-800" :
+                                                "bg-muted text-muted-foreground"
+                                            )}>
+                                                {loan.status}
                                             </Badge>
                                         </TableCell>
                                     </TableRow>

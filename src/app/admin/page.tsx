@@ -570,7 +570,7 @@ export default function Dashboard() {
                                                 <TableHead>Member No</TableHead>
                                                 <TableHead>Due Date</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Arrears Balance</TableHead>
+                                                <TableHead className="text-right">Arrears / Instalment</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -602,11 +602,16 @@ export default function Dashboard() {
                                                                 </Badge>
                                                             )}
                                                         </TableCell>
-                                                        <TableCell className={cn(
-                                                            "text-right font-black tabular-nums text-sm",
-                                                            loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600"
-                                                        )}>
-                                                            Ksh {loan.arrearsBalance > 0 ? loan.arrearsBalance.toLocaleString() : "0"}
+                                                        <TableCell className="text-right whitespace-nowrap">
+                                                            <div className={cn(
+                                                                "font-black tabular-nums text-sm",
+                                                                loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600"
+                                                            )}>
+                                                                Ksh {loan.arrearsBalance.toLocaleString()}
+                                                            </div>
+                                                            <div className="text-[10px] text-muted-foreground font-medium">
+                                                                / {loan.instalmentAmount.toLocaleString()}
+                                                            </div>
                                                         </TableCell>
                                                         <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                     </TableRow>
@@ -626,7 +631,7 @@ export default function Dashboard() {
                                                 <TableHead>Customer</TableHead>
                                                 <TableHead>Due Date</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Arrears</TableHead>
+                                                <TableHead className="text-right">Arrears / Instalment</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -644,7 +649,12 @@ export default function Dashboard() {
                                                             </Badge>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-bold text-xs text-destructive">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className={cn("font-bold text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>
+                                                            Ksh {loan.arrearsBalance.toLocaleString()}
+                                                        </div>
+                                                        <div className="text-[9px] text-muted-foreground">/ {loan.instalmentAmount.toLocaleString()}</div>
+                                                    </TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                 </TableRow>
                                             ))}
@@ -662,7 +672,7 @@ export default function Dashboard() {
                                                 <TableHead>Customer</TableHead>
                                                 <TableHead>Due Date</TableHead>
                                                 <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Arrears</TableHead>
+                                                <TableHead className="text-right">Arrears / Instalment</TableHead>
                                                 <TableHead className="text-center">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>
@@ -685,7 +695,12 @@ export default function Dashboard() {
                                                             </Badge>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="text-right font-bold text-xs text-destructive">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className={cn("font-bold text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>
+                                                            Ksh {loan.arrearsBalance.toLocaleString()}
+                                                        </div>
+                                                        <div className="text-[9px] text-muted-foreground">/ {loan.instalmentAmount.toLocaleString()}</div>
+                                                    </TableCell>
                                                     <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
                                                 </TableRow>
                                             ))}

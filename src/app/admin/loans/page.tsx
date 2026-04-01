@@ -218,8 +218,7 @@ export default function LoansPage() {
 
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
-    const today = startOfToday();
-
+    
     return loans.filter(loan => {
         if (loan.status === 'application' || loan.status === 'rejected' || loan.status === 'rollover') return false;
         
@@ -231,44 +230,6 @@ export default function LoansPage() {
             loan.idNumber?.includes(searchTerm) ||
             loan.accountNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
-    }).map(loan => {
-        // Timeline Calculation Logic
-        let baseDate: Date;
-        if (loan.firstPaymentDate?.seconds) {
-            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
-        } else {
-            const dDate = loan.disbursementDate?.seconds 
-                ? new Date(loan.disbursementDate.seconds * 1000) 
-                : new Date();
-            
-            if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
-            else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
-            else baseDate = addMonths(dDate, 1);
-        }
-
-        if (isNaN(baseDate.getTime())) baseDate = new Date();
-        
-        const instalmentAmt = loan.instalmentAmount || 1;
-        const totalPaid = loan.totalPaid || 0;
-        const actualInstalmentsPaid = totalPaid / instalmentAmt;
-
-        let cyclesPassed = 0;
-        if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
-        else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
-        else if (loan.paymentFrequency === 'monthly') cyclesPassed = differenceInMonths(today, baseDate);
-
-        const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
-        const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
-        
-        const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
-        let nextDueDate: Date;
-        if (loan.paymentFrequency === 'daily') nextDueDate = addDays(baseDate, nextInstalmentIndex);
-        else if (loan.paymentFrequency === 'weekly') nextDueDate = addWeeks(baseDate, nextInstalmentIndex);
-        else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
-
-        const daysUntil = differenceInDays(nextDueDate, today);
-
-        return { ...loan, nextDueDate, arrearsCount, daysUntil };
     });
   }, [loans, searchTerm, statusFilter]);
   
@@ -665,7 +626,7 @@ export default function LoansPage() {
                                 <TableHead>Staff Assigned</TableHead>
                                 <TableHead>First Pay</TableHead>
                                 <TableHead className="text-right">Balance</TableHead>
-                                <TableHead className="text-center">Timeline</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -690,15 +651,14 @@ export default function LoansPage() {
                                         <TableCell className="text-xs font-medium text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
                                         <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
                                         <TableCell className="text-center">
-                                            {loan.status === 'paid' ? (
-                                                <Badge className="text-[9px] uppercase">PAID</Badge>
-                                            ) : (loan.arrearsCount > 0 && loan.daysUntil < 0) ? (
-                                                <Badge variant="destructive" className="text-[9px] uppercase font-black">Late {Math.ceil(loan.arrearsCount)}{loan.paymentFrequency[0]}</Badge>
-                                            ) : (
-                                                <Badge variant="secondary" className="text-[9px] uppercase font-black">
-                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil}d`}
-                                                </Badge>
-                                            )}
+                                            <Badge className={cn("text-[9px] uppercase font-black px-3 py-1 rounded-full",
+                                                loan.status === 'active' ? "bg-blue-100 text-blue-800" :
+                                                loan.status === 'paid' ? "bg-green-100 text-green-800" :
+                                                loan.status === 'overdue' ? "bg-red-100 text-red-800" :
+                                                "bg-muted text-muted-foreground"
+                                            )}>
+                                                {loan.status}
+                                            </Badge>
                                         </TableCell>
                                     </TableRow>
                                   );

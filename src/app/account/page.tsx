@@ -355,13 +355,14 @@ export default function AccountPage() {
                                             <p className="text-muted-foreground text-[10px] font-black uppercase">Outstanding: KES {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</p>
                                         </div>
                                         <div className="flex flex-col items-end gap-1">
-                                            {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
-                                                <Badge variant="destructive" className="text-[9px] uppercase">Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency[0]}</Badge>
-                                            ) : (
-                                                <Badge className="bg-green-100 text-green-800 text-[9px] uppercase border-none">
-                                                    {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
-                                                </Badge>
-                                            )}
+                                            <Badge className={cn("text-[9px] uppercase font-black px-3 py-1 rounded-full",
+                                                loan.status === 'active' ? "bg-blue-100 text-blue-800" :
+                                                loan.status === 'paid' ? "bg-green-100 text-green-800" :
+                                                loan.status === 'overdue' ? "bg-red-100 text-red-800" :
+                                                "bg-muted text-muted-foreground"
+                                            )}>
+                                                {loan.status}
+                                            </Badge>
                                             <span className="text-[10px] font-bold text-muted-foreground italic">Next: {format(loan.nextDueDate, 'MMM dd')}</span>
                                         </div>
                                     </div>
