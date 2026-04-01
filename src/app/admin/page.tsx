@@ -3,11 +3,12 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/Alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
     Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, 
     ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
-    ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins
+    ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins,
+    AlertCircle
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -162,7 +163,7 @@ export default function Dashboard() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
   const isFinance = user?.role?.toLowerCase() === 'finance';
   const isStaff = user?.role?.toLowerCase() === 'staff' || isFinance;
   const isAuthorized = user && (isSuperAdmin || isStaff);
