@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useRef } from 'react';
@@ -94,7 +95,6 @@ export default function Dashboard() {
   const isStaff = user?.role?.toLowerCase() === 'staff' || isFinance;
   const isAuthorized = user && (isSuperAdmin || isStaff);
   
-  // KYC functionality is strictly Finance only
   const canManageKYC = isSuperAdmin || isFinance;
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
@@ -316,9 +316,7 @@ export default function Dashboard() {
         }
 
         const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
-        
         const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
-        const advanceCount = Math.max(0, actualInstalmentsPaid - expectedByNow);
         
         const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
         let nextDueDate: Date;
@@ -333,18 +331,23 @@ export default function Dashboard() {
             ...loan, 
             nextDueDate, 
             arrearsCount, 
-            advanceCount,
             arrearsBalance,
-            actualInstalmentsPaid,
-            expectedByNow,
             daysUntil: differenceInDays(nextDueDate, today)
         };
       }).filter(loan => {
+          // A loan is a dashboard priority if:
+          // 1. It is already late (daysUntil < 0)
+          // 2. It has positive arrears balance
+          // 3. It is due within the threshold (7 days for monthly, 3 for weekly, 1 for daily)
           const offset = loan.paymentFrequency === 'monthly' ? 7 : (loan.paymentFrequency === 'weekly' ? 3 : 1);
-          return loan.arrearsCount > 0 || loan.daysUntil <= offset;
+          const isLate = loan.daysUntil < 0;
+          const isDueSoon = loan.daysUntil >= 0 && loan.daysUntil <= offset;
+          const hasArrears = loan.arrearsBalance > 0;
+
+          return isLate || isDueSoon || hasArrears;
       }).sort((a, b) => {
-          if (b.arrearsCount !== a.arrearsCount) return b.arrearsCount - a.arrearsCount;
-          return a.nextDueDate.getTime() - b.nextDueDate.getTime();
+          if (a.daysUntil !== b.daysUntil) return a.daysUntil - b.daysUntil;
+          return b.arrearsBalance - a.arrearsBalance;
       });
   }, [processedLoans]);
 
@@ -576,6 +579,7 @@ export default function Dashboard() {
                                         </TableHeader>
                                         <TableBody>
                                             {dueLoans.map((loan) => {
+                                                const isLate = loan.daysUntil < 0;
                                                 return (
                                                     <TableRow key={loan.id}>
                                                         <TableCell>
@@ -592,9 +596,9 @@ export default function Dashboard() {
                                                             {format(loan.nextDueDate, 'dd/MM/yyyy')}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
+                                                            {isLate ? (
                                                                 <Badge variant="destructive" className="text-[9px] w-fit font-black uppercase tracking-tighter">
-                                                                    Late {Math.ceil(loan.arrearsCount)} {loan.paymentFrequency === 'daily' ? 'd' : (loan.paymentFrequency === 'weekly' ? 'w' : 'm')}
+                                                                    Late {Math.abs(loan.daysUntil)} {Math.abs(loan.daysUntil) === 1 ? 'day' : 'days'}
                                                                 </Badge>
                                                             ) : (
                                                                 <Badge variant="secondary" className="text-[9px] w-fit font-black uppercase tracking-tighter">
@@ -641,8 +645,8 @@ export default function Dashboard() {
                                                     <TableCell><div className="font-medium text-xs">{loan.displayName}</div></TableCell>
                                                     <TableCell className="text-xs font-bold">{format(loan.nextDueDate, 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell>
-                                                        {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
-                                                            <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}d</Badge>
+                                                        {loan.daysUntil < 0 ? (
+                                                            <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.abs(loan.daysUntil)}d</Badge>
                                                         ) : (
                                                             <Badge className="text-[9px] font-black uppercase bg-secondary text-secondary-foreground">
                                                                 {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
@@ -687,8 +691,8 @@ export default function Dashboard() {
                                                     </TableCell>
                                                     <TableCell className="text-xs font-bold">{format(loan.nextDueDate, 'dd/MM/yyyy')}</TableCell>
                                                     <TableCell>
-                                                        {loan.arrearsCount > 0 && loan.daysUntil < 0 ? (
-                                                            <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.ceil(loan.arrearsCount)}w</Badge>
+                                                        {loan.daysUntil < 0 ? (
+                                                            <Badge variant="destructive" className="text-[9px] font-black uppercase">Late {Math.abs(loan.daysUntil)}d</Badge>
                                                         ) : (
                                                             <Badge className="text-[9px] font-black uppercase bg-secondary text-secondary-foreground">
                                                                 {loan.daysUntil === 0 ? 'Due Today' : `Due in ${loan.daysUntil} days`}
