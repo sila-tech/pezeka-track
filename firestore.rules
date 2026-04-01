@@ -20,15 +20,13 @@ service cloud.firestore {
     function isFinance() {
       let email = request.auth.token.email;
       let uid = request.auth.uid;
-      // Explicitly grant Simon access by email and multiple known UIDs
+      
+      // Explicitly grant Simon access by email and known UIDs
       let isSimon = email == 'simon@pezeka.com' || email == 'simon@finance.pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
       let isFinanceDomain = email != null && email.endsWith('@finance.pezeka.com');
       
-      // Check Firestore doc only if domain/Simon check fails
-      let hasFinanceRole = exists(/databases/$(database)/documents/users/$(uid)) && 
-                           get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance';
-      
-      return isSignedIn() && (isSimon || isFinanceDomain || hasFinanceRole);
+      // Check role role only if Simon/Domain check fails
+      return isSignedIn() && (isSimon || isFinanceDomain || (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance'));
     }
 
     /** 
@@ -37,13 +35,11 @@ service cloud.firestore {
     function isStaff() {
       let email = request.auth.token.email;
       let uid = request.auth.uid;
+      
       let isSimon = email == 'simon@pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
       let isStaffDomain = email != null && (email.endsWith('@staff.pezeka.com') || email.endsWith('@finance.pezeka.com'));
       
-      let hasStaffRole = exists(/databases/$(database)/documents/users/$(uid)) && 
-                         get(/databases/$(database)/documents/users/$(uid)).data.role.lower() in ['staff', 'finance'];
-      
-      return isSignedIn() && (isSimon || isStaffDomain || hasStaffRole);
+      return isSignedIn() && (isSimon || isStaffDomain || (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() in ['staff', 'finance']));
     }
 
     function isOwner(userId) {
@@ -89,7 +85,6 @@ service cloud.firestore {
     }
 
     match /kyc_documents/{docId} {
-      // All admins (Staff and Finance) can manage KYC documents
       allow get, list, create, update, delete: if isStaff();
     }
 
@@ -115,7 +110,7 @@ service cloud.firestore {
     }
 
     match /mail_logs/{logId} {
-      allow get, list, create: if isFinance();
+      allow get, list, create: if isFinance() || isStaff();
       allow update, delete: if false;
     }
   }

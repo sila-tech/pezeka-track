@@ -380,7 +380,7 @@ export default function Dashboard() {
                                     <FormField control={kycForm.control} name="customerId" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Select Customer</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
@@ -391,7 +391,7 @@ export default function Dashboard() {
                                     <FormField control={kycForm.control} name="type" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Document Category</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     <SelectItem value="owner_id">Owner ID Card</SelectItem>
