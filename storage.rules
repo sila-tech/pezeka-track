@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /kyc/{customerId}/{allPaths=**} {
+      // Allow all authorized staff to read and write KYC documents.
+      // This logic mirrors your isStaff() check in Firestore.
+      allow read, write: if request.auth != null && 
+        (
+          request.auth.token.email == 'simon@pezeka.com' ||
+          request.auth.token.email.matches('.*@staff.pezeka.com$') ||
+          request.auth.token.email.matches('.*@finance.pezeka.com$') ||
+          request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
+        );
+    }
+  }
+}

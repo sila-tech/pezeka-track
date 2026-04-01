@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { deleteKYCDocument } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -180,11 +181,17 @@ export default function KYCRepositoryPage() {
                                             <TableRow key={doc.id} className="group hover:bg-muted/30 transition-colors">
                                                 <TableCell>
                                                     <div 
-                                                        className="h-12 w-12 rounded border bg-muted flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                                        className="h-12 w-12 rounded border bg-muted flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity relative"
                                                         onClick={() => setViewingDoc(doc)}
                                                     >
                                                         {doc.fileUrl ? (
-                                                            <img src={doc.fileUrl} alt="Thumbnail" className="h-full w-full object-cover" />
+                                                            <Image 
+                                                                src={doc.fileUrl} 
+                                                                alt="Thumbnail" 
+                                                                fill 
+                                                                className="object-cover"
+                                                                sizes="48px"
+                                                            />
                                                         ) : (
                                                             <FileText className="h-6 w-6 text-muted-foreground" />
                                                         )}
@@ -245,7 +252,16 @@ export default function KYCRepositoryPage() {
                         </Button>
                         
                         {viewingDoc?.fileUrl && (
-                            <img src={viewingDoc.fileUrl} alt="Full Resolution KYC" className="max-w-full max-h-[85vh] object-contain" />
+                            <div className="relative w-full h-[85vh]">
+                                <Image 
+                                    src={viewingDoc.fileUrl} 
+                                    alt="Full Resolution KYC" 
+                                    fill 
+                                    className="object-contain"
+                                    sizes="100vw"
+                                    unoptimized // Users upload large high-quality photos, we want to see the detail
+                                />
+                            </div>
                         )}
 
                         <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white">
