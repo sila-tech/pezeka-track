@@ -1,14 +1,13 @@
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useFirestore, useCollection, useAppUser, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useAppUser, useMemoFirebase, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock, Upload, ImagePlus } from 'lucide-react';
 import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -57,6 +56,7 @@ import {
   rolloverLoan,
   deleteLoan,
   recordLoanPayment,
+  uploadKYCDocument,
   type Loan
 } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -143,6 +143,11 @@ const penaltySchema = z.object({
     penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
 });
 
+const kycUploadSchema = z.object({
+    type: z.enum(['owner_id', 'guarantor_id', 'loan_form', 'security_attachment', 'guarantor_undertaking']),
+    fileName: z.string().min(1, "Enter a label for this document."),
+});
+
 interface Customer {
   id: string;
   name: string;
@@ -192,9 +197,17 @@ export default function LoansPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingKYC, setViewingKYC] = useState<KYCDoc | null>(null);
+  
+  // KYC Upload Internal states
+  const [isKYCAddOpen, setIsKYCAddOpen] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
+  const storage = useStorage();
   const { toast } = useToast();
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
@@ -232,7 +245,6 @@ export default function LoansPage() {
             loan.accountNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
     }).sort((a, b) => {
-        // Sort by disbursement date descending (latest first)
         const d1 = a.disbursementDate?.seconds || 0;
         const d2 = b.disbursementDate?.seconds || 0;
         return d2 - d1;
@@ -242,7 +254,6 @@ export default function LoansPage() {
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => loan.status === 'application').sort((a, b) => {
-        // Sort applications by submission time (createdAt) descending
         const d1 = a.createdAt?.seconds || 0;
         const d2 = b.createdAt?.seconds || 0;
         return d2 - d1;
@@ -271,6 +282,11 @@ export default function LoansPage() {
       resolver: zodResolver(editTermsSchema),
   });
 
+  const kycUploadForm = useForm<z.infer<typeof kycUploadSchema>>({
+      resolver: zodResolver(kycUploadSchema),
+      defaultValues: { type: 'owner_id', fileName: '' }
+  });
+
   const { watch } = form;
   const principalAmountWatch = watch('principalAmount');
   const interestRateWatch = watch('interestRate');
@@ -286,6 +302,62 @@ export default function LoansPage() {
     };
   }, [principalAmountWatch, interestRateWatch, numberOfInstalmentsWatch, paymentFrequencyWatch]);
 
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setShowCamera(true);
+      setCapturedImage(null);
+    } catch (e) { toast({ variant: 'destructive', title: 'Camera Error' }); }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+    }
+    setShowCamera(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+      setCapturedImage(canvas.toDataURL('image/jpeg', 0.8));
+      stopCamera();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => { setCapturedImage(reader.result as string); stopCamera(); };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  async function onKYCSubmit(values: z.infer<typeof kycUploadSchema>) {
+      if (!loanToEdit || !capturedImage || !user) return;
+      setIsSubmitting(true);
+      try {
+          await uploadKYCDocument(firestore, storage, {
+              ...values,
+              customerId: loanToEdit.customerId,
+              customerName: loanToEdit.customerName,
+              fileUrl: capturedImage,
+              uploadedBy: user.name || user.email || 'Admin'
+          });
+          toast({ title: 'KYC Document Saved' });
+          setCapturedImage(null);
+          setIsKYCAddOpen(false);
+          kycUploadForm.reset();
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Upload Failed', description: e.message });
+      } finally { setIsSubmitting(false); }
+  }
 
   async function onSubmit(values: z.infer<typeof loanSchema>) {
     if (!canEdit) return;
@@ -468,53 +540,16 @@ export default function LoansPage() {
 
   const handleConfirmDelete = async () => {
     if (!loanToDelete || !canEdit) return;
-    
     setIsDeleting(true);
     try {
       await deleteLoan(firestore, loanToDelete.id);
-      toast({ title: 'Loan Deleted', description: `Loan #${loanToDelete.loanNumber} has been permanently removed.` });
-      
-      if (loanToEdit?.id === loanToDelete.id) {
-          setLoanToEdit(null);
-      }
-      
+      toast({ title: 'Loan Deleted' });
+      if (loanToEdit?.id === loanToDelete.id) setLoanToEdit(null);
       setLoanToDelete(null);
       setDeleteConfirmOpen(false);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
-    } finally {
-      setIsDeleting(false);
-    }
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Delete Failed', description: e.message }); } finally { setIsDeleting(false); }
   };
 
-  const penaltyCalculation = useMemo(() => {
-      if (!loanToEdit) return { dailyRate: 0, daysLate: 0, suggested: 0 };
-      const oneInstInterest = calculateInterestForOneInstalment(loanToEdit.principalAmount || 0, loanToEdit.interestRate || 0, loanToEdit.numberOfInstalments || 1, loanToEdit.paymentFrequency || 'monthly');
-      const daysInFreq = loanToEdit.paymentFrequency === 'monthly' ? 30 : (loanToEdit.paymentFrequency === 'weekly' ? 7 : 1);
-      const dailyRate = oneInstInterest / daysInFreq;
-      
-      let dDate = loanToEdit.firstPaymentDate?.seconds 
-        ? new Date(loanToEdit.firstPaymentDate.seconds * 1000) 
-        : (loanToEdit.firstPaymentDate ? new Date(loanToEdit.firstPaymentDate as any) : new Date());
-      
-      if (isNaN(dDate.getTime())) return { dailyRate: 0, daysLate: 0, suggested: 0 };
-
-      let finalDueDate: Date;
-      if (loanToEdit.paymentFrequency === 'monthly') finalDueDate = addMonths(dDate, (loanToEdit.numberOfInstalments || 1) - 1);
-      else if (loanToEdit.paymentFrequency === 'weekly') finalDueDate = addWeeks(dDate, (loanToEdit.numberOfInstalments || 1) - 1);
-      else finalDueDate = addDays(dDate, (loanToEdit.numberOfInstalments || 1) - 1);
-      
-      const daysLate = differenceInDays(new Date(), finalDueDate);
-      return { dailyRate, daysLate: daysLate > 0 ? daysLate : 0, suggested: Math.round((daysLate > 0 ? daysLate : 0) * dailyRate) };
-  }, [loanToEdit]);
-
-  const authorizeSuggestedPenalty = () => {
-      if (!penaltyCalculation.suggested || !canEdit) return;
-      penaltyForm.setValue('penaltyAmount', penaltyCalculation.suggested);
-      penaltyForm.setValue('penaltyDate', format(new Date(), 'yyyy-MM-dd'));
-      penaltyForm.setValue('penaltyDescription', `Late Payment Penalty: ${penaltyCalculation.daysLate} days overdue.`);
-  };
-  
   if (!isAuthorized && !userLoading) return <div className="flex h-screen w-full items-center justify-center"><h2>Access Restricted</h2></div>;
 
   return (
@@ -553,107 +588,44 @@ export default function LoansPage() {
                     ) : (
                       <>
                         <FormField control={form.control} name="newCustomerName" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Name</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''}/></FormControl>
-                            </FormItem>
+                            <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                         )} />
                         <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Phone</FormLabel>
-                                <FormControl><Input {...field} value={field.value ?? ''}/></FormControl>
-                            </FormItem>
+                            <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
                         )} />
                       </>
                     )}
                     <FormField control={form.control} name="idNumber" render={({ field }) => (
-                        <FormItem className="col-span-2">
-                            <FormLabel>ID Number</FormLabel>
-                            <FormControl><Input placeholder="Customer ID" {...field} value={field.value ?? ''}/></FormControl>
-                            <FormMessage/>
-                        </FormItem>
+                        <FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID" {...field} /></FormControl><FormMessage/></FormItem>
                     )} />
                     <FormField control={form.control} name="assignedStaffId" render={({ field }) => (
-                        <FormItem className="col-span-2">
-                          <FormLabel>Assign Staff Follow-up</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                            <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                            <SelectContent>
-                                {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </FormItem>
+                        <FormItem className="col-span-2"><FormLabel>Assign Staff</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select staff"/></SelectTrigger></FormControl><SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent></Select></FormItem>
                     )} />
-                    
                     <FormField control={form.control} name="disbursementDate" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Disbursement Date</FormLabel>
-                            <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
-                        </FormItem>
+                        <FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name="firstPaymentDate" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-primary font-bold">First Payment Date</FormLabel>
-                            <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
-                        </FormItem>
+                        <FormItem><FormLabel className="text-primary font-bold">First Payment Date</FormLabel><FormControl><Input type="date" {...field} className="border-primary/30" /></FormControl></FormItem>
                     )} />
-
                     <FormField control={form.control} name="principalAmount" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Principal</FormLabel>
-                            <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
-                        </FormItem>
+                        <FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name="interestRate" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Interest %</FormLabel>
-                            <FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''}/></FormControl>
-                        </FormItem>
+                        <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Instalments</FormLabel>
-                            <FormControl><Input type="number" {...field} value={field.value ?? ''}/></FormControl>
-                        </FormItem>
+                        <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Frequency</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                          <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
-                          <SelectContent>
-                              <SelectItem value="daily">Daily</SelectItem>
-                              <SelectItem value="weekly">Weekly</SelectItem>
-                              <SelectItem value="monthly">Monthly</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
+                      <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                     )} />
-                    
-                    {watch('paymentFrequency') === 'weekly' && (
-                        <FormField control={form.control} name="preferredPaymentDay" render={({ field }) => (
-                            <FormItem className="col-span-2">
-                                <FormLabel>Preferred Weekly Payment Day</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </FormItem>
-                        )} />
-                    )}
-
                     <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
                       <div className="flex justify-between"><span className="text-sm">Instalment</span><span className="font-bold">Ksh {calculatedValues.instalmentAmount}</span></div>
                       <div className="flex justify-between"><span className="text-sm">Total</span><span className="font-bold">Ksh {calculatedValues.totalRepayableAmount}</span></div>
                     </div>
                   </form>
                 </ScrollArea>
-                <DialogFooter className="p-6 pt-2">
-                    <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                    <Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button>
-                </DialogFooter>
+                <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button></DialogFooter>
               </Form>
             </DialogContent>
           </Dialog>
@@ -687,35 +659,20 @@ export default function LoansPage() {
                           </TableHeader>
                           <TableBody>
                               {filteredLoans.map((loan: any) => {
-                                  const fDate = loan.firstPaymentDate?.seconds 
-                                    ? new Date(loan.firstPaymentDate.seconds * 1000) 
-                                    : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
-                                  
-                                  const currentCustomer = customers?.find(c => c.id === loan.customerId);
-                                  const displayName = currentCustomer?.name || loan.customerName;
-
+                                  const fDate = loan.firstPaymentDate?.seconds ? new Date(loan.firstPaymentDate.seconds * 1000) : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
                                   return (
                                     <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                                         <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
                                         <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
                                         <TableCell>
-                                            <div className="font-bold text-sm">{displayName}</div>
+                                            <div className="font-bold text-sm">{loan.customerName}</div>
                                             <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
                                         </TableCell>
                                         <TableCell className="text-xs">{loan.customerPhone}</TableCell>
                                         <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                         <TableCell className="text-xs font-medium text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
                                         <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
-                                        <TableCell className="text-center">
-                                            <Badge className={cn("text-[9px] uppercase font-black px-3 py-1 rounded-full",
-                                                loan.status === 'active' ? "bg-blue-100 text-blue-800" :
-                                                loan.status === 'paid' ? "bg-green-100 text-green-800" :
-                                                loan.status === 'overdue' ? "bg-red-100 text-red-800" :
-                                                "bg-muted text-muted-foreground"
-                                            )}>
-                                                {loan.status}
-                                            </Badge>
-                                        </TableCell>
+                                        <TableCell className="text-center"><Badge variant="outline">{loan.status.toUpperCase()}</Badge></TableCell>
                                     </TableRow>
                                   );
                               })}
@@ -730,40 +687,23 @@ export default function LoansPage() {
                 <CardHeader><CardTitle>Review Applications</CardTitle></CardHeader>
                 <CardContent>
                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Member No</TableHead>
-                                <TableHead>Customer Identity</TableHead>
-                                <TableHead>Phone</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead className="text-right">Amount</TableHead>
-                                <TableHead>Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
+                        <TableHeader><TableRow><TableHead>Member No</TableHead><TableHead>Customer Identity</TableHead><TableHead>Phone</TableHead><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
-                            {applicationLoans.map((loan) => {
-                                const currentCustomer = customers?.find(c => c.id === loan.customerId);
-                                const displayName = currentCustomer?.name || loan.customerName;
-
-                                return (
-                                    <TableRow key={loan.id}>
-                                        <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
-                                        <TableCell>
-                                            <div className="font-bold text-sm">{displayName}</div>
-                                            <div className="text-[10px] text-muted-foreground">National ID: {loan.idNumber || "N/A"}</div>
-                                        </TableCell>
-                                        <TableCell className="text-xs">{loan.customerPhone}</TableCell>
-                                        <TableCell className="text-xs">{loan.loanType}</TableCell>
-                                        <TableCell className="font-bold text-right tabular-nums">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
-                                        <TableCell>
-                                            <div className="flex gap-2">
-                                                <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
-                                                {canEdit && <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
+                            {applicationLoans.map((loan) => (
+                                <TableRow key={loan.id}>
+                                    <TableCell className="font-bold text-xs">{loan.accountNumber || 'N/A'}</TableCell>
+                                    <TableCell><div className="font-bold text-sm">{loan.customerName}</div></TableCell>
+                                    <TableCell className="text-xs">{loan.customerPhone}</TableCell>
+                                    <TableCell className="text-xs">{loan.loanType}</TableCell>
+                                    <TableCell className="font-bold text-right">Ksh {(loan.principalAmount || 0).toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
+                                            {canEdit && <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -771,427 +711,99 @@ export default function LoansPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!viewingApplication} onOpenChange={(isOpen) => !isOpen && setViewingApplication(null)}>
-          <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-0"><DialogTitle>Application Details</DialogTitle><DialogDescription>Full summary of the customer's self-submitted application.</DialogDescription></DialogHeader>
-              {viewingApplication && (
-                  <ScrollArea className="max-h-[60vh] p-6">
-                      <div className="grid grid-cols-2 gap-4 text-sm bg-muted/30 p-4 rounded-lg">
-                          <div className="text-muted-foreground">Member Number:</div><div className="font-bold">{viewingApplication.accountNumber || 'N/A'}</div>
-                          <div className="text-muted-foreground">Customer:</div><div className="font-medium">{viewingApplication.customerName}</div>
-                          <div className="text-muted-foreground">Phone Number:</div><div className="font-medium">{viewingApplication.customerPhone}</div>
-                          <div className="text-muted-foreground">National ID:</div><div className="font-bold text-primary">{viewingApplication.idNumber || 'N/A'}</div>
-                          <div className="text-muted-foreground">Requested Amount:</div><div className="font-bold text-primary">Ksh {(viewingApplication.principalAmount || 0).toLocaleString()}</div>
-                          <div className="text-muted-foreground">Loan Product:</div><div className="font-medium">{viewingApplication.loanType}</div>
-                          {viewingApplication.paymentFrequency === 'weekly' && (
-                              <><div className="text-muted-foreground">Preferred Day:</div><div className="font-bold text-blue-600">{viewingApplication.preferredPaymentDay || 'N/A'}</div></>
-                          )}
-                      </div>
-                  </ScrollArea>
-              )}
-              <DialogFooter className="p-6 pt-2">
-                  <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                  {canEdit && <Button onClick={() => { const app = viewingApplication; setViewingApplication(null); if (app) handleManageApplication(app); }}>Process Application</Button>}
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!applicationToManage} onOpenChange={(isOpen) => !isOpen && setApplicationToManage(null)}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
-            {applicationToManage && (
-                <>
-                    <DialogHeader className="p-6 pb-0">
-                        <DialogTitle>Process Application</DialogTitle>
-                        <DialogDescription>Finalize terms and assign a follow-up staff member.</DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="max-h-[65vh] px-6 py-4">
-                        <Form {...approvalForm}>
-                            <form id="approval-form" onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="grid grid-cols-2 gap-4">
-                                <FormField control={approvalForm.control} name="disbursementDate" render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                        <FormLabel>Approved Date</FormLabel>
-                                        <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
-                                    </FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                        <FormLabel className="text-primary font-bold">First Payment Date (Customer Agreed)</FormLabel>
-                                        <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
-                                    </FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                      <FormLabel>Assign Staff</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select staff"/></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
-                                        </SelectContent>
-                                      </Select>
-                                    </FormItem>
-                                )}/>
-                                <FormField control={approvalForm.control} name="principalAmount" render={({ field }) => (
-                                    <FormItem><FormLabel>Approved Amount</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="interestRate" render={({ field }) => (
-                                    <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({ field }) => (
-                                    <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                                )} />
-                                <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Frequency</FormLabel>
-                                      <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="daily">Daily</SelectItem>
-                                            <SelectItem value="weekly">Weekly</SelectItem>
-                                            <SelectItem value="monthly">Monthly</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </FormItem>
-                                )}/>
-                                {approvalForm.watch('paymentFrequency') === 'weekly' && (
-                                    <FormField control={approvalForm.control} name="preferredPaymentDay" render={({ field }) => (
-                                        <FormItem className="col-span-2">
-                                            <FormLabel>Preferred Weekly Payment Day</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue placeholder="Select day"/></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
-                                    )} />
-                                )}
-                            </form>
-                        </Form>
-                    </ScrollArea>
-                    <DialogFooter className="p-6 pt-2">
-                        <Button variant="outline" onClick={() => setApplicationToManage(null)}>Cancel</Button>
-                        <Button variant="destructive" onClick={handleReject}>Reject</Button>
-                        <Button type="submit" form="approval-form" disabled={isUpdatingStatus}>Approve & Disburse</Button>
-                    </DialogFooter>
-                </>
-            )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
-          <DialogContent className="sm:max-w-xl p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-0">
-                <DialogTitle>Update Loan Terms</DialogTitle>
-                <DialogDescription>Modify primary financial terms and repayment schedule.</DialogDescription>
-              </DialogHeader>
-              <ScrollArea className="max-h-[60vh] px-6 py-4">
-                <Form {...editTermsForm}>
-                    <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField control={editTermsForm.control} name="assignedStaffId" render={({ field }) => (
-                                <FormItem className="col-span-2">
-                                    <FormLabel>Assign Staff</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl><SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger></FormControl>
-                                        <SelectContent>
-                                            {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            )} />
-                            <FormField control={editTermsForm.control} name="disbursementDate" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Disbursement Date</FormLabel>
-                                    <FormControl><Input type="date" {...field} value={field.value ?? ''} /></FormControl>
-                                </FormItem>
-                            )}/>
-                            <FormField control={editTermsForm.control} name="firstPaymentDate" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-primary font-bold">First Payment Date</FormLabel>
-                                    <FormControl><Input type="date" {...field} value={field.value ?? ''} className="border-primary/30" /></FormControl>
-                                </FormItem>
-                            )}/>
-                            <FormField control={editTermsForm.control} name="principalAmount" render={({ field }) => (
-                                <FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                            )}/>
-                            <FormField control={editTermsForm.control} name="interestRate" render={({ field }) => (
-                                <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>
-                            )}/>
-                            <FormField control={editTermsForm.control} name="numberOfInstalments" render={({ field }) => (
-                                <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                            )}/>
-                            
-                            <FormField control={editTermsForm.control} name="paymentFrequency" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Frequency</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger><SelectValue placeholder="Select frequency" /></SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="daily">Daily</SelectItem>
-                                            <SelectItem value="weekly">Weekly</SelectItem>
-                                            <SelectItem value="monthly">Monthly</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormItem>
-                            )}/>
-
-                            {editTermsForm.watch('paymentFrequency') === 'weekly' && (
-                                <FormField control={editTermsForm.control} name="preferredPaymentDay" render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                        <FormLabel>Preferred Weekly Payment Day</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormItem>
-                                )} />
-                            )}
-                            <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({ field }) => (
-                                    <FormItem className="col-span-2">
-                                        <FormLabel className="font-bold text-primary">Total Repayable (Amount to Pay)</FormLabel>
-                                        <FormControl><Input type="number" {...field} className="border-primary/50 bg-primary/5 font-bold" /></FormControl>
-                                        <FormDescription className="text-[10px]">Manual override for corrections. Installments will automatically sync.</FormDescription>
-                                    </FormItem>
-                                )} />
-                        </div>
-                        <Button type="submit" className="w-full" disabled={isUpdating}>Save & Update Totals</Button>
-                    </form>
-                </Form>
-              </ScrollArea>
-              <DialogFooter className="p-6 pt-2">
-                  <DialogClose asChild><Button variant="ghost">Close</Button></DialogClose>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => !isOpen && setLoanToEdit(null)}>
+      <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => { if(!isOpen) { setLoanToEdit(null); setCapturedImage(null); setShowCamera(false); } }}>
           <DialogContent className="sm:max-w-5xl p-0 overflow-hidden">
               {loanToEdit && (
                   <>
                     <DialogHeader className="p-6 pb-0">
-                        <div className="flex items-center justify-between">
-                            <DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle>
-                            <Badge className="mr-8">{loanToEdit.status.toUpperCase()}</Badge>
-                        </div>
-                        <DialogDescription>Review interactions, record payments, and track history.</DialogDescription>
+                        <div className="flex items-center justify-between"><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><Badge className="mr-8">{loanToEdit.status.toUpperCase()}</Badge></div>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[75vh]">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-                            <div className="space-y-4 md:col-span-1">
-                                <Card>
-                                    <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
-                                        <CardTitle className="text-sm">Summary</CardTitle>
-                                        {canEdit && <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3.5 w-3.5" /></Button>}
-                                    </CardHeader>
-                                    <CardContent className="space-y-4 text-sm">
-                                        <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{(customers?.find(c => c.id === loanToEdit.customerId)?.name) || loanToEdit.customerName}</span></div>
-                                        <div className="flex justify-between"><span>Member No:</span><span className="font-bold text-primary">{loanToEdit.accountNumber || 'N/A'}</span></div>
-                                        <div className="flex justify-between"><span>Phone:</span><span className="font-medium">{loanToEdit.customerPhone}</span></div>
-                                        <div className="flex justify-between"><span>Assigned:</span><span className="font-medium">{loanToEdit.assignedStaffName || 'Unassigned'}</span></div>
-                                        <div className="flex justify-between"><span>Rate:</span><span className="font-medium">{loanToEdit.interestRate}%</span></div>
-                                        {loanToEdit.paymentFrequency === 'weekly' && (
-                                            <div className="flex justify-between"><span>Weekly Day:</span><span className="font-bold text-blue-600">{loanToEdit.preferredPaymentDay || 'N/A'}</span></div>
-                                        )}
-                                        <div className="flex justify-between border-t pt-2"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {((loanToEdit.totalRepayableAmount || 0) - (loanToEdit.totalPaid || 0)).toLocaleString()}</span></div>
-                                    </CardContent>
-                                </Card>
-                                {canEdit && (
-                                    <Card>
-                                        <CardHeader className="py-3"><CardTitle className="text-sm">Actions</CardTitle></CardHeader>
-                                        <CardContent className="space-y-2">
-                                            <Button variant="outline" className="w-full text-xs" onClick={() => rolloverLoan(firestore, loanToEdit, new Date()).then(() => { toast({ title: 'Rolled Over' }); setLoanToEdit(null); })}>Rollover</Button>
-                                            <Button variant="secondary" className="w-full text-xs" onClick={() => updateLoan(firestore, loanToEdit.id, { status: 'paid' }).then(() => { toast({ title: 'Marked Paid' }); setLoanToEdit(null); })}>Mark Paid</Button>
-                                            <Button variant="destructive" className="w-full text-xs mt-4" onClick={() => { setLoanToDelete(loanToEdit); setDeleteConfirmOpen(true); }}>Delete Loan</Button>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
-                            <div className="md:col-span-2 space-y-6">
-                                <Tabs defaultValue="payments">
-                                    <TabsList className="grid grid-cols-4 w-full">
-                                        <TabsTrigger value="payments">Payments</TabsTrigger>
-                                        <TabsTrigger value="followups">Notes</TabsTrigger>
-                                        {canViewKYC && <TabsTrigger value="kyc" className="gap-1.5"><ShieldCheck className="h-3 w-3" /> KYC Vault</TabsTrigger>}
-                                        <TabsTrigger value="penalties">Penalties</TabsTrigger>
-                                    </TabsList>
-                                    <TabsContent value="payments">
-                                        {canEdit && (
-                                            <Form {...paymentForm}>
-                                                <form onSubmit={paymentForm.handleSubmit(onRecordPayment)} className="space-y-4 mb-4">
-                                                    <div className="flex gap-2">
-                                                        <FormField control={paymentForm.control} name="paymentAmount" render={({ field }) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''} />)} />
-                                                        <FormField control={paymentForm.control} name="paymentDate" render={({ field }) => (<Input type="date" {...field} value={field.value ?? ''} />)} />
-                                                        <Button type="submit" disabled={isUpdating}>{isUpdating ? <Loader2 className="animate-spin h-4 w-4"/> : 'Pay'}</Button>
-                                                    </div>
-                                                </form>
-                                            </Form>
-                                        )}
-                                        <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => {
-                                            const payDate = (p.date as any)?.seconds 
-                                                ? new Date((p.date as any).seconds * 1000) 
-                                                : (p.date instanceof Date ? p.date : new Date());
-                                            
-                                            return (
-                                                <TableRow key={p.paymentId || i}>
-                                                    <TableCell className="text-xs">{isNaN(payDate.getTime()) ? 'N/A' : format(payDate, 'dd/MM/yy HH:mm')}</TableCell>
-                                                    <TableCell className="text-right font-medium">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
-                                                </TableRow>
-                                            )
-                                        })}</TableBody></Table></ScrollArea>
-                                    </TabsContent>
-                                    <TabsContent value="followups">
-                                        <ScrollArea className="h-[300px]">
-                                            <div className="space-y-4">
-                                                {loanToEdit.followUpNotes?.length === 0 ? (
-                                                    <p className="text-sm text-muted-foreground text-center py-8">No follow-up notes recorded.</p>
-                                                ) : (
-                                                    loanToEdit.followUpNotes?.map((note, i) => {
-                                                        const noteDate = (note.date as any)?.seconds 
-                                                            ? new Date((note.date as any).seconds * 1000) 
-                                                            : (note.date instanceof Date ? note.date : new Date());
-                                                        
-                                                        return (
-                                                            <div key={note.noteId || i} className="border p-3 rounded-lg bg-muted/30">
-                                                                <div className="flex justify-between items-center mb-2">
-                                                                    <span className="text-xs font-bold">{note.staffName}</span>
-                                                                    <span className="text-[10px] text-muted-foreground">{isNaN(noteDate.getTime()) ? 'N/A' : format(noteDate, 'PPP p')}</span>
-                                                                </div>
-                                                                <p className="text-sm italic">"{note.content}"</p>
-                                                            </div>
-                                                        )
-                                                    })
-                                                )}
-                                            </div>
-                                        </ScrollArea>
-                                    </TabsContent>
-                                    {canViewKYC && (
-                                        <TabsContent value="kyc">
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Verification Materials</h4>
-                                                    <Button variant="outline" size="sm" className="h-7 text-[10px] font-bold" onClick={() => window.location.href='/admin'}>
-                                                        <Camera className="h-3 w-3 mr-1" /> Capture New
-                                                    </Button>
-                                                </div>
-                                                <ScrollArea className="h-[350px]">
-                                                    {kycLoading ? (
-                                                        <div className="flex justify-center p-12"><Loader2 className="animate-spin" /></div>
-                                                    ) : !kycDocs || kycDocs.length === 0 ? (
-                                                        <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed rounded-xl">
-                                                            <FileText className="h-8 w-8 text-muted-foreground mb-2 opacity-20" />
-                                                            <p className="text-xs font-medium text-muted-foreground italic">No KYC documents uploaded yet.</p>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="grid grid-cols-2 gap-3 pb-4">
-                                                            {kycDocs.map(doc => (
-                                                                <div 
-                                                                    key={doc.id} 
-                                                                    className="group relative aspect-video rounded-lg overflow-hidden border bg-muted cursor-pointer hover:border-primary/50 transition-all"
-                                                                    onClick={() => setViewingKYC(doc)}
-                                                                >
-                                                                    <img src={doc.fileUrl} alt={doc.fileName} className="w-full h-full object-cover" />
-                                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white p-2">
-                                                                        <p className="text-[10px] font-black uppercase tracking-tighter text-center">{TYPE_LABELS[doc.type] || 'Document'}</p>
-                                                                        <Eye className="h-4 w-4 mt-1" />
-                                                                    </div>
-                                                                    <div className="absolute bottom-0 left-0 right-0 bg-black/40 backdrop-blur-sm p-1">
-                                                                        <p className="text-[8px] text-white font-bold truncate px-1">{doc.fileName}</p>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </ScrollArea>
-                                            </div>
-                                        </TabsContent>
-                                    )}
-                                    <TabsContent value="penalties">
-                                        {canEdit && penaltyCalculation.daysLate > 0 && (
-                                            <div className="bg-orange-50 border border-orange-200 rounded-md p-3 mb-4 space-y-2">
-                                                <div className="flex items-center gap-2 text-orange-800 font-bold text-xs uppercase"><AlertCircle className="h-4 w-4" />Overdue</div>
-                                                <Button size="sm" variant="secondary" className="w-full" onClick={authorizeSuggestedPenalty}>Apply Penalty (Ksh {penaltyCalculation.suggested})</Button>
-                                            </div>
-                                        )}
-                                        {canEdit ? (
-                                            <Form {...penaltyForm}>
-                                                <form onSubmit={penaltyForm.handleSubmit(onAddPenalty)} className="space-y-2 mb-4">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <FormField control={penaltyForm.control} name="penaltyAmount" render={({ field }) => (<Input type="number" placeholder="Amt" {...field} value={field.value ?? ''} />)} />
-                                                        <FormField control={penaltyForm.control} name="penaltyDate" render={({ field }) => (<Input type="date" {...field} value={field.value ?? ''} />)} />
-                                                    </div>
-                                                    <FormField control={penaltyForm.control} name="penaltyDescription" render={({ field }) => (<Input placeholder="Reason" {...field} value={field.value ?? ''} />)} />
-                                                    <Button type="submit" variant="destructive" className="w-full" disabled={isAddingPenalty}>Record Penalty</Button>
-                                                </form>
-                                            </Form>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground text-center py-8">Penalties can only be managed by Finance/Admin.</p>
-                                        )}
-                                        <ScrollArea className="h-48 border rounded-md"><Table><TableBody>{loanToEdit.penalties?.map((p, i) => {
-                                            const penaltyDate = (p.date as any)?.seconds 
-                                                ? new Date((p.date as any).seconds * 1000) 
-                                                : (p.date instanceof Date ? p.date : new Date());
-                                            
-                                            return (
-                                                <TableRow key={p.penaltyId || i}>
-                                                    <TableCell className="text-xs">{isNaN(penaltyDate.getTime()) ? 'N/A' : format(penaltyDate, 'dd/MM/yy')}</TableCell>
-                                                    <TableCell className="text-xs">{p.description}</TableCell>
-                                                    <TableCell className="text-right font-medium">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
-                                                </TableRow>
-                                            )
-                                        })}</TableBody></Table></ScrollArea>
-                                    </TabsContent>
-                                </Tabs>
-                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+                        <div className="space-y-4 md:col-span-1">
+                            <Card><CardHeader className="py-3 flex justify-between items-center"><CardTitle className="text-sm">Summary</CardTitle>{canEdit && <Button variant="ghost" size="icon" onClick={() => handleEditTerms(loanToEdit)}><Pencil className="h-3.5 w-3.5" /></Button>}</CardHeader>
+                                <CardContent className="space-y-4 text-sm">
+                                    <div className="flex justify-between"><span>Customer:</span><span className="font-medium">{loanToEdit.customerName}</span></div>
+                                    <div className="flex justify-between"><span>Remaining:</span><span className="font-bold text-destructive">Ksh {((loanToEdit.totalRepayableAmount || 0) - (loanToEdit.totalPaid || 0)).toLocaleString()}</span></div>
+                                </CardContent>
+                            </Card>
                         </div>
-                    </ScrollArea>
+                        <div className="md:col-span-2 space-y-6">
+                            <Tabs defaultValue="payments">
+                                <TabsList className="grid grid-cols-4 w-full">
+                                    <TabsTrigger value="payments">Payments</TabsTrigger>
+                                    <TabsTrigger value="followups">Notes</TabsTrigger>
+                                    {canViewKYC && <TabsTrigger value="kyc"><ShieldCheck className="h-3 w-3 mr-1" /> KYC Vault</TabsTrigger>}
+                                    <TabsTrigger value="penalties">Penalties</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="kyc">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-xs font-black uppercase text-muted-foreground">Verification Materials</h4>
+                                            <Dialog open={isKYCAddOpen} onOpenChange={(o) => { setIsKYCAddOpen(o); if(!o) { stopCamera(); setCapturedImage(null); } }}>
+                                                <DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 text-[10px] font-bold"><PlusCircle className="h-3 w-3 mr-1" /> Add Document</Button></DialogTrigger>
+                                                <DialogContent className="sm:max-w-md">
+                                                    <DialogHeader><DialogTitle>Record KYC Document</DialogTitle></DialogHeader>
+                                                    <Form {...kycUploadForm}>
+                                                        <form onSubmit={kycUploadForm.handleSubmit(onKYCSubmit)} className="space-y-4 pt-4">
+                                                            <FormField control={kycUploadForm.control} name="type" render={({ field }) => (
+                                                                <FormItem><FormLabel>Document Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="owner_id">Owner ID Card</SelectItem><SelectItem value="guarantor_id">Guarantor ID Card</SelectItem><SelectItem value="loan_form">Loan Form</SelectItem><SelectItem value="security_attachment">Security Photos</SelectItem></SelectContent></Select></FormItem>
+                                                            )}/>
+                                                            <FormField control={kycUploadForm.control} name="fileName" render={({ field }) => (
+                                                                <FormItem><FormLabel>Label</FormLabel><FormControl><Input placeholder="e.g. Front ID" {...field} /></FormControl></FormItem>
+                                                            )}/>
+                                                            <div className="relative min-h-[200px] bg-zinc-900 rounded-lg overflow-hidden flex items-center justify-center">
+                                                                {!showCamera && !capturedImage && (
+                                                                    <div className="text-center p-4 flex flex-col gap-2">
+                                                                        <Button type="button" size="sm" onClick={() => fileInputRef.current?.click()}>Upload File</Button>
+                                                                        <Button type="button" variant="outline" size="sm" onClick={startCamera}>Take Photo</Button>
+                                                                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                                                                    </div>
+                                                                )}
+                                                                <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
+                                                                {capturedImage && <img src={capturedImage} alt="Preview" className="max-h-[300px] object-contain" />}
+                                                            </div>
+                                                            {showCamera && <Button type="button" className="w-full" onClick={capturePhoto}>Capture</Button>}
+                                                            <DialogFooter><Button type="submit" disabled={isSubmitting || !capturedImage}>Save Document</Button></DialogFooter>
+                                                        </form>
+                                                    </Form>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </div>
+                                        <ScrollArea className="h-64 border rounded-md p-2">
+                                            {kycLoading ? <Loader2 className="animate-spin mx-auto mt-10" /> : (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {kycDocs?.map(doc => (
+                                                        <div key={doc.id} className="relative aspect-video rounded border bg-muted cursor-pointer group overflow-hidden" onClick={() => setViewingKYC(doc)}>
+                                                            <img src={doc.fileUrl} className="w-full h-full object-cover" alt="KYC" />
+                                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><Eye className="text-white h-5 w-5" /></div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </ScrollArea>
+                                    </div>
+                                </TabsContent>
+                                <TabsContent value="payments">
+                                    <ScrollArea className="h-64 border rounded-md"><Table><TableBody>{loanToEdit.payments?.map((p, i) => (
+                                        <TableRow key={p.paymentId || i}><TableCell className="text-xs">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell><TableCell className="text-right">Ksh {(p.amount || 0).toLocaleString()}</TableCell></TableRow>
+                                    ))}</TableBody></Table></ScrollArea>
+                                </TabsContent>
+                            </Tabs>
+                        </div>
+                    </div>
                     <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
           </DialogContent>
       </Dialog>
 
-      {/* KYC Viewer */}
       <Dialog open={!!viewingKYC} onOpenChange={(o) => !o && setViewingKYC(null)}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none">
-              <div className="relative w-full h-full min-h-[400px] flex items-center justify-center">
-                  {viewingKYC?.fileUrl && (
-                      <img src={viewingKYC.fileUrl} className="max-w-full max-h-[85vh] object-contain" alt="KYC Document" />
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent text-white">
-                      <h3 className="text-xl font-black">{TYPE_LABELS[viewingKYC?.type || ''] || 'Document'}</h3>
-                      <p className="text-sm opacity-70">{viewingKYC?.fileName}</p>
-                  </div>
+              <div className="relative w-full h-[85vh] flex items-center justify-center">
+                  {viewingKYC?.fileUrl && <img src={viewingKYC.fileUrl} className="max-w-full max-h-full object-contain" alt="KYC" />}
               </div>
           </DialogContent>
       </Dialog>
-
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Loan Record?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete Loan #{loanToDelete?.loanNumber || loanToEdit?.loanNumber} and all its associated history (payments, penalties, notes). This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setDeleteConfirmOpen(false); setLoanToDelete(null); }}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }} 
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={isDeleting}
-            >
-              {isDeleting ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
-              Permanently Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
