@@ -148,6 +148,7 @@ export default function CustomersPage() {
                 <Table>
                     <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow>
+                            <TableHead className="w-[50px]">#</TableHead>
                             <TableHead>Customer Name</TableHead>
                             <TableHead>Phone Number</TableHead>
                             <TableHead>National ID</TableHead>
@@ -159,13 +160,14 @@ export default function CustomersPage() {
                     <TableBody>
                         {sortedCustomers.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground italic">
+                                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground italic">
                                     {customersLoading ? 'Loading member data...' : 'No matching customers found.'}
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            sortedCustomers.map((c) => (
+                            sortedCustomers.map((c, index) => (
                                 <TableRow key={c.id} className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-[10px] font-mono text-muted-foreground">{index + 1}</TableCell>
                                     <TableCell className="font-black text-sm">{c.name}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
