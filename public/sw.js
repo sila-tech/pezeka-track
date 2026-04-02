@@ -1,18 +1,13 @@
-// Pezeka Credit Service Worker
-const CACHE_NAME = 'pezeka-cache-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/pezeka_logo_transparent.png',
-  '/manifest.webmanifest'
-];
+
+/**
+ * Simple Service Worker for Pezeka Credit PWA.
+ * Ensures the app loads and prevents ERR_FAILED errors.
+ */
+
+const CACHE_NAME = 'pezeka-v1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -20,10 +15,12 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Required for PWA installability criteria
+  // Simple network-first fetch strategy
   event.respondWith(
     fetch(event.request).catch(() => {
+      // Offline fallback can be added here
       return caches.match(event.request);
     })
   );
 });
+    

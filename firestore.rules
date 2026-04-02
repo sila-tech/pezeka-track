@@ -11,7 +11,7 @@
     
         /**
          * @description Absolute bypass for Simon / Super Admin.
-         * Checked first to avoid unnecessary document lookups.
+         * Checked FIRST to ensure unrestricted access.
          */
         function isSimon() {
           return isSignedIn() && (
@@ -22,14 +22,10 @@
         }
     
         // --- GLOBAL BYPASS FOR SUPER ADMIN ---
-        // Placing this at the top ensures Simon is never blocked by complex logic below.
         match /{allPaths=**} {
           allow read, write: if isSimon();
         }
     
-        /** 
-         * @description Check for Finance authorization. 
-         */
         function isFinance() {
           return isSimon() || (
             isSignedIn() && (
@@ -40,9 +36,6 @@
           );
         }
     
-        /** 
-         * @description Check for Staff authorization. 
-         */
         function isStaff() {
           return isSimon() || (
             isSignedIn() && (

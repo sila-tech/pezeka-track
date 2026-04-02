@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -104,7 +105,6 @@ export default function FinancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lbSearch, setLbSearch] = useState('');
   const [lbStatus, setLbStatus] = useState('all');
-  const [selectedLoanForHistory, setSelectedLoanForHistory] = useState<Loan | null>(null);
   const [selectedLoanForEdit, setSelectedLoanForEdit] = useState<Loan | null>(null);
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
 
@@ -470,7 +470,7 @@ export default function FinancePage() {
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
 
-      {/* Edit Loan Dialog - UI Matching Request */}
+      {/* Redesigned Edit Loan Dialog - UI Matching Request */}
       <Dialog open={!!selectedLoanForEdit} onOpenChange={(o) => !o && setSelectedLoanForEdit(null)}>
           <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-[1.5rem]">
               {selectedLoanForEdit && (
@@ -479,7 +479,7 @@ export default function FinancePage() {
                         <DialogTitle className="text-2xl font-black text-[#1B2B33]">Edit Ledger Entry: {selectedLoanForEdit.customerName}</DialogTitle>
                         <DialogDescription className="text-sm font-medium text-[#5BA9D0]">Modify primary financial data and repayment day.</DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="max-h-[55vh] px-8">
+                    <ScrollArea className="max-h-[50vh] px-8">
                         <Form {...editForm}>
                             <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6 pt-2 pb-8">
                                 <div className="grid grid-cols-2 gap-x-6 gap-y-5">
@@ -592,3 +592,4 @@ export default function FinancePage() {
     </div>
   );
 }
+    

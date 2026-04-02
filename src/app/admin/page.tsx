@@ -507,19 +507,6 @@ export default function Dashboard() {
     });
   }, [loans, customers]);
 
-  const setDatePreset = (preset: 'today' | 'weekly' | 'monthly' | 'all') => {
-      const today = new Date();
-      if (preset === 'all') {
-          setDate(undefined);
-      } else if (preset === 'today') {
-          setDate({ from: startOfToday(), to: endOfToday() });
-      } else if (preset === 'weekly') {
-          setDate({ from: startOfWeek(today), to: endOfWeek(today) });
-      } else if (preset === 'monthly') {
-          setDate({ from: startOfMonth(today), to: endOfMonth(today) });
-      }
-  };
-  
   if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
 
   return (
@@ -528,112 +515,33 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold tracking-tight text-primary">Welcome, {user?.name || user?.email?.split('@')[0] || 'Admin'}!</h1>
         <div className="flex flex-wrap gap-2">
             {canManageKYC && (
-                <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { 
-                    setIsKYCUploadOpen(open); 
-                    if(!open) { 
-                        stopCamera(); 
-                        setCapturedImage(null); 
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                    } 
-                }}>
+                <Dialog open={isKYCUploadOpen} onOpenChange={(open) => { setIsKYCUploadOpen(open); if(!open) { stopCamera(); setCapturedImage(null); if (fileInputRef.current) fileInputRef.current.value = ''; } }}>
                     <DialogTrigger asChild><Button variant="outline" className="border-primary/20 text-primary"><FileUp className="mr-2 h-4 w-4" />Capture KYC</Button></DialogTrigger>
                     <DialogContent className="sm:max-w-md p-0 overflow-hidden">
-                        <DialogHeader className="p-6 pb-0">
-                            <DialogTitle>Customer KYC Capture</DialogTitle>
-                            <DialogDescription>Select an image from gallery or take a new photo.</DialogDescription>
-                        </DialogHeader>
+                        <DialogHeader className="p-6 pb-0"><DialogTitle>Customer KYC Capture</DialogTitle><DialogDescription>Select an image from gallery or take a new photo.</DialogDescription></DialogHeader>
                         <ScrollArea className="max-h-[70vh] px-6 py-4">
                             <Form {...kycForm}>
                                 <form id="kyc-upload-form" onSubmit={kycForm.handleSubmit(onKYCSubmit)} className="space-y-4">
                                     <FormField control={kycForm.control} name="customerId" render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Select Customer</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
+                                        <FormItem><FormLabel>Select Customer</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Search member..." /></SelectTrigger></FormControl><SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}</SelectContent></Select></FormItem>
                                     )}/>
                                     <FormField control={kycForm.control} name="type" render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Document Category</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                                                <SelectContent>
-                                                    <SelectItem value="owner_id">Owner ID Card</SelectItem>
-                                                    <SelectItem value="guarantor_id">Guarantor ID Card</SelectItem>
-                                                    <SelectItem value="loan_form">Physical Loan Form</SelectItem>
-                                                    <SelectItem value="security_attachment">Security Photos/Docs</SelectItem>
-                                                    <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormItem>
+                                        <FormItem><FormLabel>Document Category</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="owner_id">Owner ID Card</SelectItem><SelectItem value="guarantor_id">Guarantor ID Card</SelectItem><SelectItem value="loan_form">Physical Loan Form</SelectItem><SelectItem value="security_attachment">Security Photos/Docs</SelectItem><SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem></SelectContent></Select></FormItem>
                                     )}/>
-                                    <FormField control={kycForm.control} name="fileName" render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Document Label/Note</FormLabel>
-                                            <FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl>
-                                        </FormItem>
-                                    )}/>
-
+                                    <FormField control={kycForm.control} name="fileName" render={({ field }) => (<FormItem><FormLabel>Document Label/Note</FormLabel><FormControl><Input placeholder="e.g. ID Front Side" {...field} /></FormControl></FormItem>)}/>
                                     <div className="space-y-4 pt-2">
                                         <div className="relative min-h-[200px] max-h-[300px] bg-zinc-900 rounded-lg overflow-hidden border-2 border-muted flex items-center justify-center">
-                                            {!showCamera && !capturedImage && (
-                                                <div className="text-center space-y-4 p-6">
-                                                    <div className="flex flex-col items-center gap-2">
-                                                        <ImagePlus className="h-10 w-10 text-muted-foreground" />
-                                                        <p className="text-xs text-muted-foreground">No document image selected</p>
-                                                    </div>
-                                                    <div className="flex flex-col gap-2">
-                                                        <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-                                                            <Upload className="mr-2 h-4 w-4" /> Select from Gallery
-                                                        </Button>
-                                                        <Button type="button" variant="outline" size="sm" onClick={startCamera}>
-                                                            <Camera className="mr-2 h-4 w-4" /> Take Photo
-                                                        </Button>
-                                                    </div>
-                                                    <input 
-                                                        type="file" 
-                                                        ref={fileInputRef} 
-                                                        className="hidden" 
-                                                        accept="image/*" 
-                                                        onChange={handleFileChange} 
-                                                    />
-                                                </div>
-                                            )}
+                                            {!showCamera && !capturedImage && (<div className="text-center space-y-4 p-6"><div className="flex flex-col items-center gap-2"><ImagePlus className="h-10 w-10 text-muted-foreground" /><p className="text-xs text-muted-foreground">No document selected</p></div><div className="flex flex-col gap-2"><Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Gallery</Button><Button type="button" variant="outline" size="sm" onClick={startCamera}><Camera className="mr-2 h-4 w-4" /> Take Photo</Button></div><input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} /></div>)}
                                             <video ref={videoRef} className={`w-full h-full object-contain ${showCamera ? 'block' : 'hidden'}`} autoPlay muted playsInline />
-                                            {capturedImage && (
-                                                <img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />
-                                            )}
+                                            {capturedImage && (<img src={capturedImage} alt="Captured KYC" className="max-w-full max-h-full object-contain shadow-2xl" />)}
                                         </div>
-
-                                        {showCamera && (
-                                            <div className="flex gap-2">
-                                                <Button type="button" className="flex-1" size="sm" onClick={capturePhoto}>Capture Photo</Button>
-                                                <Button type="button" variant="outline" size="sm" onClick={stopCamera}>Cancel</Button>
-                                            </div>
-                                        )}
-
-                                        {capturedImage && (
-                                            <div className="flex gap-2">
-                                                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => fileInputRef.current?.click()}>
-                                                    <Upload className="h-4 w-4 mr-2" /> Change File
-                                                </Button>
-                                                <Button type="button" variant="outline" size="sm" className="flex-1" onClick={startCamera}>
-                                                    <Camera className="h-4 w-4 mr-2" /> Retake Photo
-                                                </Button>
-                                            </div>
-                                        )}
+                                        {showCamera && (<div className="flex gap-2"><Button type="button" className="flex-1" size="sm" onClick={capturePhoto}>Capture Photo</Button><Button type="button" variant="outline" size="sm" onClick={stopCamera}>Cancel</Button></div>)}
+                                        {capturedImage && (<div className="flex gap-2"><Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => fileInputRef.current?.click()}><Upload className="h-4 w-4 mr-2" /> Change</Button><Button type="button" variant="outline" size="sm" className="flex-1" onClick={startCamera}><Camera className="h-4 w-4 mr-2" /> Retake</Button></div>)}
                                     </div>
                                 </form>
                             </Form>
                         </ScrollArea>
-                        <DialogFooter className="p-6 pt-2">
-                            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                            <Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record Document</Button>
-                        </DialogFooter>
+                        <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="kyc-upload-form" disabled={isSubmitting || !capturedImage}>{isSubmitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}Record Document</Button></DialogFooter>
                     </DialogContent>
                 </Dialog>
             )}
@@ -641,21 +549,12 @@ export default function Dashboard() {
             <Dialog open={isFacilitationOpen} onOpenChange={setIsFacilitationOpen}>
                 <DialogTrigger asChild><Button variant="outline" className="border-green-200 text-green-700 bg-green-50 hover:bg-green-100"><Banknote className="mr-2 h-4 w-4" />Request Facilitation</Button></DialogTrigger>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Facilitation Request</DialogTitle>
-                        <DialogDescription>Submit a request for operational funds. Requires Finance approval.</DialogDescription>
-                    </DialogHeader>
+                    <DialogHeader><DialogTitle>Facilitation Request</DialogTitle><DialogDescription>Submit a request for operational funds. Requires Finance approval.</DialogDescription></DialogHeader>
                     <Form {...facilitationForm}>
                         <form onSubmit={facilitationForm.handleSubmit(onFacilitationSubmit)} className="space-y-4 pt-4">
-                            <FormField control={facilitationForm.control} name="amount" render={({ field }) => (
-                                <FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <FormField control={facilitationForm.control} name="description" render={({ field }) => (
-                                <FormItem><FormLabel>Reason / Expense Details</FormLabel><FormControl><Textarea placeholder="Details of the expense..." {...field} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                            <DialogFooter>
-                                <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Submit Request</Button>
-                            </DialogFooter>
+                            <FormField control={facilitationForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                            <FormField control={facilitationForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Reason / Expense Details</FormLabel><FormControl><Textarea placeholder="Details of the expense..." {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                            <DialogFooter><Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Submit Request</Button></DialogFooter>
                         </form>
                     </Form>
                 </DialogContent>
@@ -664,42 +563,16 @@ export default function Dashboard() {
             <Dialog open={isStaffLoanOpen} onOpenChange={setIsStaffLoanOpen}>
             <DialogTrigger asChild><Button variant="secondary"><UserCheck className="mr-2 h-4 w-4" />Staff Loan</Button></DialogTrigger>
             <DialogContent className="sm:max-w-md p-0 overflow-hidden">
-                <DialogHeader className="p-6 pb-0">
-                <DialogTitle>Staff Loan Application</DialogTitle>
-                <DialogDescription>Apply for an internal staff credit facility.</DialogDescription>
-                </DialogHeader>
+                <DialogHeader className="p-6 pb-0"><DialogTitle>Staff Loan Application</DialogTitle><DialogDescription>Apply for an internal staff credit facility.</DialogDescription></DialogHeader>
                 <ScrollArea className="max-h-[60vh] px-6 py-4">
                     <Form {...staffLoanForm}>
                         <form id="staff-loan-form" onSubmit={staffLoanForm.handleSubmit(onStaffLoanSubmit)} className="space-y-4">
-                            <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Amount (Ksh)</FormLabel>
-                                    <FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}/>
+                            <FormField control={staffLoanForm.control} name="amount" render={({ field }) => (<FormItem><FormLabel>Amount (Ksh)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
                             <div className="grid grid-cols-2 gap-4">
-                                <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>ID Number</FormLabel>
-                                        <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                                <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Alt. Phone</FormLabel>
-                                        <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
-                                    </FormItem>
-                                )}/>
+                                <FormField control={staffLoanForm.control} name="idNumber" render={({ field }) => (<FormItem><FormLabel>ID Number</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
+                                <FormField control={staffLoanForm.control} name="alternativeNumber" render={({ field }) => (<FormItem><FormLabel>Alt. Phone</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/>
                             </div>
-                            <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Reason</FormLabel>
-                                    <FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}/>
+                            <FormField control={staffLoanForm.control} name="reason" render={({ field }) => (<FormItem><FormLabel>Reason</FormLabel><FormControl><Textarea {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)}/>
                         </form>
                     </Form>
                 </ScrollArea>
@@ -711,212 +584,70 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-4">
           <Card className="border-l-4 border-l-primary">
-              <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
-                      <ShieldCheck className="h-3 w-3" /> Active Debt
-                  </CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold">{myPortfolioStats.activeCount}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Total assigned active loans</p>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><ShieldCheck className="h-3 w-3" /> Active Debt</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold">{myPortfolioStats.activeCount}</div><p className="text-[10px] text-muted-foreground mt-1">Total assigned active loans</p></CardContent>
           </Card>
           <Card className="border-l-4 border-l-blue-500">
-              <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
-                      <HandCoins className="h-3 w-3" /> Period Disbursed
-                  </CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold">Ksh {myPortfolioStats.totalDisbursed.toLocaleString()}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Capital advanced in selected window</p>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><HandCoins className="h-3 w-3" /> Period Disbursed</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold">Ksh {myPortfolioStats.totalDisbursed.toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Capital advanced in window</p></CardContent>
           </Card>
           <Card className="border-l-4 border-l-green-500">
-              <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
-                      <TrendingUp className="h-3 w-3 text-green-600" /> Period Collected
-                  </CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold text-green-600">Ksh {myPortfolioStats.totalCollected.toLocaleString()}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Total payments processed in window</p>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><TrendingUp className="h-3 w-3 text-green-600" /> Period Collected</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold text-green-600">Ksh {myPortfolioStats.totalCollected.toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Total payments processed</p></CardContent>
           </Card>
           <Card className="border-l-4 border-l-orange-500">
-              <CardHeader className="pb-2">
-                  <CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2">
-                      <Banknote className="h-3 w-3 text-orange-600" /> My Monthly Expenses
-                  </CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">Ksh {myMonthlyExpenses.toLocaleString()}</div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Facilitation used in {format(new Date(), 'MMMM')}</p>
-              </CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><Banknote className="h-3 w-3 text-orange-600" /> My Monthly Expenses</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {myMonthlyExpenses.toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Facilitation used in {format(new Date(), 'MMMM')}</p></CardContent>
           </Card>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
             <Card className="flex flex-col h-[500px]">
-                <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Due Loans & Follow-ups</CardTitle>
-                            <CardDescription>Repayment tracking and cycle management.</CardDescription>
-                        </div>
-                        <DatePickerWithRange date={date} setDate={setDate} />
-                    </div>
-                </CardHeader>
+                <CardHeader className="pb-2"><div className="flex items-center justify-between"><div><CardTitle>Due Loans & Follow-ups</CardTitle><CardDescription>Repayment tracking and cycle management.</CardDescription></div><DatePickerWithRange date={date} setDate={setDate} /></div></CardHeader>
                 <CardContent className="flex-1 overflow-hidden p-0">
                     <Tabs defaultValue="all" className="h-full flex flex-col">
-                        <div className="px-6 pb-2">
-                            <TabsList className="grid grid-cols-3 w-full">
-                                <TabsTrigger value="all" className="text-xs">Priority ({priorityDueLoans.length})</TabsTrigger>
-                                <TabsTrigger value="daily" className="text-xs">Daily ({dailyDue.length})</TabsTrigger>
-                                <TabsTrigger value="weekly" className="text-xs">Weekly ({weeklyDue.length})</TabsTrigger>
-                            </TabsList>
-                        </div>
-                        
+                        <div className="px-6 pb-2"><TabsList className="grid grid-cols-3 w-full"><TabsTrigger value="all" className="text-xs">Priority ({priorityDueLoans.length})</TabsTrigger><TabsTrigger value="daily" className="text-xs">Daily ({dailyDue.length})</TabsTrigger><TabsTrigger value="weekly" className="text-xs">Weekly ({weeklyDue.length})</TabsTrigger></TabsList></div>
                         <div className="flex-1 overflow-hidden">
                             <TabsContent value="all" className="h-full m-0 p-0">
-                                {priorityDueLoans.length === 0 ? (
-                                    <div className="p-12 text-center h-full flex flex-col items-center justify-center">
-                                        <Clock className="h-12 w-12 text-muted-foreground/20 mb-4" />
-                                        <p className="text-muted-foreground font-medium">No urgent follow-ups required.</p>
-                                    </div>
-                                ) : (
-                                    <ScrollArea className="h-full">
-                                        <Table>
-                                            <TableHeader className="sticky top-0 bg-card z-10">
-                                                <TableRow>
-                                                    <TableHead>Customer</TableHead>
-                                                    <TableHead>Member</TableHead>
-                                                    <TableHead>Status</TableHead>
-                                                    <TableHead className="text-right">Arrears/Inst.</TableHead>
-                                                    <TableHead className="text-center">Action</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {priorityDueLoans.map((loan) => (
-                                                    <TableRow key={loan.id}>
-                                                        <TableCell><div className="font-bold text-xs">{loan.displayName}</div></TableCell>
-                                                        <TableCell className="text-xs">{loan.accountNumber}</TableCell>
-                                                        <TableCell>{loan.daysUntil < 0 ? <Badge variant="destructive" className="text-[8px]">LATE {Math.abs(loan.daysUntil)}d</Badge> : <Badge variant="secondary" className="text-[8px]">DUE {loan.daysUntil}d</Badge>}</TableCell>
-                                                        <TableCell className="text-right whitespace-nowrap"><div className={cn("font-black tabular-nums text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>Ksh {loan.arrearsBalance.toLocaleString()}</div></TableCell>
-                                                        <TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </ScrollArea>
+                                {priorityDueLoans.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><Clock className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No urgent follow-ups required.</p></div>) : (
+                                    <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+                                            <TableBody>{priorityDueLoans.map((loan) => (
+                                                    <TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div></TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell>{loan.daysUntil < 0 ? <Badge variant="destructive" className="text-[8px]">LATE {Math.abs(loan.daysUntil)}d</Badge> : <Badge variant="secondary" className="text-[8px]">DUE {loan.daysUntil}d</Badge>}</TableCell><TableCell className="text-right whitespace-nowrap"><div className={cn("font-black tabular-nums text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>Ksh {loan.arrearsBalance.toLocaleString()}</div></TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>
+                                                ))}</TableBody>
+                                        </Table></ScrollArea>
                                 )}
                             </TabsContent>
-                            <TabsContent value="daily" className="h-full m-0 p-0">
-                                <ScrollArea className="h-full">
-                                    <Table>
-                                        <TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader>
-                                        <TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell className="font-bold text-xs">{loan.displayName}</TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
-                                    </Table>
-                                </ScrollArea>
-                            </TabsContent>
-                            <TabsContent value="weekly" className="h-full m-0 p-0">
-                                <ScrollArea className="h-full">
-                                    <Table>
-                                        <TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader>
-                                        <TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell className="font-bold text-xs">{loan.displayName}</TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
-                                    </Table>
-                                </ScrollArea>
-                            </TabsContent>
+                            <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell className="font-bold text-xs">{loan.displayName}</TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                            <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell className="font-bold text-xs">{loan.displayName}</TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
                         </div>
                     </Tabs>
                 </CardContent>
             </Card>
 
             <Card className="h-[300px]">
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                    <div>
-                        <CardTitle className="text-lg flex items-center gap-2"><HistoryIcon className="h-5 w-5 text-primary" /> Facilitation Requests</CardTitle>
-                        <CardDescription>Status of your operational expense requests.</CardDescription>
-                    </div>
-                </CardHeader>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between"><div><CardTitle className="text-lg flex items-center gap-2"><HistoryIcon className="h-5 w-5 text-primary" /> Facilitation Requests</CardTitle><CardDescription>Status of your operational expense requests.</CardDescription></div></CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-[220px]">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-card z-10">
-                                <TableRow>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">Status</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {facilitationRequests?.length === 0 ? (
-                                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">No requests made yet.</TableCell></TableRow>
-                                ) : (
+                    <ScrollArea className="h-[220px]"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
+                            <TableBody>{facilitationRequests?.length === 0 ? (<TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">No requests made yet.</TableCell></TableRow>) : (
                                     [...facilitationRequests || []].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((req) => (
-                                        <TableRow key={req.id}>
-                                            <TableCell className="text-[10px]">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM') : '...'}</TableCell>
-                                            <TableCell className="font-bold text-xs">Ksh {req.amount.toLocaleString()}</TableCell>
-                                            <TableCell className="text-[10px] max-w-[150px] truncate">{req.description}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Badge variant={req.status === 'approved' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase">
-                                                    {req.status}
-                                                </Badge>
-                                            </TableCell>
-                                        </TableRow>
+                                        <TableRow key={req.id}><TableCell className="text-[10px]">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM') : '...'}</TableCell><TableCell className="font-bold text-xs">Ksh {req.amount.toLocaleString()}</TableCell><TableCell className="text-[10px] max-w-[150px] truncate">{req.description}</TableCell><TableCell className="text-right"><Badge variant={req.status === 'approved' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase">{req.status}</Badge></TableCell></TableRow>
                                     ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
+                                )}</TableBody>
+                        </Table></ScrollArea>
                 </CardContent>
             </Card>
         </div>
 
         <Card className="flex flex-col h-[816px]">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div>
-                    <CardTitle>New Applications</CardTitle>
-                    <CardDescription>Latest customer self-submissions.</CardDescription>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                    <Link href="/admin/loans">Review All <ArrowRight className="ml-2 h-3 w-3" /></Link>
-                </Button>
-            </CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><div><CardTitle>New Applications</CardTitle><CardDescription>Latest customer self-submissions.</CardDescription></div><Button variant="outline" size="sm" asChild><Link href="/admin/loans">Review All <ArrowRight className="ml-2 h-3 w-3" /></Link></Button></CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
-                {newApplications.length === 0 ? (
-                    <div className="p-12 text-center h-full flex flex-col items-center justify-center">
-                        <AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" />
-                        <p className="text-muted-foreground font-medium">No pending applications.</p>
-                    </div>
-                ) : (
-                    <ScrollArea className="h-full">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-card z-10">
-                                <TableRow>
-                                    <TableHead>Identity & Phone</TableHead>
-                                    <TableHead>Member No</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                    <TableHead className="w-[50px]"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {newApplications.map((loan) => (
-                                    <TableRow key={loan.id} className="group">
-                                        <TableCell>
-                                            <div className="font-bold text-xs">{loan.displayName}</div>
-                                            <div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div>
-                                        </TableCell>
-                                        <TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell>
-                                        <TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(loan.principalAmount || 0).toLocaleString()}</TableCell>
-                                        <TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
+                {newApplications.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No pending applications.</p></div>) : (
+                    <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Identity & Phone</TableHead><TableHead>Member No</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
+                            <TableBody>{newApplications.map((loan) => (
+                                    <TableRow key={loan.id} className="group"><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div></TableCell><TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell><TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(loan.principalAmount || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell></TableRow>
+                                ))}</TableBody>
+                        </Table></ScrollArea>
                 )}
             </CardContent>
         </Card>
@@ -925,37 +656,11 @@ export default function Dashboard() {
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
           <DialogContent className="sm:max-md p-0 overflow-hidden">
               {selectedLoanForNotes && (
-                  <>
-                    <DialogHeader className="p-6 pb-0">
-                        <DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle>
-                        <DialogDescription>Record customer interactions.</DialogDescription>
-                    </DialogHeader>
+                  <><DialogHeader className="p-6 pb-0"><DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle><DialogDescription>Record interactions.</DialogDescription></DialogHeader>
                     <div className="space-y-4 px-6 py-4">
-                        <Form {...noteForm}>
-                            <form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2">
-                                <FormField control={noteForm.control} name="content" render={({ field }) => (
-                                    <FormItem><FormControl><Textarea placeholder="Notes..." className="h-16 text-sm" {...field} value={field.value ?? ''} /></FormControl></FormItem>
-                                )}/>
-                                <Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>{isAddingNote ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}Save Note</Button>
-                            </form>
-                        </Form>
-                        <ScrollArea className="h-40 border rounded-md p-3">
-                            {(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions recorded.</p>) : (
-                                <div className="space-y-3">
-                                    {[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => (
-                                        <div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold">{note.staffName}</span>
-                                                <span className="text-[9px]">{note.date?.seconds ? format(new Date(note.date.seconds * 1000), 'dd/MM HH:mm') : '...'}</span>
-                                            </div>
-                                            <p className="italic">"{note.content}"</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </ScrollArea>
-                    </div>
-                    <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose></DialogFooter>
+                        <Form {...noteForm}><form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2"><FormField control={noteForm.control} name="content" render={({ field }) => (<FormItem><FormControl><Textarea placeholder="Notes..." className="h-16 text-sm" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/><Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>{isAddingNote ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}Save Note</Button></form></Form>
+                        <ScrollArea className="h-40 border rounded-md p-3">{(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions.</p>) : (<div className="space-y-3">{[...selectedLoanForNotes.followUpNotes].reverse().map((note, index) => (<div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold">{note.staffName}</span><span className="text-[9px]">{note.date?.seconds ? format(new Date(note.date.seconds * 1000), 'dd/MM HH:mm') : '...'}</span></div><p className="italic">"{note.content}"</p></div>))}</div>)}</ScrollArea>
+                    </div><DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose></DialogFooter>
                   </>
               )}
           </DialogContent>
