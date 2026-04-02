@@ -24,13 +24,14 @@ service cloud.firestore {
       
       // Explicitly grant Simon access by email and known UIDs immediately
       let isSimon = email == 'simon@pezeka.com' || email == 'simon@finance.pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-      
-      if (isSimon) return true;
-      
       let isFinanceDomain = email != null && email.endsWith('@finance.pezeka.com');
       
       // Check role only if Simon/Domain check fails
-      return isSignedIn() && (isFinanceDomain || (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance'));
+      return isSignedIn() && (
+        isSimon || 
+        isFinanceDomain || 
+        (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance')
+      );
     }
 
     /** 
@@ -41,12 +42,13 @@ service cloud.firestore {
       let uid = request.auth.uid;
       
       let isSimon = email == 'simon@pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-      
-      if (isSimon) return true;
-      
       let isStaffDomain = email != null && (email.endsWith('@staff.pezeka.com') || email.endsWith('@finance.pezeka.com'));
       
-      return isSignedIn() && (isStaffDomain || (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() in ['staff', 'finance']));
+      return isSignedIn() && (
+        isSimon || 
+        isStaffDomain || 
+        (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() in ['staff', 'finance'])
+      );
     }
 
     function isOwner(userId) {
