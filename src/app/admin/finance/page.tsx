@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -433,13 +432,26 @@ export default function FinancePage() {
 
           <TabsContent value="requests">
               <Card>
-                  <CardHeader><CardTitle>Staff Facilitation Requests</CardTitle><CardDescription>Approve or reject staff expense submissions. Latest requests first.</CardDescription></CardHeader>
+                  <CardHeader>
+                      <CardTitle>Staff Facilitation Requests</CardTitle>
+                      <CardDescription>Approve or reject staff expense submissions. Latest requests first.</CardDescription>
+                  </CardHeader>
                   <CardContent>
                       <Table>
-                          <TableHeader><TableRow><TableHead>Date</TableHead> <TableHead>Staff Member</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                          <TableHeader>
+                              <TableRow>
+                                  <TableHead>Date</TableHead>
+                                  <TableHead>Staff Member</TableHead>
+                                  <TableHead>Amount</TableHead>
+                                  <TableHead>Description</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                              </TableRow>
+                          </TableHeader>
                           <TableBody>
                               {pendingRequests.length === 0 ? (
-                                  <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">No pending requests.</TableCell></TableRow>
+                                  <TableRow>
+                                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">No pending requests.</TableCell>
+                                  </TableRow>
                               ) : (
                                   pendingRequests.map(req => (
                                       <TableRow key={req.id}>
@@ -449,8 +461,12 @@ export default function FinancePage() {
                                           <TableCell className="max-w-[300px] text-xs italic">"{req.description}"</TableCell>
                                           <TableCell className="text-right">
                                               <div className="flex justify-end gap-2">
-                                                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleApproveRequest(req.id)} disabled={isSubmitting}><CheckCircle2 className="h-4 w-4 mr-1" /> Approve</Button>
-                                                  <Button size="sm" variant="destructive" onClick={() => handleRejectRequest(req.id)} disabled={isSubmitting}><XCircle className="h-4 w-4 mr-1" /> Reject</Button>
+                                                  <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={() => handleApproveRequest(req.id)} disabled={isSubmitting}>
+                                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
+                                                  </Button>
+                                                  <Button size="sm" variant="destructive" onClick={() => handleRejectRequest(req.id)} disabled={isSubmitting}>
+                                                      <XCircle className="h-4 w-4 mr-1" /> Reject
+                                                  </Button>
                                               </div>
                                           </TableCell>
                                       </TableRow>
@@ -470,7 +486,6 @@ export default function FinancePage() {
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
 
-      {/* Redesigned Edit Loan Dialog - UI Matching Request */}
       <Dialog open={!!selectedLoanForEdit} onOpenChange={(o) => !o && setSelectedLoanForEdit(null)}>
           <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-[1.5rem]">
               {selectedLoanForEdit && (
@@ -592,4 +607,3 @@ export default function FinancePage() {
     </div>
   );
 }
-    
