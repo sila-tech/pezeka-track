@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useCollection, useFirestore, useDoc, useAuth, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
@@ -12,6 +13,7 @@ import {
   CreditCard,
   Wallet,
   LogOut,
+  LogOut as SignOut,
   ChevronRight,
   Loader2,
   Users,
@@ -73,6 +75,7 @@ interface Loan {
   disbursementDate?: any;
   numberOfInstalments: number;
   payments?: { paymentId: string; amount: number; date: any }[];
+  createdAt?: { seconds: number; nanoseconds: number };
 }
 
 interface Customer {
@@ -196,7 +199,8 @@ export default function AccountPage() {
   [customerLoans]);
 
   const applicationHistory = useMemo(() => 
-    customerLoans?.filter(l => l.status === 'application' || l.status === 'rejected') || [],
+    (customerLoans?.filter(l => l.status === 'application' || l.status === 'rejected') || [])
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)),
   [customerLoans]);
 
   const repaymentHistory = useMemo(() => {
@@ -266,6 +270,9 @@ export default function AccountPage() {
             arrearsBalance,
             daysUntil: differenceInDays(nextDueDate, today)
         };
+    }).sort((a, b) => {
+        // Sort by next due date ascending (soonest first)
+        return a.nextDueDate.getTime() - b.nextDueDate.getTime();
     });
   }, [activeLoans]);
 

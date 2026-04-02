@@ -70,6 +70,7 @@ interface DashboardLoan {
   assignedStaffName?: string;
   followUpNotes?: FollowUpNote[];
   payments?: { amount: number; date: any }[];
+  createdAt?: { seconds: number; nanoseconds: number };
 }
 
 const staffLoanSchema = z.object({
@@ -446,8 +447,9 @@ export default function Dashboard() {
         const currentCustomer = customers?.find(c => c.id === loan.customerId);
         return { ...loan, displayName: currentCustomer?.name || loan.customerName };
     }).sort((a, b) => {
-        const tsA = a.disbursementDate?.seconds || 0;
-        const tsB = b.disbursementDate?.seconds || 0;
+        // Correct sorting by submission time (createdAt) descending
+        const tsA = a.createdAt?.seconds || 0;
+        const tsB = b.createdAt?.seconds || 0;
         return tsB - tsA;
     });
   }, [loans, customers]);
@@ -930,7 +932,7 @@ export default function Dashboard() {
       </div>
 
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
-          <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <DialogContent className="sm:max-md p-0 overflow-hidden">
               {selectedLoanForNotes && (
                   <>
                     <DialogHeader className="p-6 pb-0">

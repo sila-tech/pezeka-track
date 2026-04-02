@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -230,14 +231,20 @@ export default function LoansPage() {
             loan.idNumber?.includes(searchTerm) ||
             loan.accountNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
+    }).sort((a, b) => {
+        // Sort by disbursement date descending (latest first)
+        const d1 = a.disbursementDate?.seconds || 0;
+        const d2 = b.disbursementDate?.seconds || 0;
+        return d2 - d1;
     });
   }, [loans, searchTerm, statusFilter]);
   
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => loan.status === 'application').sort((a, b) => {
-        const d1 = a.disbursementDate?.seconds ? a.disbursementDate.seconds : (a.disbursementDate ? new Date(a.disbursementDate).getTime() / 1000 : 0);
-        const d2 = b.disbursementDate?.seconds ? b.disbursementDate.seconds : (b.disbursementDate ? new Date(b.disbursementDate).getTime() / 1000 : 0);
+        // Sort applications by submission time (createdAt) descending
+        const d1 = a.createdAt?.seconds || 0;
+        const d2 = b.createdAt?.seconds || 0;
         return d2 - d1;
     });
   }, [loans]);

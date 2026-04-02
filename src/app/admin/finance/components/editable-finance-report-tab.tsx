@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -27,6 +28,7 @@ interface FinanceEntry {
   expenseCategory?: string;
   receiptCategory?: string;
   payoutCategory?: string;
+  createdAt?: { seconds: number; nanoseconds: number };
 }
 
 interface FinanceReportTabProps {
@@ -137,13 +139,24 @@ export function EditableFinanceReportTab({ title, description, entries, loading,
     return filtered.sort((a, b) => {
         let dateA = 0;
         let dateB = 0;
-        if (typeof a.date === 'string') dateA = new Date(a.date).getTime();
-        else if (a.date instanceof Date) dateA = a.date.getTime();
-        else if (a.date && 'seconds' in a.date) dateA = a.date.seconds * 1000;
+        
+        // Helper to get timestamp
+        const getTs = (d: any) => {
+            if (typeof d === 'string') return new Date(d).getTime();
+            if (d instanceof Date) return d.getTime();
+            if (d && 'seconds' in d) return d.seconds * 1000;
+            return 0;
+        };
 
-        if (typeof b.date === 'string') dateB = new Date(b.date).getTime();
-        else if (b.date instanceof Date) dateB = b.date.getTime();
-        else if (b.date && 'seconds' in b.date) dateB = b.date.seconds * 1000;
+        dateA = getTs(a.date);
+        dateB = getTs(b.date);
+
+        // If transaction dates are same, fallback to createdAt for perfect chronological ordering
+        if (dateA === dateB) {
+            const createdAtA = a.createdAt?.seconds || 0;
+            const createdAtB = b.createdAt?.seconds || 0;
+            return createdAtB - createdAtA;
+        }
 
         return dateB - dateA;
     });
