@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal, Share2, Phone, ShieldCheck } from 'lucide-react';
+import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal, Share2, Phone, ShieldCheck, Mail, Lock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { addCustomer, updateCustomer, deleteCustomer } from '@/lib/firestore';
+import { updateCustomer, deleteCustomer, upsertCustomer } from '@/lib/firestore';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -50,10 +50,17 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 
+// Background Auth Imports
+import { initializeApp, deleteApp, getApps, getApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut as signOff } from 'firebase/auth';
+import { firebaseConfig } from '@/firebase/config';
+
 const customerSchema = z.object({
   name: z.string().min(1, 'Name required.'),
   phone: z.string().min(10, 'Valid phone number required.'),
   idNumber: z.string().min(5, 'National ID is required.'),
+  email: z.string().email().optional().or(z.literal('')),
+  password: z.string().min(6, 'Password must be at least 6 chars.').optional().or(z.literal('')),
 });
 
 export default function CustomersPage() {
@@ -87,22 +94,51 @@ export default function CustomersPage() {
 
   const form = useForm<z.infer<typeof customerSchema>>({
     resolver: zodResolver(customerSchema),
-    defaultValues: { name: '', phone: '', idNumber: '' },
+    defaultValues: { name: '', phone: '', idNumber: '', email: '', password: '' },
   });
 
   async function onSubmit(values: z.infer<typeof customerSchema>) {
     setIsSubmitting(true);
     try {
       if (customerToEdit) {
-          await updateCustomer(firestore, customerToEdit.id, values);
+          await updateCustomer(firestore, customerToEdit.id, {
+              name: values.name,
+              phone: values.phone,
+              idNumber: values.idNumber
+          });
           toast({ title: 'Customer Updated' });
       } else {
-          await addCustomer(firestore, {
-              ...values,
+          // NEW CUSTOMER FLOW
+          let uid: string | null = null;
+
+          // 1. If email/password provided, create Auth user in background
+          if (values.email && values.password) {
+              const secondaryApp = initializeApp(firebaseConfig, 'SecondaryRegistration');
+              const secondaryAuth = getAuth(secondaryApp);
+              try {
+                  const userCred = await createUserWithEmailAndPassword(secondaryAuth, values.email, values.password);
+                  uid = userCred.user.uid;
+                  await signOff(secondaryAuth);
+              } finally {
+                  await deleteApp(secondaryApp);
+              }
+          }
+
+          // 2. Create Firestore profile
+          const targetId = uid || `manual_${Date.now()}`;
+          await upsertCustomer(firestore, targetId, {
+              name: values.name,
+              phone: values.phone,
+              email: values.email || '',
+              idNumber: values.idNumber,
               registeredByStaffId: user?.uid,
               registeredByStaffName: user?.name || user?.email || 'Staff'
           });
-          toast({ title: 'Customer Added' });
+
+          toast({ 
+              title: uid ? 'Account & Profile Created' : 'Member Profile Created',
+              description: uid ? 'Member can now log in with the credentials provided.' : 'No login account created (missing email/password).'
+          });
       }
       setAddCustomerOpen(false);
       setEditCustomerOpen(false);
@@ -128,7 +164,7 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight text-primary">Members & Customers</h1>
-        <Button onClick={() => { setCustomerToEdit(null); form.reset({ name: '', phone: '', idNumber: '' }); setAddCustomerOpen(true); }} className="font-bold">
+        <Button onClick={() => { setCustomerToEdit(null); form.reset({ name: '', phone: '', idNumber: '', email: '', password: '' }); setAddCustomerOpen(true); }} className="font-bold">
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Member
         </Button>
       </div>
@@ -203,7 +239,7 @@ export default function CustomersPage() {
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => { setCustomerToEdit(c); form.reset({ name: c.name, phone: c.phone, idNumber: c.idNumber || '' }); setEditCustomerOpen(true); }}>Edit Profile</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => { setCustomerToEdit(c); form.reset({ name: c.name, phone: c.phone, idNumber: c.idNumber || '', email: c.email || '', password: '' }); setEditCustomerOpen(true); }}>Edit Profile</DropdownMenuItem>
                                                 {canEdit && <DropdownMenuItem onClick={() => { setCustomerToDelete(c); setDeleteConfirmOpen(true); }} className="text-destructive font-bold">Delete Member</DropdownMenuItem>}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -218,42 +254,69 @@ export default function CustomersPage() {
       </Card>
 
       <Dialog open={addCustomerOpen || editCustomerOpen} onOpenChange={(o) => { if (!o) { setAddCustomerOpen(false); setEditCustomerOpen(false); } }}>
-          <DialogContent className="sm:max-w-md">
-              <DialogHeader>
+          <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl">
+              <DialogHeader className="p-6 bg-muted/20">
                   <DialogTitle className="text-2xl font-black">{customerToEdit ? 'Edit Member Profile' : 'Register New Member'}</DialogTitle>
                   <DialogDescription>Ensure all KYC information is accurate before saving.</DialogDescription>
               </DialogHeader>
-              <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-4">
-                      <FormField control={form.control} name="name" render={({ field }) => (
-                          <FormItem>
-                              <FormLabel className="font-bold">Full Legal Name</FormLabel>
-                              <FormControl><Input placeholder="As per ID Card" {...field} className="h-12 rounded-xl border-primary/20" /></FormControl>
-                              <FormMessage />
-                          </FormItem>
-                      )} />
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="phone" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="font-bold">Phone Number</FormLabel>
-                                <FormControl><Input placeholder="07XX XXX XXX" {...field} className="h-12 rounded-xl border-primary/20" /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="idNumber" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="font-bold">National ID</FormLabel>
-                                <FormControl><Input placeholder="ID Card Number" {...field} className="h-12 rounded-xl border-primary/20" /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                      </div>
-                      <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95" disabled={isSubmitting}>
-                          {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                          {customerToEdit ? 'Save Member Changes' : 'Register Member'}
-                      </Button>
-                  </form>
-              </Form>
+              <ScrollArea className="max-h-[70vh]">
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-5">
+                        <div className="space-y-4">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Identity Details</h4>
+                            <FormField control={form.control} name="name" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="font-bold">Full Legal Name</FormLabel>
+                                    <FormControl><Input placeholder="As per ID Card" {...field} className="h-12 rounded-xl" /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="phone" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold">Phone Number</FormLabel>
+                                        <FormControl><Input placeholder="07XX XXX XXX" {...field} className="h-12 rounded-xl" /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="idNumber" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold">National ID</FormLabel>
+                                        <FormControl><Input placeholder="ID Card Number" {...field} className="h-12 rounded-xl" /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                            </div>
+                        </div>
+
+                        {!customerToEdit && (
+                            <div className="space-y-4 pt-4 border-t border-dashed">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Login Credentials (Optional)</h4>
+                                <p className="text-[10px] text-muted-foreground leading-tight">Providing an email and password will automatically create a login account for the customer.</p>
+                                <FormField control={form.control} name="email" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold flex items-center gap-2"><Mail className="h-3 w-3" /> Email Address</FormLabel>
+                                        <FormControl><Input type="email" placeholder="customer@email.com" {...field} className="h-12 rounded-xl" /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="password" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="font-bold flex items-center gap-2"><Lock className="h-3 w-3" /> Initial Password</FormLabel>
+                                        <FormControl><Input type="text" placeholder="Min 6 characters" {...field} className="h-12 rounded-xl" /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                            </div>
+                        )}
+
+                        <Button type="submit" className="w-full h-14 rounded-full text-lg font-black bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 mt-4" disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                            {customerToEdit ? 'Save Member Changes' : 'Register Member Account'}
+                        </Button>
+                    </form>
+                </Form>
+              </ScrollArea>
           </DialogContent>
       </Dialog>
 

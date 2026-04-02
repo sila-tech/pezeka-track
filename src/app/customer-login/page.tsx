@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,7 +8,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfi
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { query, collection, where, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { query, collection, where, getDocs, limit } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,12 +19,13 @@ import { Loader2 } from 'lucide-react';
 import { upsertCustomer } from '@/lib/firestore';
 
 const authSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email.' }),
+  identifier: z.string().min(3, { message: 'Enter your email or phone number.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }).optional().or(z.literal('')),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   phone: z.string().min(10, 'Valid phone number is required.').optional().or(z.literal('')),
   idNumber: z.string().min(5, 'National ID is required.').optional().or(z.literal('')),
+  email: z.string().email().optional().or(z.literal('')),
 });
 
 export default function CustomerLoginPage() {
@@ -39,12 +41,13 @@ export default function CustomerLoginPage() {
   const form = useForm<z.infer<typeof authSchema>>({
     resolver: zodResolver(authSchema),
     defaultValues: {
-      email: '',
+      identifier: '',
       password: '',
       firstName: '',
       lastName: '',
       phone: '',
       idNumber: '',
+      email: '',
     },
   });
 
@@ -54,22 +57,21 @@ export default function CustomerLoginPage() {
     }
   }, [user, loading, router]);
   
-  async function onEmailSubmit(values: z.infer<typeof authSchema>) {
+  async function onAuthSubmit(values: z.infer<typeof authSchema>) {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
         // Enforce mandatory fields during sign-up
-        if (!values.firstName || !values.lastName || !values.phone || !values.idNumber || !values.password) {
+        if (!values.firstName || !values.lastName || !values.phone || !values.idNumber || !values.password || !values.email) {
           toast({ 
             variant: 'destructive', 
             title: 'Incomplete Registration', 
-            description: 'Full name, phone number, National ID, and password are required to create an account.' 
+            description: 'All fields are required to create an account.' 
           });
           setIsSubmitting(false); 
           return;
         }
 
-        // Check for stored referral code
         const referredBy = typeof window !== 'undefined' ? sessionStorage.getItem('referralCode') || undefined : undefined;
 
         const cred = await createUserWithEmailAndPassword(auth, values.email, values.password);
@@ -95,13 +97,39 @@ export default function CustomerLoginPage() {
             setIsSubmitting(false);
             return;
         }
-        await signInWithEmailAndPassword(auth, values.email, values.password);
+
+        let loginEmail = values.identifier;
+
+        // If identifier is not an email, assume it's a phone number and look up the email
+        if (!values.identifier.includes('@')) {
+            const customersRef = collection(firestore, 'customers');
+            const q = query(customersRef, where('phone', '==', values.identifier), limit(1));
+            const querySnapshot = await getDocs(q);
+            
+            if (querySnapshot.empty) {
+                toast({ variant: 'destructive', title: 'Account Not Found', description: 'No member is registered with this phone number.' });
+                setIsSubmitting(false);
+                return;
+            }
+            
+            const customerData = querySnapshot.docs[0].data();
+            if (!customerData.email) {
+                toast({ variant: 'destructive', title: 'Configuration Error', description: 'This phone account does not have a linked email. Contact support.' });
+                setIsSubmitting(false);
+                return;
+            }
+            loginEmail = customerData.email;
+        }
+
+        await signInWithEmailAndPassword(auth, loginEmail, values.password);
         toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
       }
     } catch (e: any) { 
       let errorMessage = e.message;
       if (e.code === 'auth/network-request-failed') {
         errorMessage = 'Connection error. Please check your internet or try again later.';
+      } else if (e.code === 'auth/invalid-credential') {
+          errorMessage = 'Incorrect credentials. Check your password or email/phone.';
       }
       toast({ 
         variant: 'destructive', 
@@ -114,16 +142,23 @@ export default function CustomerLoginPage() {
   }
 
   const handleForgotPassword = async () => {
-    const email = form.getValues('email');
-    if (!email || !z.string().email().safeParse(email).success) {
-      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter a valid email address first.' });
+    const identifier = form.getValues('identifier');
+    if (!identifier) {
+      toast({ variant: 'destructive', title: 'Email Required', description: 'Please enter your email address to reset password.' });
       return;
+    }
+
+    let resetEmail = identifier;
+
+    if (!identifier.includes('@')) {
+        toast({ variant: 'destructive', title: 'Use Email', description: 'Please enter your registered email address to receive a reset link.' });
+        return;
     }
 
     setIsResetting(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-      toast({ title: 'Email Sent', description: `A reset link has been sent to ${email}.` });
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast({ title: 'Email Sent', description: `A reset link has been sent to ${resetEmail}.` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Reset Failed', description: error.message });
     } finally {
@@ -141,11 +176,11 @@ export default function CustomerLoginPage() {
       <Card className="w-full shadow-lg border-t-4 border-t-primary rounded-3xl overflow-hidden">
         <CardHeader className="text-center bg-muted/20 pb-8">
           <CardTitle className="text-2xl font-black text-[#1B2B33]">{isSignUp ? 'Join Pezeka' : 'Member Sign In'}</CardTitle>
-          <CardDescription className="font-medium">{isSignUp ? 'Complete your profile to start applying for loans' : 'Access your dashboard and manage repayments'}</CardDescription>
+          <CardDescription className="font-medium">{isSignUp ? 'Complete your profile to start applying for loans' : 'Login with your registered Email or Phone'}</CardDescription>
         </CardHeader>
         <CardContent className="p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-5">
+            <form onSubmit={form.handleSubmit(onAuthSubmit)} className="space-y-5">
               {isSignUp && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -180,15 +215,26 @@ export default function CustomerLoginPage() {
                       </FormItem>
                     )} />
                   </div>
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Email Address</FormLabel>
+                      <FormControl><Input placeholder="email@example.com" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                 </>
               )}
-              <FormField control={form.control} name="email" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Email Address</FormLabel>
-                  <FormControl><Input placeholder="email@example.com" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              
+              {!isSignUp && (
+                <FormField control={form.control} name="identifier" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-bold text-xs uppercase tracking-widest text-muted-foreground">Email or Phone Number</FormLabel>
+                    <FormControl><Input placeholder="07XX... or email@domain.com" {...field} className="h-12 rounded-xl" value={field.value ?? ''} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
+
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem>
                   <div className="flex items-center justify-between">
