@@ -2,14 +2,14 @@
 'use client';
 
 import { useMemo, useState, useRef, useEffect } from 'react';
-import { useAppUser, useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
+import { useAppUser, useCollection, useFirestore, useStorage, useMemoFirebase, useDoc } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, 
     ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
     ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins,
     AlertCircle, Banknote, History as HistoryIcon, CheckCircle2, XCircle, Phone,
-    Target, UserPlus, Wallet
+    Target, UserPlus, Wallet, Info
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -181,6 +181,9 @@ export default function Dashboard() {
 
   const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
   const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
+
+  const currentMonthKey = useMemo(() => format(new Date(), 'yyyy-MM'), []);
+  const { data: myGoal, isLoading: goalLoading } = useDoc<any>(user ? `staffGoals/${user.uid}_${currentMonthKey}` : null);
 
   const myRequestsQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
@@ -424,7 +427,7 @@ export default function Dashboard() {
   }, [myPortfolio, date]);
 
   // Goal Calculations
-  const myMonthlyGoals = useMemo(() => {
+  const myMonthlyProgress = useMemo(() => {
       if (!user || !loans || !customers) return { onboarding: 0, disbursement: 0, collection: 0 };
       
       const start = startOfMonth(new Date());
@@ -456,7 +459,6 @@ export default function Dashboard() {
 
           // Collection (recorded by me)
           (loan.payments || []).forEach(p => {
-              // We check both recordedBy name match OR staffId if we start recording it
               const isMine = p.staffId === user.uid || p.recordedBy === (user.name || user.email);
               if (isMine) {
                   const pDate = (p.date as any)?.seconds ? new Date((p.date as any).seconds * 1000) : new Date(p.date as any);
@@ -470,11 +472,13 @@ export default function Dashboard() {
       return { onboarding: myOnboarded, disbursement: myDisbursed, collection: myCollected };
   }, [user, loans, customers]);
 
-  const GOAL_TARGETS = {
-      onboarding: 20,
-      disbursement: 1000000,
-      collection: 800000
-  };
+  const activeTargets = useMemo(() => {
+      return {
+          onboarding: myGoal?.onboardingTarget || 20,
+          disbursement: myGoal?.disbursementTarget || 1000000,
+          collection: myGoal?.collectionTarget || 800000
+      };
+  }, [myGoal]);
 
   const processedLoansWithTimeline = useMemo(() => {
       if (!loans) return [];
@@ -562,7 +566,7 @@ export default function Dashboard() {
     });
   }, [loans, customers]);
 
-  if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+  if (userLoading || loansLoading || goalLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -730,28 +734,38 @@ export default function Dashboard() {
                   <GoalCard 
                     title="Customer Onboarding" 
                     icon={<UserPlus className="h-5 w-5 text-blue-600" />} 
-                    current={myMonthlyGoals.onboarding} 
-                    target={GOAL_TARGETS.onboarding} 
+                    current={myMonthlyProgress.onboarding} 
+                    target={activeTargets.onboarding} 
                     unit="Members" 
                     description="New customer registrations this month." 
                   />
                   <GoalCard 
                     title="Monthly Disbursement" 
                     icon={<HandCoins className="h-5 w-5 text-primary" />} 
-                    current={myMonthlyGoals.disbursement} 
-                    target={GOAL_TARGETS.disbursement} 
+                    current={myMonthlyProgress.disbursement} 
+                    target={activeTargets.disbursement} 
                     unit="Ksh" 
                     description="Total principal advanced to customers." 
                   />
                   <GoalCard 
                     title="Collection Target" 
                     icon={<Wallet className="h-5 w-5 text-green-600" />} 
-                    current={myMonthlyGoals.collection} 
-                    target={GOAL_TARGETS.collection} 
+                    current={myMonthlyProgress.collection} 
+                    target={activeTargets.collection} 
                     unit="Ksh" 
                     description="Total repayments collected from the field." 
                   />
               </div>
+
+              {!myGoal && (
+                  <Alert className="mt-6 bg-blue-50 border-blue-200">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      <AlertTitle className="text-blue-800">Standard Monthly Targets</AlertTitle>
+                      <AlertDescription className="text-blue-700">
+                          Finance has not yet set specific targets for your profile this month. Showing standard company targets.
+                      </AlertDescription>
+                  </Alert>
+              )}
 
               <Card className="mt-6 border-dashed bg-muted/20">
                   <CardHeader>

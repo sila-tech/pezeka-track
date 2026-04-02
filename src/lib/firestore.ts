@@ -720,3 +720,21 @@ export async function rejectDeposit(db: Firestore, investorId: string, depositId
     const updated = data.deposits.map((x: any) => x.depositId === depositId ? { ...x, status: 'rejected' } : x);
     await updateDoc(investorRef, { deposits: updated, updatedAt: serverTimestamp() });
 }
+
+export async function setStaffGoal(db: Firestore, staffId: string, month: string, targets: { onboardingTarget: number, disbursementTarget: number, collectionTarget: number }) {
+    const goalId = `${staffId}_${month}`;
+    const goalRef = doc(db, 'staffGoals', goalId);
+    const goalData = {
+        staffId,
+        month,
+        ...targets,
+        updatedAt: serverTimestamp()
+    };
+    try {
+        await setDoc(goalRef, goalData, { merge: true });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: goalRef.path, operation: 'write', requestResourceData: goalData });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}

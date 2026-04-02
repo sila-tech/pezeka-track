@@ -5,54 +5,39 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents an internal staff member of Pezeka Credit Ltd, used for tracking who performed certain actions and for managing access roles (roles managed by an external authentication system).",
+      "description": "Represents an internal staff member of Pezeka Credit Ltd.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity."
-        },
-        "username": {
-          "type": "string",
-          "description": "A unique identifier for the user within the system, often used for login (though authentication details are external)."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the staff member."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the staff member."
-        },
-        "role": {
-          "type": "string",
-          "description": "The role of the staff member within the company (e.g., 'Finance', 'GeneralStaff')."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the staff member.",
-          "format": "email"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the user account was created.",
-          "format": "date-time"
-        }
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "username",
-        "firstName",
-        "lastName",
-        "role",
-        "email",
-        "createdAt"
-      ]
+      "required": ["id", "username", "firstName", "lastName", "role", "email", "createdAt"]
+    },
+    "StaffGoal": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "StaffGoal",
+      "type": "object",
+      "description": "Monthly performance targets set for a staff member by Finance.",
+      "properties": {
+        "id": { "type": "string" },
+        "staffId": { "type": "string" },
+        "month": { "type": "string", "description": "Format: YYYY-MM" },
+        "onboardingTarget": { "type": "number" },
+        "disbursementTarget": { "type": "number" },
+        "collectionTarget": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["staffId", "month", "onboardingTarget", "disbursementTarget", "collectionTarget"]
     },
     "ExpenseRequest": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "ExpenseRequest",
       "type": "object",
-      "description": "Represents a request for facilitation or other operational fees made by a staff member.",
+      "description": "Represents a request for facilitation fees made by a staff member.",
       "properties": {
         "id": { "type": "string" },
         "staffId": { "type": "string" },
@@ -71,317 +56,35 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
       "type": "object",
-      "description": "Stores detailed information about a customer who has applied for or received a loan.",
+      "description": "Stores detailed information about a customer.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Customer entity."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The first name of the customer."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The last name of the customer."
-        },
-        "nationalIdNumber": {
-          "type": "string",
-          "description": "The unique national identification number (e.g., ID card, passport number) of the customer."
-        },
-        "contactNumber": {
-          "type": "string",
-          "description": "The primary contact phone number of the customer."
-        },
-        "email": {
-          "type": "string",
-          "description": "The email address of the customer (optional).",
-          "format": "email"
-        },
-        "address": {
-          "type": "string",
-          "description": "The physical address of the customer (optional)."
-        },
-        "dateRegistered": {
-          "type": "string",
-          "description": "The date and time when the customer's record was first registered.",
-          "format": "date-time"
-        },
-        "profilePhotoUrl": {
-          "type": "string",
-          "description": "URL to the customer's profile photo, used for identification.",
-          "format": "uri"
-        }
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "nationalIdNumber": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "dateRegistered": { "type": "string", "format": "date-time" }
       },
-      "required": [
-        "id",
-        "firstName",
-        "lastName",
-        "nationalIdNumber",
-        "contactNumber",
-        "dateRegistered"
-      ]
+      "required": ["id", "firstName", "lastName", "nationalIdNumber", "contactNumber", "dateRegistered"]
     },
     "Loan": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Loan",
       "type": "object",
-      "description": "Records details of an individual loan disbursed to a customer, including its terms, current status, and financial breakdown.",
+      "description": "Records details of an individual loan.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Loan entity."
-        },
-        "customerId": {
-          "type": "string",
-          "description": "Reference to the Customer who received this loan. (Relationship: Customer 1:N Loan)"
-        },
-        "amountDisbursed": {
-          "type": "number",
-          "description": "The principal amount of money disbursed to the customer."
-        },
-        "disbursementDate": {
-          "type": "string",
-          "description": "The date and time when the loan amount was disbursed.",
-          "format": "date-time"
-        },
-        "interestRate": {
-          "type": "number",
-          "description": "The annual interest rate applied to the loan (e.g., 0.10 for 10%)."
-        },
-        "loanTermInDays": {
-          "type": "number",
-          "description": "The total duration of the loan in days."
-        },
-        "repaymentFrequency": {
-          "type": "string",
-          "description": "How often the customer is expected to make payments (e.g., 'Daily', 'Weekly', 'Monthly')."
-        },
-        "totalAmountDue": {
-          "type": "number",
-          "description": "The total amount expected to be repaid by the customer, including principal, interest, and all fees."
-        },
-        "outstandingBalance": {
-          "type": "number",
-          "description": "The current remaining balance on the loan."
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the loan (e.g., 'Active', 'Fully Paid', 'Overdue', 'Defaulted', 'Pending')."
-        },
-        "facilitationFee": {
-          "type": "number",
-          "description": "Any fee charged for processing or facilitating the loan."
-        },
-        "transactionCost": {
-          "type": "number",
-          "description": "Any additional transaction costs associated with the loan disbursement or management."
-        },
-        "nextPaymentDueDate": {
-          "type": "string",
-          "description": "The due date for the next scheduled payment for this loan.",
-          "format": "date-time"
-        },
-        "nextPaymentAmount": {
-          "type": "number",
-          "description": "The amount expected for the next scheduled payment."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the loan record was created in the system.",
-          "format": "date-time"
-        },
-        "supportingDocumentUrls": {
-          "type": "array",
-          "description": "URLs to supporting documents or images related to the loan application, collateral, or agreements (e.g., customer ID photos, signed agreements).",
-          "items": {
-            "type": "string"
-          }
-        }
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "amountDisbursed": { "type": "number" },
+        "disbursementDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" }
       },
-      "required": [
-        "id",
-        "customerId",
-        "amountDisbursed",
-        "disbursementDate",
-        "interestRate",
-        "loanTermInDays",
-        "repaymentFrequency",
-        "totalAmountDue",
-        "outstandingBalance",
-        "status",
-        "facilitationFee",
-        "transactionCost",
-        "nextPaymentDueDate",
-        "nextPaymentAmount",
-        "createdAt"
-      ]
-    },
-    "Repayment": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Repayment",
-      "type": "object",
-      "description": "Records an individual payment made by a customer towards a specific loan.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Repayment entity."
-        },
-        "loanId": {
-          "type": "string",
-          "description": "Reference to the Loan this payment is applied to. (Relationship: Loan 1:N Repayment)"
-        },
-        "amountPaid": {
-          "type": "number",
-          "description": "The amount of money paid by the customer."
-        },
-        "paymentDate": {
-          "type": "string",
-          "description": "The date and time when the payment was received.",
-          "format": "date-time"
-        },
-        "paymentMethod": {
-          "type": "string",
-          "description": "The method used for the payment (e.g., 'Cash', 'Bank Transfer', 'Mobile Money')."
-        },
-        "isLate": {
-          "type": "boolean",
-          "description": "Indicates if the payment was made after its due date."
-        },
-        "paymentProofPhotoUrl": {
-          "type": "string",
-          "description": "URL to the photo of the customer's payment proof (e.g., bank slip, mobile money screenshot). Optional.",
-          "format": "uri"
-        }
-      },
-      "required": [
-        "id",
-        "loanId",
-        "amountPaid",
-        "paymentDate",
-        "paymentMethod",
-        "isLate"
-      ]
-    },
-    "DailyExpense": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "DailyExpense",
-      "type": "object",
-      "description": "Records daily operational expenses incurred by the company, such as facilitation costs or office supplies.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the DailyExpense entity."
-        },
-        "date": {
-          "type": "string",
-          "description": "The specific date on which the expense occurred.",
-          "format": "date"
-        },
-        "category": {
-          "type": "string",
-          "description": "The category of the expense (e.g., 'Facilitation', 'Office Supplies', 'Utilities')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A detailed description of the expense."
-        },
-        "amount": {
-          "type": "number",
-          "description": "The monetary amount of the expense."
-        },
-        "recordedByUserId": {
-          "type": "string",
-          "description": "Reference to the User who recorded this expense. (Relationship: User 1:N DailyExpense)"
-        },
-        "receiptPhotoUrl": {
-          "type": "string",
-          "description": "URL to the photo of the expense receipt for verification.",
-          "format": "uri"
-        }
-      },
-      "required": [
-        "id",
-        "date",
-        "category",
-        "description",
-        "amount",
-        "recordedByUserId"
-      ]
-    },
-    "DailyPayout": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "DailyPayout",
-      "type": "object",
-      "description": "Summarizes the total amount of money disbursed to customers and associated costs on a given day.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the DailyPayout entity."
-        },
-        "date": {
-          "type": "string",
-          "description": "The specific date for which the payout summary is recorded.",
-          "format": "date"
-        },
-        "totalDisbursedPrincipal": {
-          "type": "number",
-          "description": "The aggregate principal amount of all loans disbursed on this date."
-        },
-        "totalAssociatedFees": {
-          "type": "number",
-          "description": "The aggregate of facilitation fees and transaction costs for all loans disbursed on this date."
-        },
-        "recordedByUserId": {
-          "type": "string",
-          "description": "Reference to the User who recorded this daily payout summary. (Relationship: User 1:N DailyPayout)"
-        }
-      },
-      "required": [
-        "id",
-        "date",
-        "totalDisbursedPrincipal",
-        "totalAssociatedFees",
-        "recordedByUserId"
-      ]
-    },
-    "DailyReceipt": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "DailyReceipt",
-      "type": "object",
-      "description": "Summarizes the total amount of money received from customer repayments on a given day.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the DailyReceipt entity."
-        },
-        "date": {
-          "type": "string",
-          "description": "The specific date for which the receipt summary is recorded.",
-          "format": "date"
-        },
-        "totalAmountReceived": {
-          "type": "number",
-          "description": "The aggregate amount of all customer repayments received on this date."
-        },
-        "recordedByUserId": {
-          "type": "string",
-          "description": "Reference to the User who recorded this daily receipt summary. (Relationship: User 1:N DailyReceipt)"
-        }
-      },
-      "required": [
-        "id",
-        "date",
-        "totalAmountReceived",
-        "recordedByUserId"
-      ]
+      "required": ["id", "customerId", "amountDisbursed", "status"]
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
@@ -389,29 +92,31 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
+          "schema": { "$ref": "#/backend/entities/User" },
           "description": "Stores internal staff member profiles."
+        }
+      },
+      {
+        "path": "/staffGoals/{goalId}",
+        "definition": {
+          "entityName": "StaffGoal",
+          "schema": { "$ref": "#/backend/entities/StaffGoal" },
+          "description": "Stores performance targets for staff."
         }
       },
       {
         "path": "/expenseRequests/{requestId}",
         "definition": {
           "entityName": "ExpenseRequest",
-          "schema": {
-            "$ref": "#/backend/entities/ExpenseRequest"
-          },
-          "description": "Stores staff requests for facilitation fees and other operational costs."
+          "schema": { "$ref": "#/backend/entities/ExpenseRequest" },
+          "description": "Stores staff requests for facilitation fees."
         }
       },
       {
         "path": "/customers/{customerId}",
         "definition": {
           "entityName": "Customer",
-          "schema": {
-            "$ref": "#/backend/entities/Customer"
-          },
+          "schema": { "$ref": "#/backend/entities/Customer" },
           "description": "Stores customer profiles."
         }
       },
@@ -419,9 +124,7 @@
         "path": "/loans/{loanId}",
         "definition": {
           "entityName": "Loan",
-          "schema": {
-            "$ref": "#/backend/entities/Loan"
-          },
+          "schema": { "$ref": "#/backend/entities/Loan" },
           "description": "Stores loan records."
         }
       },
@@ -434,13 +137,10 @@
             "properties": {
               "type": { "type": "string" },
               "amount": { "type": "number" },
-              "date": { "type": "string" },
-              "description": { "type": "string" },
-              "recordedBy": { "type": "string" },
-              "staffId": { "type": "string" }
+              "date": { "type": "string" }
             }
           },
-          "description": "General financial ledger for all cash movements."
+          "description": "General financial ledger."
         }
       }
     ]

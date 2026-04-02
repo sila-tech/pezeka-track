@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -6,13 +7,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { User, BarChart2, Calendar as CalendarIcon, HandCoins, TrendingUp, Wallet, ReceiptText } from 'lucide-react';
+import { User, BarChart2, Calendar as CalendarIcon, HandCoins, TrendingUp, Wallet, ReceiptText, Target, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { DateRange } from 'react-day-picker';
 import { startOfMonth, endOfMonth, isWithinInterval, startOfToday, endOfToday, startOfWeek, endOfWeek, format, addDays, addWeeks, addMonths, differenceInDays, differenceInMonths } from 'date-fns';
 import { DatePickerWithRange } from './editable-finance-report-tab';
 import { cn } from '@/lib/utils';
+import { useFirestore } from '@/firebase';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import { setStaffGoal } from '@/lib/firestore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 
 interface Payment {
     paymentId: string;
@@ -50,10 +60,25 @@ interface StaffPortfoliosTabProps {
   staffList: Staff[] | null;
 }
 
+const goalSchema = z.object({
+    onboardingTarget: z.coerce.number().min(0),
+    disbursementTarget: z.coerce.number().min(0),
+    collectionTarget: z.coerce.number().min(0),
+});
+
 export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps) {
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
+  });
+  const firestore = useFirestore();
+  const { toast } = useToast();
+  const [selectedStaffForGoal, setSelectedStaffForGoal] = useState<Staff | null>(null);
+  const [isGoalSubmitting, setIsGoalSubmitting] = useState(false);
+
+  const goalForm = useForm<z.infer<typeof goalSchema>>({
+      resolver: zodResolver(goalSchema),
+      defaultValues: { onboardingTarget: 0, disbursementTarget: 0, collectionTarget: 0 }
   });
 
   const processedData = useMemo(() => {
@@ -112,6 +137,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
       return {
         id: staff.id,
         uid: staff.id,
+        staffObject: staff,
         name: staff.name || staff.email,
         activeCount,
         periodDisbursed,
@@ -144,6 +170,21 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
           setDate({ from: startOfWeek(today), to: endOfWeek(today) });
       } else if (preset === 'monthly') {
           setDate({ from: startOfMonth(today), to: endOfMonth(today) });
+      }
+  }
+
+  const handleSetGoal = async (values: z.infer<typeof goalSchema>) => {
+      if (!selectedStaffForGoal || !firestore) return;
+      setIsGoalSubmitting(true);
+      try {
+          const monthKey = format(new Date(), 'yyyy-MM');
+          await setStaffGoal(firestore, selectedStaffForGoal.uid || selectedStaffForGoal.id, monthKey, values);
+          toast({ title: 'Monthly Goals Updated', description: `Targets set for ${selectedStaffForGoal.name} for ${format(new Date(), 'MMMM')}.` });
+          setSelectedStaffForGoal(null);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Goal Update Failed', description: e.message });
+      } finally {
+          setIsGoalSubmitting(false);
       }
   }
 
@@ -214,7 +255,7 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                   <TableHead className="text-right">Period Disbursed</TableHead>
                   <TableHead className="text-right">Period Collected</TableHead>
                   <TableHead className="w-[120px]">Efficiency</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -244,11 +285,16 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/admin/finance/staff/${staff.uid}`}>
-                                <BarChart2 className="h-4 w-4" />
-                            </Link>
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" title="Set Monthly Goals" onClick={() => { setSelectedStaffForGoal(staff.staffObject); goalForm.reset({ onboardingTarget: 20, disbursementTarget: 1000000, collectionTarget: 800000 }); }}>
+                                <Target className="h-4 w-4 text-primary" />
+                            </Button>
+                            <Button variant="ghost" size="icon" asChild>
+                                <Link href={`/admin/finance/staff/${staff.uid}`}>
+                                    <BarChart2 className="h-4 w-4" />
+                                </Link>
+                            </Button>
+                        </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -265,6 +311,32 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
           </ScrollArea>
         </CardContent>
       </Card>
+
+      <Dialog open={!!selectedStaffForGoal} onOpenChange={(o) => !o && setSelectedStaffForGoal(null)}>
+          <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                  <DialogTitle>Set Monthly Goals: {selectedStaffForGoal?.name}</DialogTitle>
+                  <DialogDescription>Assign performance targets for {format(new Date(), 'MMMM yyyy')}. These will appear on the staff's dashboard.</DialogDescription>
+              </DialogHeader>
+              <Form {...goalForm}>
+                  <form onSubmit={goalForm.handleSubmit(handleSetGoal)} className="space-y-4 pt-4">
+                      <FormField control={goalForm.control} name="onboardingTarget" render={({ field }) => (
+                          <FormItem><FormLabel>Onboarding Target (Members)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={goalForm.control} name="disbursementTarget" render={({ field }) => (
+                          <FormItem><FormLabel>Disbursement Target (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                      )} />
+                      <FormField control={goalForm.control} name="collectionTarget" render={({ field }) => (
+                          <FormItem><FormLabel>Collection Target (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                      )} />
+                      <DialogFooter className="pt-2">
+                          <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
+                          <Button type="submit" disabled={isGoalSubmitting}>{isGoalSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Set Targets</Button>
+                      </DialogFooter>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
 
       <Card>
           <CardHeader className="pb-2">
