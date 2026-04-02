@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -46,6 +47,25 @@
         "email",
         "createdAt"
       ]
+    },
+    "ExpenseRequest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExpenseRequest",
+      "type": "object",
+      "description": "Represents a request for facilitation or other operational fees made by a staff member.",
+      "properties": {
+        "id": { "type": "string" },
+        "staffId": { "type": "string" },
+        "staffName": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string", "enum": ["facilitation", "other"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "approverId": { "type": "string" },
+        "approverName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["staffId", "amount", "status", "createdAt"]
     },
     "Customer": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -372,7 +392,17 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores internal staff member profiles and their roles, used for authorization. Each document's ID is the Firebase Authentication UID. This collection provides authorization independence via the denormalized 'role' field."
+          "description": "Stores internal staff member profiles."
+        }
+      },
+      {
+        "path": "/expenseRequests/{requestId}",
+        "definition": {
+          "entityName": "ExpenseRequest",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseRequest"
+          },
+          "description": "Stores staff requests for facilitation fees and other operational costs."
         }
       },
       {
@@ -382,108 +412,37 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores detailed information about customers. Includes `profilePhotoUrl` for identification. Access for staff is granted based on their role from the `/users` collection, supporting QAPs for listing all customers.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the customer."
-            }
-          ]
+          "description": "Stores customer profiles."
         }
       },
       {
-        "path": "/customers/{customerId}/loans/{loanId}",
+        "path": "/loans/{loanId}",
         "definition": {
           "entityName": "Loan",
           "schema": {
             "$ref": "#/backend/entities/Loan"
           },
-          "description": "Records individual loans disbursed to a specific customer. This subcollection maintains authorization independence as `customerId` is available in the path. Includes `supportingDocumentUrls` for related documents.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the parent customer."
-            },
-            {
-              "name": "loanId",
-              "description": "The unique identifier for the loan."
-            }
-          ]
+          "description": "Stores loan records."
         }
       },
       {
-        "path": "/customers/{customerId}/loans/{loanId}/repayments/{repaymentId}",
+        "path": "/financeEntries/{entryId}",
         "definition": {
-          "entityName": "Repayment",
+          "entityName": "FinanceEntry",
           "schema": {
-            "$ref": "#/backend/entities/Repayment"
-          },
-          "description": "Records individual payments made by a customer towards a specific loan. This subcollection maintains authorization independence as `customerId` and `loanId` are available in the path. Includes `paymentProofPhotoUrl` for verification.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier for the grandparent customer."
-            },
-            {
-              "name": "loanId",
-              "description": "The unique identifier for the parent loan."
-            },
-            {
-              "name": "repaymentId",
-              "description": "The unique identifier for the repayment."
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "amount": { "type": "number" },
+              "date": { "type": "string" },
+              "description": { "type": "string" },
+              "recordedBy": { "type": "string" },
+              "staffId": { "type": "string" }
             }
-          ]
-        }
-      },
-      {
-        "path": "/dailyExpenses/{expenseId}",
-        "definition": {
-          "entityName": "DailyExpense",
-          "schema": {
-            "$ref": "#/backend/entities/DailyExpense"
           },
-          "description": "Records daily operational expenses incurred by the company. Includes `recordedByUserId` for tracking and `receiptPhotoUrl` for verification. Access is strictly controlled by the 'Finance' role, supporting QAPs for listing all expenses.",
-          "params": [
-            {
-              "name": "expenseId",
-              "description": "The unique identifier for the daily expense."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/dailyPayouts/{payoutId}",
-        "definition": {
-          "entityName": "DailyPayout",
-          "schema": {
-            "$ref": "#/backend/entities/DailyPayout"
-          },
-          "description": "Summarizes daily loan disbursements and associated costs. Includes `recordedByUserId` for tracking. Access is strictly controlled by the 'Finance' role, supporting QAPs for listing all payouts.",
-          "params": [
-            {
-              "name": "payoutId",
-              "description": "The unique identifier for the daily payout summary."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/dailyReceipts/{receiptId}",
-        "definition": {
-          "entityName": "DailyReceipt",
-          "schema": {
-            "$ref": "#/backend/entities/DailyReceipt"
-          },
-          "description": "Summarizes daily customer repayments received. Includes `recordedByUserId` for tracking. Access is strictly controlled by the 'Finance' role, supporting QAPs for listing all receipts.",
-          "params": [
-            {
-              "name": "receiptId",
-              "description": "The unique identifier for the daily receipt summary."
-            }
-          ]
+          "description": "General financial ledger for all cash movements."
         }
       }
-    ],
-    "reasoning": "The Firestore structure prioritizes secure, scalable, and debuggable access by adhering to the core design principles, especially Authorization Independence and Structural Segregation.\n\n**Authorization Independence (CRITICAL) via Denormalization:**\n1.  **User Roles (`/users/{userId}`):** The primary mechanism for authorization is the `role` field directly within each `User` document. This means that to check a user's role (e.g., 'Finance' or 'GeneralStaff'), security rules only need to perform a `get()` operation on `users/$(request.auth.uid)`. This is a single, atomic operation that does not rely on hierarchical data dependencies for authorization, completely eliminating complex `get()` calls in subcollection rules based on parent data. The `request.auth.uid` directly identifies the requesting staff member, making this lookup efficient and clear.\n2.  **Customer, Loan, Repayment Hierarchy:** For customer-related data (`/customers/{customerId}`, `/customers/{customerId}/loans/{loanId}`, `/customers/{customerId}/loans/{loanId}/repayments/{repaymentId}`), the hierarchical path inherently denormalizes the parent IDs. For example, when evaluating a rule for a `Loan` document, the `customerId` is directly available as a wildcard in the path (`{customerId}`), removing the need for `get(/customers/$(customerId))`. Similarly, for `Repayment` documents, both `customerId` and `loanId` are available in the path. While the `Loan` schema also includes `customerId` and `Repayment` includes `loanId`, their presence in the path is what enables `request.auth.uid` (via role checks on `users/{userId}`) to be combined with path-based identification for secure, atomic operations. The `recordedByUserId` in `DailyExpense`, `DailyPayout`, and `DailyReceipt` serves as an audit trail rather than an authorization field, with access being determined by the *current* user's role, as defined in `/users/{userId}`.\n\n**QAPs (Rules are not Filters) via Structural Segregation:**\nEach collection and subcollection is designed with a homogeneous security posture, ensuring that `list` operations return a consistent set of data without requiring client-side filtering or complex rule-based data exclusion:\n1.  **`/users/{userId}`:** This collection stores individual staff profiles. 'Finance' staff might be allowed to list all users, or each user can only read their own, depending on more granular requirements. The critical aspect is that *all* documents in this collection (or a subset based on a simple query like `role == 'Finance'`) will be accessible to an authorized `list` caller, without filtering by rules.\n2.  **`/customers`:** All authenticated staff (General Staff and Finance) can likely read/list all `Customer` documents. The rule set will grant broad read access to authenticated staff based on their `role` from `/users/{uid}`, ensuring that a `list` operation on `/customers` returns all customers without internal filtering.\n3.  **`/customers/{customerId}/loans`:** A `list` operation on this subcollection will securely return *all* loans for the specified `{customerId}` to authorized staff. All `Loan` documents under a given customer share the same access requirements, satisfying QAPs.\n4.  **`/customers/{customerId}/loans/{loanId}/repayments`:** Similarly, a `list` operation here will return *all* repayments for the specified `{loanId}` to authorized staff. All `Repayment` documents for a given loan share the same access requirements.\n5.  **`/dailyExpenses`, `/dailyPayouts`, `/dailyReceipts`:** These top-level collections are exclusively for 'Finance' staff. A `list` operation by a 'Finance' user will retrieve *all* documents within these collections, providing a complete financial overview without rules acting as filters. General Staff would be entirely denied access to these collections for any operation, including `list`.\n\nThis structure makes security rules concise and explicit, leveraging path-based parameters and the denormalized `role` field to make authorization decisions independent of complex cross-document `get()` calls, thereby enhancing debuggability and system integrity."
+    ]
   }
 }

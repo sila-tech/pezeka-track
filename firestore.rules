@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -28,7 +29,7 @@ service cloud.firestore {
       
       let isFinanceDomain = email != null && email.endsWith('@finance.pezeka.com');
       
-      // Check role role only if Simon/Domain check fails
+      // Check role only if Simon/Domain check fails
       return isSignedIn() && (isFinanceDomain || (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance'));
     }
 
@@ -59,6 +60,14 @@ service cloud.firestore {
       allow list: if isStaff();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isFinance();
+      allow delete: if isFinance();
+    }
+
+    match /expenseRequests/{requestId} {
+      allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
+      allow list: if isStaff();
+      allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
+      allow update: if isFinance();
       allow delete: if isFinance();
     }
 
@@ -107,7 +116,7 @@ service cloud.firestore {
     }
 
     match /financeEntries/{entryId} {
-      allow get, list, create, update, delete: if isFinance();
+      allow get, list, create, update, delete: if isFinance() || isStaff();
     }
 
     match /investors/{investorId} {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { addDoc, collection, Firestore, serverTimestamp, DocumentReference, DocumentData, doc, updateDoc, deleteDoc, arrayUnion, increment, getDocs, query, setDoc, getDoc, where, limit } from 'firebase/firestore';
@@ -230,6 +231,7 @@ type FinanceEntryData = {
     description?: string;
     loanId?: string;
     recordedBy?: string;
+    staffId?: string;
     expenseCategory?: 'facilitation_commission' | 'office_purchase' | 'other';
     receiptCategory?: 'loan_repayment' | 'upfront_fees' | 'registration_fee' | 'penalty_payment' | 'investor_deposit' | 'other';
     payoutCategory?: 'loan_disbursement' | 'investor_withdrawal' | 'other';
@@ -248,6 +250,67 @@ export async function addFinanceEntry(db: Firestore, entryData: FinanceEntryData
       errorEmitter.emit('permission-error', permissionError);
       throw serverError;
   }
+}
+
+export async function addExpenseRequest(db: Firestore, data: { staffId: string, staffName: string, amount: number, description: string, category: string }) {
+    const requestsCol = collection(db, 'expenseRequests');
+    const newRequest = {
+        ...data,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+    };
+    try {
+        return await addDoc(requestsCol, newRequest);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: requestsCol.path, operation: 'create', requestResourceData: newRequest });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function approveExpenseRequest(db: Firestore, requestId: string, approver: { id: string, name: string }) {
+    const requestRef = doc(db, 'expenseRequests', requestId);
+    const snap = await getDoc(requestRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+
+    try {
+        await updateDoc(requestRef, {
+            status: 'approved',
+            approverId: approver.id,
+            approverName: approver.name,
+            updatedAt: serverTimestamp()
+        });
+
+        // Add to main ledger
+        await addFinanceEntry(db, {
+            type: 'expense',
+            amount: data.amount,
+            date: new Date(),
+            description: `Facilitation: ${data.description} (Requested by ${data.staffName})`,
+            recordedBy: approver.name,
+            staffId: data.staffId,
+            expenseCategory: 'facilitation_commission'
+        });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: requestRef.path, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function rejectExpenseRequest(db: Firestore, requestId: string) {
+    const requestRef = doc(db, 'expenseRequests', requestId);
+    try {
+        await updateDoc(requestRef, {
+            status: 'rejected',
+            updatedAt: serverTimestamp()
+        });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: requestRef.path, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
 }
 
 export async function updateFinanceEntry(db: Firestore, entryId: string, data: { [key: string]: any }) {
