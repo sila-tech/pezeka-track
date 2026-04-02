@@ -1,122 +1,115 @@
 
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    /**
-     * CORE PHILOSOPHY
-     * This ruleset enforces a Role-Based Access Control (RBAC) model.
-     * We prioritize an absolute bypass for Simon (Super Admin) at the top level
-     * to ensure administrative access is never blocked by complex evaluation.
-     */
-
-    // --- Helper Functions ---
-
-    function isSignedIn() {
-      return request.auth != null;
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+    
+        // --- Helper Functions ---
+    
+        function isSignedIn() {
+          return request.auth != null;
+        }
+    
+        /**
+         * @description Absolute bypass for Simon / Super Admin.
+         */
+        function isSimon() {
+          return isSignedIn() && (
+            request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
+            request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+            request.auth.token.email == 'simon@pezeka.com'
+          );
+        }
+    
+        /** 
+         * @description Check for Finance authorization. 
+         */
+        function isFinance() {
+          return isSimon() || (
+            isSignedIn() && (
+              (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com')) ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
+            )
+          );
+        }
+    
+        /** 
+         * @description Check for Staff authorization. 
+         */
+        function isStaff() {
+          return isSimon() || (
+            isSignedIn() && (
+              (request.auth.token.email != null && (
+                request.auth.token.email.endsWith('@staff.pezeka.com') || 
+                request.auth.token.email.endsWith('@finance.pezeka.com')
+              )) ||
+              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
+            )
+          );
+        }
+    
+        function isOwner(userId) {
+          return isSignedIn() && request.auth.uid == userId;
+        }
+    
+        // --- SUPER ADMIN GLOBAL BYPASS ---
+        match /{allPaths=**} {
+          allow read, write: if isSimon();
+        }
+    
+        // --- Collection Rules ---
+    
+        match /users/{userId} {
+          allow get: if isSignedIn();
+          allow list: if isStaff();
+          allow create: if isOwner(userId) || isSimon();
+          allow update: if isOwner(userId) || isFinance();
+          allow delete: if isFinance();
+        }
+    
+        match /expenseRequests/{requestId} {
+          // Allow listing for all staff (Super Admin is handled by global bypass)
+          allow list: if isStaff();
+          // Allow get if the staff member owns it or if the user is Finance
+          allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
+          // Allow create if the staff member is recording their own request
+          allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
+          // Finance manages updates/deletes (approvals)
+          allow update, delete: if isFinance();
+        }
+    
+        match /customers/{customerId} {
+          allow get, list: if isStaff() || isOwner(customerId);
+          allow create: if isStaff() || isSignedIn();
+          allow update: if isStaff() || isOwner(customerId);
+          allow delete: if isFinance();
+        }
+    
+        match /loans/{loanId} {
+          allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+          allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
+          allow update: if isStaff();
+          allow delete: if isFinance();
+        }
+    
+        match /kyc_documents/{docId} {
+          allow get, list, create, update, delete: if isStaff();
+        }
+    
+        match /financeEntries/{entryId} {
+          allow get, list, create, update, delete: if isFinance() || isStaff();
+        }
+    
+        match /investors/{investorId} {
+          allow get: if isSignedIn() && (request.auth.uid == investorId || isFinance());
+          allow list, create, update, delete: if isFinance();
+        }
+    
+        match /mail_logs/{logId} {
+          allow get, list, create: if isFinance() || isStaff();
+          allow update, delete: if false;
+        }
+      }
     }
-
-    /**
-     * @description Absolute bypass for Simon / Super Admin.
-     * Checks UIDs and Emails directly to ensure guaranteed access.
-     */
-    function isSimon() {
-      return isSignedIn() && (
-        request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
-        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
-        request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
-        request.auth.token.email == 'simon@pezeka.com' || 
-        request.auth.token.email == 'simon@finance.pezeka.com'
-      );
-    }
-
-    /** 
-     * @description Robust check for Finance authorization. 
-     */
-    function isFinance() {
-      return isSimon() || (
-        isSignedIn() && (
-          (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com')) ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
-        )
-      );
-    }
-
-    /** 
-     * @description Robust check for Staff authorization. 
-     */
-    function isStaff() {
-      return isSimon() || (
-        isSignedIn() && (
-          (request.auth.token.email != null && (
-            request.auth.token.email.endsWith('@staff.pezeka.com') || 
-            request.auth.token.email.endsWith('@finance.pezeka.com')
-          )) ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
-        )
-      );
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // --- SUPER ADMIN GLOBAL BYPASS ---
-    // Simon has access to EVERYTHING. This match applies to all paths.
-    match /{allPaths=**} {
-      allow read, write: if isSimon();
-    }
-
-    // --- Collection Rules ---
-
-    match /users/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isStaff();
-      allow create: if isOwner(userId) || isSimon();
-      allow update: if isOwner(userId) || isFinance();
-      allow delete: if isFinance();
-    }
-
-    match /expenseRequests/{requestId} {
-      allow list: if isStaff();
-      allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
-      allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
-      allow update: if isFinance();
-      allow delete: if isFinance();
-    }
-
-    match /customers/{customerId} {
-      allow get, list: if isStaff() || isOwner(customerId);
-      allow create: if isStaff() || isSignedIn();
-      allow update: if isStaff() || isOwner(customerId);
-      allow delete: if isFinance();
-    }
-
-    match /loans/{loanId} {
-      allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
-      allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
-      allow update: if isStaff();
-      allow delete: if isFinance();
-    }
-
-    match /kyc_documents/{docId} {
-      allow get, list, create, update, delete: if isStaff();
-    }
-
-    match /financeEntries/{entryId} {
-      allow get, list, create, update, delete: if isFinance() || isStaff();
-    }
-
-    match /investors/{investorId} {
-      allow get: if isSignedIn() && (request.auth.uid == investorId || isFinance());
-      allow list, create, update, delete: if isFinance();
-    }
-
-    match /mail_logs/{logId} {
-      allow get, list, create: if isFinance() || isStaff();
-      allow update, delete: if false;
-    }
-  }
-}
+    
