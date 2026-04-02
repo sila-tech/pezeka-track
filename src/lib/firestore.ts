@@ -64,24 +64,22 @@ export async function addMailLog(db: Firestore, logData: { recipient: string, su
     };
     
     addDoc(logsCollection, newLog).catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
-            path: logsCollection.path,
-            operation: 'create',
-            requestResourceData: newLog,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        // Log silently to avoid breaking user flows if rule propagation is slow
+        console.warn("[MAIL LOG ERROR]: Permission denied or network issue.");
     });
 }
 
 async function generateAccountNumber(db: Firestore): Promise<string> {
   const customerCollection = collection(db, 'customers');
+  // Sensible default/fallback
   let accNo = `PZ-${Math.floor(10000 + Math.random() * 90000)}`;
   try {
     const q = query(customerCollection);
     const snap = await getDocs(q);
     accNo = `PZ-${String(snap.size + 1).padStart(5, '0')}`;
   } catch (e) {
-    console.error("Error generating account number", e);
+    // Permission denied usually happens for non-staff listing entire collection
+    console.warn("Generating random account number due to list restriction.");
   }
   return accNo;
 }
@@ -141,6 +139,8 @@ export async function upsertCustomer(db: Firestore, customerId: string, customer
     if (!existingSnap.exists()) {
         finalData.accountNumber = await generateAccountNumber(db);
         finalData.referralCode = generateReferralCode();
+        finalData.createdAt = serverTimestamp();
+        
         if (customerData.email) {
             sendAutomatedEmail({
                 type: 'welcome',
@@ -738,3 +738,4 @@ export async function setStaffGoal(db: Firestore, staffId: string, month: string
         throw serverError;
     }
 }
+    

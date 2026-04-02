@@ -17,12 +17,13 @@
           return isSignedIn() && (
             request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
             request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+            request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
             request.auth.token.email == 'simon@pezeka.com'
           );
         }
     
         // --- GLOBAL BYPASS FOR SUPER ADMIN ---
-        // Force refresh: 2024-05-22 14:00
+        // Force refresh: 2024-05-23 10:00
         match /{allPaths=**} {
           allow read, write: if isSimon();
         }
@@ -64,6 +65,12 @@
           allow delete: if isFinance();
         }
     
+        match /staffGoals/{goalId} {
+          allow get: if isSignedIn();
+          allow list: if isStaff();
+          allow create, update, delete: if isFinance();
+        }
+    
         match /expenseRequests/{requestId} {
           allow list: if isStaff();
           allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
@@ -86,7 +93,6 @@
         }
     
         match /kyc_documents/{docId} {
-          // Explicit Simon bypass for uploads
           allow read, write: if isSimon() || isStaff();
         }
     
@@ -100,7 +106,8 @@
         }
     
         match /mail_logs/{logId} {
-          allow get, list, create: if isFinance() || isStaff();
+          allow create: if isSignedIn(); 
+          allow get, list: if isFinance() || isStaff();
           allow update, delete: if false;
         }
       }
