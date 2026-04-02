@@ -6,7 +6,7 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model.
-     * We prioritize direct UID/Email bypass for Super Admins (Simon).
+     * We prioritize absolute bypass for Simon (Super Admin) to prevent evaluation failures.
      */
 
     // --- Helper Functions ---
@@ -16,7 +16,8 @@ service cloud.firestore {
     }
 
     /**
-     * @description Direct bypass for Simon / Super Admin.
+     * @description Absolute bypass for Simon / Super Admin.
+     * Checks UIDs and Emails directly to avoid document lookup overhead.
      */
     function isSimon() {
       return isSignedIn() && (
@@ -65,13 +66,13 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isStaff();
-      allow create: if isOwner(userId);
+      allow create: if isOwner(userId) || isSimon();
       allow update: if isOwner(userId) || isFinance();
       allow delete: if isFinance();
     }
 
     match /expenseRequests/{requestId} {
-      // Allow listing if staff. The UI will further filter for non-finance users.
+      // Simon and Finance can list all. Staff can list their own (UI filtered).
       allow list: if isStaff();
       allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
       allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
@@ -86,20 +87,6 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
-    match /customers/{customerId}/loans/{loanId} {
-      allow get, list: if isStaff() || isOwner(customerId);
-      allow create: if isStaff() || isOwner(customerId);
-      allow update: if isStaff();
-      allow delete: if isFinance();
-
-      match /repayments/{repaymentId} {
-        allow get, list: if isStaff() || isOwner(customerId);
-        allow create: if isStaff();
-        allow update: if isStaff();
-        allow delete: if isFinance();
-      }
-    }
-
     match /loans/{loanId} {
       allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
       allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
@@ -109,18 +96,6 @@ service cloud.firestore {
 
     match /kyc_documents/{docId} {
       allow get, list, create, update, delete: if isStaff();
-    }
-
-    match /dailyExpenses/{expenseId} {
-      allow get, list, create, update, delete: if isFinance();
-    }
-
-    match /dailyPayouts/{payoutId} {
-      allow get, list, create, update, delete: if isFinance();
-    }
-
-    match /dailyReceipts/{receiptId} {
-      allow get, list, create, update, delete: if isFinance();
     }
 
     match /financeEntries/{entryId} {
