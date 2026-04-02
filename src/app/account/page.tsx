@@ -558,13 +558,20 @@ export default function AccountPage() {
           <DialogContent className="sm:max-w-md rounded-[2.5rem] p-0 overflow-hidden">
               <div className="bg-[#1B2B33] p-10 text-white"><DialogHeader><DialogTitle className="text-3xl font-black text-white">Our Loans</DialogTitle></DialogHeader></div>
               <div className="p-8 space-y-6 bg-white">
-                  <ScrollArea className="max-h-[40vh]">{LOAN_PRODUCTS.map((p, i) => (
-                      <div key={i} className="p-6 rounded-3xl border mb-4 flex items-center justify-between hover:bg-[#5BA9D0]/5">
-                          <div className="space-y-1"><p className="font-black text-lg">{p.title}</p><p className="text-[10px] font-black text-[#5BA9D0] uppercase">{p.rate}</p></div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                  ))}</ScrollArea>
-                  <Button onClick={() => router.push('/account/apply')} className="w-full h-16 rounded-full bg-[#5BA9D0] font-black text-xl">Apply Now</Button>
+                  <ScrollArea className="max-h-[50vh] overflow-y-auto pr-4">
+                      {LOAN_PRODUCTS.map((p, i) => (
+                          <div key={i} className="p-6 rounded-3xl border mb-4 flex items-center justify-between hover:bg-[#5BA9D0]/5 transition-colors cursor-pointer" onClick={() => router.push('/account/apply')}>
+                              <div className="space-y-1">
+                                  <p className="font-black text-lg">{p.title}</p>
+                                  <p className="text-[10px] font-black text-[#5BA9D0] uppercase tracking-widest">{p.rate}</p>
+                              </div>
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                      ))}
+                  </ScrollArea>
+                  <Button onClick={() => router.push('/account/apply')} className="w-full h-16 rounded-full bg-[#5BA9D0] text-white text-lg font-black shadow-lg shadow-[#5BA9D0]/20 transition-all active:scale-95">
+                      Apply Now
+                  </Button>
               </div>
           </DialogContent>
       </Dialog>
