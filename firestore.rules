@@ -6,7 +6,7 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model.
-     * We prioritize domain-based authorization for Pezeka staff.
+     * We prioritize direct UID/Email bypass for Super Admins (Simon).
      */
 
     // --- Helper Functions ---
@@ -15,22 +15,28 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    /**
+     * @description Direct bypass for Simon / Super Admin.
+     */
+    function isSimon() {
+      return isSignedIn() && (
+        request.auth.token.email == 'simon@pezeka.com' || 
+        request.auth.token.email == 'simon@finance.pezeka.com' ||
+        request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
+      );
+    }
+
     /** 
      * @description Robust check for Finance authorization. 
      */
     function isFinance() {
-      let email = request.auth.token.email;
-      let uid = request.auth.uid;
-      
-      // Explicitly grant Simon access by email and known UIDs immediately
-      let isSimon = email == 'simon@pezeka.com' || email == 'simon@finance.pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-      let isFinanceDomain = email != null && email.endsWith('@finance.pezeka.com');
-      
-      // Check role only if Simon/Domain check fails
-      return isSignedIn() && (
-        isSimon || 
-        isFinanceDomain || 
-        (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() == 'finance')
+      return isSimon() || (
+        isSignedIn() && (
+          (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com')) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
+        )
       );
     }
 
@@ -38,16 +44,15 @@ service cloud.firestore {
      * @description Robust check for Staff authorization. 
      */
     function isStaff() {
-      let email = request.auth.token.email;
-      let uid = request.auth.uid;
-      
-      let isSimon = email == 'simon@pezeka.com' || uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-      let isStaffDomain = email != null && (email.endsWith('@staff.pezeka.com') || email.endsWith('@finance.pezeka.com'));
-      
-      return isSignedIn() && (
-        isSimon || 
-        isStaffDomain || 
-        (exists(/databases/$(database)/documents/users/$(uid)) && get(/databases/$(database)/documents/users/$(uid)).data.role.lower() in ['staff', 'finance'])
+      return isSimon() || (
+        isSignedIn() && (
+          (request.auth.token.email != null && (
+            request.auth.token.email.endsWith('@staff.pezeka.com') || 
+            request.auth.token.email.endsWith('@finance.pezeka.com')
+          )) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
+        )
       );
     }
 
@@ -66,8 +71,9 @@ service cloud.firestore {
     }
 
     match /expenseRequests/{requestId} {
-      allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
+      // Allow listing if staff. The UI will further filter for non-finance users.
       allow list: if isStaff();
+      allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
       allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
       allow update: if isFinance();
       allow delete: if isFinance();
