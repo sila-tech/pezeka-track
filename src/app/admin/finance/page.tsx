@@ -332,30 +332,30 @@ export default function FinancePage() {
                   <CardContent className="p-0 border-t">
                       <ScrollArea className="w-full">
                           <div className="h-[65vh] w-full">
-                              <Table className="min-w-[2200px] border-collapse">
+                              <Table className="min-w-[2400px] border-collapse">
                                   <TableHeader className="bg-muted/50 sticky top-0 z-40">
                                       <TableRow className="bg-muted/80 backdrop-blur-sm">
                                           <TableHead className="sticky left-0 bg-muted/95 border-r w-[200px] z-50">Client Name</TableHead>
-                                          <TableHead>Phone Number</TableHead>
-                                          <TableHead>Staff Assigned</TableHead>
+                                          <TableHead>Phone</TableHead>
+                                          <TableHead>Staff</TableHead>
                                           <TableHead>Loan No.</TableHead>
-                                          <TableHead>Disbursement Date</TableHead>
-                                          <TableHead className="text-right">Principal Amount</TableHead>
-                                          <TableHead className="text-right">Reg. Fee</TableHead>
-                                          <TableHead className="text-right">Proc. Fee</TableHead>
+                                          <TableHead>Disb. Date</TableHead>
+                                          <TableHead className="text-primary font-bold">First Pay</TableHead>
+                                          <TableHead className="text-right">Principal</TableHead>
+                                          <TableHead className="text-right">Reg Fee</TableHead>
+                                          <TableHead className="text-right">Proc Fee</TableHead>
                                           <TableHead className="text-right bg-blue-50/50">Take Home</TableHead>
-                                          <TableHead className="text-right">Car Track Fee</TableHead>
-                                          <TableHead className="text-right">Charging Cost</TableHead>
+                                          <TableHead className="text-right">Car Track</TableHead>
+                                          <TableHead className="text-right">Charging</TableHead>
                                           <TableHead className="text-center">Instalments</TableHead>
-                                          <TableHead className="text-right">Inst. Amount</TableHead>
-                                          <TableHead className="text-right font-bold">Total to Pay</TableHead>
-                                          <TableHead className="text-right text-green-600">Total Paid</TableHead>
+                                          <TableHead className="text-right">Inst. Amt</TableHead>
+                                          <TableHead className="text-right font-bold">Amount to Pay</TableHead>
+                                          <TableHead className="text-right text-green-600">Paid Amount</TableHead>
                                           <TableHead className="text-right text-destructive font-black">Balance</TableHead>
                                           <TableHead className="text-right text-orange-600">Penalties</TableHead>
-                                          <TableHead className="text-right bg-green-50/50">Expected Interest</TableHead>
-                                          <TableHead className="text-right bg-green-100/50">Expected Income</TableHead>
-                                          <TableHead>Status</TableHead>
-                                          <TableHead className="sticky right-0 bg-muted/95 border-l w-[80px] z-50 text-center">Manage</TableHead>
+                                          <TableHead className="text-right bg-green-50/50">Exp. Interest</TableHead>
+                                          <TableHead className="text-right bg-green-100/50">Exp. Income</TableHead>
+                                          <TableHead className="sticky right-0 bg-muted/95 border-l w-[80px] z-50 text-center">Actions</TableHead>
                                       </TableRow>
                                   </TableHeader>
                                   <TableBody>
@@ -382,41 +382,37 @@ export default function FinancePage() {
                                                 ? new Date(loan.disbursementDate.seconds * 1000) 
                                                 : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
 
+                                              const fDate = loan.firstPaymentDate?.seconds 
+                                                ? new Date(loan.firstPaymentDate.seconds * 1000) 
+                                                : (loan.firstPaymentDate instanceof Date ? loan.firstPaymentDate : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate) : null));
+
                                               return (
                                                 <TableRow key={loan.id} className="hover:bg-muted/30 transition-colors">
                                                     <TableCell className="font-bold sticky left-0 bg-background border-r z-30">{loan.customerName}</TableCell>
                                                     <TableCell className="text-xs text-muted-foreground">{loan.customerPhone}</TableCell>
                                                     <TableCell>
-                                                        <div className="flex items-center gap-1 text-xs">
+                                                        <div className="flex items-center gap-1 text-[10px]">
                                                             <User className="h-3 w-3 text-muted-foreground" />
                                                             {loan.assignedStaffName || 'Unassigned'}
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
-                                                    <TableCell className="text-xs">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
-                                                    <TableCell className="text-right font-medium">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-xs">{regFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-xs">{procFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-bold text-blue-600 bg-blue-50/20">Ksh {takeHome.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-xs">{trackFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-xs">{chargingFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-center text-xs">{loan.numberOfInstalments} ({loan.paymentFrequency})</TableCell>
-                                                    <TableCell className="text-right text-xs">{(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-bold">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-green-600 font-medium">{loan.totalPaid.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-destructive font-black">Ksh {balance.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-orange-600 text-xs">{(loan.totalPenalties || 0).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-medium text-green-700 bg-green-50/20">Ksh {interest.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-black text-green-800 bg-green-100/20">Ksh {totalIncome.toLocaleString()}</TableCell>
-                                                    <TableCell>
-                                                        <Badge className={cn("text-[10px] font-black uppercase px-2", 
-                                                            loan.status === 'paid' ? "bg-green-100 text-green-800" :
-                                                            loan.status === 'overdue' ? "bg-red-100 text-red-800" :
-                                                            "bg-blue-100 text-blue-800"
-                                                        )}>
-                                                            {loan.status}
-                                                        </Badge>
-                                                    </TableCell>
+                                                    <TableCell className="text-[10px]">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
+                                                    <TableCell className="text-[10px] font-bold text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
+                                                    <TableCell className="text-right font-medium text-xs">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{regFee.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{procFee.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold text-blue-600 bg-blue-50/20 text-xs">Ksh {takeHome.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{trackFee.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{chargingFee.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-center text-[10px]">{loan.numberOfInstalments} ({loan.paymentFrequency})</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold text-xs">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-green-600 font-medium text-xs">{loan.totalPaid.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-destructive font-black text-xs">Ksh {balance.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-orange-600 text-[10px]">{(loan.totalPenalties || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-medium text-green-700 bg-green-50/20 text-[10px]">Ksh {interest.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-black text-green-800 bg-green-100/20 text-xs">Ksh {totalIncome.toLocaleString()}</TableCell>
                                                     <TableCell className="sticky right-0 bg-background border-l z-30 text-center">
                                                         <Button variant="ghost" size="icon" onClick={() => handleEditClick(loan)}>
                                                             <ChevronRight className="h-4 w-4" />
@@ -440,7 +436,7 @@ export default function FinancePage() {
                   <CardHeader><CardTitle>Staff Facilitation Requests</CardTitle><CardDescription>Approve or reject staff expense submissions. Latest requests first.</CardDescription></CardHeader>
                   <CardContent>
                       <Table>
-                          <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Staff Member</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                          <TableHeader><TableRow><TableHead>Date</TableHead> <TableHead>Staff Member</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                           <TableBody>
                               {pendingRequests.length === 0 ? (
                                   <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">No pending requests.</TableCell></TableRow>
