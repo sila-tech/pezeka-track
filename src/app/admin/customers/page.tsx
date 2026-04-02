@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -68,8 +69,8 @@ export default function CustomersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const isAuthorized = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com';
-  const canEdit = user?.role === 'finance' || user?.email === 'simon@pezeka.com';
+  const isAuthorized = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const canEdit = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
 
   const { data: customers, loading: customersLoading } = useCollection<any>(isAuthorized ? 'customers' : null);
 
@@ -117,7 +118,7 @@ export default function CustomersPage() {
       } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); }
   }
 
-  if (!isAuthorized) return <div className="p-12 text-center">Access Denied</div>;
+  if (!isAuthorized && !customersLoading) return <div className="p-12 text-center font-bold">Access Denied</div>;
 
   return (
     <div className="space-y-6">
@@ -135,7 +136,7 @@ export default function CustomersPage() {
                 <div className="relative">
                     <Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" />
                     <Input 
-                        placeholder="Search name, phone, ID or PZ number..." 
+                        placeholder="Search name, phone, ID or Member number..." 
                         value={searchTerm} 
                         onChange={(e) => setSearchTerm(e.target.value)} 
                         className="pl-8 w-full sm:w-[350px]" 
@@ -269,3 +270,4 @@ export default function CustomersPage() {
     </div>
   );
 }
+    

@@ -22,6 +22,7 @@
         }
     
         // --- GLOBAL BYPASS FOR SUPER ADMIN ---
+        // Force refresh: 2024-05-22 14:00
         match /{allPaths=**} {
           allow read, write: if isSimon();
         }
@@ -85,7 +86,8 @@
         }
     
         match /kyc_documents/{docId} {
-          allow get, list, create, update, delete: if isStaff();
+          // Explicit Simon bypass for uploads
+          allow read, write: if isSimon() || isStaff();
         }
     
         match /financeEntries/{entryId} {
