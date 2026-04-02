@@ -19,13 +19,13 @@ import { Loader2 } from 'lucide-react';
 import { upsertCustomer } from '@/lib/firestore';
 
 const authSchema = z.object({
-  identifier: z.string().min(3, { message: 'Enter your email or phone number.' }),
-  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }).optional().or(z.literal('')),
+  identifier: z.string().optional(),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  phone: z.string().min(10, 'Valid phone number is required.').optional().or(z.literal('')),
-  idNumber: z.string().min(5, 'National ID is required.').optional().or(z.literal('')),
-  email: z.string().email().optional().or(z.literal('')),
+  phone: z.string().optional(),
+  idNumber: z.string().optional(),
+  email: z.string().optional(),
 });
 
 export default function CustomerLoginPage() {
@@ -61,7 +61,7 @@ export default function CustomerLoginPage() {
     setIsSubmitting(true);
     try {
       if (isSignUp) {
-        // Enforce mandatory fields during sign-up
+        // Enforce mandatory fields during sign-up manually
         if (!values.firstName || !values.lastName || !values.phone || !values.idNumber || !values.password || !values.email) {
           toast({ 
             variant: 'destructive', 
@@ -91,9 +91,10 @@ export default function CustomerLoginPage() {
         }
 
         toast({ title: 'Account Created', description: 'Welcome to Pezeka Credit!' });
+        router.push('/account');
       } else {
-        if (!values.password) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please enter your password.' });
+        if (!values.identifier || values.identifier.length < 3) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Enter your email or phone number.' });
             setIsSubmitting(false);
             return;
         }
@@ -123,6 +124,7 @@ export default function CustomerLoginPage() {
 
         await signInWithEmailAndPassword(auth, loginEmail, values.password);
         toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
+        router.push('/account');
       }
     } catch (e: any) { 
       let errorMessage = e.message;
@@ -130,6 +132,8 @@ export default function CustomerLoginPage() {
         errorMessage = 'Connection error. Please check your internet or try again later.';
       } else if (e.code === 'auth/invalid-credential') {
           errorMessage = 'Incorrect credentials. Check your password or email/phone.';
+      } else if (e.code === 'auth/email-already-in-use') {
+          errorMessage = 'An account with this email already exists.';
       }
       toast({ 
         variant: 'destructive', 
@@ -254,7 +258,10 @@ export default function CustomerLoginPage() {
                 {isSignUp ? 'Create Member Account' : 'Sign In to Portal'}
               </Button>
               <div className="text-center pt-2">
-                <Button type="button" variant="ghost" className="font-bold text-sm hover:bg-transparent hover:text-primary" onClick={() => setIsSignUp(!isSignUp)}>
+                <Button type="button" variant="ghost" className="font-bold text-sm hover:bg-transparent hover:text-primary" onClick={() => {
+                    setIsSignUp(!isSignUp);
+                    form.reset();
+                }}>
                   {isSignUp ? 'Already a member? Sign in here' : 'New to Pezeka? Register here'}
                 </Button>
               </div>
