@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addMonths } from "date-fns";
-import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2, Wallet, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2, Wallet, ArrowDownLeft, ArrowUpRight, ReceiptText, HandCoins } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,7 +43,7 @@ const editLoanSchema = z.object({
 });
 
 const financeEntrySchema = z.object({
-    type: z.enum(['receipt', 'expense', 'payout']),
+    type: z.enum(['receipt', 'payout', 'expense']),
     amount: z.coerce.number().min(1, 'Amount must be greater than 0'),
     date: z.string().min(1, 'Date is required'),
     description: z.string().min(3, 'Provide a clear description'),
@@ -119,14 +119,20 @@ export default function FinancePage() {
   const financialData = useMemo(() => {
     const receipts: any[] = [];
     const payouts: any[] = [];
-    if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [] };
+    const expenses: any[] = [];
+    if (!loans || !financeEntries) return { allReceipts: [], allPayouts: [], allExpenses: [] };
     
     financeEntries.forEach(e => {
-        if (e.type === 'receipt') receipts.push(e);
-        else payouts.push(e);
+        if (e.type === 'receipt') {
+            receipts.push(e);
+        } else if (e.type === 'payout') {
+            payouts.push(e);
+        } else if (e.type === 'expense') {
+            expenses.push(e);
+        }
     });
 
-    return { allReceipts: receipts, allPayouts: payouts };
+    return { allReceipts: receipts, allPayouts: payouts, allExpenses: expenses };
   }, [loans, financeEntries]);
 
   const filteredLoanBook = useMemo(() => {
@@ -209,8 +215,10 @@ export default function FinancePage() {
 
           if (values.type === 'receipt') {
               entryData.receiptCategory = values.category;
-          } else {
+          } else if (values.type === 'payout') {
               entryData.payoutCategory = values.category;
+          } else if (values.type === 'expense') {
+              entryData.expenseCategory = values.category;
           }
 
           await addFinanceEntry(firestore, entryData);
@@ -241,22 +249,26 @@ export default function FinancePage() {
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Record Financial Transaction</DialogTitle>
-                    <DialogDescription>Manually record non-automated income or expenditure.</DialogDescription>
+                    <DialogDescription>Manually record non-automated income, capital movement, or operational expenses.</DialogDescription>
                 </DialogHeader>
                 <Form {...entryForm}>
                     <form onSubmit={entryForm.handleSubmit(onEntrySubmit)} className="space-y-4 pt-4">
                         <FormField control={entryForm.control} name="type" render={({ field }) => (
                             <FormItem className="space-y-3">
-                                <FormLabel>Transaction Direction</FormLabel>
+                                <FormLabel>Transaction Flow</FormLabel>
                                 <FormControl>
-                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-4">
+                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-wrap gap-4">
                                         <FormItem className="flex items-center space-x-2 space-y-0">
                                             <FormControl><RadioGroupItem value="receipt" /></FormControl>
-                                            <FormLabel className="font-bold text-green-600 flex items-center gap-1"><ArrowDownLeft className="h-3 w-3" /> Inflow (Receipt)</FormLabel>
+                                            <FormLabel className="font-bold text-green-600 flex items-center gap-1 cursor-pointer"><ArrowDownLeft className="h-3 w-3" /> Receipt (In)</FormLabel>
                                         </FormItem>
                                         <FormItem className="flex items-center space-x-2 space-y-0">
                                             <FormControl><RadioGroupItem value="payout" /></FormControl>
-                                            <FormLabel className="font-bold text-destructive flex items-center gap-1"><ArrowUpRight className="h-3 w-3" /> Outflow (Payout)</FormLabel>
+                                            <FormLabel className="font-bold text-destructive flex items-center gap-1 cursor-pointer"><HandCoins className="h-3 w-3" /> Payout (Capital)</FormLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="expense" /></FormControl>
+                                            <FormLabel className="font-bold text-orange-600 flex items-center gap-1 cursor-pointer"><ReceiptText className="h-3 w-3" /> Expense (Op)</FormLabel>
                                         </FormItem>
                                     </RadioGroup>
                                 </FormControl>
@@ -278,7 +290,7 @@ export default function FinancePage() {
                                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                        {entryForm.watch('type') === 'receipt' ? (
+                                        {entryForm.watch('type') === 'receipt' && (
                                             <>
                                                 <SelectItem value="loan_repayment">Loan Repayment (Manual)</SelectItem>
                                                 <SelectItem value="upfront_fees">Upfront Fees (Appraisal/Proc)</SelectItem>
@@ -287,12 +299,22 @@ export default function FinancePage() {
                                                 <SelectItem value="investor_deposit">Investor Deposit</SelectItem>
                                                 <SelectItem value="other">Other Inflow / Misc Income</SelectItem>
                                             </>
-                                        ) : (
+                                        )}
+                                        {entryForm.watch('type') === 'payout' && (
+                                            <>
+                                                <SelectItem value="loan_disbursement">Loan Disbursement (Manual)</SelectItem>
+                                                <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
+                                                <SelectItem value="capital_transfer">General Capital Transfer</SelectItem>
+                                                <SelectItem value="other">Other Capital Outflow</SelectItem>
+                                            </>
+                                        )}
+                                        {entryForm.watch('type') === 'expense' && (
                                             <>
                                                 <SelectItem value="facilitation_commission">Staff Commission / Facilitation</SelectItem>
                                                 <SelectItem value="office_purchase">Office / Utility / Supply Expense</SelectItem>
-                                                <SelectItem value="investor_withdrawal">Investor Withdrawal</SelectItem>
-                                                <SelectItem value="other">Other Outflow / General Expense</SelectItem>
+                                                <SelectItem value="rent_lease">Office Rent / Lease</SelectItem>
+                                                <SelectItem value="marketing_sales">Marketing & Sales Expense</SelectItem>
+                                                <SelectItem value="other">Other Operational Expense</SelectItem>
                                             </>
                                         )}
                                     </SelectContent>
@@ -318,12 +340,13 @@ export default function FinancePage() {
       </div>
       
       <Tabs defaultValue="loanbook" className="w-full">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex flex-wrap h-auto">
               <TabsTrigger value="loanbook">Internal Loan Book</TabsTrigger>
               <TabsTrigger value="reports">Portfolio Reports</TabsTrigger>
               <TabsTrigger value="cashflow">Cash Flow Ledger</TabsTrigger>
-              <TabsTrigger value="receipts">Receipts</TabsTrigger>
-              <TabsTrigger value="payouts">Payouts & Expenses</TabsTrigger>
+              <TabsTrigger value="receipts">Receipts (In)</TabsTrigger>
+              <TabsTrigger value="payouts">Payouts (Capital)</TabsTrigger>
+              <TabsTrigger value="expenses">Expenses (Ops)</TabsTrigger>
               <TabsTrigger value="investors">Investors</TabsTrigger>
               <TabsTrigger value="staff">Staff Performance</TabsTrigger>
           </TabsList>
@@ -462,8 +485,9 @@ export default function FinancePage() {
           </TabsContent>
           <TabsContent value="reports"><PortfolioReportsTab loans={loans} /></TabsContent>
           <TabsContent value="cashflow"><EditableFinanceReportTab title="Cash Flow Ledger" description="Comprehensive record of all incoming and outgoing funds." entries={financeEntries} loading={financeEntriesLoading} /></TabsContent>
-          <TabsContent value="receipts"><EditableFinanceReportTab title="Receipts" description="Incoming cash flow." entries={financialData.allReceipts} loading={financeEntriesLoading} /></TabsContent>
-          <TabsContent value="payouts"><EditableFinanceReportTab title="Payouts" description="Outgoing cash flow." entries={financialData.allPayouts} loading={financeEntriesLoading} /></TabsContent>
+          <TabsContent value="receipts"><EditableFinanceReportTab title="Receipts" description="Incoming revenue and capital injections." entries={financialData.allReceipts} loading={financeEntriesLoading} /></TabsContent>
+          <TabsContent value="payouts"><EditableFinanceReportTab title="Capital Payouts" description="Primary capital leaving the business (Disbursements/Withdrawals)." entries={financialData.allPayouts} loading={financeEntriesLoading} /></TabsContent>
+          <TabsContent value="expenses"><EditableFinanceReportTab title="Operational Expenses" description="Staff commissions, office costs, and facilitation fees." entries={financialData.allExpenses} loading={financeEntriesLoading} /></TabsContent>
           <TabsContent value="investors"><InvestorsPortfolioTab /></TabsContent>
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
