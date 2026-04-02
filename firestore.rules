@@ -11,6 +11,7 @@
     
         /**
          * @description Absolute bypass for Simon / Super Admin.
+         * Checked first to avoid unnecessary document lookups.
          */
         function isSimon() {
           return isSignedIn() && (
@@ -18,6 +19,12 @@
             request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
             request.auth.token.email == 'simon@pezeka.com'
           );
+        }
+    
+        // --- GLOBAL BYPASS FOR SUPER ADMIN ---
+        // Placing this at the top ensures Simon is never blocked by complex logic below.
+        match /{allPaths=**} {
+          allow read, write: if isSimon();
         }
     
         /** 
@@ -53,11 +60,6 @@
           return isSignedIn() && request.auth.uid == userId;
         }
     
-        // --- SUPER ADMIN GLOBAL BYPASS ---
-        match /{allPaths=**} {
-          allow read, write: if isSimon();
-        }
-    
         // --- Collection Rules ---
     
         match /users/{userId} {
@@ -69,13 +71,9 @@
         }
     
         match /expenseRequests/{requestId} {
-          // Allow listing for all staff (Super Admin is handled by global bypass)
           allow list: if isStaff();
-          // Allow get if the staff member owns it or if the user is Finance
           allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
-          // Allow create if the staff member is recording their own request
           allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
-          // Finance manages updates/deletes (approvals)
           allow update, delete: if isFinance();
         }
     

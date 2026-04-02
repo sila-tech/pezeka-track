@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { format, addMonths } from "date-fns";
-import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2, Wallet, ArrowDownLeft, ArrowUpRight, ReceiptText, HandCoins, CheckCircle2, XCircle } from "lucide-react";
+import { PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, History, Info, Settings2, Wallet, ArrowDownLeft, ArrowUpRight, ReceiptText, HandCoins, CheckCircle2, XCircle, ChevronRight } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +28,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { calculateAmortization } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 
 const editLoanSchema = z.object({
   principalAmount: z.coerce.number().min(1, 'Principal is required.'),
@@ -137,13 +138,22 @@ export default function FinancePage() {
       if (!loans) return [];
       return loans.filter(loan => {
           if (loan.status === 'application' || loan.status === 'rejected') return false;
+          
           const searchMatch = !lbSearch || 
             loan.customerName.toLowerCase().includes(lbSearch.toLowerCase()) || 
             loan.customerPhone.includes(lbSearch) ||
             loan.loanNumber.toLowerCase().includes(lbSearch.toLowerCase());
-          const statusMatch = lbStatus === 'all' || loan.status === lbStatus;
+          
+          const statusMatch = lbStatus === 'all' 
+            ? (loan.status !== 'rollover') // Default hide rolled over to avoid confusion
+            : (loan.status === lbStatus);
+            
           return searchMatch && statusMatch;
-      }).sort((a, b) => (b.disbursementDate?.seconds || 0) - (a.disbursementDate?.seconds || 0));
+      }).sort((a, b) => {
+          const t1 = a.disbursementDate?.seconds || 0;
+          const t2 = b.disbursementDate?.seconds || 0;
+          return t2 - t1;
+      });
   }, [loans, lbSearch, lbStatus]);
 
   const pendingRequests = useMemo(() => {
@@ -279,10 +289,88 @@ export default function FinancePage() {
           </TabsList>
           
           <TabsContent value="loanbook">
-              <Card><CardHeader><div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"><div><CardTitle>Internal Loan Book</CardTitle></div><div className="flex gap-2"><div className="relative"><Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={lbSearch} onChange={(e) => setLbSearch(e.target.value)} className="w-[250px] pl-8" /></div><Select value={lbStatus} onValueChange={setLbStatus}><SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select></div></div></CardHeader>
-                  <CardContent className="p-0 border-t"><ScrollArea className="w-full"><div className="h-[65vh] w-full"><Table className="min-w-[2000px]"><TableHeader className="bg-muted/50 sticky top-0 z-40"><TableRow><TableHead className="sticky left-0 bg-muted/50 border-r w-[200px]">Client</TableHead><TableHead>Loan No.</TableHead><TableHead>Principal</TableHead><TableHead>Total Paid</TableHead><TableHead>Balance</TableHead><TableHead className="sticky right-0 bg-muted/50 border-l w-[100px]">Actions</TableHead></TableRow></TableHeader>
-                      <TableBody>{filteredLoanBook.map(loan => (<TableRow key={loan.id} className="hover:bg-muted/30"><TableCell className="font-bold sticky left-0 bg-background border-r">{loan.customerName}</TableCell><TableCell>{loan.loanNumber}</TableCell><TableCell>{loan.principalAmount.toLocaleString()}</TableCell><TableCell>{loan.totalPaid.toLocaleString()}</TableCell><TableCell className="font-black text-destructive">{(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}</TableCell><TableCell className="sticky right-0 bg-background border-l text-center"><Button variant="ghost" size="icon" onClick={() => handleEditClick(loan)}><Pencil className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
-                  </Table></div><ScrollBar orientation="horizontal" /></ScrollArea></CardContent>
+              <Card>
+                  <CardHeader>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div>
+                              <CardTitle>Internal Loan Book</CardTitle>
+                              <CardDescription>Master record of all disbursed credit facilities.</CardDescription>
+                          </div>
+                          <div className="flex gap-2">
+                              <div className="relative">
+                                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                  <Input placeholder="Search..." value={lbSearch} onChange={(e) => setLbSearch(e.target.value)} className="w-[250px] pl-8" />
+                              </div>
+                              <Select value={lbStatus} onValueChange={setLbStatus}>
+                                  <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="all">Active Debt</SelectItem>
+                                      <SelectItem value="active">Active</SelectItem>
+                                      <SelectItem value="overdue">Overdue</SelectItem>
+                                      <SelectItem value="paid">Paid</SelectItem>
+                                      <SelectItem value="rollover">Rolled Over</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                      </div>
+                  </CardHeader>
+                  <CardContent className="p-0 border-t">
+                      <ScrollArea className="w-full">
+                          <div className="h-[65vh] w-full">
+                              <Table className="min-w-[1200px]">
+                                  <TableHeader className="bg-muted/50 sticky top-0 z-40">
+                                      <TableRow>
+                                          <TableHead className="sticky left-0 bg-muted/50 border-r w-[200px]">Client Name</TableHead>
+                                          <TableHead>Loan No.</TableHead>
+                                          <TableHead>Principal</TableHead>
+                                          <TableHead>Total Paid</TableHead>
+                                          <TableHead>Current Balance</TableHead>
+                                          <TableHead>Frequency</TableHead>
+                                          <TableHead>Status</TableHead>
+                                          <TableHead className="sticky right-0 bg-muted/50 border-l w-[100px] text-center">Manage</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {filteredLoanBook.length === 0 ? (
+                                          <TableRow>
+                                              <TableCell colSpan={8} className="text-center py-12 text-muted-foreground italic">
+                                                  No loans found in the book.
+                                              </TableCell>
+                                          </TableRow>
+                                      ) : (
+                                          filteredLoanBook.map(loan => (
+                                              <TableRow key={loan.id} className="hover:bg-muted/30">
+                                                  <TableCell className="font-bold sticky left-0 bg-background border-r">{loan.customerName}</TableCell>
+                                                  <TableCell className="font-mono text-xs">{loan.loanNumber}</TableCell>
+                                                  <TableCell>Ksh {loan.principalAmount.toLocaleString()}</TableCell>
+                                                  <TableCell className="text-green-600 font-medium">Ksh {loan.totalPaid.toLocaleString()}</TableCell>
+                                                  <TableCell className="font-black text-destructive">
+                                                      Ksh {(loan.totalRepayableAmount - loan.totalPaid).toLocaleString()}
+                                                  </TableCell>
+                                                  <TableCell className="capitalize text-xs">{loan.paymentFrequency}</TableCell>
+                                                  <TableCell>
+                                                      <Badge className={cn("text-[10px] font-black uppercase px-2", 
+                                                          loan.status === 'paid' ? "bg-green-100 text-green-800" :
+                                                          loan.status === 'overdue' ? "bg-red-100 text-red-800" :
+                                                          "bg-blue-100 text-blue-800"
+                                                      )}>
+                                                          {loan.status}
+                                                      </Badge>
+                                                  </TableCell>
+                                                  <TableCell className="sticky right-0 bg-background border-l text-center">
+                                                      <Button variant="ghost" size="icon" onClick={() => handleEditClick(loan)}>
+                                                          <ChevronRight className="h-4 w-4" />
+                                                      </Button>
+                                                  </TableCell>
+                                              </TableRow>
+                                          ))
+                                      )}
+                                  </TableBody>
+                              </Table>
+                          </div>
+                          <ScrollBar orientation="horizontal" />
+                      </ScrollArea>
+                  </CardContent>
               </Card>
           </TabsContent>
 
@@ -341,3 +429,4 @@ export default function FinancePage() {
     </div>
   );
 }
+    
