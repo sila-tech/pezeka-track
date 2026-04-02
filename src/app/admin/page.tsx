@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage, useMemoFirebase, useDoc } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -173,8 +173,8 @@ export default function Dashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
-  const isFinance = user?.role?.toLowerCase() === 'finance';
-  const isStaff = user?.role?.toLowerCase() === 'staff' || isFinance;
+  const isFinance = user?.role === 'finance';
+  const isStaff = user?.role === 'staff' || isFinance;
   const isAuthorized = user && (isSuperAdmin || isStaff);
   
   const canManageKYC = isAuthorized;
@@ -788,7 +788,7 @@ export default function Dashboard() {
       </Tabs>
 
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
-          <DialogContent className="sm:max-md p-0 overflow-hidden">
+          <DialogContent className="sm:max-w-md p-0 overflow-hidden">
               {selectedLoanForNotes && (
                   <><DialogHeader className="p-6 pb-0"><DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle><DialogDescription>Record interactions.</DialogDescription></DialogHeader>
                     <div className="space-y-4 px-6 py-4">
@@ -804,7 +804,7 @@ export default function Dashboard() {
 }
 
 function GoalCard({ title, icon, current, target, unit, description }: { title: string, icon: React.ReactNode, current: number, target: number, unit: string, description: string }) {
-    const percentage = Math.min(100, Math.round((current / target) * 100));
+    const percentage = Math.min(100, Math.round((current / (target || 1)) * 100));
     
     return (
         <Card className="overflow-hidden border-t-4 border-t-primary/20">
@@ -821,11 +821,11 @@ function GoalCard({ title, icon, current, target, unit, description }: { title: 
             <CardContent className="pt-2">
                 <div className="flex items-baseline gap-1">
                     <span className="text-2xl font-black">{unit === 'Ksh' ? 'Ksh ' : ''}{current.toLocaleString()}</span>
-                    <span className="text-[10px] text-muted-foreground font-bold uppercase">/ {target.toLocaleString()} {unit === 'Ksh' ? '' : unit}</span>
+                    <span className="text-[10px] text-muted-foreground font-bold uppercase">/ {(target || 0).toLocaleString()} {unit === 'Ksh' ? '' : unit}</span>
                 </div>
                 <Progress value={percentage} className="h-2 mt-4" />
                 <p className="text-[9px] text-muted-foreground mt-3 font-medium italic">
-                    {percentage >= 100 ? "Goal achieved! Excellent work." : `Remaining: ${unit === 'Ksh' ? 'Ksh ' : ''}${(target - current).toLocaleString()} ${unit === 'Ksh' ? '' : unit}`}
+                    {percentage >= 100 ? "Goal achieved! Excellent work." : `Remaining: ${unit === 'Ksh' ? 'Ksh ' : ''}${Math.max(0, (target || 0) - current).toLocaleString()} ${unit === 'Ksh' ? '' : unit}`}
                 </p>
             </CardContent>
         </Card>

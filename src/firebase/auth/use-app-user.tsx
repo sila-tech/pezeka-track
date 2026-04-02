@@ -12,7 +12,12 @@ interface UserProfileData {
   email?: string;
 }
 
-export interface AppUser extends User, UserProfileData {}
+export interface AppUser extends UserProfileData {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    emailVerified: boolean;
+}
 
 interface UseAppUser {
     user: AppUser | null;
@@ -27,10 +32,19 @@ export const useAppUser = (): UseAppUser => {
 
     const mergedUser = React.useMemo(() => {
         if (!user || isLoading) return null;
+        
+        // Safely extract primitive properties from the Firebase User object
+        const baseUser = {
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            emailVerified: user.emailVerified,
+        };
+
         if (profile) {
-            return { ...user, ...profile };
+            return { ...baseUser, ...profile };
         }
-        return user;
+        return baseUser;
     }, [user, profile, isLoading]);
     
     return { user: mergedUser as AppUser | null, loading: isLoading };
