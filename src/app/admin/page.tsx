@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState, useRef, useEffect } from 'react';
@@ -7,7 +8,8 @@ import {
     Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, 
     ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
     ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins,
-    AlertCircle, Banknote, History as HistoryIcon, CheckCircle2, XCircle, Phone
+    AlertCircle, Banknote, History as HistoryIcon, CheckCircle2, XCircle, Phone,
+    Target, UserPlus, Wallet
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +40,7 @@ import { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { query, collection, where } from 'firebase/firestore';
+import { Progress } from '@/components/ui/progress';
 
 interface FollowUpNote {
     noteId: string;
@@ -68,7 +71,7 @@ interface DashboardLoan {
   assignedStaffId?: string;
   assignedStaffName?: string;
   followUpNotes?: FollowUpNote[];
-  payments?: { amount: number; date: any }[];
+  payments?: { amount: number; date: any; staffId?: string }[];
   createdAt?: { seconds: number; nanoseconds: number };
 }
 
@@ -420,6 +423,59 @@ export default function Dashboard() {
       };
   }, [myPortfolio, date]);
 
+  // Goal Calculations
+  const myMonthlyGoals = useMemo(() => {
+      if (!user || !loans || !customers) return { onboarding: 0, disbursement: 0, collection: 0 };
+      
+      const start = startOfMonth(new Date());
+      const end = endOfMonth(new Date());
+      const interval = { start, end };
+
+      // Onboarding
+      const myOnboarded = customers.filter(c => {
+          if (c.registeredByStaffId !== user.uid) return false;
+          const cDate = c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000) : new Date();
+          return isWithinInterval(cDate, interval);
+      }).length;
+
+      // Disbursement & Collection
+      let myDisbursed = 0;
+      let myCollected = 0;
+
+      loans.forEach(loan => {
+          // Disbursement
+          if (loan.assignedStaffId === user.uid && loan.status !== 'application' && loan.status !== 'rejected') {
+              const dDate = loan.disbursementDate?.seconds 
+                  ? new Date(loan.disbursementDate.seconds * 1000) 
+                  : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
+              
+              if (isWithinInterval(dDate, interval)) {
+                  myDisbursed += Number(loan.principalAmount) || 0;
+              }
+          }
+
+          // Collection (recorded by me)
+          (loan.payments || []).forEach(p => {
+              // We check both recordedBy name match OR staffId if we start recording it
+              const isMine = p.staffId === user.uid || p.recordedBy === (user.name || user.email);
+              if (isMine) {
+                  const pDate = (p.date as any)?.seconds ? new Date((p.date as any).seconds * 1000) : new Date(p.date as any);
+                  if (isWithinInterval(pDate, interval)) {
+                      myCollected += Number(p.amount) || 0;
+                  }
+              }
+          });
+      });
+
+      return { onboarding: myOnboarded, disbursement: myDisbursed, collection: myCollected };
+  }, [user, loans, customers]);
+
+  const GOAL_TARGETS = {
+      onboarding: 20,
+      disbursement: 1000000,
+      collection: 800000
+  };
+
   const processedLoansWithTimeline = useMemo(() => {
       if (!loans) return [];
       const today = startOfToday();
@@ -600,66 +656,122 @@ export default function Dashboard() {
           </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-            <Card className="flex flex-col h-[500px]">
-                <CardHeader className="pb-2"><div className="flex items-center justify-between"><div><CardTitle>Due Loans & Follow-ups</CardTitle><CardDescription>Detailed repayment tracking and cycle management.</CardDescription></div><DatePickerWithRange date={date} setDate={setDate} /></div></CardHeader>
-                <CardContent className="flex-1 overflow-hidden p-0">
-                    <Tabs defaultValue="all" className="h-full flex flex-col">
-                        <div className="px-6 pb-2"><TabsList className="grid grid-cols-3 w-full"><TabsTrigger value="all" className="text-xs">Priority ({priorityDueLoans.length})</TabsTrigger><TabsTrigger value="daily" className="text-xs">Daily ({dailyDue.length})</TabsTrigger><TabsTrigger value="weekly" className="text-xs">Weekly ({weeklyDue.length})</TabsTrigger></TabsList></div>
-                        <div className="flex-1 overflow-hidden">
-                            <TabsContent value="all" className="h-full m-0 p-0">
-                                {priorityDueLoans.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><Clock className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No urgent follow-ups required.</p></div>) : (
-                                    <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Member & Phone</TableHead><TableHead>Schedule</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
-                                            <TableBody>{priorityDueLoans.map((loan) => (
-                                                    <TableRow key={loan.id}><TableCell>
-                                                        <div className="font-bold text-xs">{loan.displayName}</div>
-                                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><Phone className="h-2.5 w-2.5" /> {loan.customerPhone}</div>
-                                                        <div className="text-[9px] font-mono text-primary/60">{loan.accountNumber}</div>
-                                                    </TableCell><TableCell>
-                                                        <div className="text-[10px] font-bold uppercase">{loan.paymentFrequency}</div>
-                                                        {loan.paymentFrequency === 'weekly' && loan.preferredPaymentDay && (
-                                                            <div className="text-[9px] text-blue-600 font-black">{loan.preferredPaymentDay}</div>
-                                                        )}
-                                                    </TableCell><TableCell>{loan.daysUntil < 0 ? <Badge variant="destructive" className="text-[8px]">LATE {Math.abs(loan.daysUntil)}d</Badge> : <Badge variant="secondary" className="text-[8px]">DUE {loan.daysUntil}d</Badge>}</TableCell><TableCell className="text-right whitespace-nowrap"><div className={cn("font-black tabular-nums text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>Ksh {loan.arrearsBalance.toLocaleString()}</div></TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>
-                                                ))}</TableBody>
-                                        </Table></ScrollArea>
-                                )}
-                            </TabsContent>
-                            <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
-                            <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || '-'}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
-                        </div>
-                    </Tabs>
-                </CardContent>
-            </Card>
+      <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="mb-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="goals">My Goals <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary text-[10px] border-none">LIVE</Badge></TabsTrigger>
+          </TabsList>
 
-            <Card className="h-[300px]">
-                <CardHeader className="pb-2 flex flex-row items-center justify-between"><div><CardTitle className="text-lg flex items-center gap-2"><HistoryIcon className="h-5 w-5 text-primary" /> Facilitation Requests</CardTitle><CardDescription>Status of your operational expense requests.</CardDescription></div></CardHeader>
-                <CardContent className="p-0">
-                    <ScrollArea className="h-[220px]"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
-                            <TableBody>{facilitationRequests?.length === 0 ? (<TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">No requests made yet.</TableCell></TableRow>) : (
-                                    [...facilitationRequests || []].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((req) => (
-                                        <TableRow key={req.id}><TableCell className="text-[10px]">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM') : '...'}</TableCell><TableCell className="font-bold text-xs">Ksh {req.amount.toLocaleString()}</TableCell><TableCell className="text-[10px] max-w-[150px] truncate">{req.description}</TableCell><TableCell className="text-right"><Badge variant={req.status === 'approved' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase">{req.status}</Badge></TableCell></TableRow>
-                                    ))
-                                )}</TableBody>
-                        </Table></ScrollArea>
-                </CardContent>
-            </Card>
-        </div>
+          <TabsContent value="overview" className="m-0 space-y-6">
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div className="space-y-6">
+                    <Card className="flex flex-col h-[500px]">
+                        <CardHeader className="pb-2"><div className="flex items-center justify-between"><div><CardTitle>Due Loans & Follow-ups</CardTitle><CardDescription>Detailed repayment tracking and cycle management.</CardDescription></div><DatePickerWithRange date={date} setDate={setDate} /></div></CardHeader>
+                        <CardContent className="flex-1 overflow-hidden p-0">
+                            <Tabs defaultValue="all" className="h-full flex flex-col">
+                                <div className="px-6 pb-2"><TabsList className="grid grid-cols-3 w-full"><TabsTrigger value="all" className="text-xs">Priority ({priorityDueLoans.length})</TabsTrigger><TabsTrigger value="daily" className="text-xs">Daily ({dailyDue.length})</TabsTrigger><TabsTrigger value="weekly" className="text-xs">Weekly ({weeklyDue.length})</TabsTrigger></TabsList></div>
+                                <div className="flex-1 overflow-hidden">
+                                    <TabsContent value="all" className="h-full m-0 p-0">
+                                        {priorityDueLoans.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><Clock className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No urgent follow-ups required.</p></div>) : (
+                                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Member & Phone</TableHead><TableHead>Schedule</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+                                                    <TableBody>{priorityDueLoans.map((loan) => (
+                                                            <TableRow key={loan.id}><TableCell>
+                                                                <div className="font-bold text-xs">{loan.displayName}</div>
+                                                                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5"><Phone className="h-2.5 w-2.5" /> {loan.customerPhone}</div>
+                                                                <div className="text-[9px] font-mono text-primary/60">{loan.accountNumber}</div>
+                                                            </TableCell><TableCell>
+                                                                <div className="text-[10px] font-bold uppercase">{loan.paymentFrequency}</div>
+                                                                {loan.paymentFrequency === 'weekly' && loan.preferredPaymentDay && (
+                                                                    <div className="text-[9px] text-blue-600 font-black">{loan.preferredPaymentDay}</div>
+                                                                )}
+                                                            </TableCell><TableCell>{loan.daysUntil < 0 ? <Badge variant="destructive" className="text-[8px]">LATE {Math.abs(loan.daysUntil)}d</Badge> : <Badge variant="secondary" className="text-[8px]">DUE {loan.daysUntil}d</Badge>}</TableCell><TableCell className="text-right whitespace-nowrap"><div className={cn("font-black tabular-nums text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>Ksh {loan.arrearsBalance.toLocaleString()}</div></TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>
+                                                        ))}</TableBody>
+                                                </Table></ScrollArea>
+                                        )}
+                                    </TabsContent>
+                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                    <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || '-'}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                </div>
+                            </Tabs>
+                        </CardContent>
+                    </Card>
 
-        <Card className="flex flex-col h-[816px]">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><div><CardTitle>New Applications</CardTitle><CardDescription>Latest customer self-submissions.</CardDescription></div><Button variant="outline" size="sm" asChild><Link href="/admin/loans">Review All <ArrowRight className="ml-2 h-3 w-3" /></Link></Button></CardHeader>
-            <CardContent className="flex-1 overflow-hidden p-0">
-                {newApplications.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No pending applications.</p></div>) : (
-                    <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Identity & Phone</TableHead><TableHead>Member No</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
-                            <TableBody>{newApplications.map((loan) => (
-                                    <TableRow key={loan.id} className="group"><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div></TableCell><TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell><TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(loan.principalAmount || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell></TableRow>
-                                ))}</TableBody>
-                        </Table></ScrollArea>
-                )}
-            </CardContent>
-        </Card>
-      </div>
+                    <Card className="h-[300px]">
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between"><div><CardTitle className="text-lg flex items-center gap-2"><HistoryIcon className="h-5 w-5 text-primary" /> Facilitation Requests</CardTitle><CardDescription>Status of your operational expense requests.</CardDescription></div></CardHeader>
+                        <CardContent className="p-0">
+                            <ScrollArea className="h-[220px]"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
+                                    <TableBody>{facilitationRequests?.length === 0 ? (<TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">No requests made yet.</TableCell></TableRow>) : (
+                                            [...facilitationRequests || []].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((req) => (
+                                                <TableRow key={req.id}><TableCell className="text-[10px]">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM') : '...'}</TableCell><TableCell className="font-bold text-xs">Ksh {req.amount.toLocaleString()}</TableCell><TableCell className="text-[10px] max-w-[150px] truncate">{req.description}</TableCell><TableCell className="text-right"><Badge variant={req.status === 'approved' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase">{req.status}</Badge></TableCell></TableRow>
+                                            ))
+                                        )}</TableBody>
+                                </Table></ScrollArea>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <Card className="flex flex-col h-[816px]">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><div><CardTitle>New Applications</CardTitle><CardDescription>Latest customer self-submissions.</CardDescription></div><Button variant="outline" size="sm" asChild><Link href="/admin/loans">Review All <ArrowRight className="ml-2 h-3 w-3" /></Link></Button></CardHeader>
+                    <CardContent className="flex-1 overflow-hidden p-0">
+                        {newApplications.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No pending applications.</p></div>) : (
+                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Identity & Phone</TableHead><TableHead>Member No</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
+                                    <TableBody>{newApplications.map((loan) => (
+                                            <TableRow key={loan.id} className="group"><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div></TableCell><TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell><TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(loan.principalAmount || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell></TableRow>
+                                        ))}</TableBody>
+                                </Table></ScrollArea>
+                        )}
+                    </CardContent>
+                </Card>
+              </div>
+          </TabsContent>
+
+          <TabsContent value="goals" className="m-0">
+              <div className="grid gap-6 md:grid-cols-3">
+                  <GoalCard 
+                    title="Customer Onboarding" 
+                    icon={<UserPlus className="h-5 w-5 text-blue-600" />} 
+                    current={myMonthlyGoals.onboarding} 
+                    target={GOAL_TARGETS.onboarding} 
+                    unit="Members" 
+                    description="New customer registrations this month." 
+                  />
+                  <GoalCard 
+                    title="Monthly Disbursement" 
+                    icon={<HandCoins className="h-5 w-5 text-primary" />} 
+                    current={myMonthlyGoals.disbursement} 
+                    target={GOAL_TARGETS.disbursement} 
+                    unit="Ksh" 
+                    description="Total principal advanced to customers." 
+                  />
+                  <GoalCard 
+                    title="Collection Target" 
+                    icon={<Wallet className="h-5 w-5 text-green-600" />} 
+                    current={myMonthlyGoals.collection} 
+                    target={GOAL_TARGETS.collection} 
+                    unit="Ksh" 
+                    description="Total repayments collected from the field." 
+                  />
+              </div>
+
+              <Card className="mt-6 border-dashed bg-muted/20">
+                  <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                          <Target className="h-5 w-5 text-primary" />
+                          About Your Goals
+                      </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground space-y-4 max-w-3xl">
+                      <p>Goals are automatically calculated based on your activity during the current calendar month. Progress is tracked from your registered customer profiles, loans assigned to you, and payments you record.</p>
+                      <ul className="list-disc pl-5 space-y-2">
+                          <li><strong>Onboarding</strong>: Count of customers where you are the 'Registered By' staff member.</li>
+                          <li><strong>Disbursement</strong>: Sum of principal amounts for loans assigned to you and disbursed this month.</li>
+                          <li><strong>Collection</strong>: Sum of all loan payments you have recorded in the system this month.</li>
+                      </ul>
+                      <p className="italic font-medium text-primary">Consistently meeting your targets helps improve the Pezeka community and your internal performance rating.</p>
+                  </CardContent>
+              </Card>
+          </TabsContent>
+      </Tabs>
 
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
           <DialogContent className="sm:max-md p-0 overflow-hidden">
@@ -675,4 +787,33 @@ export default function Dashboard() {
       </Dialog>
     </div>
   );
+}
+
+function GoalCard({ title, icon, current, target, unit, description }: { title: string, icon: React.ReactNode, current: number, target: number, unit: string, description: string }) {
+    const percentage = Math.min(100, Math.round((current / target) * 100));
+    
+    return (
+        <Card className="overflow-hidden border-t-4 border-t-primary/20">
+            <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                    <div className="bg-muted/50 p-2 rounded-lg">{icon}</div>
+                    <Badge variant={percentage >= 100 ? 'default' : 'secondary'} className={cn(percentage >= 100 ? "bg-green-600" : "")}>
+                        {percentage}%
+                    </Badge>
+                </div>
+                <CardTitle className="text-base font-black mt-3">{title}</CardTitle>
+                <CardDescription className="text-[10px] leading-tight">{description}</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+                <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black">{unit === 'Ksh' ? 'Ksh ' : ''}{current.toLocaleString()}</span>
+                    <span className="text-[10px] text-muted-foreground font-bold uppercase">/ {target.toLocaleString()} {unit === 'Ksh' ? '' : unit}</span>
+                </div>
+                <Progress value={percentage} className="h-2 mt-4" />
+                <p className="text-[9px] text-muted-foreground mt-3 font-medium italic">
+                    {percentage >= 100 ? "Goal achieved! Excellent work." : `Remaining: ${unit === 'Ksh' ? 'Ksh ' : ''}${(target - current).toLocaleString()} ${unit === 'Ksh' ? '' : unit}`}
+                </p>
+            </CardContent>
+        </Card>
+    );
 }

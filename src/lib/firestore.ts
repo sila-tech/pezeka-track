@@ -16,6 +16,8 @@ type CustomerData = {
   accountNumber?: string;
   referredBy?: string;
   referralCode?: string;
+  registeredByStaffId?: string;
+  registeredByStaffName?: string;
 }
 
 export interface Loan {
@@ -46,7 +48,7 @@ export interface Loan {
   totalPaid: number;
   totalPenalties?: number;
   paymentFrequency: 'daily' | 'weekly' | 'monthly';
-  payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; recordedBy?: string; }[];
+  payments?: { paymentId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; recordedBy?: string; staffId?: string; }[];
   penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; recordedBy?: string; }[];
   followUpNotes?: { noteId: string; date: { seconds: number; nanoseconds: number } | Date; staffName: string; staffId: string; content: string; }[];
   comments?: string;
@@ -452,7 +454,7 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
     }
 }
 
-export async function recordLoanPayment(db: Firestore, loanId: string, payment: { amount: number, date: Date, recordedBy?: string }) {
+export async function recordLoanPayment(db: Firestore, loanId: string, payment: { amount: number, date: Date, recordedBy?: string, staffId?: string }) {
     const loanRef = doc(db, 'loans', loanId);
     try {
         await updateDoc(loanRef, {

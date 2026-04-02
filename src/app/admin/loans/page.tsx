@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
@@ -210,7 +211,7 @@ export default function LoansPage() {
   const storage = useStorage();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
   const userRole = user?.role?.toLowerCase();
   const isFinance = userRole === 'finance';
   const isStaff = userRole === 'staff' || isFinance;
@@ -369,7 +370,13 @@ export default function LoansPage() {
       let accountNumber = '';
 
       if (values.customerType === 'new') {
-        const newCustomerData = { name: values.newCustomerName!, phone: values.newCustomerPhone!, idNumber: values.idNumber };
+        const newCustomerData = { 
+            name: values.newCustomerName!, 
+            phone: values.newCustomerPhone!, 
+            idNumber: values.idNumber,
+            registeredByStaffId: user?.uid,
+            registeredByStaffName: user?.name || user?.email || 'Staff'
+        };
         const newCustomerDocRef = await addCustomer(firestore, newCustomerData);
         const newSnap = await getDoc(newCustomerDocRef);
         customerId = newCustomerDocRef.id;
@@ -475,21 +482,12 @@ export default function LoansPage() {
         await recordLoanPayment(firestore, loanToEdit.id, { 
             amount: values.paymentAmount, 
             date: new Date(values.paymentDate),
-            recordedBy: user?.name || user?.email || 'Admin'
+            recordedBy: user?.name || user?.email || 'Admin',
+            staffId: user?.uid 
         });
         toast({ title: 'Payment Recorded', description: 'Notification sent to customer.' });
         paymentForm.reset();
     } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsUpdating(false); }
-  }
-
-  async function onAddPenalty(values: z.infer<typeof penaltySchema>) {
-    if (!loanToEdit || !canEdit) return;
-    setIsAddingPenalty(true);
-    try {
-        await addPenaltyToLoan(firestore, loanToEdit.id, { amount: values.penaltyAmount, date: new Date(values.penaltyDate), description: values.penaltyDescription });
-        toast({ title: 'Penalty Added' });
-        penaltyForm.reset();
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsAddingPenalty(false); }
   }
 
   const handleEditTerms = (loan: Loan) => {

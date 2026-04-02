@@ -97,7 +97,11 @@ export default function CustomersPage() {
           await updateCustomer(firestore, customerToEdit.id, values);
           toast({ title: 'Customer Updated' });
       } else {
-          await addCustomer(firestore, values);
+          await addCustomer(firestore, {
+              ...values,
+              registeredByStaffId: user?.uid,
+              registeredByStaffName: user?.name || user?.email || 'Staff'
+          });
           toast({ title: 'Customer Added' });
       }
       setAddCustomerOpen(false);
@@ -270,4 +274,3 @@ export default function CustomersPage() {
     </div>
   );
 }
-    
