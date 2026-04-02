@@ -1,23 +1,27 @@
-// Minimal PWA Service Worker for Pezeka Credit
+/**
+ * Pezeka Credit Service Worker
+ * Satisfies PWA installation requirements and handles basic connectivity reliability.
+ */
+
 const CACHE_NAME = 'pezeka-cache-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/manifest.json',
-  '/pezeka_logo_transparent.png'
-];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
-  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
+  // Pass-through for standard requests to prevent breakage while fixing "ERR_FAILED"
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    fetch(event.request).catch(() => {
+      // Return a 404 for missing resources when offline
+      return new Response('Offline - Service Worker active', {
+        status: 404,
+        statusText: 'Not Found'
+      });
     })
   );
 });
