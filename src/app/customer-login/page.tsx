@@ -99,10 +99,14 @@ export default function CustomerLoginPage() {
         toast({ title: 'Welcome Back!', description: 'Logged in successfully.' });
       }
     } catch (e: any) { 
+      let errorMessage = e.message;
+      if (e.code === 'auth/network-request-failed') {
+        errorMessage = 'Connection error. Please check your internet or try again later.';
+      }
       toast({ 
         variant: 'destructive', 
         title: 'Authentication Failed', 
-        description: e.message || 'Check your credentials and try again.' 
+        description: errorMessage 
       }); 
     } finally { 
       setIsSubmitting(false); 

@@ -55,7 +55,13 @@ export default function AdminLoginPage() {
     },
   });
   
-  const isAuthorizedAdmin = user && (user.email === 'simon@pezeka.com' || user.role === 'staff' || user.role === 'finance');
+  const isAuthorizedAdmin = user && (
+    user.email === 'simon@pezeka.com' || 
+    user.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
+    user.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+    user.role === 'staff' || 
+    user.role === 'finance'
+  );
 
   useEffect(() => {
     if (!loading && isAuthorizedAdmin) {
@@ -109,7 +115,10 @@ export default function AdminLoginPage() {
 
     } catch (error: any) {
       let errorMessage = error.message;
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+      
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection or ensure pezeka.com is authorized in Firebase Console.';
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
         errorMessage = 'Invalid email or password. Please check your credentials.';
       }
 
