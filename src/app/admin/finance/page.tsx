@@ -10,7 +10,8 @@ import {
     PlusCircle, Loader2, Pencil, Trash2, FileBarChart, Search, X, 
     History, Info, Settings2, Wallet, ArrowDownLeft, ArrowUpRight, 
     ReceiptText, HandCoins, CheckCircle2, XCircle, ChevronRight,
-    User, Phone, Calendar as CalendarIcon, Banknote, ShieldAlert
+    User, Phone, Calendar as CalendarIcon, Banknote, ShieldAlert,
+    SlidersHorizontal
 } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
@@ -470,18 +471,123 @@ export default function FinancePage() {
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
 
-      {/* Edit Loan Dialog */}
+      {/* Edit Loan Dialog - UI Matching Request */}
       <Dialog open={!!selectedLoanForEdit} onOpenChange={(o) => !o && setSelectedLoanForEdit(null)}>
-          <DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Edit Loan Record: {selectedLoanForEdit?.customerName}</DialogTitle></DialogHeader>
-              <Form {...editForm}><form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6 pt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                      <FormField control={editForm.control} name="disbursementDate" render={({field}) => (<FormItem><FormLabel>Disbursement</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                      <FormField control={editForm.control} name="firstPaymentDate" render={({field}) => (<FormItem><FormLabel>First Payment</FormLabel><FormControl><Input type="date" {...field}/></FormControl></FormItem>)} />
-                      <FormField control={editForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                      <FormField control={editForm.control} name="totalRepayableAmount" render={({field}) => (<FormItem className="col-span-2"><FormLabel>Total to Pay</FormLabel><FormControl><Input type="number" {...field}/></FormControl></FormItem>)} />
-                  </div>
-                  <DialogFooter><Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4"/>}Update Record</Button></DialogFooter>
-              </form></Form>
+          <DialogContent className="sm:max-w-xl p-0 overflow-hidden rounded-[1.5rem]">
+              {selectedLoanForEdit && (
+                  <>
+                    <DialogHeader className="p-8 pb-4">
+                        <DialogTitle className="text-2xl font-black text-[#1B2B33]">Edit Ledger Entry: {selectedLoanForEdit.customerName}</DialogTitle>
+                        <DialogDescription className="text-sm font-medium text-[#5BA9D0]">Modify primary financial data and repayment day.</DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-[70vh] px-8">
+                        <Form {...editForm}>
+                            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-6 pt-2 pb-8">
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                                    <FormField control={editForm.control} name="disbursementDate" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Disbursement Date</FormLabel>
+                                            <FormControl><Input type="date" {...field} className="h-12 rounded-xl border-2 border-primary/20 focus:border-primary" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={editForm.control} name="firstPaymentDate" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#5BA9D0]">First Payment Date</FormLabel>
+                                            <FormControl><Input type="date" {...field} className="h-12 rounded-xl border-2 border-primary/10" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    
+                                    <FormField control={editForm.control} name="assignedStaffId" render={({ field }) => (
+                                        <FormItem className="col-span-2">
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Staff Member</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger className="h-12 rounded-xl border-2 border-primary/10">
+                                                        <SelectValue placeholder="Select staff member" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )} />
+
+                                    <FormField control={editForm.control} name="principalAmount" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Principal</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-12 rounded-xl bg-muted/30 border-none" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={editForm.control} name="registrationFee" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Reg Fee</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-12 rounded-xl bg-muted/30 border-none" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={editForm.control} name="processingFee" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Proc Fee</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-12 rounded-xl bg-muted/30 border-none" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={editForm.control} name="carTrackInstallationFee" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Car Track Fee</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-12 rounded-xl bg-muted/30 border-none" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={editForm.control} name="chargingCost" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Charging Cost</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-12 rounded-xl bg-muted/30 border-none" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={editForm.control} name="numberOfInstalments" render={({field}) => (
+                                        <FormItem>
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Instalments</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-12 rounded-xl bg-muted/30 border-none" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    
+                                    <FormField control={editForm.control} name="paymentFrequency" render={({ field }) => (
+                                        <FormItem className="col-span-2">
+                                            <FormLabel className="text-sm font-black text-[#1B2B33]">Frequency</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger className="h-12 rounded-xl border-2 border-primary/10">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="daily">Daily</SelectItem>
+                                                    <SelectItem value="weekly">Weekly</SelectItem>
+                                                    <SelectItem value="monthly">Monthly</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormItem>
+                                    )} />
+
+                                    <FormField control={editForm.control} name="totalRepayableAmount" render={({ field }) => (
+                                        <FormItem className="col-span-2">
+                                            <FormLabel className="text-sm font-black text-[#5BA9D0]">Total Repayable (Override)</FormLabel>
+                                            <FormControl><Input type="number" {...field} className="h-14 rounded-xl border-2 border-primary/30 bg-primary/5 text-lg font-black" /></FormControl>
+                                            <FormDescription className="text-[10px] font-medium leading-relaxed">Enter the total amount the client should pay (Principal + Total Interest).</FormDescription>
+                                        </FormItem>
+                                    )} />
+                                </div>
+                            </form>
+                        </Form>
+                    </ScrollArea>
+                    <DialogFooter className="p-8 pt-4 bg-muted/10 border-t flex items-center justify-end gap-3">
+                        <DialogClose asChild><Button variant="outline" className="h-12 px-8 rounded-xl font-bold">Cancel</Button></DialogClose>
+                        <Button onClick={editForm.handleSubmit(onEditSubmit)} disabled={isSubmitting} className="h-12 px-8 rounded-xl font-bold bg-[#5BA9D0] hover:bg-[#5BA9D0]/90">
+                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : <SlidersHorizontal className="mr-2 h-4 w-4" />}
+                            Update Ledger
+                        </Button>
+                    </DialogFooter>
+                  </>
+              )}
           </DialogContent>
       </Dialog>
     </div>
