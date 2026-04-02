@@ -4,7 +4,6 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage, useMemoFirebase } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
     Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, 
     ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
@@ -761,8 +760,13 @@ export default function Dashboard() {
         <div className="space-y-6">
             <Card className="flex flex-col h-[500px]">
                 <CardHeader className="pb-2">
-                    <CardTitle>Due Loans & Follow-ups</CardTitle>
-                    <CardDescription>Comprehensive monitoring of repayment cycles.</CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Due Loans & Follow-ups</CardTitle>
+                            <CardDescription>Repayment tracking and cycle management.</CardDescription>
+                        </div>
+                        <DatePickerWithRange date={date} setDate={setDate} />
+                    </div>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden p-0">
                     <Tabs defaultValue="all" className="h-full flex flex-col">
@@ -808,7 +812,22 @@ export default function Dashboard() {
                                     </ScrollArea>
                                 )}
                             </TabsContent>
-                            {/* Other tabs follow same pattern */}
+                            <TabsContent value="daily" className="h-full m-0 p-0">
+                                <ScrollArea className="h-full">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader>
+                                        <TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell className="font-bold text-xs">{loan.displayName}</TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            </TabsContent>
+                            <TabsContent value="weekly" className="h-full m-0 p-0">
+                                <ScrollArea className="h-full">
+                                    <Table>
+                                        <TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer</TableHead><TableHead>Member</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader>
+                                        <TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell className="font-bold text-xs">{loan.displayName}</TableCell><TableCell className="text-xs">{loan.accountNumber}</TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody>
+                                    </Table>
+                                </ScrollArea>
+                            </TabsContent>
                         </div>
                     </Tabs>
                 </CardContent>

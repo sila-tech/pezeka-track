@@ -6,7 +6,8 @@ service cloud.firestore {
     /**
      * CORE PHILOSOPHY
      * This ruleset enforces a Role-Based Access Control (RBAC) model.
-     * We prioritize absolute bypass for Simon (Super Admin) to prevent evaluation failures.
+     * We prioritize an absolute bypass for Simon (Super Admin) at the top level
+     * to ensure administrative access is never blocked by complex evaluation.
      */
 
     // --- Helper Functions ---
@@ -17,14 +18,15 @@ service cloud.firestore {
 
     /**
      * @description Absolute bypass for Simon / Super Admin.
-     * Checks UIDs and Emails directly to avoid document lookup overhead.
+     * Checks UIDs and Emails directly to ensure guaranteed access.
      */
     function isSimon() {
       return isSignedIn() && (
-        request.auth.token.email == 'simon@pezeka.com' || 
-        request.auth.token.email == 'simon@finance.pezeka.com' ||
         request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
-        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+        request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
+        request.auth.token.email == 'simon@pezeka.com' || 
+        request.auth.token.email == 'simon@finance.pezeka.com'
       );
     }
 
@@ -61,6 +63,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // --- SUPER ADMIN GLOBAL BYPASS ---
+    // Simon has access to EVERYTHING. This match applies to all paths.
+    match /{allPaths=**} {
+      allow read, write: if isSimon();
+    }
+
     // --- Collection Rules ---
 
     match /users/{userId} {
@@ -72,7 +80,6 @@ service cloud.firestore {
     }
 
     match /expenseRequests/{requestId} {
-      // Simon and Finance can list all. Staff can list their own (UI filtered).
       allow list: if isStaff();
       allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
       allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
