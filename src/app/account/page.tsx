@@ -20,6 +20,10 @@ import {
   Zap,
   AlertCircle,
   FileText,
+  History,
+  CheckCircle2,
+  Clock,
+  ArrowUpRight,
 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { collection, query, where } from 'firebase/firestore';
@@ -68,6 +72,7 @@ interface Loan {
   firstPaymentDate?: any;
   disbursementDate?: any;
   numberOfInstalments: number;
+  payments?: { paymentId: string; amount: number; date: any }[];
 }
 
 interface Customer {
@@ -190,6 +195,29 @@ export default function AccountPage() {
     customerLoans?.filter(l => l.status !== 'application' && l.status !== 'paid' && l.status !== 'rejected' && l.status !== 'rollover') || [], 
   [customerLoans]);
 
+  const applicationHistory = useMemo(() => 
+    customerLoans?.filter(l => l.status === 'application' || l.status === 'rejected') || [],
+  [customerLoans]);
+
+  const repaymentHistory = useMemo(() => {
+    if (!customerLoans) return [];
+    const allPayments: any[] = [];
+    customerLoans.forEach(loan => {
+        (loan.payments || []).forEach(p => {
+            allPayments.push({
+                ...p,
+                loanNumber: loan.loanNumber,
+                loanType: loan.loanType || 'Quick Pesa'
+            });
+        });
+    });
+    return allPayments.sort((a, b) => {
+        const t1 = a.date?.seconds || 0;
+        const t2 = b.date?.seconds || 0;
+        return t2 - t1;
+    });
+  }, [customerLoans]);
+
   const processedActiveLoans = useMemo(() => {
     const today = startOfToday();
     return activeLoans.map(loan => {
@@ -289,7 +317,9 @@ export default function AccountPage() {
             </Avatar>
             <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{greeting}</span>
-                <span className="text-lg font-black text-[#1B2B33]">{activeTab === 'Profile' ? 'Settings' : `${firstName} 👋`}</span>
+                <span className="text-lg font-black text-[#1B2B33]">
+                    {activeTab === 'Profile' ? 'Settings' : activeTab === 'History' ? 'Transaction Log' : `${firstName} 👋`}
+                </span>
             </div>
         </div>
         <div className="flex items-center gap-2">
@@ -380,6 +410,76 @@ export default function AccountPage() {
             </>
         )}
 
+        {activeTab === 'History' && (
+            <div className="space-y-8 pb-10">
+                <section className="space-y-4">
+                    <h3 className="text-lg font-black flex items-center gap-2">
+                        <ArrowUpRight className="h-5 w-5 text-[#5BA9D0]" />
+                        My Applications
+                    </h3>
+                    {applicationHistory.length === 0 ? (
+                        <div className="bg-white rounded-[2rem] p-10 text-center border-2 border-dashed">
+                            <Clock className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+                            <p className="text-xs text-muted-foreground font-medium">No previous applications found.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {applicationHistory.map(app => {
+                                const appDate = app.createdAt?.seconds ? new Date(app.createdAt.seconds * 1000) : new Date();
+                                return (
+                                    <div key={app.id} className="bg-white p-5 rounded-[1.5rem] border border-muted shadow-sm flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <p className="font-black text-sm text-[#1B2B33]">{app.loanType || 'Personal Loan'}</p>
+                                            <p className="text-[10px] text-muted-foreground font-medium uppercase">{format(appDate, 'PPP')}</p>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <p className="font-black text-sm">KES {app.principalAmount.toLocaleString()}</p>
+                                            <Badge variant="outline" className={cn("text-[8px] uppercase font-black px-2 py-0.5 rounded-full border-none",
+                                                app.status === 'application' ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
+                                            )}>
+                                                {app.status === 'application' ? 'Under Review' : app.status}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </section>
+
+                <section className="space-y-4">
+                    <h3 className="text-lg font-black flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        Repayment Log
+                    </h3>
+                    {repaymentHistory.length === 0 ? (
+                        <div className="bg-white rounded-[2rem] p-10 text-center border-2 border-dashed">
+                            <Wallet className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+                            <p className="text-xs text-muted-foreground font-medium">No repayments recorded yet.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {repaymentHistory.map((payment, i) => {
+                                const payDate = payment.date?.seconds ? new Date(payment.date.seconds * 1000) : new Date();
+                                return (
+                                    <div key={payment.paymentId || i} className="bg-white p-5 rounded-[1.5rem] border border-muted shadow-sm flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <p className="font-black text-xs text-[#1B2B33]">Ref: {payment.loanNumber}</p>
+                                            <p className="text-[9px] text-muted-foreground font-black uppercase tracking-wider">{format(payDate, 'MMM dd, yyyy HH:mm')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-black text-green-600 text-base">+ KES {payment.amount.toLocaleString()}</p>
+                                            <p className="text-[8px] text-muted-foreground font-bold uppercase">{payment.loanType}</p>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+                </section>
+            </div>
+        )}
+
         {activeTab === 'Profile' && (
             <div className="space-y-6 pb-10">
                 <Card className="rounded-[2.5rem] bg-white shadow-xl overflow-hidden border-none">
@@ -409,8 +509,9 @@ export default function AccountPage() {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t px-8 flex items-center justify-between z-50">
+      <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t px-6 flex items-center justify-between z-50">
           <NavItem icon={<Home className="h-6 w-6" />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
+          <NavItem icon={<History className="h-6 w-6" />} label="History" active={activeTab === 'History'} onClick={() => setActiveTab('History')} />
           <NavItem icon={<Plus className="h-6 w-6" />} label="Apply" onClick={() => router.push('/account/apply')} />
           <NavItem icon={<User className="h-6 w-6" />} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
       </nav>
