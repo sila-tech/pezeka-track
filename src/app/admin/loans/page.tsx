@@ -8,7 +8,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser, useMemoFirebase, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock, Upload, ImagePlus } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock, Upload, ImagePlus, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -138,12 +138,6 @@ const paymentSchema = z.object({
     paymentDate: z.string().min(1, 'Payment date is required.'),
 });
 
-const penaltySchema = z.object({
-    penaltyAmount: z.coerce.number().min(0.01, 'Penalty amount must be greater than 0.'),
-    penaltyDate: z.string().min(1, 'Penalty date is required.'),
-    penaltyDescription: z.string().min(1, 'A description for the penalty is required.'),
-});
-
 const kycUploadSchema = z.object({
     type: z.enum(['owner_id', 'guarantor_id', 'loan_form', 'security_attachment', 'guarantor_undertaking']),
     fileName: z.string().min(1, "Enter a label for this document."),
@@ -193,9 +187,10 @@ export default function LoansPage() {
   const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isAddingPenalty, setIsAddingPenalty] = useState(false);
   const [isEditingTerms, setIsEditingTerms] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [rolloverConfirmOpen, setRolloverConfirmOpen] = useState(false);
+  const [markAsPaidConfirmOpen, setMarkAsPaidConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingKYC, setViewingKYC] = useState<KYCDoc | null>(null);
   
@@ -272,11 +267,6 @@ export default function LoansPage() {
   const paymentForm = useForm<z.infer<typeof paymentSchema>>({
     resolver: zodResolver(paymentSchema),
     defaultValues: { paymentDate: format(new Date(), 'yyyy-MM-dd'), paymentAmount: 0 }
-  });
-
-  const penaltyForm = useForm<z.infer<typeof penaltySchema>>({
-    resolver: zodResolver(penaltySchema),
-    defaultValues: { penaltyDate: format(new Date(), 'yyyy-MM-dd'), penaltyAmount: 0, penaltyDescription: '' }
   });
 
   const editTermsForm = useForm<z.infer<typeof editTermsSchema>>({
@@ -535,6 +525,36 @@ export default function LoansPage() {
           setIsEditingTerms(false);
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); } finally { setIsUpdating(false); }
   }
+
+  const handleRollover = async () => {
+      if (!loanToEdit || !canEdit) return;
+      setIsUpdating(true);
+      try {
+          await rolloverLoan(firestore, loanToEdit, new Date());
+          toast({ title: 'Loan Rolled Over', description: 'New active loan created and old facility retired.' });
+          setLoanToEdit(null);
+          setRolloverConfirmOpen(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Rollover Failed', description: e.message });
+      } finally {
+          setIsUpdating(false);
+      }
+  };
+
+  const handleMarkAsPaid = async () => {
+      if (!loanToEdit || !canEdit) return;
+      setIsUpdating(true);
+      try {
+          await updateLoan(firestore, loanToEdit.id, { status: 'paid' });
+          toast({ title: 'Loan Settled', description: 'Status updated to fully paid.' });
+          setLoanToEdit(null);
+          setMarkAsPaidConfirmOpen(false);
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+      } finally {
+          setIsUpdating(false);
+      }
+  };
 
   const handleConfirmDelete = async () => {
     if (!loanToDelete || !canEdit) return;
@@ -878,6 +898,26 @@ export default function LoansPage() {
                                                     </Button>
                                                 </form>
                                             </Form>
+                                            <div className="flex gap-2 pt-4 border-t border-dashed mt-4">
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="flex-1 text-green-600 border-green-200 hover:bg-green-50 font-bold h-9 text-xs"
+                                                    onClick={() => setMarkAsPaidConfirmOpen(true)}
+                                                    disabled={loanToEdit.status === 'paid' || isUpdating}
+                                                >
+                                                    <CheckCircle2 className="h-3 w-3 mr-2" /> Mark Settled
+                                                </Button>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 font-bold h-9 text-xs"
+                                                    onClick={() => setRolloverConfirmOpen(true)}
+                                                    disabled={['paid', 'rollover', 'application'].includes(loanToEdit.status) || isUpdating}
+                                                >
+                                                    <RefreshCw className="h-3 w-3 mr-2" /> Rollover
+                                                </Button>
+                                            </div>
                                         </div>
                                     )}
                                     <ScrollArea className="h-48 border rounded-md">
@@ -920,6 +960,44 @@ export default function LoansPage() {
               </div>
           </DialogContent>
       </Dialog>
+
+      {/* Rollover Confirmation */}
+      <AlertDialog open={rolloverConfirmOpen} onOpenChange={setRolloverConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Rollover Loan #{loanToEdit?.loanNumber}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This will close the current facility, record the interest payment in the ledger, and create a new active loan for the principal amount. This action is irreversible.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRollover} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700">
+                      {isUpdating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Confirm Rollover
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Mark as Paid Confirmation */}
+      <AlertDialog open={markAsPaidConfirmOpen} onOpenChange={setMarkAsPaidConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Mark Loan as Fully Settled?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Are you sure you want to mark Loan #{loanToEdit?.loanNumber} as paid? This will move the loan to history and settle the outstanding balance.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleMarkAsPaid} disabled={isUpdating} className="bg-green-600 hover:bg-green-700">
+                      {isUpdating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      Confirm Settlement
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
