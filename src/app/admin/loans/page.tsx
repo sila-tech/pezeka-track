@@ -709,6 +709,86 @@ export default function LoansPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Application Management Dialog */}
+      <Dialog open={!!applicationToManage} onOpenChange={(o) => !o && setApplicationToManage(null)}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+              {applicationToManage && (
+                  <>
+                    <DialogHeader>
+                        <DialogTitle>Process Application: {applicationToManage.customerName}</DialogTitle>
+                        <DialogDescription>Review terms and finalize disbursement or reject the request.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...approvalForm}>
+                        <form onSubmit={approvalForm.handleSubmit(onApproveSubmit)} className="space-y-6 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={approvalForm.control} name="principalAmount" render={({ field }) => (
+                                    <FormItem><FormLabel>Approved Principal (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={approvalForm.control} name="interestRate" render={({ field }) => (
+                                    <FormItem><FormLabel>Monthly Interest (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>
+                                )}/>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={approvalForm.control} name="numberOfInstalments" render={({ field }) => (
+                                    <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
+                                    <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
+                                )}/>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={approvalForm.control} name="disbursementDate" render={({ field }) => (
+                                    <FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                                )}/>
+                                <FormField control={approvalForm.control} name="firstPaymentDate" render={({ field }) => (
+                                    <FormItem><FormLabel>First Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+                                )}/>
+                            </div>
+                            <FormField control={approvalForm.control} name="assignedStaffId" render={({ field }) => (
+                                <FormItem><FormLabel>Assign Field Officer</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger></FormControl><SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent></Select></FormItem>
+                            )}/>
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField control={approvalForm.control} name="processingFee" render={({ field }) => (<FormItem><FormLabel>Processing Fee</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                                <FormField control={approvalForm.control} name="registrationFee" render={({ field }) => (<FormItem><FormLabel>Reg. Fee</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                            </div>
+                            <DialogFooter className="gap-2">
+                                <Button type="button" variant="destructive" onClick={handleReject} disabled={isUpdatingStatus}>Reject Application</Button>
+                                <Button type="submit" disabled={isUpdatingStatus}>{isUpdatingStatus ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}Approve & Disburse</Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                  </>
+              )}
+          </DialogContent>
+      </Dialog>
+
+      {/* View Application Dialog */}
+      <Dialog open={!!viewingApplication} onOpenChange={(o) => !o && setViewingApplication(null)}>
+          <DialogContent className="sm:max-w-md">
+              {viewingApplication && (
+                  <>
+                    <DialogHeader>
+                        <DialogTitle>Application Details</DialogTitle>
+                        <DialogDescription>Submitted by {viewingApplication.customerName}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="font-bold">Requested Amount:</div><div>Ksh {viewingApplication.principalAmount.toLocaleString()}</div>
+                            <div className="font-bold">Loan Product:</div><div>{viewingApplication.loanType}</div>
+                            <div className="font-bold">Instalments:</div><div>{viewingApplication.numberOfInstalments} ({viewingApplication.paymentFrequency})</div>
+                            <div className="font-bold">Phone:</div><div>{viewingApplication.customerPhone}</div>
+                            <div className="font-bold">ID Number:</div><div>{viewingApplication.idNumber || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setViewingApplication(null)}>Close</Button>
+                        {canEdit && <Button onClick={() => { setViewingApplication(null); handleManageApplication(viewingApplication); }}>Process Application</Button>}
+                    </DialogFooter>
+                  </>
+              )}
+          </DialogContent>
+      </Dialog>
+
       <Dialog open={!!loanToEdit} onOpenChange={(isOpen) => { if(!isOpen) { setLoanToEdit(null); setCapturedImage(null); setShowCamera(false); } }}>
           <DialogContent className="sm:max-w-5xl p-0 overflow-hidden">
               {loanToEdit && (
