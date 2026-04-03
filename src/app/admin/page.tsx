@@ -33,6 +33,7 @@ import { addLoan, addFollowUpNoteToLoan, uploadKYCDocument, addExpenseRequest } 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { DateRange } from 'react-day-picker';
@@ -40,7 +41,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { query, collection, where } from 'firebase/firestore';
 import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface FollowUpNote {
     noteId: string;
@@ -283,6 +283,7 @@ export default function Dashboard() {
           const customer = customers?.find(c => c.id === values.customerId);
           await uploadKYCDocument(firestore, storage, {
               ...values,
+              customerId: values.customerId,
               customerName: customer?.name || "Unknown",
               fileUrl: capturedImage,
               uploadedBy: user.name || user.email || "Staff"
@@ -426,7 +427,6 @@ export default function Dashboard() {
       };
   }, [myPortfolio, date]);
 
-  // Goal Calculations
   const myMonthlyProgress = useMemo(() => {
       if (!user || !loans || !customers) return { onboarding: 0, disbursement: 0, collection: 0 };
       
@@ -434,19 +434,16 @@ export default function Dashboard() {
       const end = endOfMonth(new Date());
       const interval = { start, end };
 
-      // Onboarding
       const myOnboarded = customers.filter(c => {
           if (c.registeredByStaffId !== user.uid) return false;
           const cDate = c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000) : new Date();
           return isWithinInterval(cDate, interval);
       }).length;
 
-      // Disbursement & Collection
       let myDisbursed = 0;
       let myCollected = 0;
 
       loans.forEach(loan => {
-          // Disbursement
           if (loan.assignedStaffId === user.uid && loan.status !== 'application' && loan.status !== 'rejected') {
               const dDate = loan.disbursementDate?.seconds 
                   ? new Date(loan.disbursementDate.seconds * 1000) 
@@ -457,7 +454,6 @@ export default function Dashboard() {
               }
           }
 
-          // Collection (recorded by me)
           (loan.payments || []).forEach(p => {
               const isMine = p.staffId === user.uid || p.recordedBy === (user.name || user.email);
               if (isMine) {
@@ -518,7 +514,7 @@ export default function Dashboard() {
           else if (loan.paymentFrequency === 'weekly') cyclesPassed = Math.floor(differenceInDays(today, baseDate) / 7);
           else if (loan.paymentFrequency === 'monthly') cyclesPassed = differenceInMonths(today, baseDate);
 
-          const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed;
+          const expectedByNow = cyclesPassed < 0 ? 0 : cyclesPassed + 1;
           const arrearsCount = Math.max(0, expectedByNow - actualInstalmentsPaid);
           
           const nextInstalmentIndex = Math.floor(actualInstalmentsPaid);
@@ -543,11 +539,7 @@ export default function Dashboard() {
 
   const priorityDueLoans = useMemo(() => {
       return processedLoansWithTimeline.filter(loan => {
-          const offset = loan.paymentFrequency === 'monthly' ? 14 : (loan.paymentFrequency === 'weekly' ? 7 : 3);
-          const isLate = loan.daysUntil < 0;
-          const isDueSoon = loan.daysUntil >= 0 && loan.daysUntil <= offset;
-          const hasArrears = loan.arrearsBalance > 0;
-          return isLate || isDueSoon || hasArrears;
+          return loan.arrearsBalance > 0;
       }).sort((a, b) => a.daysUntil - b.daysUntil);
   }, [processedLoansWithTimeline]);
 
@@ -693,7 +685,7 @@ export default function Dashboard() {
                                                 </Table></ScrollArea>
                                         )}
                                     </TabsContent>
-                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead>  <TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
                                     <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || '-'}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
                                 </div>
                             </Tabs>
