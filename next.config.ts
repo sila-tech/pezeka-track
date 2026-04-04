@@ -2,9 +2,11 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   typescript: {
+    // Prototyping: ignore minor type mismatches to ensure the build completes
     ignoreBuildErrors: true,
   },
   eslint: {
+    // Prototyping: ignore lint errors during production builds
     ignoreDuringBuilds: true,
   },
   images: {

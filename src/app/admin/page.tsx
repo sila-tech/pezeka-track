@@ -669,7 +669,7 @@ export default function Dashboard() {
                                 <div className="flex-1 overflow-hidden">
                                     <TabsContent value="all" className="h-full m-0 p-0">
                                         {priorityDueLoans.length === 0 ? (<div className="p-12 text-center h-full flex flex-col items-center justify-center"><Clock className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No urgent follow-ups required.</p></div>) : (
-                                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Member & Phone</TableHead><TableHead>Schedule</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+                                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Member & Phone</TableHead>  <TableHead>Schedule</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
                                                     <TableBody>{priorityDueLoans.map((loan) => (
                                                             <TableRow key={loan.id}><TableCell>
                                                                 <div className="font-bold text-xs">{loan.displayName}</div>

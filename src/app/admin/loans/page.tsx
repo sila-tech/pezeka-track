@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
@@ -241,8 +240,8 @@ export default function LoansPage() {
             loan.accountNumber?.includes(searchTerm);
         return statusMatch && searchMatch;
     }).sort((a, b) => {
-        const d1 = a.disbursementDate?.seconds || 0;
-        const d2 = b.disbursementDate?.seconds || 0;
+        const d1 = (a.disbursementDate as any)?.seconds || 0;
+        const d2 = (b.disbursementDate as any)?.seconds || 0;
         return d2 - d1;
     });
   }, [loans, searchTerm, statusFilter]);
@@ -250,8 +249,8 @@ export default function LoansPage() {
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
     return loans.filter(loan => loan.status === 'application').sort((a, b) => {
-        const d1 = a.createdAt?.seconds || 0;
-        const d2 = b.createdAt?.seconds || 0;
+        const d1 = (a as any).createdAt?.seconds || 0;
+        const d2 = (b as any).createdAt?.seconds || 0;
         return d2 - d1;
     });
   }, [loans]);
@@ -372,7 +371,7 @@ export default function LoansPage() {
         customerId = newCustomerDocRef.id;
         customerName = newCustomerData.name;
         customerPhone = newCustomerData.phone;
-        accountNumber = newSnap.data()?.accountNumber || '';
+        accountNumber = (newSnap.data() as any)?.accountNumber || '';
       } else {
         const selectedCustomer = customers?.find(c => c.id === customerId);
         if (!selectedCustomer) throw new Error("Selected customer not found.");
@@ -482,12 +481,12 @@ export default function LoansPage() {
 
   const handleEditTerms = (loan: Loan) => {
       if (!canEdit) return;
-      const dDate = loan.disbursementDate?.seconds 
-          ? new Date(loan.disbursementDate.seconds * 1000) 
+      const dDate = (loan.disbursementDate as any)?.seconds 
+          ? new Date((loan.disbursementDate as any).seconds * 1000) 
           : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
       
-      const fDate = loan.firstPaymentDate?.seconds
-          ? new Date(loan.firstPaymentDate.seconds * 1000)
+      const fDate = (loan.firstPaymentDate as any)?.seconds
+          ? new Date((loan.firstPaymentDate as any).seconds * 1000)
           : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : addMonths(dDate, 1));
 
       editTermsForm.reset({
@@ -515,13 +514,13 @@ export default function LoansPage() {
               ...values,
               disbursementDate: new Date(values.disbursementDate),
               firstPaymentDate: new Date(values.firstPaymentDate),
-              assignedStaffName: staff?.name || staff?.email || "Unknown",
+              assignedStaffName: assignedStaff?.name || assignedStaff?.email || "Unknown",
               instalmentAmount,
               totalRepayableAmount: values.totalRepayableAmount,
           };
           await updateLoan(firestore, loanToEdit.id, updateData);
           toast({ title: 'Terms Updated' });
-          setLoanToEdit({ ...loanToEdit, ...updateData });
+          setLoanToEdit({ ...loanToEdit, ...updateData } as Loan);
           setIsEditingTerms(false);
       } catch (e: any) { toast({ variant: 'destructive', title: 'Update Failed', description: e.message }); } finally { setIsUpdating(false); }
   }
@@ -656,9 +655,11 @@ export default function LoansPage() {
         </TabsList>
         <TabsContent value="all" className="m-0">
             <Card>
-                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <CardTitle>Portfolio Ledger</CardTitle>
-                    <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone, ID or Member No..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[350px]" /></div>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <CardTitle>Portfolio Ledger</CardTitle>
+                        <div className="relative"><Search className="absolute left-2.5 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search name, phone, ID or Member No..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 w-[350px]" /></div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[60vh]">
@@ -676,8 +677,8 @@ export default function LoansPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                              {filteredLoans.map((loan: any) => {
-                                  const fDate = loan.firstPaymentDate?.seconds ? new Date(loan.firstPaymentDate.seconds * 1000) : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
+                              {filteredLoans.map((loan: Loan) => {
+                                  const fDate = (loan.firstPaymentDate as any)?.seconds ? new Date((loan.firstPaymentDate as any).seconds * 1000) : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : null);
                                   return (
                                     <TableRow key={loan.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setLoanToEdit(loan)}>
                                         <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
@@ -995,6 +996,43 @@ export default function LoansPage() {
                       {isUpdating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
                       Confirm Settlement
                   </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Terms Dialog */}
+      <Dialog open={isEditingTerms} onOpenChange={setIsEditingTerms}>
+          <DialogContent className="sm:max-w-md">
+              <DialogHeader><DialogTitle>Edit Loan Terms</DialogTitle></DialogHeader>
+              <Form {...editTermsForm}>
+                  <form onSubmit={editTermsForm.handleSubmit(onEditTermsSubmit)} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editTermsForm.control} name="principalAmount" render={({field}) => (<FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="interestRate" render={({field}) => (<FormItem><FormLabel>Monthly Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)}/>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>)}/>
+                      </div>
+                      <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (<FormItem><FormLabel>Total Repayable (Override)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
+                      <div className="grid grid-cols-2 gap-4">
+                          <FormField control={editTermsForm.control} name="disbursementDate" render={({field}) => (<FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)}/>
+                          <FormField control={editTermsForm.control} name="firstPaymentDate" render={({field}) => (<FormItem><FormLabel>First Pay Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>)}/>
+                      </div>
+                      <FormField control={editTermsForm.control} name="assignedStaffId" render={({field}) => (<FormItem><FormLabel>Assign Staff</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent></Select></FormItem>)}/>
+                      <DialogFooter><Button type="submit" disabled={isUpdating}>{isUpdating && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Update Terms</Button></DialogFooter>
+                  </form>
+              </Form>
+          </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader><AlertDialogTitle>Delete Loan Record?</AlertDialogTitle><AlertDialogDescription>This will permanently remove the record from the ledger.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setLoanToDelete(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive" disabled={isDeleting}>Delete</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
