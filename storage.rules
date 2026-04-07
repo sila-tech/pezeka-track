@@ -1,16 +1,49 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    
+    // --- Helper Functions ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSimon() {
+      return isSignedIn() && (
+        request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+        request.auth.uid == 'zdf58EsGJKa2xr7D6RmNBS3gbx53' ||
+        request.auth.token.email.matches('(?i)^simon@pezeka\\.com$')
+      );
+    }
+
+    function isFinance() {
+      return isSimon() || (
+        isSignedIn() && (
+          request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')
+        )
+      );
+    }
+
+    function isStaff() {
+      return isSimon() || isFinance() || (
+        isSignedIn() && (
+          request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@staff\\.pezeka\\.com$')
+        )
+      );
+    }
+
+    // --- KYC Documents ---
+    
     match /kyc/{customerId}/{allPaths=**} {
-      // Allow all authorized staff to read and write KYC documents.
-      // This logic mirrors your isStaff() check in Firestore.
-      allow read, write: if request.auth != null && 
-        (
-          request.auth.token.email == 'simon@pezeka.com' ||
-          request.auth.token.email.matches('.*@staff.pezeka.com$') ||
-          request.auth.token.email.matches('.*@finance.pezeka.com$') ||
-          request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
-        );
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isFinance();
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }

@@ -48,7 +48,7 @@ export default function AdminReferralsPage() {
                 item.referredName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.referrerName.toLowerCase().includes(searchTerm.toLowerCase())
             )
-            .sort((a, b) => (b.referralDate?.seconds || 0) - (a.referralDate?.seconds || 0));
+            .sort((a, b) => ((b.referralDate as any)?.seconds || 0) - ((a.referralDate as any)?.seconds || 0));
     }, [allCustomers, searchTerm]);
 
     if (userLoading || customersLoading) {
@@ -141,9 +141,9 @@ export default function AdminReferralsPage() {
                                     </TableRow>
                                 ) : (
                                     referralData.map((item) => {
-                                        const rDate = item.referralDate?.seconds 
-                                            ? new Date(item.referralDate.seconds * 1000) 
-                                            : new Date();
+                                        const rDate = (item.referralDate as any)?.seconds 
+                                            ? new Date((item.referralDate as any).seconds * 1000) 
+                                            : (item.referralDate ? new Date(item.referralDate as any) : new Date());
                                         return (
                                             <TableRow key={item.id}>
                                                 <TableCell>

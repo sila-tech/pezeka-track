@@ -380,7 +380,7 @@ export default function Dashboard() {
       const start = startOfMonth(new Date());
       const end = endOfMonth(new Date());
       return myApprovedExpenses.reduce((acc, exp) => {
-          const date = exp.date?.seconds ? new Date(exp.date.seconds * 1000) : new Date(exp.date);
+          const date = (exp.date as any)?.seconds ? new Date((exp.date as any).seconds * 1000) : new Date(exp.date as any);
           if (date >= start && date <= end) return acc + Number(exp.amount);
           return acc;
       }, 0);
@@ -399,8 +399,8 @@ export default function Dashboard() {
       let periodCollected = 0;
 
       myPortfolio.forEach(loan => {
-          const dDate = loan.disbursementDate?.seconds 
-              ? new Date(loan.disbursementDate.seconds * 1000) 
+          const dDate = (loan.disbursementDate as any)?.seconds 
+              ? new Date((loan.disbursementDate as any).seconds * 1000) 
               : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
           
           if (!interval || isWithinInterval(dDate, interval)) {
@@ -455,7 +455,7 @@ export default function Dashboard() {
           }
 
           (loan.payments || []).forEach(p => {
-              const isMine = p.staffId === user.uid || p.recordedBy === (user.name || user.email);
+              const isMine = (p as any).staffId === user.uid || (p as any).recordedBy === (user.name || user.email);
               if (isMine) {
                   const pDate = (p.date as any)?.seconds ? new Date((p.date as any).seconds * 1000) : new Date(p.date as any);
                   if (isWithinInterval(pDate, interval)) {
@@ -785,7 +785,7 @@ export default function Dashboard() {
                   <><DialogHeader className="p-6 pb-0"><DialogTitle className="text-lg">Follow-up: {selectedLoanForNotes.customerName}</DialogTitle><DialogDescription>Record interactions.</DialogDescription></DialogHeader>
                     <div className="space-y-4 px-6 py-4">
                         <Form {...noteForm}><form onSubmit={noteForm.handleSubmit(onAddNoteSubmit)} className="space-y-2"><FormField control={noteForm.control} name="content" render={({ field }) => (<FormItem><FormControl><Textarea placeholder="Notes..." className="h-16 text-sm" {...field} value={field.value ?? ''} /></FormControl></FormItem>)}/><Button type="submit" className="w-full" size="sm" disabled={isAddingNote}>{isAddingNote ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}Save Note</Button></form></Form>
-                        <ScrollArea className="h-40 border rounded-md p-3">{(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions.</p>) : (<div className="space-y-3">{[...(selectedLoanForNotes.followUpNotes || [])].reverse().map((note, index) => (<div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold">{note.staffName}</span><span className="text-[9px]">{note.date?.seconds ? format(new Date(note.date.seconds * 1000), 'dd/MM HH:mm') : '...'}</span></div><p className="italic">"{note.content}"</p></div>))}</div>)}</ScrollArea>
+                        <ScrollArea className="h-40 border rounded-md p-3">{(!selectedLoanForNotes.followUpNotes || selectedLoanForNotes.followUpNotes.length === 0) ? (<p className="text-xs text-muted-foreground text-center py-8 italic">No interactions.</p>) : (<div className="space-y-3">{[...(selectedLoanForNotes.followUpNotes || [])].reverse().map((note, index) => (<div key={note.noteId || index} className="bg-muted/50 p-2 rounded border text-xs"><div className="flex justify-between items-center mb-1"><span className="font-bold">{note.staffName}</span><span className="text-[9px]">{(note.date as any)?.seconds ? format(new Date((note.date as any).seconds * 1000), 'dd/MM HH:mm') : (note.date ? format(new Date(note.date as any), 'dd/MM HH:mm') : '...')}</span></div><p className="italic">"{note.content}"</p></div>))}</div>)}</ScrollArea>
                     </div><DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="outline" size="sm" className="w-full">Close</Button></DialogClose></DialogFooter>
                   </>
               )}

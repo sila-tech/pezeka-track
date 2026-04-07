@@ -32,6 +32,7 @@ export interface FirebaseContextState {
   // User authentication state
   user: User | null;
   isUserLoading: boolean; // True during initial auth check
+  loading: boolean;      // Alias for backward compatibility
   userError: Error | null; // Error from auth listener
 }
 
@@ -46,10 +47,10 @@ export interface FirebaseServicesAndUser {
   userError: Error | null;
 }
 
-// Return type for useUser() - specific to user auth state
 export interface UserHookResult { // Renamed from UserAuthHookResult for consistency if desired, or keep as UserAuthHookResult
   user: User | null;
   isUserLoading: boolean;
+  loading: boolean;
   userError: Error | null;
 }
 
@@ -105,6 +106,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       storage: servicesAvailable ? storage : null,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
+      loading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
     };
   }, [firebaseApp, firestore, auth, storage, userAuthState]);
@@ -185,5 +187,5 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
  */
 export const useUser = (): UserHookResult => { // Renamed from useAuthUser
   const { user, isUserLoading, userError } = useFirebase(); // Leverages the main hook
-  return { user, isUserLoading, userError };
+  return { user, isUserLoading, loading: isUserLoading, userError };
 };

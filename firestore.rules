@@ -17,8 +17,8 @@
           return isSignedIn() && (
             request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
             request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
-            request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
-            request.auth.token.email == 'simon@pezeka.com'
+            request.auth.uid == 'zdf58EsGJKa2xr7D6RmNBS3gbx53' ||
+            request.auth.token.email.matches('(?i)^simon@pezeka\\.com$')
           );
         }
     
@@ -31,7 +31,7 @@
         function isFinance() {
           return isSimon() || (
             isSignedIn() && (
-              (request.auth.token.email != null && request.auth.token.email.endsWith('@finance.pezeka.com')) ||
+              (request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')) ||
               (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
             )
@@ -39,11 +39,11 @@
         }
     
         function isStaff() {
-          return isSimon() || (
+          return isSimon() || isFinance() || (
             isSignedIn() && (
               (request.auth.token.email != null && (
-                request.auth.token.email.endsWith('@staff.pezeka.com') || 
-                request.auth.token.email.endsWith('@finance.pezeka.com')
+                request.auth.token.email.matches('(?i)^.*@staff\\.pezeka\\.com$') || 
+                request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')
               )) ||
               (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
@@ -93,7 +93,9 @@
         }
     
         match /kyc_documents/{docId} {
-          allow read, write: if isSimon() || isStaff();
+          allow get, list: if isStaff();
+          allow create: if isStaff();
+          allow update, delete: if isFinance();
         }
     
         match /financeEntries/{entryId} {

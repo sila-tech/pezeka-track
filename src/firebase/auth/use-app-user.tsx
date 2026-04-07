@@ -12,7 +12,7 @@ interface UserProfileData {
   email?: string;
 }
 
-export interface AppUser extends UserProfileData {
+export interface AppUser extends Omit<UserProfileData, 'email'> {
     uid: string;
     email: string | null;
     displayName: string | null;
@@ -26,7 +26,7 @@ interface UseAppUser {
 
 export const useAppUser = (): UseAppUser => {
     const { user, loading: authLoading } = useUser();
-    const { data: profile, loading: profileLoading } = useDoc<UserProfileData>(user ? `users/${user.uid}` : null);
+    const { data: profile, isLoading: profileLoading } = useDoc<UserProfileData>(user ? `users/${user.uid}` : null);
 
     const isLoading = authLoading || (!!user && profileLoading);
 

@@ -200,7 +200,7 @@ export default function AccountPage() {
 
   const applicationHistory = useMemo(() => 
     (customerLoans?.filter(l => l.status === 'application' || l.status === 'rejected') || [])
-    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)),
+    .sort((a, b) => ((b.createdAt as any)?.seconds || 0) - ((a.createdAt as any)?.seconds || 0)),
   [customerLoans]);
 
   const repaymentHistory = useMemo(() => {
@@ -216,8 +216,8 @@ export default function AccountPage() {
         });
     });
     return allPayments.sort((a, b) => {
-        const t1 = a.date?.seconds || 0;
-        const t2 = b.date?.seconds || 0;
+        const t1 = (a.date as any)?.seconds || 0;
+        const t2 = (b.date as any)?.seconds || 0;
         return t2 - t1;
     });
   }, [customerLoans]);
@@ -226,11 +226,11 @@ export default function AccountPage() {
     const today = startOfToday();
     return activeLoans.map(loan => {
         let baseDate: Date;
-        if (loan.firstPaymentDate?.seconds) {
-            baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+        if ((loan.firstPaymentDate as any)?.seconds) {
+            baseDate = new Date((loan.firstPaymentDate as any).seconds * 1000);
         } else {
-            const dDate = loan.disbursementDate?.seconds 
-                ? new Date(loan.disbursementDate.seconds * 1000) 
+            const dDate = (loan.disbursementDate as any)?.seconds 
+                ? new Date((loan.disbursementDate as any).seconds * 1000) 
                 : new Date();
             
             if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
@@ -282,6 +282,11 @@ export default function AccountPage() {
 
   const totalArrears = useMemo(() => {
       return processedActiveLoans.reduce((acc, loan) => acc + loan.arrearsBalance, 0);
+  }, [processedActiveLoans]);
+
+  const nextInstalmentAmount = useMemo(() => {
+    // Show the instalment amount of the most immediate active loan
+    return processedActiveLoans[0]?.instalmentAmount || 0;
   }, [processedActiveLoans]);
 
   const handleLogout = async () => {
@@ -369,7 +374,7 @@ export default function AccountPage() {
                     <ActionCircle icon={<SendHorizontal className="h-6 w-6" />} label="Send" status="SOON" />
                     <ActionCircle icon={<Wallet className="h-6 w-6" />} label="Pay" onClick={() => setIsPayOpen(true)} />
                     <ActionCircle icon={<Landmark className="h-6 w-6" />} label="Loans" onClick={() => setIsLoansOpen(true)} />
-                    <ActionCircle icon={<Users className="h-6 w-6" />} label="Refer" onClick={() => setIsReferOpen(true)} />
+                    <ActionCircle icon={<Users className="h-6 w-6" />} label="Refer and Earn" onClick={() => setIsReferOpen(true)} />
                 </div>
 
                 <section className="space-y-4">
@@ -432,7 +437,7 @@ export default function AccountPage() {
                     ) : (
                         <div className="space-y-3">
                             {applicationHistory.map(app => {
-                                const appDate = app.createdAt?.seconds ? new Date(app.createdAt.seconds * 1000) : new Date();
+                                const appDate = (app.createdAt as any)?.seconds ? new Date((app.createdAt as any).seconds * 1000) : new Date();
                                 return (
                                     <div key={app.id} className="bg-white p-5 rounded-[1.5rem] border border-muted shadow-sm flex items-center justify-between">
                                         <div className="space-y-1">
@@ -467,7 +472,7 @@ export default function AccountPage() {
                     ) : (
                         <div className="space-y-3">
                             {repaymentHistory.map((payment, i) => {
-                                const payDate = payment.date?.seconds ? new Date(payment.date.seconds * 1000) : new Date();
+                                const payDate = (payment.date as any)?.seconds ? new Date((payment.date as any).seconds * 1000) : new Date();
                                 return (
                                     <div key={payment.paymentId || i} className="bg-white p-5 rounded-[1.5rem] border border-muted shadow-sm flex items-center justify-between">
                                         <div className="space-y-1">
@@ -525,7 +530,7 @@ export default function AccountPage() {
 
       <Dialog open={isReferOpen} onOpenChange={setIsReferOpen}>
           <DialogContent className="sm:max-w-md rounded-[2.5rem]">
-              <DialogHeader><DialogTitle className="text-2xl font-black">Refer & Grow</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle className="text-2xl font-black">Refer and Earn</DialogTitle></DialogHeader>
               <div className="p-4 space-y-6">
                   <div className="bg-[#1B2B33] rounded-3xl p-8 text-center space-y-4">
                       <div className="bg-[#5BA9D0] h-16 w-16 rounded-2xl flex items-center justify-center mx-auto"><Users className="h-8 w-8 text-white" /></div>
@@ -547,6 +552,12 @@ export default function AccountPage() {
                   <div className="bg-[#F8FAFB] p-6 rounded-3xl space-y-4 border">
                       <div className="flex justify-between items-center"><span className="text-muted-foreground text-[10px] font-black uppercase">Paybill</span><span className="text-xl font-black">522522</span></div>
                       <div className="flex justify-between items-center"><span className="text-muted-foreground text-[10px] font-black uppercase">Account</span><span className="text-xl font-black">1347823360</span></div>
+                      {nextInstalmentAmount > 0 && (
+                          <div className="flex justify-between items-center pt-2 border-t">
+                              <span className="text-[#5BA9D0] text-[10px] font-black uppercase">Next Instalment</span>
+                              <span className="text-xl font-black text-[#1B2B33]">KES {nextInstalmentAmount.toLocaleString()}</span>
+                          </div>
+                      )}
                       <div className="flex justify-between items-center pt-2 border-t"><span className="text-primary text-[10px] font-black uppercase">Total Arrears</span><span className="text-2xl font-black text-destructive">KES {totalArrears.toLocaleString()}</span></div>
                   </div>
                   <Button onClick={() => setIsPayOpen(false)} className="w-full h-14 rounded-2xl bg-[#5BA9D0] font-black text-white">Done</Button>

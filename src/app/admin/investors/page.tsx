@@ -130,7 +130,7 @@ export default function InvestorsPage() {
     const handleEditClick = (investor: Investor) => {
         if (!canEdit) return;
         setInvestorToEdit(investor);
-        editForm.reset({ uid: investor.uid, name: investor.name, email: investor.email, totalInvestment: investor.totalInvestment, interestRate: investor.interestRate || 0, createdAt: investor.createdAt ? format(new Date(investor.createdAt.seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd') });
+        editForm.reset({ uid: investor.uid, name: investor.name, email: investor.email, totalInvestment: investor.totalInvestment, interestRate: investor.interestRate || 0, createdAt: (investor.createdAt as any)?.seconds ? format(new Date((investor.createdAt as any).seconds * 1000), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd') });
         setEditDialogOpen(true);
     };
     

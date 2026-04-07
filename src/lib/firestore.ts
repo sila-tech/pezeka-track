@@ -516,9 +516,8 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
         const snap = await getDocs(query(collection(db, 'loans')));
         const newLoanNumber = `LN-${String(snap.size + 1).padStart(3, '0')}`;
 
-        await addDoc(collection(db, 'loans'), {
+        const newLoanData = {
             ...originalLoan,
-            id: undefined,
             loanNumber: newLoanNumber,
             disbursementDate: rolloverDate,
             status: 'active',
@@ -530,7 +529,13 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
             comments: `Rollover from Loan #${originalLoan.loanNumber}`,
             createdAt: serverTimestamp(),
             disbursementRecorded: true 
-        });
+        } as any;
+        
+        // Remove undefined fields which cause Firebase SDK to throw an error 
+        delete newLoanData.id;
+        const cleanLoanData = Object.fromEntries(Object.entries(newLoanData).filter(([_, v]) => v !== undefined));
+
+        await addDoc(collection(db, 'loans'), cleanLoanData);
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({ path: 'loan_rollover', operation: 'create' });
         errorEmitter.emit('permission-error', permissionError);
@@ -687,6 +692,15 @@ export async function processWithdrawal(db: Firestore, investorId: string, withd
 
     const updated = data.withdrawals.map((x: any) => x.withdrawalId === withdrawalId ? { ...x, status: 'processed' } : x);
     await updateDoc(investorRef, { withdrawals: updated, currentBalance: increment(-w.amount), totalWithdrawn: increment(w.amount), updatedAt: serverTimestamp() });
+}
+
+export async function rejectWithdrawal(db: Firestore, investorId: string, withdrawalId: string) {
+    const investorRef = doc(db, 'investors', investorId);
+    const snap = await getDoc(investorRef);
+    if (!snap.exists()) return;
+    const data = snap.data();
+    const updated = data.withdrawals.map((x: any) => x.withdrawalId === withdrawalId ? { ...x, status: 'rejected' } : x);
+    await updateDoc(investorRef, { withdrawals: updated, updatedAt: serverTimestamp() });
 }
 
 export async function requestDeposit(db: Firestore, investorId: string, amount: number) {

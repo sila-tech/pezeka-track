@@ -164,14 +164,14 @@ export default function FinancePage() {
             
           return searchMatch && statusMatch;
       }).sort((a, b) => {
-          const t1 = a.disbursementDate?.seconds || 0;
-          const t2 = b.disbursementDate?.seconds || 0;
+          const t1 = (a.disbursementDate as any)?.seconds || 0;
+          const t2 = (b.disbursementDate as any)?.seconds || 0;
           return t2 - t1;
       });
   }, [loans, lbSearch, lbStatus]);
 
   const pendingRequests = useMemo(() => {
-      return (expenseRequests || []).filter(r => r.status === 'pending').sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      return (expenseRequests || []).filter(r => r.status === 'pending').sort((a,b) => ((b.createdAt as any)?.seconds || 0) - ((a.createdAt as any)?.seconds || 0));
   }, [expenseRequests]);
 
   const handleApproveRequest = async (requestId: string) => {
@@ -201,8 +201,8 @@ export default function FinancePage() {
 
   const handleEditClick = (loan: Loan) => {
     setSelectedLoanForEdit(loan);
-    const dDate = loan.disbursementDate?.seconds ? new Date(loan.disbursementDate.seconds * 1000) : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
-    const fDate = loan.firstPaymentDate?.seconds ? new Date(loan.firstPaymentDate.seconds * 1000) : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : addMonths(dDate, 1));
+    const dDate = (loan.disbursementDate as any)?.seconds ? new Date((loan.disbursementDate as any).seconds * 1000) : (loan.disbursementDate ? new Date(loan.disbursementDate as any) : new Date());
+    const fDate = (loan.firstPaymentDate as any)?.seconds ? new Date((loan.firstPaymentDate as any).seconds * 1000) : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate as any) : addMonths(dDate, 1));
 
     editForm.reset({
         principalAmount: loan.principalAmount || 0,
@@ -377,12 +377,12 @@ export default function FinancePage() {
                                               const interest = Number(loan.totalRepayableAmount) - Number(loan.principalAmount) - (Number(loan.totalPenalties) || 0);
                                               const totalIncome = interest + totalFees;
 
-                                              const dDate = loan.disbursementDate?.seconds 
-                                                ? new Date(loan.disbursementDate.seconds * 1000) 
+                                              const dDate = (loan.disbursementDate as any)?.seconds 
+                                                ? new Date((loan.disbursementDate as any).seconds * 1000) 
                                                 : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date(loan.disbursementDate));
 
-                                              const fDate = loan.firstPaymentDate?.seconds 
-                                                ? new Date(loan.firstPaymentDate.seconds * 1000) 
+                                              const fDate = (loan.firstPaymentDate as any)?.seconds 
+                                                ? new Date((loan.firstPaymentDate as any).seconds * 1000) 
                                                 : (loan.firstPaymentDate instanceof Date ? loan.firstPaymentDate : (loan.firstPaymentDate ? new Date(loan.firstPaymentDate) : null));
 
                                               return (
@@ -455,7 +455,7 @@ export default function FinancePage() {
                               ) : (
                                   pendingRequests.map(req => (
                                       <TableRow key={req.id}>
-                                          <TableCell className="text-xs">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM/yyyy HH:mm') : '...'}</TableCell>
+                                          <TableCell className="text-xs">{(req.createdAt as any)?.seconds ? format(new Date((req.createdAt as any).seconds * 1000), 'dd/MM/yyyy HH:mm') : '...'}</TableCell>
                                           <TableCell className="font-bold">{req.staffName}</TableCell>
                                           <TableCell className="font-black text-primary">Ksh {req.amount.toLocaleString()}</TableCell>
                                           <TableCell className="max-w-[300px] text-xs italic">"{req.description}"</TableCell>

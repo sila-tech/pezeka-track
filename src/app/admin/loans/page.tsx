@@ -531,8 +531,9 @@ export default function LoansPage() {
       try {
           await rolloverLoan(firestore, loanToEdit, new Date());
           toast({ title: 'Loan Rolled Over', description: 'New active loan created and old facility retired.' });
-          setLoanToEdit(null);
           setRolloverConfirmOpen(false);
+          // Delay closing the parent modal to prevent Radix UI body pointer-events freeze
+          setTimeout(() => setLoanToEdit(null), 150);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Rollover Failed', description: e.message });
       } finally {
@@ -546,8 +547,9 @@ export default function LoansPage() {
       try {
           await updateLoan(firestore, loanToEdit.id, { status: 'paid' });
           toast({ title: 'Loan Settled', description: 'Status updated to fully paid.' });
-          setLoanToEdit(null);
           setMarkAsPaidConfirmOpen(false);
+          // Delay closing the parent modal to prevent Radix UI body pointer-events freeze
+          setTimeout(() => setLoanToEdit(null), 150);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
       } finally {
@@ -930,7 +932,7 @@ export default function LoansPage() {
                                                 ) : (
                                                     [...loanToEdit.payments].reverse().map((p, i) => (
                                                         <TableRow key={p.paymentId || i}>
-                                                            <TableCell className="text-[10px]">{format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm')}</TableCell>
+                                                            <TableCell className="text-[10px]">{ (p.date as any)?.seconds ? format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm') : (p.date ? format(new Date(p.date as any), 'dd/MM/yy HH:mm') : '...')}</TableCell>
                                                             <TableCell className="text-right text-[10px] font-bold">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
                                                         </TableRow>
                                                     ))

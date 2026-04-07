@@ -23,6 +23,7 @@ type WithId<T> = T & { id: string };
 export interface UseDocResult<T> {
   data: WithId<T> | null; // Document data with ID, or null.
   isLoading: boolean;       // True if loading.
+  loading: boolean;         // Alias for backward compatibility.
   error: FirestoreError | Error | null; // Error object, or null.
 }
 
@@ -104,5 +105,5 @@ export function useDoc<T = any>(
     throw new Error('DocumentReference was not properly memoized using useMemoFirebase');
   }
 
-  return { data, isLoading, error };
+  return { data, isLoading, loading: isLoading, error };
 }
