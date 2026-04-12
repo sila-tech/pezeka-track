@@ -27,24 +27,10 @@ const forms = [
 export default function ApplicationFormsPage() {
   const { user, loading } = useAppUser();
   
-  // Robust check for all admin team roles
-  const userRole = user?.role?.toLowerCase()?.trim();
-  const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-  const isAuthorized = user && (isSuperAdmin || userRole === 'staff' || userRole === 'finance');
-
   if (loading) {
     return (
       <div className="flex h-[60vh] w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthorized) {
-    return (
-      <div className="p-12 text-center bg-card rounded-xl border border-dashed">
-        <h2 className="text-xl font-bold">Access Denied</h2>
-        <p className="text-muted-foreground mt-2">You do not have the required permissions to view the application forms dashboard.</p>
       </div>
     );
   }
@@ -70,7 +56,7 @@ export default function ApplicationFormsPage() {
             </CardHeader>
             <CardContent>
               <Button asChild className="w-full font-bold" variant="outline">
-                <Link href={form.href} target="_blank">
+                <Link href={form.href}>
                   <Download className="mr-2 h-4 w-4" />
                   View & Print Form
                 </Link>

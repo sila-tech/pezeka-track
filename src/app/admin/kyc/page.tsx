@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, Download, X, Lock, PlusCircle, Camera, Upload, ImagePlus } from 'lucide-react';
+import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, X, Lock, PlusCircle, Camera, Upload, ImagePlus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ import {
   DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import {
   Form,
   FormControl,
@@ -333,16 +334,16 @@ export default function KYCRepositoryPage() {
             <Card className="rounded-xl shadow-sm border-muted overflow-hidden">
                 <CardHeader>
                     <CardTitle>Verification Log</CardTitle>
-                    <CardDescription>Visual history of all captured materials.</CardDescription>
+                    <CardDescription>Click any row to view the document image.</CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-[65vh]">
                         <Table>
                             <TableHeader className="bg-muted/50 sticky top-0 z-10">
                                 <TableRow>
-                                    <TableHead className="w-[80px]">Preview</TableHead>
+                                    <TableHead className="w-[52px]"></TableHead>
                                     <TableHead>Customer</TableHead>
-                                    <TableHead>Type</TableHead>
+                                    <TableHead>Document Type</TableHead>
                                     <TableHead>Label</TableHead>
                                     <TableHead>Uploaded By</TableHead>
                                     <TableHead>Date</TableHead>
@@ -356,21 +357,29 @@ export default function KYCRepositoryPage() {
                                     </TableRow>
                                 ) : (
                                     filteredDocs.map((doc) => (
-                                        <TableRow key={doc.id} className="group hover:bg-muted/30 transition-colors">
+                                        <TableRow
+                                            key={doc.id}
+                                            className="group hover:bg-primary/5 transition-colors cursor-pointer"
+                                            onClick={() => setViewingDoc(doc)}
+                                        >
                                             <TableCell>
-                                                <div className="h-12 w-12 rounded border bg-muted flex items-center justify-center overflow-hidden cursor-pointer" onClick={() => setViewingDoc(doc)}>
-                                                    {doc.fileUrl ? <Image src={doc.fileUrl} alt="KYC" fill className="object-cover" sizes="48px" /> : <FileText className="h-6 w-6 text-muted-foreground" />}
+                                                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                                    <FileText className="h-5 w-5 text-primary" />
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="font-black text-sm">{doc.customerName}</TableCell>
-                                            <TableCell><Badge variant="outline" className="text-[10px] uppercase font-bold">{TYPE_LABELS[doc.type]}</Badge></TableCell>
-                                            <TableCell className="text-xs italic text-muted-foreground">"{doc.fileName}"</TableCell>
-                                            <TableCell><div className="flex items-center gap-1 text-xs"><User className="h-3 w-3" /> {doc.uploadedBy}</div></TableCell>
+                                            <TableCell className="font-bold text-sm">{doc.customerName}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="text-[11px] uppercase font-semibold tracking-wide">{TYPE_LABELS[doc.type]}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground italic">"{doc.fileName}"</TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-1 text-xs text-muted-foreground"><User className="h-3 w-3" /> {doc.uploadedBy}</div>
+                                            </TableCell>
                                             <TableCell className="text-xs text-muted-foreground">{doc.uploadedAt?.seconds ? format(new Date(doc.uploadedAt.seconds * 1000), 'dd/MM/yy HH:mm') : ''}</TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" onClick={() => setViewingDoc(doc)}><Eye className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteClick(doc)}><Trash2 className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" title="View Document" onClick={() => setViewingDoc(doc)}><Eye className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="text-destructive" title="Delete" onClick={() => handleDeleteClick(doc)}><Trash2 className="h-4 w-4" /></Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -384,6 +393,9 @@ export default function KYCRepositoryPage() {
 
             <Dialog open={!!viewingDoc} onOpenChange={(o) => !o && setViewingDoc(null)}>
                 <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none">
+                    <VisuallyHidden.Root>
+                        <DialogTitle>KYC Document Preview</DialogTitle>
+                    </VisuallyHidden.Root>
                     <div className="relative w-full h-[85vh] flex items-center justify-center">
                         <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-50 text-white bg-black/50 rounded-full" onClick={() => setViewingDoc(null)}><X className="h-6 w-6" /></Button>
                         {viewingDoc?.fileUrl && <Image src={viewingDoc.fileUrl} alt="Full KYC" fill className="object-contain" sizes="100vw" unoptimized />}

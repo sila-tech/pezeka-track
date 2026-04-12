@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useCollection, useAppUser } from '@/firebase';
+import { useAppUser } from '@/firebase';
+import { useAdminLoans } from '@/context/AdminDataContext';
 import { Bot, Sparkles, AlertCircle, Clock, ChevronRight, Loader2, RefreshCw, UserCheck, Users } from 'lucide-react';
 import {
   Popover,
@@ -33,7 +34,7 @@ interface Loan {
 
 export function AINotificationBell() {
   const { user } = useAppUser();
-  const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
+  const { loans, loansLoading } = useAdminLoans();
   const [aiResponse, setAiResponse] = useState<any>(null);
   const [isAnalyzing, setIsUpdating] = useState(false);
   const [lastAnalysis, setLastAnalysis] = useState<Date | null>(null);
@@ -75,7 +76,7 @@ export function AINotificationBell() {
         const remainingBalance = Math.max(0, (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0));
         const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
 
-        return { ...loan, arrearsCount, arrearsBalance };
+        return { ...loan, arrearsCount, arrearsBalance, remainingBalance };
     });
   }, [loans]);
 
@@ -83,23 +84,28 @@ export function AINotificationBell() {
     if (!user) return;
     setIsUpdating(true);
     
-    // Sanitize data for Server Action
+    // Sanitize data for Server Action — pass ALL notes with full ISO datetimes
+    // so the AI can reason about broken time-relative promises (e.g. "will pay this evening")
     const plainLoans = activeLoans.slice(0, 15).map(l => ({
         customerName: l.customerName || 'Valued Member',
         loanNumber: l.loanNumber || 'N/A',
         status: l.status || 'active',
         arrearsBalance: Number(l.arrearsBalance) || 0,
+        remainingBalance: Number(l.remainingBalance) || 0,
         followUpNotes: (l.followUpNotes || []).map((n: any) => ({
             content: String(n.content || ''),
             staffName: String(n.staffName || 'Staff'),
-            // Map the date to a plain object containing only primitives to avoid serialization errors
-            date: n.date?.seconds ? { seconds: n.date.seconds, nanoseconds: n.date.nanoseconds } : null
-        }))
+            // Send full ISO datetime (not just seconds object) so AI knows WHEN each note was written
+            date: n.date?.seconds
+                ? { seconds: n.date.seconds, nanoseconds: n.date.nanoseconds ?? 0 }
+                : null,
+        })),
     }));
 
     try {
-        const role = user.role === 'finance' ? 'finance' : 'staff';
-        const name = user.name || user.email?.split('@')[0] || 'Admin';
+        const u = user!;
+        const role = u.role === 'finance' ? 'finance' : 'staff';
+        const name = u.name || u.email?.split('@')[0] || 'Admin';
         const result = await getStaffAIAdvice(plainLoans, { name, role });
         if (result.success) {
             setAiResponse(result);

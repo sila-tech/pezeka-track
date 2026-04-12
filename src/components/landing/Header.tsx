@@ -35,6 +35,9 @@ export default function Header() {
           <Calculator className="h-4 w-4" />
           Calculator
         </Link>
+        <Link href="#blog" className="text-sm font-bold text-[#1B2B33] hover:text-[#5BA9D0] transition-colors">
+          Blog
+        </Link>
         <Link href="#about" className="text-sm font-bold text-[#1B2B33] hover:text-[#5BA9D0] transition-colors">
           About Us
         </Link>
@@ -72,6 +75,9 @@ export default function Header() {
                 <Link href="#calculator" className="text-lg font-bold text-[#1B2B33] hover:text-[#5BA9D0] flex items-center gap-2" onClick={closeMenu}>
                   <Calculator className="h-5 w-5" />
                   Calculator
+                </Link>
+                <Link href="#blog" className="text-lg font-bold text-[#1B2B33] hover:text-[#5BA9D0]" onClick={closeMenu}>
+                  Blog
                 </Link>
                 <Link href="#about" className="text-lg font-bold text-[#1B2B33] hover:text-[#5BA9D0]" onClick={closeMenu}>
                   About Us

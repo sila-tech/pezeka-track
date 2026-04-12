@@ -200,13 +200,15 @@ export async function uploadKYCDocument(db: Firestore, storage: FirebaseStorage,
         };
 
         return await addDoc(kycCollection, newDoc);
-    } catch (serverError) {
-        const permissionError = new FirestorePermissionError({
-            path: kycCollection.path,
-            operation: 'create',
-            requestResourceData: { ...data, fileUrl: '[STORAGE_URL]' },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+    } catch (serverError: any) {
+        if (serverError?.code === 'permission-denied' || serverError?.code === 'storage/unauthorized') {
+            const permissionError = new FirestorePermissionError({
+                path: kycCollection.path,
+                operation: 'create',
+                requestResourceData: { ...data, fileUrl: '[STORAGE_URL]' },
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
         throw serverError;
     }
 }
@@ -457,11 +459,24 @@ export async function updateLoan(db: Firestore, loanId: string, data: { [key: st
 export async function recordLoanPayment(db: Firestore, loanId: string, payment: { amount: number, date: Date, recordedBy?: string, staffId?: string }) {
     const loanRef = doc(db, 'loans', loanId);
     try {
-        await updateDoc(loanRef, {
+        const loanSnap = await getDoc(loanRef);
+        if (!loanSnap.exists()) throw new Error('Loan not found');
+        
+        const loanData = loanSnap.data();
+        const newTotalPaid = (loanData.totalPaid || 0) + payment.amount;
+        const totalRepayableAmount = loanData.totalRepayableAmount || 0;
+
+        const updatePayload: any = {
             totalPaid: increment(payment.amount),
             payments: arrayUnion({ paymentId: doc(collection(db, 'temp')).id, ...payment }),
             updatedAt: serverTimestamp()
-        });
+        };
+
+        if (newTotalPaid >= totalRepayableAmount && loanData.status !== 'paid') {
+            updatePayload.status = 'paid';
+        }
+
+        await updateDoc(loanRef, updatePayload);
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({ path: loanRef.path, operation: 'update', requestResourceData: { type: 'LOAN_PAYMENT', amount: payment.amount }});
         errorEmitter.emit('permission-error', permissionError);
@@ -507,37 +522,38 @@ export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDa
             createdAt: serverTimestamp()
         });
 
-        await updateLoan(db, originalLoan.id, {
-            status: 'rollover',
-            payments: arrayUnion({ paymentId: receiptDocRef.id, amount: interestAmount, date: rolloverDate, recordedBy: 'System (Rollover)' }),
-            totalPaid: increment(interestAmount)
-        });
-
-        const snap = await getDocs(query(collection(db, 'loans')));
-        const newLoanNumber = `LN-${String(snap.size + 1).padStart(3, '0')}`;
-
-        const newLoanData = {
-            ...originalLoan,
-            loanNumber: newLoanNumber,
-            disbursementDate: rolloverDate,
-            status: 'active',
-            totalPaid: 0,
-            payments: [],
-            penalties: [],
-            totalPenalties: 0,
-            followUpNotes: [],
-            comments: `Rollover from Loan #${originalLoan.loanNumber}`,
-            createdAt: serverTimestamp(),
-            disbursementRecorded: true 
-        } as any;
+        // Calculate the shifted base date to push the schedule forward by 1 period
+        let currentBaseDate: any = originalLoan.firstPaymentDate || originalLoan.disbursementDate;
+        let baseDateObj = currentBaseDate?.seconds ? new Date(currentBaseDate.seconds * 1000) : (currentBaseDate instanceof Date ? currentBaseDate : new Date(currentBaseDate));
         
-        // Remove undefined fields which cause Firebase SDK to throw an error 
-        delete newLoanData.id;
-        const cleanLoanData = Object.fromEntries(Object.entries(newLoanData).filter(([_, v]) => v !== undefined));
+        let newBaseDate = new Date(baseDateObj);
+        if (originalLoan.paymentFrequency === 'daily') {
+            newBaseDate.setDate(newBaseDate.getDate() + 1);
+        } else if (originalLoan.paymentFrequency === 'weekly') {
+            newBaseDate.setDate(newBaseDate.getDate() + 7);
+        } else {
+            newBaseDate.setMonth(newBaseDate.getMonth() + 1);
+        }
 
-        await addDoc(collection(db, 'loans'), cleanLoanData);
+        const updatePayload: any = {
+            status: 'active',
+            firstPaymentDate: newBaseDate,
+            payments: arrayUnion({ 
+                paymentId: receiptDocRef.id, 
+                amount: interestAmount, 
+                date: rolloverDate, 
+                recordedBy: 'System (Rollover)',
+                type: 'rollover_interest'
+            }),
+            comments: originalLoan.comments ? `${originalLoan.comments}\nRolled over on ${rolloverDate.toDateString()}` : `Rolled over on ${rolloverDate.toDateString()}`,
+            updatedAt: serverTimestamp()
+        };
+
+        // We DO NOT increment totalPaid here because the rollover interest does not decrease the outstanding balance.
+        await updateLoan(db, originalLoan.id, updatePayload);
+        
     } catch (serverError) {
-        const permissionError = new FirestorePermissionError({ path: 'loan_rollover', operation: 'create' });
+        const permissionError = new FirestorePermissionError({ path: 'loan_rollover', operation: 'update' });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
     }

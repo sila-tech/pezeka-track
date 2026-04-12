@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescri
 import { NotificationBell } from '@/components/admin/NotificationBell';
 import { AINotificationBell } from '@/components/admin/AINotificationBell';
 import { cn } from '@/lib/utils';
+import { AdminDataProvider } from '@/context/AdminDataContext';
 
 const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }) => {
     const pathname = usePathname();
@@ -127,6 +128,7 @@ export default function AdminLayout({
     }
 
     return (
+    <AdminDataProvider>
         <div className="grid h-screen w-full overflow-hidden md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr]">
         <div className="hidden border-r bg-card md:block overflow-y-auto">
             <div className="flex h-full flex-col gap-2">
@@ -193,5 +195,6 @@ export default function AdminLayout({
             </main>
         </div>
         </div>
+    </AdminDataProvider>
     );
 }

@@ -2,6 +2,7 @@ import Header from '@/components/landing/Header';
 import Hero from '@/components/landing/Hero';
 import Products from '@/components/landing/Products';
 import About from '@/components/landing/About';
+import Blog from '@/components/landing/Blog';
 import Contact from '@/components/landing/Contact';
 import Footer from '@/components/landing/Footer';
 import LoanCalculator from '@/components/landing/LoanCalculator';
@@ -14,6 +15,7 @@ export default function LandingPage() {
         <Hero />
         <Products />
         <LoanCalculator />
+        <Blog />
         <About />
         <Contact />
       </main>

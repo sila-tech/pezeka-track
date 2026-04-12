@@ -15,11 +15,19 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Simple pass-through for online-first experience
-  // Required to satisfy the PWA manifest requirements in modern browsers
+  // Only handle GET requests
+  if (event.request.method !== 'GET') {
+      return;
+  }
+  
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    fetch(event.request).catch(async () => {
+      const cachedResponse = await caches.match(event.request);
+      if (cachedResponse) {
+          return cachedResponse;
+      }
+      // If no cache, return a generic offline response or throw
+      return new Response('Offline and not cached', { status: 503, statusText: 'Service Unavailable' });
     })
   );
 });

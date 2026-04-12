@@ -225,13 +225,33 @@ export default function LoansPage() {
 
   const { data: kycDocs, isLoading: kycLoading } = useCollection<KYCDoc>(kycQuery);
 
+  const getLoanDisplayStatus = (loan: Loan) => {
+      if (loan.status === 'active') {
+          const balance = (loan.totalRepayableAmount || 0) - (loan.totalPaid || 0);
+          if (balance <= 0) return 'paid';
+      }
+      return loan.status;
+  };
+
+  const getLoanStatusColor = (status: string) => {
+      switch (status.toLowerCase()) {
+        case 'paid': return 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
+        case 'active': return 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200';
+        case 'rejected': return 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200';
+        case 'rollover': return 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200';
+        case 'application': return 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200';
+        default: return 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200';
+      }
+  };
+
   const filteredLoans = useMemo(() => {
     if (!loans) return [];
     
     return loans.filter(loan => {
-        if (loan.status === 'application' || loan.status === 'rejected' || loan.status === 'rollover') return false;
+        const displayStatus = getLoanDisplayStatus(loan);
+        if (displayStatus === 'application' || displayStatus === 'rejected') return false;
         
-        const statusMatch = statusFilter === 'all' || loan.status === statusFilter;
+        const statusMatch = statusFilter === 'all' || displayStatus === statusFilter;
         const searchMatch = searchTerm === '' ||
             loan.loanNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             loan.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -693,7 +713,7 @@ export default function LoansPage() {
                                         <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
                                         <TableCell className="text-xs font-medium text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
                                         <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
-                                        <TableCell className="text-center"><Badge variant="outline">{loan.status.toUpperCase()}</Badge></TableCell>
+                                        <TableCell className="text-center"><Badge className={cn("border", getLoanStatusColor(getLoanDisplayStatus(loan)))}>{getLoanDisplayStatus(loan).toUpperCase()}</Badge></TableCell>
                                     </TableRow>
                                   );
                               })}
@@ -817,7 +837,7 @@ export default function LoansPage() {
               {loanToEdit && (
                   <>
                     <DialogHeader className="p-6 pb-0">
-                        <div className="flex items-center justify-between"><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><Badge className="mr-8">{loanToEdit.status.toUpperCase()}</Badge></div>
+                        <div className="flex items-center justify-between"><DialogTitle>Manage Loan #{loanToEdit.loanNumber}</DialogTitle><Badge className={cn("mr-8 border", getLoanStatusColor(getLoanDisplayStatus(loanToEdit)))}>{getLoanDisplayStatus(loanToEdit).toUpperCase()}</Badge></div>
                     </DialogHeader>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
                         <div className="space-y-4 md:col-span-1">
@@ -907,7 +927,7 @@ export default function LoansPage() {
                                                     size="sm" 
                                                     className="flex-1 text-green-600 border-green-200 hover:bg-green-50 font-bold h-9 text-xs"
                                                     onClick={() => setMarkAsPaidConfirmOpen(true)}
-                                                    disabled={loanToEdit.status === 'paid' || isUpdating}
+                                                    disabled={getLoanDisplayStatus(loanToEdit) === 'paid' || isUpdating}
                                                 >
                                                     <CheckCircle2 className="h-3 w-3 mr-2" /> Mark Settled
                                                 </Button>
@@ -916,7 +936,7 @@ export default function LoansPage() {
                                                     size="sm" 
                                                     className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50 font-bold h-9 text-xs"
                                                     onClick={() => setRolloverConfirmOpen(true)}
-                                                    disabled={['paid', 'rollover', 'application'].includes(loanToEdit.status) || isUpdating}
+                                                    disabled={['paid', 'rollover', 'application'].includes(getLoanDisplayStatus(loanToEdit)) || isUpdating}
                                                 >
                                                     <RefreshCw className="h-3 w-3 mr-2" /> Rollover
                                                 </Button>

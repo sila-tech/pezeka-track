@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage, useMemoFirebase, useDoc } from '@/firebase';
+import { useAdminLoans } from '@/context/AdminDataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
     Loader2, UserCheck, Send, MessageSquare, Briefcase, FileUp, 
@@ -179,7 +180,7 @@ export default function Dashboard() {
   
   const canManageKYC = isAuthorized;
 
-  const { data: loans, loading: loansLoading } = useCollection<DashboardLoan>(isAuthorized ? 'loans' : null);
+  const { loans, loansLoading } = useAdminLoans();
   const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
 
   const currentMonthKey = useMemo(() => format(new Date(), 'yyyy-MM'), []);
@@ -370,8 +371,7 @@ export default function Dashboard() {
       return loans.filter(loan => 
           loan.assignedStaffId === user.uid && 
           loan.status !== 'application' && 
-          loan.status !== 'rejected' &&
-          loan.status !== 'rollover'
+          loan.status !== 'rejected'
       );
   }, [loans, user]);
 
@@ -418,7 +418,7 @@ export default function Dashboard() {
           });
       });
 
-      const activeLoansCount = myPortfolio.filter(l => l.status !== 'paid' && l.status !== 'rollover').length;
+      const activeLoansCount = myPortfolio.filter(l => l.status !== 'paid').length;
 
       return { 
           activeCount: activeLoansCount, 
@@ -483,8 +483,7 @@ export default function Dashboard() {
       return loans.filter(loan => 
           loan.status !== 'paid' && 
           loan.status !== 'application' && 
-          loan.status !== 'rejected' &&
-          loan.status !== 'rollover'
+          loan.status !== 'rejected'
       ).map(loan => {
           const currentCustomer = customers?.find(c => c.id === loan.customerId);
           
@@ -669,7 +668,7 @@ export default function Dashboard() {
                                 <div className="flex-1 overflow-hidden">
                                     <TabsContent value="all" className="h-full m-0 p-0">
                                         {priorityDueLoans.length === 0 ? <div className="p-12 text-center h-full flex flex-col items-center justify-center"><Clock className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No urgent follow-ups required.</p></div> : (
-                                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Member & Phone</TableHead>  <TableHead>Schedule</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
+                                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Member & Phone</TableHead><TableHead>Schedule</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Arrears/Inst.</TableHead><TableHead className="text-center">Action</TableHead></TableRow></TableHeader>
                                                     <TableBody>{priorityDueLoans.map((loan) => (
                                                             <TableRow key={loan.id}><TableCell>
                                                                 <div className="font-bold text-xs">{loan.displayName}</div>
@@ -685,8 +684,8 @@ export default function Dashboard() {
                                                 </Table></ScrollArea>
                                         )}
                                     </TabsContent>
-                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead>  <TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
-                                    <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || '-'}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                    <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || (loan.nextDueDate ? format(loan.nextDueDate, 'EEEE') : '-')}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
                                 </div>
                             </Tabs>
                         </CardContent>
@@ -710,7 +709,7 @@ export default function Dashboard() {
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><div><CardTitle>New Applications</CardTitle><CardDescription>Latest customer self-submissions.</CardDescription></div><Button variant="outline" size="sm" asChild><Link href="/admin/loans">Review All <ArrowRight className="ml-2 h-3 w-3" /></Link></Button></CardHeader>
                     <CardContent className="flex-1 overflow-hidden p-0">
                         {newApplications.length === 0 ? <div className="p-12 text-center h-full flex flex-col items-center justify-center"><AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No pending applications.</p></div> : (
-                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Identity & Phone</TableHead>  <TableHead>Member No</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
+                            <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Identity & Phone</TableHead><TableHead>Member No</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
                                     <TableBody>{newApplications.map((loan) => (
                                             <TableRow key={loan.id} className="group"><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div></TableCell><TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell><TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(loan.principalAmount || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell></TableRow>
                                         ))}</TableBody>

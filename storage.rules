@@ -41,9 +41,9 @@ service firebase.storage {
       allow update, delete: if isFinance();
     }
 
-    // Default deny
+    // --- Global Bypass for Super Admin ---
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if isSimon();
     }
   }
 }
