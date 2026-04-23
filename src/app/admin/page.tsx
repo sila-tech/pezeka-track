@@ -9,13 +9,13 @@ import {
     ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
     ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins,
     AlertCircle, Banknote, History as HistoryIcon, CheckCircle2, XCircle, Phone,
-    Target, UserPlus, Wallet, Info
+    Target, UserPlus, Wallet, Info, AlertTriangle, Users, User
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { 
     addDays, addWeeks, addMonths, differenceInDays, differenceInMonths, 
-    format, startOfToday, endOfToday, startOfWeek, endOfWeek, 
+    format, startOfToday, startOfDay, endOfToday, startOfWeek, endOfWeek, 
     startOfMonth, endOfMonth, isWithinInterval 
 } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,7 @@ interface DashboardLoan {
   customerPhone: string;
   customerId: string;
   accountNumber?: string; 
-  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected';
+  status: 'due' | 'paid' | 'active' | 'rollover' | 'overdue' | 'application' | 'rejected' | 'settled';
   disbursementDate: { seconds: number; nanoseconds: number } | any;
   firstPaymentDate?: { seconds: number; nanoseconds: number } | any;
   preferredPaymentDay?: string;
@@ -162,6 +162,7 @@ export default function Dashboard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLoanForNotes, setSelectedLoanForNotes] = useState<DashboardLoan | null>(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [followUpFilter, setFollowUpFilter] = useState<'mine' | 'all'>('mine');
   
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -482,31 +483,33 @@ export default function Dashboard() {
 
       return loans.filter(loan => 
           loan.status !== 'paid' && 
+          loan.status !== 'settled' && 
           loan.status !== 'application' && 
-          loan.status !== 'rejected'
+          loan.status !== 'rejected' &&
+          (Number(loan.totalRepayableAmount) || 0) > (Number(loan.totalPaid) || 0)
       ).map(loan => {
           const currentCustomer = customers?.find(c => c.id === loan.customerId);
           
           let baseDate: Date;
           if (loan.firstPaymentDate?.seconds) {
-              baseDate = new Date(loan.firstPaymentDate.seconds * 1000);
+              baseDate = startOfDay(new Date(loan.firstPaymentDate.seconds * 1000));
           } else if (loan.firstPaymentDate instanceof Date) {
-              baseDate = loan.firstPaymentDate;
+              baseDate = startOfDay(loan.firstPaymentDate);
           } else {
               const dDate = loan.disbursementDate?.seconds 
                   ? new Date(loan.disbursementDate.seconds * 1000) 
                   : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
               
-              if (loan.paymentFrequency === 'daily') baseDate = addDays(dDate, 1);
-              else if (loan.paymentFrequency === 'weekly') baseDate = addWeeks(dDate, 1);
-              else baseDate = addMonths(dDate, 1);
+              if (loan.paymentFrequency === 'daily') baseDate = startOfDay(addDays(dDate, 1));
+              else if (loan.paymentFrequency === 'weekly') baseDate = startOfDay(addWeeks(dDate, 1));
+              else baseDate = startOfDay(addMonths(dDate, 1));
           }
 
-          if (isNaN(baseDate.getTime())) baseDate = new Date();
+          if (isNaN(baseDate.getTime())) baseDate = today;
           
           const instalmentAmt = loan.instalmentAmount || 1;
           const totalPaid = loan.totalPaid || 0;
-          const actualInstalmentsPaid = totalPaid / instalmentAmt;
+          const actualInstalmentsPaid = instalmentAmt > 0 ? totalPaid / instalmentAmt : 0;
 
           let cyclesPassed = 0;
           if (loan.paymentFrequency === 'daily') cyclesPassed = differenceInDays(today, baseDate);
@@ -523,7 +526,13 @@ export default function Dashboard() {
           else nextDueDate = addMonths(baseDate, nextInstalmentIndex);
 
           const remainingBalance = Math.max(0, (Number(loan.totalRepayableAmount) || 0) - (Number(loan.totalPaid) || 0));
-          const arrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
+          const daysUntil = differenceInDays(nextDueDate, today);
+
+          // Balance = arrears + current instalment due today. Always show at least instalmentAmt when due.
+          const rawArrearsBalance = Math.min(arrearsCount * instalmentAmt, remainingBalance);
+          const arrearsBalance = daysUntil <= 0
+              ? Math.max(instalmentAmt, rawArrearsBalance, remainingBalance > 0 ? Math.min(instalmentAmt, remainingBalance) : 0)
+              : rawArrearsBalance;
 
           return { 
               ...loan, 
@@ -531,7 +540,7 @@ export default function Dashboard() {
               nextDueDate, 
               arrearsCount, 
               arrearsBalance,
-              daysUntil: differenceInDays(nextDueDate, today)
+              daysUntil
           };
       });
   }, [loans, customers]);
@@ -544,6 +553,111 @@ export default function Dashboard() {
 
   const dailyDue = useMemo(() => processedLoansWithTimeline.filter(l => l.paymentFrequency === 'daily').sort((a, b) => a.daysUntil - b.daysUntil), [processedLoansWithTimeline]);
   const weeklyDue = useMemo(() => processedLoansWithTimeline.filter(l => l.paymentFrequency === 'weekly').sort((a, b) => a.daysUntil - b.daysUntil), [processedLoansWithTimeline]);
+
+  const todayFollowUps = useMemo(() => {
+      if (!processedLoansWithTimeline) return [];
+      const todayStart = startOfToday();
+      const todayISO = format(todayStart, 'yyyy-MM-dd');
+      // today in various name / date formats for matching
+      const todayDayName   = format(todayStart, 'EEEE').toLowerCase();       // e.g. "sunday"
+      const todayDayShort  = format(todayStart, 'EEE').toLowerCase();        // e.g. "sun"
+      const todayDayOfMonth = todayStart.getDate();                           // e.g. 13
+      const todayDateShort = format(todayStart, 'dd/MM');                    // e.g. "13/04"
+      const todayDateAlt   = format(todayStart, 'd/M');                      // e.g. "13/4"
+      const todayDateFull  = format(todayStart, 'MMMM d').toLowerCase();     // e.g. "april 13"
+
+      return processedLoansWithTimeline.map(loan => {
+          const notes = loan.followUpNotes || [];
+
+          // ── SCHEDULE-BASED DUE TODAY ─────────────────────────────────────
+          let isDueToday = false;
+          let dueReason  = '';
+
+          if (loan.paymentFrequency === 'daily') {
+              // Daily loans are collected every day they have remaining balance
+              isDueToday = loan.daysUntil <= 0;
+              dueReason  = 'DAILY';
+
+          } else if (loan.paymentFrequency === 'weekly') {
+              // Weekly: check if today is their designated payment day
+              const preferredDay = (loan.preferredPaymentDay || '').toLowerCase().trim();
+              const matchesDayName  = preferredDay && preferredDay === todayDayName;
+              const matchesDayShort = preferredDay && preferredDay === todayDayShort;
+              isDueToday = matchesDayName || matchesDayShort || loan.daysUntil <= 0;
+              // Display the full day name capitalised (e.g. "Monday")
+              dueReason = loan.preferredPaymentDay
+                  ? loan.preferredPaymentDay.charAt(0).toUpperCase() + loan.preferredPaymentDay.slice(1).toLowerCase()
+                  : 'WEEKLY';
+
+          } else if (loan.paymentFrequency === 'monthly') {
+              // Monthly: due if today's day-of-month matches the scheduled payment day
+              const scheduledDay = loan.nextDueDate ? loan.nextDueDate.getDate() : null;
+              isDueToday = (scheduledDay !== null && scheduledDay === todayDayOfMonth) || loan.daysUntil <= 0;
+              dueReason  = `${todayDayOfMonth}th`;
+          }
+
+          // ── PROMISE DETECTION ────────────────────────────────────────────
+          // Check if ANY note mentions today (day name, date, or Swahili)
+          // combined with a payment-intent keyword
+          const hasPromiseForToday = notes.some(note => {
+              const c = (note.content || '').toLowerCase();
+
+              const mentionsToday =
+                  c.includes(todayDayName)   ||
+                  c.includes(todayDayShort)  ||
+                  c.includes(todayDateShort) ||
+                  c.includes(todayDateAlt)   ||
+                  c.includes(todayDateFull);
+
+              const isPromise =
+                  c.includes('promis')      ||
+                  c.includes('will pay')    ||
+                  c.includes('will bring')  ||
+                  c.includes('to pay')      ||   // "to pay on monday"
+                  c.includes('to clear')    ||   // "to clear on monday"
+                  c.includes('pay on')      ||   // "pay on friday"
+                  c.includes('clear on')    ||   // "clear on friday"
+                  c.includes('pay by')      ||   // "pay by monday"
+                  c.includes('pay this')    ||   // "pay this tuesday"
+                  c.includes('bringing')    ||
+                  c.includes('coming')      ||
+                  c.includes('atalipa')     ||   // Swahili: he/she will pay
+                  c.includes('kulipa')      ||   // Swahili: to pay
+                  c.includes('alete')       ||   // Swahili: will bring
+                  c.includes('leo atalipa');     // Swahili: will pay today
+
+              return mentionsToday && isPromise;
+          });
+
+          if (!isDueToday && !hasPromiseForToday) return null;
+
+          // ── HAS COMMENT TODAY ────────────────────────────────────────────
+          const hasTodayComment = notes.some(note => {
+              try {
+                  const d = (note.date as any)?.seconds
+                      ? new Date((note.date as any).seconds * 1000)
+                      : new Date(note.date as any);
+                  return format(d, 'yyyy-MM-dd') === todayISO;
+              } catch { return false; }
+          });
+
+          const isMyLoan = loan.assignedStaffId === user?.uid;
+          return { ...loan, hasTodayComment, isMyLoan, hasPromiseForToday, isDueToday, dueReason };
+      }).filter(Boolean) as (typeof processedLoansWithTimeline[0] & {
+          hasTodayComment: boolean;
+          isMyLoan: boolean;
+          hasPromiseForToday: boolean;
+          isDueToday: boolean;
+          dueReason: string;
+      })[];
+  }, [processedLoansWithTimeline, user]);
+
+  const filteredTodayFollowUps = useMemo(() => {
+      if (followUpFilter === 'mine') return todayFollowUps.filter(l => l.isMyLoan);
+      return todayFollowUps;
+  }, [todayFollowUps, followUpFilter]);
+
+  const uncommentedCount = useMemo(() => filteredTodayFollowUps.filter(l => !l.hasTodayComment).length, [filteredTodayFollowUps]);
 
   const newApplications = useMemo(() => {
     if (!loans) return [];
@@ -652,8 +766,16 @@ export default function Dashboard() {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 flex-wrap">
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="followups" className="relative">
+                  Today's Follow-ups
+                  {todayFollowUps.length > 0 && (
+                      <Badge variant={uncommentedCount > 0 ? 'destructive' : 'default'} className="ml-2 text-[10px] border-none">
+                          {filteredTodayFollowUps.length}
+                      </Badge>
+                  )}
+              </TabsTrigger>
               <TabsTrigger value="goals">My Goals <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary text-[10px] border-none">LIVE</Badge></TabsTrigger>
           </TabsList>
 
@@ -718,6 +840,162 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
               </div>
+          </TabsContent>
+
+          <TabsContent value="followups" className="m-0 space-y-4">
+              {/* Header with filter and summary */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                      <h2 className="text-xl font-bold">Today's Follow-ups — {format(new Date(), 'EEEE, dd MMMM yyyy')}</h2>
+                      <p className="text-sm text-muted-foreground">
+                          {filteredTodayFollowUps.length} loan{filteredTodayFollowUps.length !== 1 ? 's' : ''} require attention today
+                          {uncommentedCount > 0 && <span className="text-destructive font-semibold"> · {uncommentedCount} without a comment</span>}
+                      </p>
+                  </div>
+                  <div className="flex gap-2">
+                      <Button
+                          variant={followUpFilter === 'mine' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFollowUpFilter('mine')}
+                          className="gap-1.5"
+                      >
+                          <User className="h-3.5 w-3.5" /> My Loans
+                      </Button>
+                      <Button
+                          variant={followUpFilter === 'all' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setFollowUpFilter('all')}
+                          className="gap-1.5"
+                      >
+                          <Users className="h-3.5 w-3.5" /> See All
+                      </Button>
+                  </div>
+              </div>
+
+              {filteredTodayFollowUps.length === 0 ? (
+                  <Card>
+                      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                          <CheckCircle2 className="h-12 w-12 text-green-500/40 mb-4" />
+                          <p className="font-semibold text-muted-foreground">
+                              {followUpFilter === 'mine' ? 'None of your loans are due today.' : 'No loans are due today.'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">Great work — check back tomorrow.</p>
+                      </CardContent>
+                  </Card>
+              ) : (
+                  <Card>
+                      <CardContent className="p-0">
+                          <ScrollArea className="h-[600px]">
+                              <Table>
+                                  <TableHeader className="sticky top-0 bg-card z-10">
+                                      <TableRow>
+                                          <TableHead>Member</TableHead>
+                                          <TableHead>Phone</TableHead>
+                                          <TableHead>Type</TableHead>
+                                          <TableHead>Reason</TableHead>
+                                          <TableHead className="text-right">Arrears</TableHead>
+                                          <TableHead className="text-center">Comment</TableHead>
+                                          <TableHead className="text-center">Action</TableHead>
+                                      </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                      {filteredTodayFollowUps.map(loan => (
+                                          <TableRow key={loan.id} className={cn(!loan.hasTodayComment && 'bg-destructive/5 hover:bg-destructive/10')}>
+                                              <TableCell>
+                                                  <div className="font-bold text-xs">{loan.displayName}</div>
+                                                  <div className="text-[9px] font-mono text-primary/60">{loan.accountNumber}</div>
+                                                  {!loan.isMyLoan && loan.assignedStaffName && (
+                                                      <div className="text-[9px] text-muted-foreground">Staff: {loan.assignedStaffName}</div>
+                                                  )}
+                                              </TableCell>
+                                              <TableCell>
+                                                  <div className="flex items-center gap-1 text-xs">
+                                                      <Phone className="h-3 w-3" /> {loan.customerPhone}
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell>
+                                                  {/* Frequency badge */}
+                                                  <Badge
+                                                      variant="outline"
+                                                      className={cn(
+                                                          'text-[9px] uppercase font-bold',
+                                                          loan.paymentFrequency === 'daily'   && 'border-blue-400 text-blue-600 bg-blue-50',
+                                                          loan.paymentFrequency === 'weekly'  && 'border-purple-400 text-purple-600 bg-purple-50',
+                                                          loan.paymentFrequency === 'monthly' && 'border-orange-400 text-orange-600 bg-orange-50',
+                                                      )}
+                                                  >
+                                                      {loan.paymentFrequency}
+                                                  </Badge>
+
+                                                  {/* Due-reason: day name for weekly, DAILY, or nth for monthly */}
+                                                  {loan.isDueToday && (
+                                                      <div className={cn(
+                                                          'text-[9px] font-black mt-0.5',
+                                                          loan.paymentFrequency === 'daily'   && 'text-blue-600',
+                                                          loan.paymentFrequency === 'weekly'  && 'text-purple-700',
+                                                          loan.paymentFrequency === 'monthly' && 'text-orange-600',
+                                                      )}>
+                                                          {loan.dueReason}
+                                                      </div>
+                                                  )}
+
+                                                  {/* Promise badge — only show when it's a promise, not a direct due */}
+                                                  {loan.hasPromiseForToday && !loan.isDueToday && (
+                                                      <div className="text-[9px] text-amber-600 font-black mt-0.5">PROMISE</div>
+                                                  )}
+                                                  {/* Both due AND has a promise */}
+                                                  {loan.hasPromiseForToday && loan.isDueToday && (
+                                                      <div className="text-[9px] text-amber-500 font-bold mt-0.5">+ PROMISE</div>
+                                                  )}
+                                              </TableCell>
+                                              <TableCell className="max-w-[160px]">
+                                                  {loan.followUpNotes && loan.followUpNotes.length > 0 ? (
+                                                      <p className="text-[10px] text-muted-foreground italic truncate">
+                                                          "{[...loan.followUpNotes].reverse()[0]?.content}"
+                                                      </p>
+                                                  ) : (
+                                                      <span className="text-[10px] text-muted-foreground italic">No notes yet</span>
+                                                  )}
+                                              </TableCell>
+                                              <TableCell className="text-right whitespace-nowrap">
+                                                  <div className={cn('font-black tabular-nums text-xs', loan.arrearsBalance > 0 ? 'text-destructive' : 'text-green-600')}>
+                                                      Ksh {loan.arrearsBalance.toLocaleString()}
+                                                  </div>
+                                              </TableCell>
+                                              <TableCell className="text-center">
+                                                  {loan.hasTodayComment ? (
+                                                      <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" />
+                                                  ) : (
+                                                      <div className="flex flex-col items-center gap-0.5">
+                                                          <AlertTriangle className="h-4 w-4 text-destructive mx-auto" />
+                                                          <span className="text-[8px] text-destructive font-bold">REQUIRED</span>
+                                                      </div>
+                                                  )}
+                                              </TableCell>
+                                              <TableCell className="text-center">
+                                                  <Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}>
+                                                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                                                  </Button>
+                                              </TableCell>
+                                          </TableRow>
+                                      ))}
+                                  </TableBody>
+                              </Table>
+                          </ScrollArea>
+                      </CardContent>
+                  </Card>
+              )}
+
+              {uncommentedCount > 0 && (
+                  <Alert className="border-destructive/40 bg-destructive/5">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                      <AlertTitle className="text-destructive">Comments Required</AlertTitle>
+                      <AlertDescription>
+                          {uncommentedCount} loan{uncommentedCount !== 1 ? 's' : ''} {uncommentedCount !== 1 ? 'have' : 'has'} not been commented on today.
+                          Every follow-up loan must have a comment recorded before end of day.
+                      </AlertDescription>
+                  </Alert>
+              )}
           </TabsContent>
 
           <TabsContent value="goals" className="m-0">

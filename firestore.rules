@@ -1,105 +1,106 @@
 rules_version = '2';
-    service cloud.firestore {
-      match /databases/{database}/documents {
-    
-        function isSignedIn() {
-          return request.auth != null;
-        }
-    
-        function isSimon() {
-          return isSignedIn() && (
-            request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
-            request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
-            request.auth.uid == 'zdf58EsGJKa2xr7D6RmNBS3gbx53' ||
-            request.auth.token.email.matches('(?i)^simon@pezeka\.com$')
-          );
-        }
-    
-        match /{allPaths=**} {
-          allow read, write: if isSimon();
-        }
-    
-        function isFinance() {
-          return isSimon() || (
-            isSignedIn() && (
-              (request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@finance\.pezeka\.com$')) ||
-              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
-            )
-          );
-        }
-    
-        function isStaff() {
-          return isSimon() || isFinance() || (
-            isSignedIn() && (
-              (request.auth.token.email != null && (
-                request.auth.token.email.matches('(?i)^.*@staff\.pezeka\.com$') || 
-                request.auth.token.email.matches('(?i)^.*@finance\.pezeka\.com$')
-              )) ||
-              (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-               get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
-            )
-          );
-        }
-    
-        function isOwner(userId) {
-          return isSignedIn() && request.auth.uid == userId;
-        }
-    
-        match /users/{userId} {
-          allow get: if isSignedIn();
-          allow list: if isStaff();
-          allow create: if isOwner(userId) || isSimon();
-          allow update: if isOwner(userId) || isFinance();
-          allow delete: if isFinance();
-        }
-    
-        match /staffGoals/{goalId} {
-          allow get: if isSignedIn();
-          allow list: if isStaff();
-          allow create, update, delete: if isFinance();
-        }
-    
-        match /expenseRequests/{requestId} {
-          allow list: if isStaff();
-          allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
-          allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
-          allow update, delete: if isFinance();
-        }
-    
-        match /customers/{customerId} {
-          allow get, list: if isStaff() || isOwner(customerId);
-          allow create: if isStaff() || isSignedIn();
-          allow update: if isStaff() || isOwner(customerId);
-          allow delete: if isFinance();
-        }
-    
-        match /loans/{loanId} {
-          allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
-          allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
-          allow update: if isStaff();
-          allow delete: if isFinance();
-        }
-    
-        match /kyc_documents/{docId} {
-          allow get, list: if isStaff();
-          allow create: if isStaff();
-          allow update, delete: if isFinance();
-        }
-    
-        match /financeEntries/{entryId} {
-          allow get, list, create, update, delete: if isFinance() || isStaff();
-        }
-    
-        match /investors/{investorId} {
-          allow get: if isSignedIn() && (request.auth.uid == investorId || isFinance());
-          allow list, create, update, delete: if isFinance();
-        }
-    
-        match /mail_logs/{logId} {
-          allow create: if isSignedIn(); 
-          allow get, list: if isFinance() || isStaff();
-          allow update, delete: if false;
-        }
-      }
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
     }
+
+    function isSimon() {
+      return isSignedIn() && (
+        request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
+        request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
+        request.auth.uid == 'zdf58EsGJKa2xr7D6RmNBS3gbx53' ||
+        request.auth.token.email.matches('(?i)^simon@pezeka\\.com$')
+      );
+    }
+
+    // Global bypass for Super Admin
+    match /{allPaths=**} {
+      allow read, write: if isSimon();
+    }
+
+    function isFinance() {
+      return isSimon() || (
+        isSignedIn() && (
+          (request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
+        )
+      );
+    }
+
+    function isStaff() {
+      return isSimon() || isFinance() || (
+        isSignedIn() && (
+          (request.auth.token.email != null && (
+            request.auth.token.email.matches('(?i)^.*@staff\\.pezeka\\.com$') ||
+            request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')
+          )) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
+        )
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isStaff();
+      allow create: if isOwner(userId) || isSimon();
+      allow update: if isOwner(userId) || isFinance();
+      allow delete: if isFinance();
+    }
+
+    match /staffGoals/{goalId} {
+      allow get: if isSignedIn();
+      allow list: if isStaff();
+      allow create, update, delete: if isFinance();
+    }
+
+    match /expenseRequests/{requestId} {
+      allow list: if isStaff();
+      allow get: if isStaff() && (resource.data.staffId == request.auth.uid || isFinance());
+      allow create: if isStaff() && request.resource.data.staffId == request.auth.uid;
+      allow update, delete: if isFinance();
+    }
+
+    match /customers/{customerId} {
+      allow get, list: if isStaff() || isOwner(customerId);
+      allow create: if isStaff() || isSignedIn();
+      allow update: if isStaff() || isOwner(customerId);
+      allow delete: if isFinance();
+    }
+
+    match /loans/{loanId} {
+      allow get, list: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow create: if isStaff() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
+      allow update: if isStaff();
+      allow delete: if isFinance();
+    }
+
+    match /kyc_documents/{docId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isFinance();
+    }
+
+    match /financeEntries/{entryId} {
+      allow get, list, create, update, delete: if isFinance() || isStaff();
+    }
+
+    match /investors/{investorId} {
+      allow get: if isSignedIn() && (request.auth.uid == investorId || isFinance());
+      allow list, create, update, delete: if isFinance();
+    }
+
+    match /mail_logs/{logId} {
+      allow create: if isSignedIn();
+      allow get, list: if isFinance() || isStaff();
+      allow update, delete: if false;
+    }
+  }
+}

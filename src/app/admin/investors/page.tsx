@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
-import { addInvestor, updateInvestor, deleteInvestor } from '@/lib/firestore';
+import { addInvestor, updateInvestor, deleteInvestor, approveDeposit, rejectDeposit, processWithdrawal, rejectWithdrawal } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, MoreHorizontal, Briefcase } from 'lucide-react';
@@ -61,6 +61,8 @@ interface Investor {
   currentBalance: number;
   interestRate?: number;
   createdAt: { seconds: number; nanoseconds: number };
+  deposits?: { depositId: string; amount: number; date: any; status: string }[];
+  withdrawals?: { withdrawalId: string; amount: number; date: any; status: string }[];
 }
 
 const investorSchema = z.object({
@@ -84,15 +86,22 @@ export default function InvestorsPage() {
     const [investorToEdit, setInvestorToEdit] = useState<Investor | null>(null);
     const [investorToDelete, setInvestorToDelete] = useState<Investor | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [approvingId, setApprovingId] = useState<string | null>(null);
     const [openMenu, setOpenMenu] = useState<string | null>(null);
     
-    // Investors module is strictly hidden and restricted from Staff roles.
+    // Investors module is restricted to Finance and Super Admin roles only.
     const canViewPage = useMemo(() => {
         if (!currentUser) return false;
         const email = currentUser.email?.toLowerCase()?.trim();
         const role = currentUser.role?.toLowerCase()?.trim();
-        return email === 'simon@pezeka.com' || role === 'finance' || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+        const isSuperAdmin = email === 'simon@pezeka.com' 
+            || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
+            || currentUser.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62'
+            || currentUser.uid === 'zdf58EsGJKa2xr7D6RmNBS3gbx53';
+        const isFinance = role === 'finance';
+        return isSuperAdmin || isFinance;
     }, [currentUser]);
+
 
     // Only Finance and Super Admin can manage portfolios
     const canEdit = canViewPage;
@@ -265,6 +274,63 @@ export default function InvestorsPage() {
             </AlertDialog>
         </>
       )}
+
+      {/* ===== Pending Deposits & Withdrawals ===== */}
+      {canEdit && investors && investors.length > 0 && (() => {
+        const pendingDeposits: { investor: Investor; deposit: any }[] = [];
+        const pendingWithdrawals: { investor: Investor; withdrawal: any }[] = [];
+        investors.forEach(inv => {
+          (inv.deposits || []).filter(d => d.status === 'pending').forEach(d => pendingDeposits.push({ investor: inv, deposit: d }));
+          (inv.withdrawals || []).filter(w => w.status === 'pending').forEach(w => pendingWithdrawals.push({ investor: inv, withdrawal: w }));
+        });
+        if (pendingDeposits.length === 0 && pendingWithdrawals.length === 0) return null;
+        return (
+          <div className="mt-6 grid gap-6 md:grid-cols-2">
+            {pendingDeposits.length > 0 && (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Pending Deposits</CardTitle><CardDescription>Approve or reject customer deposit notifications.</CardDescription></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pendingDeposits.map(({ investor, deposit }) => (
+                      <div key={deposit.depositId} className="flex items-center justify-between p-3 border rounded-xl bg-muted/30">
+                        <div>
+                          <p className="text-sm font-semibold">{investor.name}</p>
+                          <p className="text-xs text-muted-foreground">KES {deposit.amount.toLocaleString()} — {deposit.date?.seconds ? format(new Date(deposit.date.seconds * 1000), 'PPP') : '...'}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-8" disabled={approvingId === deposit.depositId} onClick={async () => { setApprovingId(deposit.depositId); try { await approveDeposit(firestore, investor.id, deposit.depositId); toast({ title: 'Deposit Approved' }); } catch(e: any) { toast({ variant:'destructive', title:'Error', description: e.message }); } finally { setApprovingId(null); } }}>Approve</Button>
+                          <Button size="sm" variant="outline" className="h-8 text-destructive border-destructive/40" disabled={approvingId === deposit.depositId} onClick={async () => { setApprovingId(deposit.depositId); try { await rejectDeposit(firestore, investor.id, deposit.depositId); toast({ title: 'Deposit Rejected' }); } catch(e: any) { toast({ variant:'destructive', title:'Error', description: e.message }); } finally { setApprovingId(null); } }}>Reject</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            {pendingWithdrawals.length > 0 && (
+              <Card>
+                <CardHeader><CardTitle className="text-base">Pending Withdrawals</CardTitle><CardDescription>Process or reject customer withdrawal requests.</CardDescription></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pendingWithdrawals.map(({ investor, withdrawal }) => (
+                      <div key={withdrawal.withdrawalId} className="flex items-center justify-between p-3 border rounded-xl bg-muted/30">
+                        <div>
+                          <p className="text-sm font-semibold">{investor.name}</p>
+                          <p className="text-xs text-muted-foreground">KES {withdrawal.amount.toLocaleString()} — {withdrawal.date?.seconds ? format(new Date(withdrawal.date.seconds * 1000), 'PPP') : '...'}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8" disabled={approvingId === withdrawal.withdrawalId} onClick={async () => { setApprovingId(withdrawal.withdrawalId); try { await processWithdrawal(firestore, investor.id, withdrawal.withdrawalId); toast({ title: 'Withdrawal Processed' }); } catch(e: any) { toast({ variant:'destructive', title:'Error', description: e.message }); } finally { setApprovingId(null); } }}>Process</Button>
+                          <Button size="sm" variant="outline" className="h-8 text-destructive border-destructive/40" disabled={approvingId === withdrawal.withdrawalId} onClick={async () => { setApprovingId(withdrawal.withdrawalId); try { await rejectWithdrawal(firestore, investor.id, withdrawal.withdrawalId); toast({ title: 'Withdrawal Rejected' }); } catch(e: any) { toast({ variant:'destructive', title:'Error', description: e.message }); } finally { setApprovingId(null); } }}>Reject</Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        );
+      })()}
     </>
   );
 }

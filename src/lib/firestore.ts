@@ -52,7 +52,7 @@ export interface Loan {
   penalties?: { penaltyId: string; date: { seconds: number; nanoseconds: number } | Date; amount: number; description: string; recordedBy?: string; }[];
   followUpNotes?: { noteId: string; date: { seconds: number; nanoseconds: number } | Date; staffName: string; staffId: string; content: string; }[];
   comments?: string;
-  status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'rejected';
+  status: 'active' | 'due' | 'overdue' | 'paid' | 'rollover' | 'application' | 'awaiting_documents' | 'under_review' | 'rejected';
   disbursementRecorded?: boolean;
 }
 
@@ -185,11 +185,22 @@ export async function uploadKYCDocument(db: Firestore, storage: FirebaseStorage,
     const kycCollection = collection(db, 'kyc_documents');
     
     try {
-        const fileExtension = 'jpg';
+        // Detect the file type from the data URI
+        const mimeMatch = data.fileUrl.match(/^data:([^;]+);/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const extensionMap: Record<string, string> = {
+            'application/pdf': 'pdf',
+            'image/jpeg': 'jpg',
+            'image/png': 'png',
+            'image/gif': 'gif',
+            'image/webp': 'webp',
+        };
+        const fileExtension = extensionMap[mimeType] || 'jpg';
         const storagePath = `kyc/${data.customerId}/${Date.now()}_${data.fileName.replace(/\s+/g, '_')}.${fileExtension}`;
         const storageRef = ref(storage, storagePath);
         
         await uploadString(storageRef, data.fileUrl, 'data_url');
+
         const downloadUrl = await getDownloadURL(storageRef);
 
         const newDoc = {
@@ -376,7 +387,7 @@ export async function submitCustomerApplication(db: Firestore, customerId: strin
     const applicationData = {
         ...loanData,
         customerId,
-        status: 'application',
+        status: 'awaiting_documents',
         loanNumber: `APP-${Date.now().toString().slice(-6)}`,
         createdAt: serverTimestamp(),
         payments: [],
@@ -472,13 +483,92 @@ export async function recordLoanPayment(db: Firestore, loanId: string, payment: 
             updatedAt: serverTimestamp()
         };
 
-        if (newTotalPaid >= totalRepayableAmount && loanData.status !== 'paid') {
+        if (newTotalPaid >= totalRepayableAmount) {
             updatePayload.status = 'paid';
+        } else if (loanData.status === 'rollover') {
+            // Real payment received — exit rollover state back to active
+            updatePayload.status = 'active';
         }
 
         await updateDoc(loanRef, updatePayload);
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({ path: loanRef.path, operation: 'update', requestResourceData: { type: 'LOAN_PAYMENT', amount: payment.amount }});
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function deleteLoanPayment(db: Firestore, loanId: string, payment: any) {
+    const loanRef = doc(db, 'loans', loanId);
+    try {
+        const loanSnap = await getDoc(loanRef);
+        if (!loanSnap.exists()) throw new Error('Loan not found');
+        
+        const loanData = loanSnap.data();
+        
+        const newPayments = (loanData.payments || []).filter((p: any) => p.paymentId !== payment.paymentId);
+        
+        const updatePayload: any = {
+            totalPaid: increment(-payment.amount),
+            payments: newPayments,
+            updatedAt: serverTimestamp()
+        };
+
+        const newTotalPaid = (loanData.totalPaid || 0) - payment.amount;
+        const totalRepayableAmount = loanData.totalRepayableAmount || 0;
+        
+        if (newTotalPaid < totalRepayableAmount && loanData.status === 'paid') {
+            updatePayload.status = 'active'; 
+        }
+
+        await updateDoc(loanRef, updatePayload);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: loanRef.path, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function updateLoanPayment(db: Firestore, loanId: string, oldPayment: any, newAmount: number, newDate: Date) {
+    const loanRef = doc(db, 'loans', loanId);
+    try {
+        const loanSnap = await getDoc(loanRef);
+        if (!loanSnap.exists()) throw new Error('Loan not found');
+
+        const loanData = loanSnap.data();
+        const payments: any[] = loanData.payments || [];
+
+        // Replace the matching payment with updated values
+        const updatedPayments = payments.map((p: any) => {
+            if (p.paymentId === oldPayment.paymentId) {
+                return { ...p, amount: newAmount, date: newDate };
+            }
+            return p;
+        });
+
+        // Recalculate totalPaid from scratch to stay accurate
+        const newTotalPaid = updatedPayments
+            .filter((p: any) => p.type !== 'rollover_interest')
+            .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        const totalRepayableAmount = loanData.totalRepayableAmount || 0;
+
+        const updatePayload: any = {
+            payments: updatedPayments,
+            totalPaid: newTotalPaid,
+            updatedAt: serverTimestamp()
+        };
+
+        // Auto-update status based on new totals
+        if (newTotalPaid >= totalRepayableAmount && loanData.status !== 'paid') {
+            updatePayload.status = 'paid';
+        } else if (newTotalPaid < totalRepayableAmount && loanData.status === 'paid') {
+            updatePayload.status = 'active';
+        }
+
+        await updateDoc(loanRef, updatePayload);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: loanRef.path, operation: 'update' });
         errorEmitter.emit('permission-error', permissionError);
         throw serverError;
     }
@@ -506,52 +596,86 @@ export async function deleteCustomer(db: Firestore, customerId: string) {
     }
 }
 
+/**
+ * Rollover a loan instalment.
+ *
+ * Business rule: The customer pays ONLY the interest for this period.
+ * The principal balance does NOT change — the loan effectively skips one
+ * instalment and the next due date shifts forward by one period.
+ *
+ * What this function does:
+ *  1. Calculates the interest due for one instalment period.
+ *  2. Records it as a receipt in the finance ledger.
+ *  3. Adds a `rollover_interest` marker entry in the loan's payments array
+ *     (so the ledger trail is visible) but does NOT touch `totalPaid` —
+ *     the outstanding balance therefore remains unchanged.
+ *  4. Pushes `firstPaymentDate` forward by one period.
+ *  5. Sets status to `'rollover'` so the badge reflects the state.
+ */
 export async function rolloverLoan(db: Firestore, originalLoan: Loan, rolloverDate: Date) {
-    const interestAmount = calculateInterestForOneInstalment(originalLoan.principalAmount, originalLoan.interestRate ?? 0, originalLoan.numberOfInstalments, originalLoan.paymentFrequency);
-    if (interestAmount <= 0) throw new Error("Cannot rollover a loan with zero interest.");
-    
+    // Interest for a single instalment period (principal × rate per period)
+    const interestAmount = calculateInterestForOneInstalment(
+        originalLoan.principalAmount,
+        originalLoan.interestRate ?? 0,
+        originalLoan.numberOfInstalments,
+        originalLoan.paymentFrequency
+    );
+
+    // Guard: interest must be calculable (0% loans can still be rolled over with 0 interest)
+    if (interestAmount < 0) throw new Error('Calculated interest is negative — cannot rollover.');
+
     try {
+        // 1. Record the interest-only payment in the finance ledger
         const receiptDocRef = await addDoc(collection(db, 'financeEntries'), {
             type: 'receipt',
             receiptCategory: 'loan_repayment',
             date: rolloverDate,
             amount: interestAmount,
-            description: `Rollover interest for Loan #${originalLoan.loanNumber}`,
+            description: `Interest-only rollover for Loan #${originalLoan.loanNumber} (principal unchanged)`,
             loanId: originalLoan.id,
             recordedBy: 'System (Rollover)',
             createdAt: serverTimestamp()
         });
 
-        // Calculate the shifted base date to push the schedule forward by 1 period
+        // 2. Advance the next payment date by exactly one instalment period
         let currentBaseDate: any = originalLoan.firstPaymentDate || originalLoan.disbursementDate;
-        let baseDateObj = currentBaseDate?.seconds ? new Date(currentBaseDate.seconds * 1000) : (currentBaseDate instanceof Date ? currentBaseDate : new Date(currentBaseDate));
-        
-        let newBaseDate = new Date(baseDateObj);
+        let baseDateObj = currentBaseDate?.seconds
+            ? new Date(currentBaseDate.seconds * 1000)
+            : (currentBaseDate instanceof Date ? currentBaseDate : new Date(currentBaseDate));
+
+        let newNextPaymentDate = new Date(baseDateObj);
         if (originalLoan.paymentFrequency === 'daily') {
-            newBaseDate.setDate(newBaseDate.getDate() + 1);
+            newNextPaymentDate.setDate(newNextPaymentDate.getDate() + 1);
         } else if (originalLoan.paymentFrequency === 'weekly') {
-            newBaseDate.setDate(newBaseDate.getDate() + 7);
+            newNextPaymentDate.setDate(newNextPaymentDate.getDate() + 7);
         } else {
-            newBaseDate.setMonth(newBaseDate.getMonth() + 1);
+            // monthly
+            newNextPaymentDate.setMonth(newNextPaymentDate.getMonth() + 1);
         }
 
+        // 3. Build the update — crucially we do NOT change totalPaid or
+        //    totalRepayableAmount so the outstanding balance stays the same.
         const updatePayload: any = {
-            status: 'active',
-            firstPaymentDate: newBaseDate,
-            payments: arrayUnion({ 
-                paymentId: receiptDocRef.id, 
-                amount: interestAmount, 
-                date: rolloverDate, 
+            status: 'rollover',          // visual badge — loan is still alive
+            firstPaymentDate: newNextPaymentDate,
+            // Add a marker entry so the payment history shows the rollover event
+            payments: arrayUnion({
+                paymentId: receiptDocRef.id,
+                amount: interestAmount,
+                date: rolloverDate,
                 recordedBy: 'System (Rollover)',
-                type: 'rollover_interest'
+                type: 'rollover_interest'  // filtered out of totalPaid recalculations
             }),
-            comments: originalLoan.comments ? `${originalLoan.comments}\nRolled over on ${rolloverDate.toDateString()}` : `Rolled over on ${rolloverDate.toDateString()}`,
+            comments: originalLoan.comments
+                ? `${originalLoan.comments}\nRolled over on ${rolloverDate.toDateString()} — interest only (Ksh ${interestAmount.toLocaleString()})`
+                : `Rolled over on ${rolloverDate.toDateString()} — interest only (Ksh ${interestAmount.toLocaleString()})`,
             updatedAt: serverTimestamp()
         };
 
-        // We DO NOT increment totalPaid here because the rollover interest does not decrease the outstanding balance.
-        await updateLoan(db, originalLoan.id, updatePayload);
-        
+        // Use updateDoc directly (not updateLoan) to skip the disbursement-check logic
+        const loanRef = doc(db, 'loans', originalLoan.id);
+        await updateDoc(loanRef, updatePayload);
+
     } catch (serverError) {
         const permissionError = new FirestorePermissionError({ path: 'loan_rollover', operation: 'update' });
         errorEmitter.emit('permission-error', permissionError);
@@ -727,6 +851,26 @@ export async function requestDeposit(db: Firestore, investorId: string, amount: 
         const permissionError = new FirestorePermissionError({ path: investorRef.path, operation: 'update', requestResourceData: { deposits: 'ADD_DEPOSIT_REQUEST' }});
         errorEmitter.emit('permission-error', permissionError);
         throw e;
+    }
+}
+
+export async function ensureInvestorProfile(db: Firestore, uid: string, name: string, email: string) {
+    const investorRef = doc(db, 'investors', uid);
+    const snap = await getDoc(investorRef);
+    if (!snap.exists()) {
+        await setDoc(investorRef, {
+            uid,
+            name,
+            email,
+            totalInvestment: 0,
+            totalWithdrawn: 0,
+            currentBalance: 0,
+            interestRate: 30, // 30% annual
+            withdrawals: [],
+            deposits: [],
+            interestEntries: [],
+            createdAt: serverTimestamp(),
+        });
     }
 }
 

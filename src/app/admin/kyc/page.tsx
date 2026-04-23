@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { useCollection, useFirestore, useAppUser, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, X, Lock, PlusCircle, Camera, Upload, ImagePlus } from 'lucide-react';
+import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, X, Lock, PlusCircle, Camera, Upload, ImagePlus, Sparkles, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,12 @@ import {
   DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import {
   Form,
@@ -57,16 +63,17 @@ interface KYCDocument {
     id: string;
     customerId: string;
     customerName: string;
-    type: 'owner_id' | 'guarantor_id' | 'loan_form' | 'security_attachment' | 'guarantor_undertaking';
+    type: 'owner_id' | 'guarantor_id' | 'loan_form' | 'security_attachment' | 'guarantor_undertaking' | 'mpesa_statement' | 'id_front' | 'id_back' | 'payslip';
     fileName: string;
     fileUrl: string;
     uploadedBy: string;
     uploadedAt: any;
+    documentPassword?: string;
 }
 
 const kycUploadSchema = z.object({
     customerId: z.string().min(1, "Please select a customer."),
-    type: z.enum(['owner_id', 'guarantor_id', 'loan_form', 'security_attachment', 'guarantor_undertaking']),
+    type: z.enum(['owner_id', 'guarantor_id', 'loan_form', 'security_attachment', 'guarantor_undertaking', 'mpesa_statement', 'id_front', 'id_back', 'payslip']),
     fileName: z.string().min(1, "Enter a label for this document."),
 });
 
@@ -75,7 +82,11 @@ const TYPE_LABELS: Record<string, string> = {
     guarantor_id: 'Guarantor ID Card',
     loan_form: 'Loan Form',
     security_attachment: 'Security Attachment',
-    guarantor_undertaking: 'Guarantor Undertaking'
+    guarantor_undertaking: 'Guarantor Undertaking',
+    mpesa_statement: 'M-Pesa Statement',
+    id_front: 'ID Front',
+    id_back: 'ID Back',
+    payslip: 'Payslip'
 };
 
 export default function KYCRepositoryPage() {
@@ -84,6 +95,7 @@ export default function KYCRepositoryPage() {
     const storage = useStorage();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
+    const [memberSearch, setMemberSearch] = useState('');
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [docToDelete, setDocToDelete] = useState<KYCDocument | null>(null);
     const [viewingDoc, setViewingDoc] = useState<KYCDocument | null>(null);
@@ -96,6 +108,12 @@ export default function KYCRepositoryPage() {
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+    const selectedCustomer = useMemo(() => {
+        if (!selectedCustomerId || !groupedCustomers) return null;
+        return groupedCustomers.find(g => g.customerId === selectedCustomerId) || null;
+    }, [groupedCustomers, selectedCustomerId]);
+
 
     const isAuthorized = user && (
         user.role === 'finance' || 
@@ -106,6 +124,7 @@ export default function KYCRepositoryPage() {
 
     const { data: documents, loading: docsLoading } = useCollection<KYCDocument>(isAuthorized ? 'kyc_documents' : null);
     const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
+    const { data: allLoans } = useCollection<any>(isAuthorized ? 'loans' : null);
 
     const kycForm = useForm<z.infer<typeof kycUploadSchema>>({
         resolver: zodResolver(kycUploadSchema),
@@ -122,6 +141,28 @@ export default function KYCRepositoryPage() {
             )
             .sort((a, b) => (b.uploadedAt?.seconds || 0) - (a.uploadedAt?.seconds || 0));
     }, [documents, searchTerm]);
+
+    const groupedCustomers = useMemo(() => {
+        const groups: Record<string, { customerId: string, customerName: string, docs: KYCDocument[], latestUpload: number }> = {};
+        
+        filteredDocs.forEach(doc => {
+            if (!groups[doc.customerId]) {
+                groups[doc.customerId] = {
+                    customerId: doc.customerId,
+                    customerName: doc.customerName,
+                    docs: [],
+                    latestUpload: 0
+                };
+            }
+            groups[doc.customerId].docs.push(doc);
+            const docTime = doc.uploadedAt?.seconds || 0;
+            if (docTime > groups[doc.customerId].latestUpload) {
+                groups[doc.customerId].latestUpload = docTime;
+            }
+        });
+        
+        return Object.values(groups).sort((a, b) => b.latestUpload - a.latestUpload);
+    }, [filteredDocs]);
 
     const startCamera = async () => {
         try {
@@ -199,18 +240,30 @@ export default function KYCRepositoryPage() {
 
     const confirmDelete = async () => {
         if (!docToDelete) return;
+        
+        const idToDelete = docToDelete.id;
+        
+        // 1. Close dialog immediately to prevent UI blocking/focus issues
+        setDeleteConfirmOpen(false);
         setIsDeleting(true);
+        
         try {
-            await deleteKYCDocument(firestore, docToDelete.id);
+            // 2. Perform background deletion
+            await deleteKYCDocument(firestore, idToDelete);
             toast({ title: 'Document Record Removed' });
-            setDeleteConfirmOpen(false);
-            setDocToDelete(null);
         } catch (e: any) {
-            toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+            toast({ 
+                variant: 'destructive', 
+                title: 'Action Failed', 
+                description: e.message || 'Check your permissions and try again.' 
+            });
         } finally {
+            // 3. Cleanup
             setIsDeleting(false);
+            setDocToDelete(null);
         }
     };
+
 
     if (userLoading || docsLoading) {
         return (
@@ -267,10 +320,32 @@ export default function KYCRepositoryPage() {
                                         <FormField control={kycForm.control} name="customerId" render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Member</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                <Select onValueChange={(v) => { field.onChange(v); setMemberSearch(''); }} defaultValue={field.value}>
                                                     <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
                                                     <SelectContent>
-                                                        {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
+                                                        <div className="flex items-center border-b px-3 pb-2 mb-1">
+                                                            <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
+                                                            <input
+                                                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                                                placeholder="Search member..."
+                                                                value={memberSearch}
+                                                                onChange={(e) => setMemberSearch(e.target.value)}
+                                                                onKeyDown={(e) => e.stopPropagation()}
+                                                            />
+                                                        </div>
+                                                        {customers
+                                                            ?.filter(c =>
+                                                                (c.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+                                                                (c.accountNumber || '').toLowerCase().includes(memberSearch.toLowerCase())
+                                                            )
+                                                            .map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)
+                                                        }
+                                                        {customers?.filter(c =>
+                                                            (c.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+                                                            (c.accountNumber || '').toLowerCase().includes(memberSearch.toLowerCase())
+                                                        ).length === 0 && (
+                                                            <div className="py-4 text-center text-sm text-muted-foreground">No members found.</div>
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                             </FormItem>
@@ -286,6 +361,10 @@ export default function KYCRepositoryPage() {
                                                         <SelectItem value="loan_form">Physical Loan Form</SelectItem>
                                                         <SelectItem value="security_attachment">Security / Collateral</SelectItem>
                                                         <SelectItem value="guarantor_undertaking">Guarantor Undertaking</SelectItem>
+                                                        <SelectItem value="mpesa_statement">M-Pesa Statement</SelectItem>
+                                                        <SelectItem value="id_front">ID Front</SelectItem>
+                                                        <SelectItem value="id_back">ID Back</SelectItem>
+                                                        <SelectItem value="payslip">Payslip</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </FormItem>
@@ -343,44 +422,37 @@ export default function KYCRepositoryPage() {
                                 <TableRow>
                                     <TableHead className="w-[52px]"></TableHead>
                                     <TableHead>Customer</TableHead>
-                                    <TableHead>Document Type</TableHead>
-                                    <TableHead>Label</TableHead>
-                                    <TableHead>Uploaded By</TableHead>
-                                    <TableHead>Date</TableHead>
+                                    <TableHead>Total Documents</TableHead>
+                                    <TableHead>Latest Upload</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredDocs.length === 0 ? (
+                                {groupedCustomers.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-12 text-muted-foreground italic">No matching records found.</TableCell>
+                                        <TableCell colSpan={5} className="text-center py-12 text-muted-foreground italic">No matching records found.</TableCell>
                                     </TableRow>
                                 ) : (
-                                    filteredDocs.map((doc) => (
+                                    groupedCustomers.map((group) => (
                                         <TableRow
-                                            key={doc.id}
+                                            key={group.customerId}
                                             className="group hover:bg-primary/5 transition-colors cursor-pointer"
-                                            onClick={() => setViewingDoc(doc)}
+                                            onClick={() => setSelectedCustomerId(group.customerId)}
+
                                         >
                                             <TableCell>
                                                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                                    <FileText className="h-5 w-5 text-primary" />
+                                                    <User className="h-5 w-5 text-primary" />
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="font-bold text-sm">{doc.customerName}</TableCell>
+                                            <TableCell className="font-bold text-sm">{group.customerName}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline" className="text-[11px] uppercase font-semibold tracking-wide">{TYPE_LABELS[doc.type]}</Badge>
+                                                <Badge variant="secondary" className="font-semibold">{group.docs.length} Document(s)</Badge>
                                             </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground italic">"{doc.fileName}"</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 text-xs text-muted-foreground"><User className="h-3 w-3" /> {doc.uploadedBy}</div>
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">{doc.uploadedAt?.seconds ? format(new Date(doc.uploadedAt.seconds * 1000), 'dd/MM/yy HH:mm') : ''}</TableCell>
-                                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" title="View Document" onClick={() => setViewingDoc(doc)}><Eye className="h-4 w-4" /></Button>
-                                                    <Button variant="ghost" size="icon" className="text-destructive" title="Delete" onClick={() => handleDeleteClick(doc)}><Trash2 className="h-4 w-4" /></Button>
-                                                </div>
+                                            <TableCell className="text-xs text-muted-foreground">{group.latestUpload ? format(new Date(group.latestUpload * 1000), 'dd/MM/yy HH:mm') : 'N/A'}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedCustomerId(group.customerId); }}>View Documents</Button>
+
                                             </TableCell>
                                         </TableRow>
                                     ))
@@ -391,15 +463,141 @@ export default function KYCRepositoryPage() {
                 </CardContent>
             </Card>
 
+            <Sheet open={!!selectedCustomerId} onOpenChange={(open) => !open && setSelectedCustomerId(null)}>
+
+                <SheetContent className="sm:max-w-xl w-full overflow-y-auto">
+                    <SheetHeader className="mb-6">
+                        <SheetTitle className="text-2xl">{selectedCustomer?.customerName}</SheetTitle>
+                        <p className="text-sm text-muted-foreground">Uploaded KYC Documents</p>
+                    </SheetHeader>
+                    <div className="space-y-4">
+                        {selectedCustomer?.docs.map(doc => (
+                            <div key={doc.id} className="flex flex-col p-4 border rounded-lg bg-card space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                                            <FileText className="h-5 w-5 text-primary" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <Badge variant="outline" className="w-fit text-[10px] uppercase font-semibold mb-1">{TYPE_LABELS[doc.type]}</Badge>
+                                            <span className="text-sm font-medium">"{doc.fileName}"</span>
+                                            <span className="text-xs text-muted-foreground">{doc.uploadedAt?.seconds ? format(new Date(doc.uploadedAt.seconds * 1000), 'dd/MM/yy HH:mm') : ''}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <Button variant="ghost" size="icon" title="View Document" onClick={() => setViewingDoc(doc)}><Eye className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="text-destructive" title="Delete" onClick={() => handleDeleteClick(doc)}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                </div>
+                                {doc.documentPassword && (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border text-sm">
+                                        <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Document Password:</span>
+                                        <span className="font-mono font-medium">{doc.documentPassword}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        
+                        {/* AI Statement Analysis Report */}
+                        {(() => {
+                            if (!selectedCustomer || !allLoans) return null;
+                            const customerLoans = allLoans.filter((l: any) => l.customerId === selectedCustomer.customerId);
+                            const loanWithAnalysis = customerLoans.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).find((l: any) => l.aiAnalysis);
+                            if (!loanWithAnalysis) return null;
+                            const analysis = loanWithAnalysis.aiAnalysis;
+                            
+                            const getRiskColor = (level: string) => {
+                                if (level.includes('Zero') || level.includes('Qualified')) return 'text-green-600 bg-green-50 border-green-200';
+                                if (level.includes('Moderate')) return 'text-amber-600 bg-amber-50 border-amber-200';
+                                return 'text-red-600 bg-red-50 border-red-200';
+                            };
+
+                            const getRiskIcon = (level: string) => {
+                                if (level.includes('Zero') || level.includes('Qualified')) return <CheckCircle className="h-5 w-5 text-green-600" />;
+                                if (level.includes('Moderate')) return <AlertCircle className="h-5 w-5 text-amber-600" />;
+                                return <AlertTriangle className="h-5 w-5 text-red-600" />;
+                            };
+
+                            return (
+                                <div className="mt-8 border-2 border-indigo-100 bg-indigo-50/30 rounded-xl overflow-hidden shadow-sm">
+                                    <div className="bg-indigo-100/50 px-4 py-3 border-b border-indigo-100 flex items-center gap-2">
+                                        <Sparkles className="h-5 w-5 text-indigo-600" />
+                                        <h4 className="font-black text-indigo-900">AI Statement Analysis</h4>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Risk Assessment</p>
+                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${getRiskColor(analysis.riskLevel)}`}>
+                                                    {getRiskIcon(analysis.riskLevel)}
+                                                    <span className="font-bold text-sm">{analysis.riskLevel}</span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right space-y-1">
+                                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Flow Summary</p>
+                                                <p className="text-sm font-bold text-green-700">IN: KES {analysis.incomeFlow?.toLocaleString() || 0}</p>
+                                                <p className="text-sm font-bold text-red-700">OUT: KES {analysis.expenditure?.toLocaleString() || 0}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="bg-white rounded-lg p-3 border shadow-sm">
+                                            <p className="text-sm text-slate-700 leading-relaxed">{analysis.decisionReason}</p>
+                                        </div>
+
+                                        {(analysis.redFlags?.length > 0 || analysis.otherDebts?.length > 0) && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {analysis.redFlags?.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wide">Red Flags</p>
+                                                        <ul className="space-y-1">
+                                                            {analysis.redFlags.map((flag: string, i: number) => (
+                                                                <li key={i} className="text-xs text-slate-700 bg-red-50 px-2 py-1 rounded border border-red-100 flex items-start gap-1">
+                                                                    <span className="text-red-500">•</span> {flag}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {analysis.otherDebts?.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Other Debts / Loans</p>
+                                                        <ul className="space-y-1">
+                                                            {analysis.otherDebts.map((debt: string, i: number) => (
+                                                                <li key={i} className="text-xs text-slate-700 bg-amber-50 px-2 py-1 rounded border border-amber-100 flex items-start gap-1">
+                                                                    <span className="text-amber-500">•</span> {debt}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </SheetContent>
+            </Sheet>
             <Dialog open={!!viewingDoc} onOpenChange={(o) => !o && setViewingDoc(null)}>
                 <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none">
                     <VisuallyHidden.Root>
                         <DialogTitle>KYC Document Preview</DialogTitle>
                     </VisuallyHidden.Root>
-                    <div className="relative w-full h-[85vh] flex items-center justify-center">
-                        <Button variant="ghost" size="icon" className="absolute top-4 right-4 z-50 text-white bg-black/50 rounded-full" onClick={() => setViewingDoc(null)}><X className="h-6 w-6" /></Button>
-                        {viewingDoc?.fileUrl && <Image src={viewingDoc.fileUrl} alt="Full KYC" fill className="object-contain" sizes="100vw" unoptimized />}
-                        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white">
+                    <div className="relative w-full h-[85vh] flex items-center justify-center bg-black">
+                        <div className="absolute top-4 right-4 z-50 flex gap-2">
+                            {viewingDoc?.fileUrl && (viewingDoc.fileUrl.toLowerCase().includes('.pdf') || viewingDoc.fileUrl.toLowerCase().includes('alt=media') === false || viewingDoc.type === 'mpesa_statement' || viewingDoc.type === 'payslip' || viewingDoc.type === 'loan_form') && (
+                                <Button variant="secondary" onClick={() => window.open(viewingDoc.fileUrl, '_blank')}>Open in New Tab</Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="text-white bg-black/50 hover:bg-black/80 rounded-full" onClick={() => setViewingDoc(null)}><X className="h-6 w-6" /></Button>
+                        </div>
+                        {viewingDoc?.fileUrl && (viewingDoc.fileUrl.toLowerCase().includes('.pdf') || viewingDoc.fileUrl.toLowerCase().includes('alt=media') === false || viewingDoc.type === 'mpesa_statement' || viewingDoc.type === 'payslip' || viewingDoc.type === 'loan_form' ? (
+                            <iframe src={viewingDoc.fileUrl} className="w-full h-full border-none bg-white" title="PDF Document" />
+                        ) : (
+                            <Image src={viewingDoc.fileUrl} alt="Full KYC" fill className="object-contain" sizes="100vw" unoptimized />
+                        ))}
+                        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-white pointer-events-none">
                             <h3 className="font-black text-xl">{viewingDoc?.customerName}</h3>
                             <p className="text-sm opacity-80">{TYPE_LABELS[viewingDoc?.type || '']} • {viewingDoc?.fileName}</p>
                         </div>

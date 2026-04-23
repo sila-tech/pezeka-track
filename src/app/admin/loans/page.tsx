@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser, useMemoFirebase, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock, Upload, ImagePlus, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock, Upload, ImagePlus, RefreshCw, CheckCircle2, Sparkles, AlertTriangle, CheckCircle } from 'lucide-react';
 import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -56,6 +56,8 @@ import {
   rolloverLoan,
   deleteLoan,
   recordLoanPayment,
+  deleteLoanPayment,
+  updateLoanPayment,
   uploadKYCDocument,
   type Loan
 } from '@/lib/firestore';
@@ -85,7 +87,7 @@ const loanSchema = z.object({
   chargingCost: z.coerce.number().optional(),
   numberOfInstalments: z.coerce.number().int().min(1, 'Number of instalments is required.'),
   paymentFrequency: z.enum(['daily', 'weekly', 'monthly']),
-  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application']),
+  status: z.enum(['due', 'paid', 'active', 'rollover', 'overdue', 'application', 'awaiting_documents', 'under_review']),
   loanType: z.string().optional(),
   assignedStaffId: z.string().min(1, 'Please assign a staff member.'),
   customerType: z.enum(['existing', 'new']),
@@ -179,6 +181,7 @@ export default function LoansPage() {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
   const [viewingApplication, setViewingApplication] = useState<Loan | null>(null);
@@ -192,6 +195,9 @@ export default function LoansPage() {
   const [markAsPaidConfirmOpen, setMarkAsPaidConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewingKYC, setViewingKYC] = useState<KYCDoc | null>(null);
+  const [paymentToEdit, setPaymentToEdit] = useState<any | null>(null);
+  const [editPaymentAmount, setEditPaymentAmount] = useState('');
+  const [editPaymentDate, setEditPaymentDate] = useState('');
   
   // KYC Upload Internal states
   const [isKYCAddOpen, setIsKYCAddOpen] = useState(false);
@@ -240,6 +246,8 @@ export default function LoansPage() {
         case 'rejected': return 'bg-red-100 text-red-800 border-red-300 hover:bg-red-200';
         case 'rollover': return 'bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200';
         case 'application': return 'bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200';
+        case 'awaiting_documents': return 'bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200';
+        case 'under_review': return 'bg-cyan-100 text-cyan-800 border-cyan-300 hover:bg-cyan-200';
         default: return 'bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200';
       }
   };
@@ -249,7 +257,7 @@ export default function LoansPage() {
     
     return loans.filter(loan => {
         const displayStatus = getLoanDisplayStatus(loan);
-        if (displayStatus === 'application' || displayStatus === 'rejected') return false;
+        if (displayStatus === 'application' || displayStatus === 'awaiting_documents' || displayStatus === 'under_review' || displayStatus === 'rejected') return false;
         
         const statusMatch = statusFilter === 'all' || displayStatus === statusFilter;
         const searchMatch = searchTerm === '' ||
@@ -268,7 +276,7 @@ export default function LoansPage() {
   
   const applicationLoans = useMemo(() => {
     if (!loans) return [];
-    return loans.filter(loan => loan.status === 'application').sort((a, b) => {
+    return loans.filter(loan => loan.status === 'application' || loan.status === 'awaiting_documents' || loan.status === 'under_review').sort((a, b) => {
         const d1 = (a as any).createdAt?.seconds || 0;
         const d2 = (b as any).createdAt?.seconds || 0;
         return d2 - d1;
@@ -484,6 +492,14 @@ export default function LoansPage() {
       } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsUpdatingStatus(false); }
   };
 
+  const handleMarkUnderReview = async (loan: Loan) => {
+      setIsUpdatingStatus(true);
+      try {
+          await updateLoan(firestore, loan.id, { status: 'under_review' });
+          toast({ title: 'Application is now Under Review' });
+      } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsUpdatingStatus(false); }
+  };
+
   async function onRecordPayment(values: z.infer<typeof paymentSchema>) {
     if (!loanToEdit || !canEdit) return;
     setIsUpdating(true);
@@ -498,6 +514,49 @@ export default function LoansPage() {
         paymentForm.reset();
     } catch (e: any) { toast({ variant: 'destructive', title: 'Error', description: e.message }); } finally { setIsUpdating(false); }
   }
+
+  const handleDeletePayment = async (payment: any) => {
+    if (!loanToEdit || !canEdit) return;
+    if (!confirm('Are you sure you want to delete this payment record? This will reduce the total paid amount.')) return;
+    setIsUpdating(true);
+    try {
+        await deleteLoanPayment(firestore, loanToEdit.id, payment);
+        toast({ title: 'Payment Deleted', description: 'The payment has been removed from the ledger.' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
+  const handleOpenEditPayment = (payment: any) => {
+    if (!canEdit) return;
+    const dateObj = (payment.date as any)?.seconds
+        ? new Date((payment.date as any).seconds * 1000)
+        : (payment.date ? new Date(payment.date as any) : new Date());
+    setEditPaymentAmount(String(payment.amount || ''));
+    setEditPaymentDate(isNaN(dateObj.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(dateObj, 'yyyy-MM-dd'));
+    setPaymentToEdit(payment);
+  };
+
+  const handleEditPaymentSave = async () => {
+    if (!loanToEdit || !paymentToEdit || !canEdit) return;
+    const newAmount = parseFloat(editPaymentAmount);
+    if (isNaN(newAmount) || newAmount <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
+        return;
+    }
+    setIsUpdating(true);
+    try {
+        await updateLoanPayment(firestore, loanToEdit.id, paymentToEdit, newAmount, new Date(editPaymentDate));
+        toast({ title: 'Payment Updated', description: 'The payment has been corrected in the ledger.' });
+        setPaymentToEdit(null);
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
 
   const handleEditTerms = (loan: Loan) => {
       if (!canEdit) return;
@@ -550,10 +609,14 @@ export default function LoansPage() {
       setIsUpdating(true);
       try {
           await rolloverLoan(firestore, loanToEdit, new Date());
-          toast({ title: 'Loan Rolled Over', description: 'New active loan created and old facility retired.' });
+          const interestPaid = (loanToEdit.totalRepayableAmount - loanToEdit.principalAmount) / (loanToEdit.numberOfInstalments || 1);
+          toast({
+              title: 'Rollover Recorded',
+              description: `Interest-only payment applied. Principal balance unchanged. Next instalment date moved forward.`
+          });
           setRolloverConfirmOpen(false);
-          // Delay closing the parent modal to prevent Radix UI body pointer-events freeze
-          setTimeout(() => setLoanToEdit(null), 150);
+          // Update local state to reflect rollover status without closing modal
+          setLoanToEdit((prev) => prev ? { ...prev, status: 'rollover' } : null);
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'Rollover Failed', description: e.message });
       } finally {
@@ -616,10 +679,32 @@ export default function LoansPage() {
                       <FormField control={form.control} name="customerId" render={({ field }) => (
                           <FormItem className="col-span-2">
                             <FormLabel>Customer</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <Select onValueChange={(v) => { field.onChange(v); setCustomerSearch(''); }} defaultValue={field.value} value={field.value}>
                               <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
                               <SelectContent>
-                                {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)}
+                                <div className="flex items-center border-b px-3 pb-2 mb-1">
+                                  <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
+                                  <input
+                                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                    placeholder="Search customer..."
+                                    value={customerSearch}
+                                    onChange={(e) => setCustomerSearch(e.target.value)}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                {customers
+                                  ?.filter(c =>
+                                    (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+                                    (c.accountNumber || '').toLowerCase().includes(customerSearch.toLowerCase())
+                                  )
+                                  .map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)
+                                }
+                                {customers?.filter(c =>
+                                  (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+                                  (c.accountNumber || '').toLowerCase().includes(customerSearch.toLowerCase())
+                                ).length === 0 && (
+                                  <div className="py-4 text-center text-sm text-muted-foreground">No customers found.</div>
+                                )}
                               </SelectContent>
                             </Select>
                           </FormItem>
@@ -658,6 +743,11 @@ export default function LoansPage() {
                     <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
                       <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                     )} />
+                    {form.watch('paymentFrequency') === 'weekly' && (
+                        <FormField control={form.control} name="preferredPaymentDay" render={({ field }) => (
+                            <FormItem><FormLabel>Preferred Day</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="e.g. Monday" /></SelectTrigger></FormControl><SelectContent>{DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select></FormItem>
+                        )} />
+                    )}
                     <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
                       <div className="flex justify-between"><span className="text-sm">Instalment</span><span className="font-bold">Ksh {calculatedValues.instalmentAmount}</span></div>
                       <div className="flex justify-between"><span className="text-sm">Total</span><span className="font-bold">Ksh {calculatedValues.totalRepayableAmount}</span></div>
@@ -711,7 +801,12 @@ export default function LoansPage() {
                                         </TableCell>
                                         <TableCell className="text-xs">{loan.customerPhone}</TableCell>
                                         <TableCell><div className="flex items-center gap-1"><User className="h-3 w-3 text-muted-foreground" /><span className="text-xs">{loan.assignedStaffName || "Unassigned"}</span></div></TableCell>
-                                        <TableCell className="text-xs font-medium text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
+                                        <TableCell className="text-xs font-medium">
+                                            <div className="text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</div>
+                                            {loan.paymentFrequency === 'weekly' && loan.preferredPaymentDay && (
+                                                <div className="text-[10px] text-muted-foreground mt-0.5">{loan.preferredPaymentDay}s</div>
+                                            )}
+                                        </TableCell>
                                         <TableCell className="text-right font-bold tabular-nums">KES {((loan.totalRepayableAmount || 0) - (loan.totalPaid || 0)).toLocaleString()}</TableCell>
                                         <TableCell className="text-center"><Badge className={cn("border", getLoanStatusColor(getLoanDisplayStatus(loan)))}>{getLoanDisplayStatus(loan).toUpperCase()}</Badge></TableCell>
                                     </TableRow>
@@ -740,6 +835,9 @@ export default function LoansPage() {
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button size="sm" variant="outline" onClick={() => setViewingApplication(loan)}><Eye className="h-4 w-4 mr-1" /> View</Button>
+                                            {loan.status === 'awaiting_documents' && canEdit && (
+                                                <Button size="sm" variant="secondary" onClick={() => handleMarkUnderReview(loan)} disabled={isUpdatingStatus}>Mark Under Review</Button>
+                                            )}
                                             {canEdit && <Button size="sm" onClick={() => handleManageApplication(loan)}>Process</Button>}
                                         </div>
                                     </TableCell>
@@ -778,6 +876,11 @@ export default function LoansPage() {
                                 <FormField control={approvalForm.control} name="paymentFrequency" render={({ field }) => (
                                     <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
                                 )}/>
+                                {approvalForm.watch('paymentFrequency') === 'weekly' && (
+                                    <FormField control={approvalForm.control} name="preferredPaymentDay" render={({ field }) => (
+                                        <FormItem><FormLabel>Preferred Day</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="e.g. Monday" /></SelectTrigger></FormControl><SelectContent>{DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select></FormItem>
+                                    )} />
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField control={approvalForm.control} name="disbursementDate" render={({ field }) => (
@@ -807,7 +910,7 @@ export default function LoansPage() {
 
       {/* View Application Dialog */}
       <Dialog open={!!viewingApplication} onOpenChange={(o) => !o && setViewingApplication(null)}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
               {viewingApplication && (
                   <>
                     <DialogHeader>
@@ -822,6 +925,59 @@ export default function LoansPage() {
                             <div className="font-bold">Phone:</div><div>{viewingApplication.customerPhone}</div>
                             <div className="font-bold">ID Number:</div><div>{viewingApplication.idNumber || 'N/A'}</div>
                         </div>
+
+                        {/* AI Analysis Report */}
+                        {(viewingApplication as any).aiAnalysis ? (() => {
+                            const analysis = (viewingApplication as any).aiAnalysis;
+                            const getRiskColor = (level: string) => {
+                                if (level.includes('Zero') || level.includes('Qualified')) return 'text-green-700 bg-green-50 border-green-200';
+                                if (level.includes('Moderate')) return 'text-amber-700 bg-amber-50 border-amber-200';
+                                return 'text-red-700 bg-red-50 border-red-200';
+                            };
+                            const getRiskIcon = (level: string) => {
+                                if (level.includes('Zero') || level.includes('Qualified')) return <CheckCircle className="h-4 w-4 text-green-600" />;
+                                if (level.includes('Moderate')) return <AlertCircle className="h-4 w-4 text-amber-600" />;
+                                return <AlertTriangle className="h-4 w-4 text-red-600" />;
+                            };
+                            return (
+                                <div className="border-2 border-indigo-100 bg-indigo-50/40 rounded-xl overflow-hidden">
+                                    <div className="bg-indigo-100/60 px-4 py-2.5 flex items-center gap-2 border-b border-indigo-100">
+                                        <Sparkles className="h-4 w-4 text-indigo-600" />
+                                        <span className="font-black text-sm text-indigo-900">AI Statement Analysis</span>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-bold ${getRiskColor(analysis.riskLevel)}`}>
+                                                {getRiskIcon(analysis.riskLevel)}
+                                                {analysis.riskLevel}
+                                            </div>
+                                            <div className="text-right text-xs space-y-0.5">
+                                                <div className="font-bold text-green-700">IN: KES {(analysis.incomeFlow || 0).toLocaleString()}</div>
+                                                <div className="font-bold text-red-700">OUT: KES {(analysis.expenditure || 0).toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-lg p-3 border text-xs text-slate-700 leading-relaxed">{analysis.decisionReason}</div>
+                                        {analysis.redFlags?.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-red-600 uppercase mb-1">Red Flags</p>
+                                                <div className="space-y-1">{analysis.redFlags.map((f: string, i: number) => <div key={i} className="text-xs bg-red-50 border border-red-100 rounded px-2 py-1 text-slate-700">⚠ {f}</div>)}</div>
+                                            </div>
+                                        )}
+                                        {analysis.otherDebts?.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] font-bold text-amber-600 uppercase mb-1">Other Debts Detected</p>
+                                                <div className="space-y-1">{analysis.otherDebts.map((d: string, i: number) => <div key={i} className="text-xs bg-amber-50 border border-amber-100 rounded px-2 py-1 text-slate-700">• {d}</div>)}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })() : (
+                            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg text-xs text-muted-foreground border">
+                                <Sparkles className="h-3.5 w-3.5" />
+                                AI analysis not yet available for this application.
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setViewingApplication(null)}>Close</Button>
@@ -948,12 +1104,40 @@ export default function LoansPage() {
                                             <TableHeader className="bg-muted/50 sticky top-0"><TableRow><TableHead className="h-8 text-[10px]">Date</TableHead><TableHead className="h-8 text-right text-[10px]">Amount</TableHead></TableRow></TableHeader>
                                             <TableBody>
                                                 {(!loanToEdit.payments || loanToEdit.payments.length === 0) ? (
-                                                    <TableRow><TableCell colSpan={2} className="text-center py-8 text-xs text-muted-foreground italic">No payments recorded.</TableCell></TableRow>
+                                                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-xs text-muted-foreground italic">No payments recorded.</TableCell></TableRow>
                                                 ) : (
                                                     [...loanToEdit.payments].reverse().map((p, i) => (
-                                                        <TableRow key={p.paymentId || i}>
+                                                        <TableRow key={p.paymentId || i} className="group hover:bg-muted/50">
                                                             <TableCell className="text-[10px]">{ (p.date as any)?.seconds ? format(new Date((p.date as any).seconds * 1000), 'dd/MM/yy HH:mm') : (p.date ? format(new Date(p.date as any), 'dd/MM/yy HH:mm') : '...')}</TableCell>
-                                                            <TableCell className="text-right text-[10px] font-bold">Ksh {(p.amount || 0).toLocaleString()}</TableCell>
+                                                            <TableCell className="text-right text-[10px] font-bold">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <span>Ksh {(p.amount || 0).toLocaleString()}</span>
+                                                                    {canEdit && (
+                                                                        <>
+                                                                            <Button 
+                                                                                variant="ghost" 
+                                                                                size="icon" 
+                                                                                className="h-5 w-5 text-primary opacity-0 group-hover:opacity-100 transition-opacity" 
+                                                                                onClick={() => handleOpenEditPayment(p)} 
+                                                                                disabled={isUpdating}
+                                                                                title="Edit Payment"
+                                                                            >
+                                                                                <Pencil className="h-3 w-3" />
+                                                                            </Button>
+                                                                            <Button 
+                                                                                variant="ghost" 
+                                                                                size="icon" 
+                                                                                className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" 
+                                                                                onClick={() => handleDeletePayment(p)} 
+                                                                                disabled={isUpdating}
+                                                                                title="Delete Payment"
+                                                                            >
+                                                                                <Trash2 className="h-3 w-3" />
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
                                                         </TableRow>
                                                     ))
                                                 )}
@@ -976,6 +1160,32 @@ export default function LoansPage() {
           </DialogContent>
       </Dialog>
 
+      {/* Edit Payment Modal */}
+      <Dialog open={!!paymentToEdit} onOpenChange={(o) => { if (!o) setPaymentToEdit(null); }}>
+          <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                  <DialogTitle>Edit Payment</DialogTitle>
+                  <DialogDescription>Correct the amount or date for this payment. The loan balance will be recalculated automatically.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                  <div className="space-y-1">
+                      <label className="text-xs font-semibold">Payment Date</label>
+                      <Input type="date" value={editPaymentDate} onChange={(e) => setEditPaymentDate(e.target.value)} className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                      <label className="text-xs font-semibold">Amount (Ksh)</label>
+                      <Input type="number" value={editPaymentAmount} onChange={(e) => setEditPaymentAmount(e.target.value)} className="h-9 text-sm" placeholder="Enter correct amount" />
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setPaymentToEdit(null)}>Cancel</Button>
+                  <Button onClick={handleEditPaymentSave} disabled={isUpdating}>
+                      {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
       <Dialog open={!!viewingKYC} onOpenChange={(o) => !o && setViewingKYC(null)}>
           <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-none">
               <div className="relative w-full h-[85vh] flex items-center justify-center">
@@ -988,16 +1198,27 @@ export default function LoansPage() {
       <AlertDialog open={rolloverConfirmOpen} onOpenChange={setRolloverConfirmOpen}>
           <AlertDialogContent>
               <AlertDialogHeader>
-                  <AlertDialogTitle>Rollover Loan #{loanToEdit?.loanNumber}?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This will close the current facility, record the interest payment in the ledger, and create a new active loan for the principal amount. This action is irreversible.
+                  <AlertDialogTitle>Confirm Instalment Rollover — Loan #{loanToEdit?.loanNumber}</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                      <div className="space-y-2 text-sm">
+                          <p>
+                              The customer is paying <strong>interest only</strong> for this instalment period.
+                          </p>
+                          <ul className="list-disc ml-4 space-y-1 text-muted-foreground">
+                              <li>The <strong>principal balance stays unchanged</strong> — the loan is not reduced.</li>
+                              <li>The interest amount will be recorded as a receipt in the finance ledger.</li>
+                              <li>The <strong>next payment date</strong> will shift forward by one period.</li>
+                              <li>The loan status will show <strong>ROLLOVER</strong> until the next real payment is made.</li>
+                          </ul>
+                          <p className="font-semibold text-foreground">This action cannot be undone.</p>
+                      </div>
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={handleRollover} disabled={isUpdating} className="bg-blue-600 hover:bg-blue-700">
                       {isUpdating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                      Confirm Rollover
+                      Confirm Interest-Only Rollover
                   </AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
@@ -1035,6 +1256,11 @@ export default function LoansPage() {
                       <div className="grid grid-cols-2 gap-4">
                           <FormField control={editTermsForm.control} name="numberOfInstalments" render={({field}) => (<FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
                           <FormField control={editTermsForm.control} name="paymentFrequency" render={({field}) => (<FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>)}/>
+                          {editTermsForm.watch('paymentFrequency') === 'weekly' && (
+                              <FormField control={editTermsForm.control} name="preferredPaymentDay" render={({ field }) => (
+                                  <FormItem><FormLabel>Preferred Day</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="e.g. Monday" /></SelectTrigger></FormControl><SelectContent>{DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select></FormItem>
+                              )} />
+                          )}
                       </div>
                       <FormField control={editTermsForm.control} name="totalRepayableAmount" render={({field}) => (<FormItem><FormLabel>Total Repayable (Override)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>)}/>
                       <div className="grid grid-cols-2 gap-4">

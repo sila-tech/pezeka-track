@@ -106,6 +106,7 @@ export default function FinancePage() {
   const [lbStatus, setLbStatus] = useState('all');
   const [selectedLoanForEdit, setSelectedLoanForEdit] = useState<Loan | null>(null);
   const [isAddEntryOpen, setIsAddEntryOpen] = useState(false);
+  const [selectedEntryForEdit, setSelectedEntryForEdit] = useState<any>(null);
 
   const { user, loading: userLoading } = useAppUser();
   const firestore = useFirestore();
@@ -239,12 +240,46 @@ export default function FinancePage() {
           if (values.type === 'receipt') entryData.receiptCategory = values.category;
           else if (values.type === 'payout') entryData.payoutCategory = values.category;
           else if (values.type === 'expense') entryData.expenseCategory = values.category;
-          await addFinanceEntry(firestore, entryData);
-          toast({ title: 'Entry Recorded' });
+          
+          if (selectedEntryForEdit) {
+              await updateFinanceEntry(firestore, selectedEntryForEdit.id, entryData);
+              toast({ title: 'Entry Updated' });
+              setSelectedEntryForEdit(null);
+          } else {
+              await addFinanceEntry(firestore, entryData);
+              toast({ title: 'Entry Recorded' });
+          }
           entryForm.reset();
           setIsAddEntryOpen(false);
       } catch (e: any) { toast({ variant: 'destructive', title: 'Action Failed', description: e.message }); } finally { setIsSubmitting(false); }
   }
+
+  const handleEditEntry = (entry: any) => {
+      setSelectedEntryForEdit(entry);
+      
+      const eDate = entry.date?.seconds 
+          ? new Date(entry.date.seconds * 1000) 
+          : (entry.date instanceof Date ? entry.date : new Date(entry.date));
+
+      entryForm.reset({
+          type: entry.type,
+          amount: entry.amount,
+          date: isNaN(eDate.getTime()) ? format(new Date(), 'yyyy-MM-dd') : format(eDate, 'yyyy-MM-dd'),
+          description: entry.description || '',
+          category: entry.expenseCategory || entry.receiptCategory || entry.payoutCategory || 'other'
+      });
+      setIsAddEntryOpen(true);
+  };
+
+  const handleDeleteEntry = async (entry: any) => {
+      if (!confirm('Are you sure you want to delete this financial entry?')) return;
+      try {
+          await deleteFinanceEntry(firestore, entry.id);
+          toast({ title: 'Entry Deleted' });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'Deletion Failed', description: e.message });
+      }
+  };
 
   if (userLoading || loansLoading || financeEntriesLoading || requestsLoading) return <div className="flex h-full w-full items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (!isAuthorized) return <div className="p-12 text-center font-bold">Access Denied</div>;
@@ -253,10 +288,10 @@ export default function FinancePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Finance Ledger</h1>
-        <Dialog open={isAddEntryOpen} onOpenChange={setIsAddEntryOpen}>
+        <Dialog open={isAddEntryOpen} onOpenChange={(val) => { setIsAddEntryOpen(val); if (!val) { setSelectedEntryForEdit(null); entryForm.reset(); } }}>
             <DialogTrigger asChild><Button className="h-11 font-bold shadow-md"><PlusCircle className="mr-2 h-5 w-5" />Add Finance Entry</Button></DialogTrigger>
             <DialogContent className="sm:max-w-md">
-                <DialogHeader><DialogTitle>Record Financial Transaction</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>{selectedEntryForEdit ? 'Update Financial Transaction' : 'Record Financial Transaction'}</DialogTitle></DialogHeader>
                 <Form {...entryForm}>
                     <form onSubmit={entryForm.handleSubmit(onEntrySubmit)} className="space-y-4 pt-4">
                         <FormField control={entryForm.control} name="type" render={({ field }) => (
@@ -283,7 +318,7 @@ export default function FinancePage() {
                             </SelectContent></Select></FormItem>
                         )} />
                         <FormField control={entryForm.control} name="description" render={({ field }) => (<FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Details..." {...field} /></FormControl></FormItem>)}/>
-                        <Button type="submit" className="w-full h-12 text-lg font-bold" disabled={isSubmitting}>{isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Save Entry</Button>
+                        <Button type="submit" className="w-full h-12 text-lg font-bold" disabled={isSubmitting}>{isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}{selectedEntryForEdit ? 'Update Entry' : 'Save Entry'}</Button>
                     </form>
                 </Form>
             </DialogContent>
@@ -478,10 +513,10 @@ export default function FinancePage() {
               </Card>
           </TabsContent>
 
-          <TabsContent value="cashflow"><EditableFinanceReportTab title="Cash Flow" entries={financeEntries} loading={financeEntriesLoading} description="Unified transaction history." /></TabsContent>
-          <TabsContent value="receipts"><EditableFinanceReportTab title="Receipts" entries={financialData.allReceipts} loading={financeEntriesLoading} description="Revenue and member inflows." /></TabsContent>
-          <TabsContent value="payouts"><EditableFinanceReportTab title="Capital Payouts" entries={financialData.allPayouts} loading={financeEntriesLoading} description="Loan disbursements and withdrawals." /></TabsContent>
-          <TabsContent value="expenses"><EditableFinanceReportTab title="Operational Expenses" entries={financialData.allExpenses} loading={financeEntriesLoading} description="Staff facilitation and office overhead." /></TabsContent>
+          <TabsContent value="cashflow"><EditableFinanceReportTab title="Cash Flow" entries={financeEntries} loading={financeEntriesLoading} description="Unified transaction history." onEdit={handleEditEntry} onDelete={handleDeleteEntry}/></TabsContent>
+          <TabsContent value="receipts"><EditableFinanceReportTab title="Receipts" entries={financialData.allReceipts} loading={financeEntriesLoading} description="Revenue and member inflows." onEdit={handleEditEntry} onDelete={handleDeleteEntry} /></TabsContent>
+          <TabsContent value="payouts"><EditableFinanceReportTab title="Capital Payouts" entries={financialData.allPayouts} loading={financeEntriesLoading} description="Loan disbursements and withdrawals." onEdit={handleEditEntry} onDelete={handleDeleteEntry} /></TabsContent>
+          <TabsContent value="expenses"><EditableFinanceReportTab title="Operational Expenses" entries={financialData.allExpenses} loading={financeEntriesLoading} description="Staff facilitation and office overhead." onEdit={handleEditEntry} onDelete={handleDeleteEntry} /></TabsContent>
           <TabsContent value="investors"><InvestorsPortfolioTab /></TabsContent>
           <TabsContent value="staff"><StaffPortfoliosTab loans={loans} staffList={staffList}/></TabsContent>
       </Tabs>
@@ -492,7 +527,7 @@ export default function FinancePage() {
                   <>
                     <DialogHeader className="p-8 pb-4">
                         <DialogTitle className="text-2xl font-black text-[#1B2B33]">Edit Ledger Entry: {selectedLoanForEdit.customerName}</DialogTitle>
-                        <DialogDescription className="text-sm font-medium text-[#5BA9D0]">Modify primary financial data and repayment day.</DialogDescription>
+                        <DialogDescription className="text-sm font-medium text-[#0078D4]">Modify primary financial data and repayment day.</DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[50vh] px-8">
                         <Form {...editForm}>
@@ -506,7 +541,7 @@ export default function FinancePage() {
                                     )} />
                                     <FormField control={editForm.control} name="firstPaymentDate" render={({field}) => (
                                         <FormItem>
-                                            <FormLabel className="text-sm font-black text-[#5BA9D0]">First Payment Date</FormLabel>
+                                            <FormLabel className="text-sm font-black text-[#0078D4]">First Payment Date</FormLabel>
                                             <FormControl><Input type="date" {...field} className="h-12 rounded-xl border-2 border-primary/10" /></FormControl>
                                         </FormItem>
                                     )} />
@@ -584,7 +619,7 @@ export default function FinancePage() {
 
                                     <FormField control={editForm.control} name="totalRepayableAmount" render={({ field }) => (
                                         <FormItem className="col-span-2">
-                                            <FormLabel className="text-sm font-black text-[#5BA9D0]">Total Repayable (Override)</FormLabel>
+                                            <FormLabel className="text-sm font-black text-[#0078D4]">Total Repayable (Override)</FormLabel>
                                             <FormControl><Input type="number" {...field} className="h-14 rounded-xl border-2 border-primary/30 bg-primary/5 text-lg font-black" /></FormControl>
                                             <FormDescription className="text-[10px] font-medium leading-relaxed">Enter the total amount the client should pay (Principal + Total Interest).</FormDescription>
                                         </FormItem>
@@ -595,7 +630,7 @@ export default function FinancePage() {
                     </ScrollArea>
                     <DialogFooter className="p-8 pt-4 bg-muted/10 border-t flex items-center justify-end gap-3">
                         <DialogClose asChild><Button variant="outline" className="h-12 px-8 rounded-xl font-bold">Cancel</Button></DialogClose>
-                        <Button onClick={editForm.handleSubmit(onEditSubmit)} disabled={isSubmitting} className="h-12 px-8 rounded-xl font-bold bg-[#5BA9D0] hover:bg-[#5BA9D0]/90">
+                        <Button onClick={editForm.handleSubmit(onEditSubmit)} disabled={isSubmitting} className="h-12 px-8 rounded-xl font-bold bg-[#0078D4] hover:bg-[#0078D4]/90">
                             {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : <SlidersHorizontal className="mr-2 h-4 w-4" />}
                             Update Ledger
                         </Button>

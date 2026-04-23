@@ -7,6 +7,7 @@
  * - generateLoanAlerts: Main entry point for the flow.
  */
 
+import { googleAI } from '@genkit-ai/google-genai';
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
@@ -84,7 +85,7 @@ export const loanAlertFlow = ai.defineFlow(
     }
 
     const { output } = await ai.generate({
-      model: 'googleai/gemini-2.5-flash',
+      model: googleAI.model('gemini-2.5-flash'),
       output: { schema: AlertSchema },
       prompt: `You are an AI Credit Assistant for Pezeka Credit Ltd.
 

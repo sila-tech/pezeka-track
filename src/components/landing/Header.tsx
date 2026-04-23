@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu, Calculator } from 'lucide-react';
+import { Menu, Calculator, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { useState, useEffect } from 'react';
@@ -52,6 +52,9 @@ export default function Header() {
       </nav>
       {mounted && (
         <div className="md:hidden ml-auto flex items-center gap-2">
+          <Link href="/customer-login" className="flex items-center justify-center h-9 w-9 text-[#5BA9D0] hover:bg-muted/50 rounded-md">
+            <User className="h-6 w-6" />
+          </Link>
           <PWAInstallButton showIconOnly variant="ghost" className="h-9 w-9 text-[#5BA9D0] hover:bg-muted" />
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>

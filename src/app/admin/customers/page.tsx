@@ -57,7 +57,10 @@ import { firebaseConfig } from '@/firebase/config';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Name required.'),
-  phone: z.string().min(10, 'Valid phone number required.'),
+  phone: z.string()
+    .min(10, 'Phone number must be at least 10 digits.')
+    .max(13, 'Phone number is too long.')
+    .regex(/^(?:(?:\+254|254)[17]\d{8}|0[17]\d{8})$/, 'Enter a valid Kenyan phone number (e.g. 0712345678 or +254712345678).'),
   idNumber: z.string().min(5, 'National ID is required.'),
   email: z.string().email().optional().or(z.literal('')),
   password: z.string().min(6, 'Password must be at least 6 chars.').optional().or(z.literal('')),
@@ -89,7 +92,7 @@ export default function CustomersPage() {
         c.idNumber?.includes(searchTerm) ||
         c.referralCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+    ).sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
   }, [customers, searchTerm]);
 
   const form = useForm<z.infer<typeof customerSchema>>({
@@ -113,14 +116,27 @@ export default function CustomersPage() {
 
           // 1. If email/password provided, create Auth user in background
           if (values.email && values.password) {
-              const secondaryApp = initializeApp(firebaseConfig, 'SecondaryRegistration');
+              const appName = 'SecondaryRegistration';
+              const existingApps = getApps();
+              let secondaryApp = existingApps.find(app => app.name === appName);
+              if (!secondaryApp) {
+                  secondaryApp = initializeApp(firebaseConfig, appName);
+              }
               const secondaryAuth = getAuth(secondaryApp);
               try {
                   const userCred = await createUserWithEmailAndPassword(secondaryAuth, values.email, values.password);
                   uid = userCred.user.uid;
+                  
+                  // Set display name using the name provided exactly like customer portal
+                  const { updateProfile } = await import('firebase/auth');
+                  await updateProfile(userCred.user, { displayName: values.name });
+                  
                   await signOff(secondaryAuth);
-              } finally {
-                  await deleteApp(secondaryApp);
+              } catch (err: any) {
+                  if (err.code === 'auth/email-already-in-use') {
+                      throw new Error('This email is already linked to another account.');
+                  }
+                  throw err;
               }
           }
 
