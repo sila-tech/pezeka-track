@@ -169,7 +169,7 @@ export default function AccountPage() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [randomTip, setRandomTip] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([
-    { role: 'model', content: `Hello! 🚀 I'm NOVA, your Pezeka Neural Assistant. I can help you check your payment history, calculate repayments, apply for a new loan, or give you financial advice. How can I help you today?` }
+    { role: 'model', content: `Hello! 🚀 I'm NOVA, your Pezeka Neural Assistant. I'm currently completing my training to serve you better. I'll be fully online soon to help with your loans and financial advice. Stay tuned! ✨` }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -797,19 +797,18 @@ export default function AccountPage() {
                     )}
                 </div>
 
-                <div className="mt-4 flex gap-2 items-center bg-white border border-muted p-2 rounded-[2rem] shadow-xl focus-within:ring-2 ring-primary/20 transition-all">
+                <div className="mt-4 flex gap-2 items-center bg-[#F8FAFB] border border-muted p-2 rounded-[2rem] shadow-none transition-all opacity-60">
                     <Input 
-                        placeholder="Ask about loans or calculations..." 
+                        placeholder="NOVA is coming soon..." 
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                        className="flex-1 border-none focus-visible:ring-0 h-12 bg-transparent text-sm font-medium"
+                        disabled={true}
+                        className="flex-1 border-none focus-visible:ring-0 h-12 bg-transparent text-sm font-medium italic"
                     />
                     <Button 
                         size="icon" 
-                        onClick={handleSendMessage}
-                        disabled={isTyping || !inputValue.trim()}
-                        className="h-12 w-12 rounded-full shrink-0 shadow-lg"
+                        disabled={true}
+                        className="h-12 w-12 rounded-full shrink-0 shadow-none bg-muted grayscale"
                     >
                         <Send className="h-5 w-5" />
                     </Button>
@@ -899,6 +898,11 @@ export default function AccountPage() {
               {/* pulse ring */}
               <span className="absolute inset-0 rounded-[1.6rem] animate-ping opacity-20 bg-[#0078D4] group-hover:opacity-30" />
               <BrainCircuit className="h-8 w-8 text-white relative z-10" />
+              
+              {/* Soon Badge */}
+              <div className="absolute -top-1 -right-3 bg-yellow-400 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm border border-black/10 z-20">
+                SOON
+              </div>
             </button>
             <span className="mt-1.5 text-[9px] font-black uppercase tracking-widest"
               style={{ color: activeTab === 'Assistant' ? '#7c3aed' : '#1B2B33' }}>
