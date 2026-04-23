@@ -8,8 +8,8 @@ runConfig:
 
 env:
   - variable: GEMINI_API_KEY
-    value: AIzaSyB0vWjrFLZ-_qqE32b-Nf8K4Y1py3_Wtrg
+    secret: GEMINI_API_KEY
   - variable: RESEND_API_KEY
-    value: re_RGjGEBJf_JL8dayzB1Ji86iZbZ3CtrBFA
+    secret: RESEND_API_KEY
   - variable: FIREBASE_CONFIG
     value: '{"projectId":"pezeka-8ad5e","appId":"1:793868989809:web:96e8346f917540a9277054","storageBucket":"pezeka-8ad5e.firebasestorage.app","locationId":"us-central1"}'
