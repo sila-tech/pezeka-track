@@ -31,6 +31,9 @@ export default function Header() {
         <Link href="#products" className="text-sm font-bold text-[#1B2B33] hover:text-[#5BA9D0] transition-colors">
           Products
         </Link>
+        <Link href="#invest" className="text-sm font-bold text-[#1B2B33] hover:text-[#5BA9D0] transition-colors">
+          Invest
+        </Link>
         <Link href="#calculator" className="text-sm font-bold text-[#1B2B33] hover:text-[#5BA9D0] transition-colors flex items-center gap-1">
           <Calculator className="h-4 w-4" />
           Calculator
@@ -74,6 +77,9 @@ export default function Header() {
                 </Link>
                 <Link href="#products" className="text-lg font-bold text-[#1B2B33] hover:text-[#5BA9D0]" onClick={closeMenu}>
                   Products
+                </Link>
+                <Link href="#invest" className="text-lg font-bold text-[#1B2B33] hover:text-[#5BA9D0]" onClick={closeMenu}>
+                  Invest
                 </Link>
                 <Link href="#calculator" className="text-lg font-bold text-[#1B2B33] hover:text-[#5BA9D0] flex items-center gap-2" onClick={closeMenu}>
                   <Calculator className="h-5 w-5" />

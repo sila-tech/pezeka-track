@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAppUser, useAuth } from '@/firebase';
 import { Loader2, LogOut, LayoutDashboard, Users, HandCoins, FileDown, Menu, FileText, ShieldCheck, Briefcase, Mail, Share2, FolderKey } from 'lucide-react';
@@ -10,17 +10,29 @@ import { signOut } from 'firebase/auth';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { NotificationBell } from '@/components/admin/NotificationBell';
 import { AINotificationBell } from '@/components/admin/AINotificationBell';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { AdminDataProvider } from '@/context/AdminDataContext';
+import { AdminDataProvider, useAdminLoans } from '@/context/AdminDataContext';
+import { isSuperAdmin as checkSuperAdmin, canAccessSensitiveModules } from '@/lib/admin-auth';
 
 const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }) => {
     const pathname = usePathname();
-    const userRole = user?.role?.toLowerCase()?.trim();
-    const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || 
-                        user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
-                        user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
-    const isFinance = userRole === 'finance';
-    const canSeeSensitive = isSuperAdmin || isFinance;
+    const isSuperAdmin = checkSuperAdmin(user);
+    const canSeeSensitive = canAccessSensitiveModules(user);
+    const { investors, investmentApps } = useAdminLoans();
+
+    const pendingInvCount = useMemo(() => {
+        let count = 0;
+        if (investmentApps) {
+            count += investmentApps.filter(a => a.status === 'pending').length;
+        }
+        if (investors) {
+            investors.forEach(inv => {
+                count += (inv.deposits?.filter((d: any) => d.status === 'pending') || []).length;
+            });
+        }
+        return count;
+    }, [investors, investmentApps]);
 
     const linkClass = (path: string) => cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary",
@@ -68,12 +80,18 @@ const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }
 
                     <Link href="/admin/mail" className={linkClass("/admin/mail")} onClick={onLinkClick}>
                         <Mail className="h-4 w-4" />
-                        Mail
+                        <span>Mail</span>
+                        <Badge variant="outline" className="ml-auto text-[8px] h-4 px-1 leading-none uppercase font-black bg-amber-100 text-amber-700 border-amber-200">Soon</Badge>
                     </Link>
 
                     <Link href="/admin/investors" className={linkClass("/admin/investors")} onClick={onLinkClick}>
                         <Briefcase className="h-4 w-4" />
-                        Investors
+                        <span>Investors</span>
+                        {pendingInvCount > 0 && (
+                            <Badge className="ml-auto flex h-5 w-5 items-center justify-center rounded-full p-0 text-[10px] bg-amber-500 hover:bg-amber-600">
+                                {pendingInvCount}
+                            </Badge>
+                        )}
                     </Link>
 
                     <Link href="/admin/users" className={linkClass("/admin/users")} onClick={onLinkClick}>

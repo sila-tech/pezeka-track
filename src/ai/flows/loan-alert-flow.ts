@@ -85,9 +85,10 @@ export const loanAlertFlow = ai.defineFlow(
     }
 
     const { output } = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash'),
+      model: googleAI.model('gemini-1.5-flash'),
       output: { schema: AlertSchema },
-      prompt: `You are an AI Credit Assistant for Pezeka Credit Ltd.
+      prompt: `SYSTEM INSTRUCTIONS:
+You are an AI Credit Assistant for Pezeka Credit Ltd.
 
 Current User: ${input.userName}
 Role: ${input.userRole}

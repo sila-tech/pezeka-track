@@ -15,23 +15,25 @@ export function getSdks(app: FirebaseApp) {
   };
 }
 
+let cachedSdks: ReturnType<typeof getSdks> | null = null;
+
 export function initializeFirebase() {
+  if (cachedSdks) return cachedSdks;
+
   if (typeof window !== 'undefined' && !getApps().length) {
     try {
-      // Attempt to initialize via Firebase App Hosting environment variables
       firebaseApp = initializeApp();
     } catch (e) {
-      // Only warn in production because it's normal to use the firebaseConfig to initialize
-      // during development
       if (process.env.NODE_ENV === 'production') {
         console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
       }
       firebaseApp = initializeApp(firebaseConfig);
     }
-    return getSdks(firebaseApp);
+    cachedSdks = getSdks(firebaseApp);
+    return cachedSdks;
   }
 
-  // If already initialized or on server, return the SDKs with the already initialized App
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return getSdks(app);
+  cachedSdks = getSdks(app);
+  return cachedSdks;
 }

@@ -13,11 +13,13 @@ export default function ClientOverlays() {
   const pathname = usePathname();
   const { user, loading } = useAppUser();
   
-  // Only show on the absolute root path, and only if we are certain no user is logged in
+  // Show on the landing page (root path)
   const isLandingPage = pathname === '/';
-  // Hide if NOT on landing page OR if user exists OR if path includes portal keywords
+  // Hide if in the customer portal area
   const isPortal = pathname.includes('/account') || pathname.includes('/apply') || pathname.includes('/history') || pathname.includes('/profile');
-  const showWhatsApp = isLandingPage && !user && !loading && !isPortal;
+  
+  // Show on landing page, or potentially other non-portal pages if desired
+  const showWhatsApp = isLandingPage && !isPortal;
 
   if (!showWhatsApp) return null;
 

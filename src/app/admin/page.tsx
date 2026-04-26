@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef } from 'react';
 import { useAppUser, useCollection, useFirestore, useStorage, useMemoFirebase, useDoc } from '@/firebase';
+import { isSuperAdmin as checkSuperAdmin, canAccessStaffModules } from '@/lib/admin-auth';
 import { useAdminLoans } from '@/context/AdminDataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -174,10 +175,8 @@ export default function Dashboard() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
-  const isFinance = user?.role === 'finance';
-  const isStaff = user?.role === 'staff' || isFinance;
-  const isAuthorized = user && (isSuperAdmin || isStaff);
+  const isSuperAdmin = checkSuperAdmin(user);
+  const isAuthorized = canAccessStaffModules(user);
   
   const canManageKYC = isAuthorized;
 
@@ -753,15 +752,15 @@ export default function Dashboard() {
           </Card>
           <Card className="border-l-4 border-l-blue-500">
               <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><HandCoins className="h-3 w-3" /> Period Disbursed</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold">Ksh {myPortfolioStats.totalDisbursed.toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Capital advanced in window</p></CardContent>
+              <CardContent><div className="text-2xl font-bold">Ksh {(Number(myPortfolioStats.totalDisbursed) || 0).toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Capital advanced in window</p></CardContent>
           </Card>
           <Card className="border-l-4 border-l-green-500">
               <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><TrendingUp className="h-3 w-3 text-green-600" /> Period Collected</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-green-600">Ksh {myPortfolioStats.totalCollected.toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Total payments processed</p></CardContent>
+              <CardContent><div className="text-2xl font-bold text-green-600">Ksh {(Number(myPortfolioStats.totalCollected) || 0).toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Total payments processed</p></CardContent>
           </Card>
           <Card className="border-l-4 border-l-orange-500">
               <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground uppercase flex items-center gap-2"><Banknote className="h-3 w-3 text-orange-600" /> My Monthly Expenses</CardTitle></CardHeader>
-              <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {myMonthlyExpenses.toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Facilitation used in {format(new Date(), 'MMMM')}</p></CardContent>
+              <CardContent><div className="text-2xl font-bold text-orange-600">Ksh {(Number(myMonthlyExpenses) || 0).toLocaleString()}</div><p className="text-[10px] text-muted-foreground mt-1">Facilitation used in {format(new Date(), 'MMMM')}</p></CardContent>
           </Card>
       </div>
 
@@ -801,13 +800,13 @@ export default function Dashboard() {
                                                                 {loan.paymentFrequency === 'weekly' && loan.preferredPaymentDay && (
                                                                     <div className="text-[9px] text-blue-600 font-black">{loan.preferredPaymentDay}</div>
                                                                 )}
-                                                            </TableCell><TableCell>{loan.daysUntil < 0 ? <Badge variant="destructive" className="text-[8px]">LATE {Math.abs(loan.daysUntil)}d</Badge> : <Badge variant="secondary" className="text-[8px]">DUE {loan.daysUntil}d</Badge>}</TableCell><TableCell className="text-right whitespace-nowrap"><div className={cn("font-black tabular-nums text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>Ksh {loan.arrearsBalance.toLocaleString()}</div></TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>
+                                                            </TableCell><TableCell>{loan.daysUntil < 0 ? <Badge variant="destructive" className="text-[8px]">LATE {Math.abs(loan.daysUntil)}d</Badge> : <Badge variant="secondary" className="text-[8px]">DUE {loan.daysUntil}d</Badge>}</TableCell><TableCell className="text-right whitespace-nowrap"><div className={cn("font-black tabular-nums text-xs", loan.arrearsBalance > 0 ? "text-destructive" : "text-green-600")}>Ksh {(Number(loan.arrearsBalance) || 0).toLocaleString()}</div></TableCell><TableCell className="text-center"><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4 text-blue-600" /></Button></TableCell></TableRow>
                                                         ))}</TableBody>
                                                 </Table></ScrollArea>
                                         )}
                                     </TabsContent>
-                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
-                                    <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || (loan.nextDueDate ? format(loan.nextDueDate, 'EEEE') : '-')}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {loan.arrearsBalance.toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                    <TabsContent value="daily" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{dailyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {(Number(loan.arrearsBalance) || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
+                                    <TabsContent value="weekly" className="h-full m-0 p-0"><ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Customer & Phone</TableHead><TableHead>Day</TableHead><TableHead>Due</TableHead><TableHead className="text-right">Balance</TableHead><TableHead/></TableRow></TableHeader><TableBody>{weeklyDue.map(loan => (<TableRow key={loan.id}><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">{loan.customerPhone}</div></TableCell><TableCell><div className="text-[10px] font-black text-blue-600 uppercase">{loan.preferredPaymentDay || (loan.nextDueDate ? format(loan.nextDueDate, 'EEEE') : '-')}</div></TableCell><TableCell><Badge variant="outline" className="text-[8px]">{loan.daysUntil === 0 ? 'TODAY' : loan.daysUntil < 0 ? 'LATE' : 'SOON'}</Badge></TableCell><TableCell className="text-right font-bold text-xs tabular-nums">Ksh {(Number(loan.arrearsBalance) || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" onClick={() => setSelectedLoanForNotes(loan as any)}><MessageSquare className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table></ScrollArea></TabsContent>
                                 </div>
                             </Tabs>
                         </CardContent>
@@ -819,7 +818,7 @@ export default function Dashboard() {
                             <ScrollArea className="h-[220px]"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Date</TableHead><TableHead>Amount</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Status</TableHead></TableRow></TableHeader>
                                     <TableBody>{facilitationRequests?.length === 0 ? (<TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">No requests made yet.</TableCell></TableRow>) : (
                                             [...facilitationRequests || []].sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).map((req) => (
-                                                <TableRow key={req.id}><TableCell className="text-[10px]">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM') : '...'}</TableCell><TableCell className="font-bold text-xs">Ksh {req.amount.toLocaleString()}</TableCell><TableCell className="text-[10px] max-w-[150px] truncate">{req.description}</TableCell><TableCell className="text-right"><Badge variant={req.status === 'approved' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase">{req.status}</Badge></TableCell></TableRow>
+                                                <TableRow key={req.id}><TableCell className="text-[10px]">{req.createdAt?.seconds ? format(new Date(req.createdAt.seconds * 1000), 'dd/MM') : '...'}</TableCell><TableCell className="font-bold text-xs">Ksh {(Number(req.amount) || 0).toLocaleString()}</TableCell><TableCell className="text-[10px] max-w-[150px] truncate">{req.description}</TableCell><TableCell className="text-right"><Badge variant={req.status === 'approved' ? 'default' : req.status === 'rejected' ? 'destructive' : 'secondary'} className="text-[8px] font-black uppercase">{req.status}</Badge></TableCell></TableRow>
                                             ))
                                         )}</TableBody>
                                 </Table></ScrollArea>
@@ -833,7 +832,7 @@ export default function Dashboard() {
                         {newApplications.length === 0 ? <div className="p-12 text-center h-full flex flex-col items-center justify-center"><AlertCircle className="h-12 w-12 text-muted-foreground/20 mb-4" /><p className="text-muted-foreground font-medium">No pending applications.</p></div> : (
                             <ScrollArea className="h-full"><Table><TableHeader className="sticky top-0 bg-card z-10"><TableRow><TableHead>Identity & Phone</TableHead><TableHead>Member No</TableHead><TableHead className="text-right">Amount</TableHead><TableHead className="w-[50px]"></TableHead></TableRow></TableHeader>
                                     <TableBody>{newApplications.map((loan) => (
-                                            <TableRow key={loan.id} className="group"><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div></TableCell><TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell><TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(loan.principalAmount || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell></TableRow>
+                                            <TableRow key={loan.id} className="group"><TableCell><div className="font-bold text-xs">{loan.displayName}</div><div className="text-[10px] text-muted-foreground">Ph: {loan.customerPhone}</div></TableCell><TableCell className="text-xs font-bold text-primary">{loan.accountNumber || 'N/A'}</TableCell><TableCell className="text-right font-bold text-xs tabular-nums text-green-600">KES {(Number(loan.principalAmount) || 0).toLocaleString()}</TableCell><TableCell><Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" asChild><Link href="/admin/loans"><ExternalLink className="h-3 w-3" /></Link></Button></TableCell></TableRow>
                                         ))}</TableBody>
                                 </Table></ScrollArea>
                         )}
@@ -959,7 +958,7 @@ export default function Dashboard() {
                                               </TableCell>
                                               <TableCell className="text-right whitespace-nowrap">
                                                   <div className={cn('font-black tabular-nums text-xs', loan.arrearsBalance > 0 ? 'text-destructive' : 'text-green-600')}>
-                                                      Ksh {loan.arrearsBalance.toLocaleString()}
+                                                      Ksh {(Number(loan.arrearsBalance) || 0).toLocaleString()}
                                                   </div>
                                               </TableCell>
                                               <TableCell className="text-center">
@@ -1089,12 +1088,12 @@ function GoalCard({ title, icon, current, target, unit, description }: { title: 
             </CardHeader>
             <CardContent className="pt-2">
                 <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black">{unit === 'Ksh' ? 'Ksh ' : ''}{current.toLocaleString()}</span>
-                    <span className="text-[10px] text-muted-foreground font-bold uppercase">/ {(target || 0).toLocaleString()} {unit === 'Ksh' ? '' : unit}</span>
+                    <span className="text-2xl font-black">{unit === 'Ksh' ? 'Ksh ' : ''}{(Number(current) || 0).toLocaleString()}</span>
+                    <span className="text-[10px] text-muted-foreground font-bold uppercase">/ {(Number(target) || 0).toLocaleString()} {unit === 'Ksh' ? '' : unit}</span>
                 </div>
                 <Progress value={percentage} className="h-2 mt-4" />
                 <p className="text-[9px] text-muted-foreground mt-3 font-medium italic">
-                    {percentage >= 100 ? "Goal achieved! Excellent work." : `Remaining: ${unit === 'Ksh' ? 'Ksh ' : ''}${Math.max(0, (target || 0) - current).toLocaleString()} ${unit === 'Ksh' ? '' : unit}`}
+                    {percentage >= 100 ? "Goal achieved! Excellent work." : `Remaining: ${unit === 'Ksh' ? 'Ksh ' : ''}${Math.max(0, (Number(target) || 0) - (Number(current) || 0)).toLocaleString()} ${unit === 'Ksh' ? '' : unit}`}
                 </p>
             </CardContent>
         </Card>

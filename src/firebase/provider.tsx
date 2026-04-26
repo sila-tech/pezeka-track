@@ -9,10 +9,10 @@ import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
   children: ReactNode;
-  firebaseApp: FirebaseApp;
-  firestore: Firestore;
-  auth: Auth;
-  storage: FirebaseStorage;
+  firebaseApp?: FirebaseApp | null;
+  firestore?: Firestore | null;
+  auth?: Auth | null;
+  storage?: FirebaseStorage | null;
 }
 
 // Internal state for user authentication

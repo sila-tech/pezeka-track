@@ -3,6 +3,7 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { useCollection } from '@/firebase';
 import { useAppUser } from '@/firebase';
+import { canAccessStaffModules } from '@/lib/admin-auth';
 
 // Re-use the same loan shape used across admin pages
 export interface AdminLoan {
@@ -32,34 +33,67 @@ export interface AdminLoan {
   nextDueDate?: Date;
 }
 
+export interface AdminInvestor {
+  uid: string;
+  name: string;
+  email: string;
+  phone: string;
+  totalInvestment: number;
+  currentBalance: number;
+  status: string;
+  deposits: any[];
+  withdrawals: any[];
+}
+
+export interface AdminInvestmentApp {
+  uid: string;
+  name: string;
+  amount: number;
+  status: string;
+}
+
 interface AdminDataContextValue {
   loans: AdminLoan[] | null;
   loansLoading: boolean;
+  investors: AdminInvestor[] | null;
+  investorsLoading: boolean;
+  investmentApps: AdminInvestmentApp[] | null;
+  investmentAppsLoading: boolean;
 }
 
 const AdminDataContext = createContext<AdminDataContextValue>({
   loans: null,
   loansLoading: true,
+  investors: null,
+  investorsLoading: true,
+  investmentApps: null,
+  investmentAppsLoading: true,
 });
 
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAppUser();
 
-  const isSuperAdmin =
-    user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' ||
-    user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
-    user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
-  const isFinance = user?.role?.toLowerCase()?.trim() === 'finance';
-  const isStaff = user?.role?.toLowerCase()?.trim() === 'staff';
-  const isAuthorized = user && (isSuperAdmin || isFinance || isStaff);
+  const isAuthorized = canAccessStaffModules(user);
 
   // ✅ Single subscription for the entire admin section
   const { data: loans, loading: loansLoading } = useCollection<AdminLoan>(
     isAuthorized ? 'loans' : null
   );
 
+  const { data: investors, loading: investorsLoading } = useCollection<AdminInvestor>(
+    isAuthorized ? 'investors' : null
+  );
+
+  const { data: investmentApps, loading: investmentAppsLoading } = useCollection<AdminInvestmentApp>(
+    isAuthorized ? 'investmentApplications' : null
+  );
+
   return (
-    <AdminDataContext.Provider value={{ loans, loansLoading }}>
+    <AdminDataContext.Provider value={{ 
+        loans, loansLoading, 
+        investors, investorsLoading, 
+        investmentApps, investmentAppsLoading 
+    }}>
       {children}
     </AdminDataContext.Provider>
   );

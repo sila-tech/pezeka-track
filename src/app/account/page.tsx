@@ -52,7 +52,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { updateCustomer, generateReferralCode, upsertCustomer, requestDeposit, requestWithdrawal, ensureInvestorProfile } from '@/lib/firestore';
+import { updateCustomer, generateReferralCode, upsertCustomer, requestDeposit, requestWithdrawal, ensureInvestorProfile, submitInvestmentApplication } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -145,8 +145,8 @@ const INVEST_TC = `Terms and Conditions — Pezeka Investment Portfolio
 6. This product is not guaranteed capital protection. Returns are subject to business performance.
 7. By proceeding, you confirm you have read and understood these terms.`;
 
-// Invest modal step: 'info' | 'tc' | 'deposit' | 'deposit_confirm' | 'withdraw'
-type InvestStep = 'info' | 'tc' | 'deposit' | 'deposit_confirm' | 'withdraw';
+// Invest modal step: 'info' | 'tc' | 'apply' | 'calculator' | 'deposit' | 'deposit_confirm' | 'withdraw'
+type InvestStep = 'info' | 'tc' | 'apply' | 'calculator' | 'deposit' | 'deposit_confirm' | 'withdraw';
 
 export default function AccountPage() {
   const { user, loading: userLoading } = useUser();
@@ -156,20 +156,14 @@ export default function AccountPage() {
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState('Home');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [greeting, setGreeting] = useState('Welcome');
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [isLoansOpen, setIsLoansOpen] = useState(false);
   const [isReferOpen, setIsReferOpen] = useState(false);
-  const [isInvestOpen, setIsInvestOpen] = useState(false);
-  const [investStep, setInvestStep] = useState<InvestStep>('info');
-  const [tcAgreed, setTcAgreed] = useState(false);
-  const [depositAmount, setDepositAmount] = useState('');
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [isSubmittingInvest, setIsSubmittingInvest] = useState(false);
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [randomTip, setRandomTip] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; content: string }[]>([
-    { role: 'model', content: `Hello! 🚀 I'm NOVA, your Pezeka Neural Assistant. I'm currently completing my training to serve you better. I'll be fully online soon to help with your loans and financial advice. Stay tuned! ✨` }
+    { role: 'model', content: `Hello! 🚀 I'm NOVA, your Pezeka Neural Assistant. I'm now online and ready to help you with loan applications, payment history, and financial advice. How can I assist you today? ✨` }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -190,6 +184,7 @@ export default function AccountPage() {
 
   const { data: customerProfile, loading: profileLoading } = useDoc<Customer>(user ? `customers/${user.uid}` : null);
   const { data: investorProfile, loading: investorLoading } = useDoc<InvestorProfile>(user ? `investors/${user.uid}` : null);
+  const { data: investmentApplication } = useDoc<any>(user ? `investmentApplications/${user.uid}` : null);
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
@@ -383,63 +378,10 @@ export default function AccountPage() {
       }
   };
 
-  const openInvestModal = () => {
-    setInvestStep('info');
-    setTcAgreed(false);
-    setDepositAmount('');
-    setWithdrawAmount('');
-    setIsInvestOpen(true);
+  const openInvestTab = () => {
+    router.push('/account/invest');
   };
 
-  const handleDepositNotify = async () => {
-    if (!user) return;
-    const amount = parseFloat(depositAmount);
-    if (isNaN(amount) || amount < 500) {
-      toast({ variant: 'destructive', title: 'Minimum 500 Ksh required' });
-      return;
-    }
-    setIsSubmittingInvest(true);
-    try {
-      // Ensure investor profile exists
-      await ensureInvestorProfile(
-        firestore,
-        user.uid,
-        fullName,
-        user.email || customerProfile?.email || ''
-      );
-      await requestDeposit(firestore, user.uid, amount);
-      toast({ title: 'Deposit Noted!', description: 'Finance will verify and approve. Interest starts upon approval.' });
-      setInvestStep('deposit_confirm');
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-      setIsSubmittingInvest(false);
-    }
-  };
-
-  const handleWithdrawRequest = async () => {
-    if (!user) return;
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast({ variant: 'destructive', title: 'Enter a valid amount' });
-      return;
-    }
-    if (amount > (investorProfile?.currentBalance || 0)) {
-      toast({ variant: 'destructive', title: 'Insufficient balance' });
-      return;
-    }
-    setIsSubmittingInvest(true);
-    try {
-      await requestWithdrawal(firestore, user.uid, amount);
-      toast({ title: 'Withdrawal Requested', description: 'Your request will be processed within 5 business days.' });
-      setWithdrawAmount('');
-      setIsInvestOpen(false);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-      setIsSubmittingInvest(false);
-    }
-  };
 
   const submitAIApplication = async () => {
     if (!pendingAIApplication || !user) return;
@@ -599,11 +541,13 @@ export default function AccountPage() {
                     icon={
                       <div className="relative">
                         <TrendingUp className="h-6 w-6" />
-                        <span className="absolute -top-2 -right-2 bg-amber-400 text-[8px] font-black text-white px-1 py-0.5 rounded-full leading-none uppercase tracking-wide">Soon</span>
+                        {investmentApplication?.status === 'pending' && (
+                          <span className="absolute -top-2 -right-2 bg-amber-400 text-[8px] font-black text-white px-1 py-0.5 rounded-full leading-none uppercase tracking-wide">Review</span>
+                        )}
                       </div>
                     }
                     label="Invest"
-                    onClick={() => toast({ title: '🚀 Coming Soon', description: 'The Investment feature is launching soon. Stay tuned!' })}
+                    onClick={openInvestTab}
                     highlight
                 />
                     <ActionCircle icon={<Wallet className="h-6 w-6" />} label="Pay" onClick={() => setIsPayOpen(true)} />
@@ -753,69 +697,24 @@ export default function AccountPage() {
                 </Card>
             </div>
         )}
-
         {activeTab === 'Assistant' && (
-            <div className="flex flex-col h-[calc(100vh-180px)] -mt-2">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="relative h-12 w-12 rounded-2xl flex items-center justify-center overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-[#0078D4] to-cyan-500 opacity-90" />
-                        <BrainCircuit className="h-6 w-6 text-white relative z-10" />
+            <div className="flex flex-col h-[calc(100vh-180px)] items-center justify-center -mt-2 space-y-6 text-center px-4">
+                <div className="relative">
+                    <div className="h-24 w-24 rounded-[2rem] bg-gradient-to-br from-violet-600 via-[#0078D4] to-cyan-500 flex items-center justify-center shadow-2xl shadow-blue-500/20">
+                        <BrainCircuit className="h-12 w-12 text-white animate-pulse" />
                     </div>
-                    <div>
-                        <h3 className="text-xl font-black text-[#1B2B33] tracking-tight">NOVA</h3>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                            <Sparkles className="h-3 w-3 text-violet-500" /> Neural AI by Pezeka
-                        </p>
-                    </div>
+                    <Badge className="absolute -top-2 -right-2 bg-amber-400 text-[10px] font-black text-white px-2 py-1 rounded-full uppercase tracking-wider border-2 border-white shadow-lg">Coming Soon</Badge>
                 </div>
-
-                <div 
-                    ref={scrollRef}
-                    className="flex-1 overflow-y-auto space-y-4 pr-2 scroll-smooth"
-                >
-                    {messages.map((msg, i) => (
-                        <div key={i} className={cn(
-                            "flex w-full",
-                            msg.role === 'user' ? "justify-end" : "justify-start"
-                        )}>
-                            <div className={cn(
-                                "max-w-[85%] px-5 py-4 rounded-3xl text-sm leading-relaxed",
-                                msg.role === 'user' 
-                                    ? "bg-primary text-white rounded-tr-none shadow-lg shadow-primary/20" 
-                                    : "bg-white border border-muted text-[#1B2B33] rounded-tl-none shadow-sm"
-                            )}>
-                                {msg.content}
-                            </div>
-                        </div>
-                    ))}
-                    {isTyping && (
-                        <div className="flex justify-start">
-                            <div className="bg-white border border-muted px-5 py-4 rounded-3xl rounded-tl-none shadow-sm">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            </div>
-                        </div>
-                    )}
+                <div className="space-y-2">
+                    <h3 className="text-2xl font-black text-[#1B2B33] tracking-tight">Meet NOVA</h3>
+                    <p className="text-sm text-muted-foreground font-medium max-w-[280px]">
+                        Our Neural AI assistant is currently being trained to provide you with better financial insights and support.
+                    </p>
                 </div>
-
-                <div className="mt-4 flex gap-2 items-center bg-[#F8FAFB] border border-muted p-2 rounded-[2rem] shadow-none transition-all opacity-60">
-                    <Input 
-                        placeholder="NOVA is coming soon..." 
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        disabled={true}
-                        className="flex-1 border-none focus-visible:ring-0 h-12 bg-transparent text-sm font-medium italic"
-                    />
-                    <Button 
-                        size="icon" 
-                        disabled={true}
-                        className="h-12 w-12 rounded-full shrink-0 shadow-none bg-muted grayscale"
-                    >
-                        <Send className="h-5 w-5" />
-                    </Button>
+                <div className="bg-[#0078D4]/5 border border-[#0078D4]/10 rounded-2xl p-4 w-full">
+                    <p className="text-[10px] font-black text-[#0078D4] uppercase tracking-widest mb-1">Status</p>
+                    <p className="text-xs font-bold text-[#1B2B33]">Integration in progress... ⚙️</p>
                 </div>
-                <p className="text-[9px] text-center text-muted-foreground mt-3 font-bold uppercase tracking-widest">
-                    AI can make mistakes. Always verify loan terms in the app.
-                </p>
             </div>
         )}
 
@@ -880,7 +779,6 @@ export default function AccountPage() {
       <nav className="fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-md border-t px-8 flex items-center justify-between z-50">
           <NavItem icon={<Home className="h-6 w-6" />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} />
           <NavItem icon={<History className="h-6 w-6" />} label="History" active={activeTab === 'History'} onClick={() => setActiveTab('History')} />
-
           {/* ── NOVA centre button ── */}
           <div className="relative flex flex-col items-center -mt-8">
             <button
@@ -898,11 +796,8 @@ export default function AccountPage() {
               {/* pulse ring */}
               <span className="absolute inset-0 rounded-[1.6rem] animate-ping opacity-20 bg-[#0078D4] group-hover:opacity-30" />
               <BrainCircuit className="h-8 w-8 text-white relative z-10" />
+              <span className="absolute -top-1 -right-1 bg-amber-400 text-[8px] font-black text-white px-1 py-0.5 rounded-full leading-none uppercase tracking-tight z-20 border border-white shadow-sm">Soon</span>
               
-              {/* Soon Badge */}
-              <div className="absolute -top-1 -right-3 bg-yellow-400 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm border border-black/10 z-20">
-                SOON
-              </div>
             </button>
             <span className="mt-1.5 text-[9px] font-black uppercase tracking-widest"
               style={{ color: activeTab === 'Assistant' ? '#7c3aed' : '#1B2B33' }}>
@@ -914,214 +809,7 @@ export default function AccountPage() {
           <NavItem icon={<User className="h-6 w-6" />} label="Profile" active={activeTab === 'Profile'} onClick={() => setActiveTab('Profile')} />
       </nav>
 
-      {/* ===== INVEST MODAL ===== */}
-      <Dialog open={isInvestOpen} onOpenChange={(o) => { if (!o) setIsInvestOpen(false); }}>
-          <DialogContent className="sm:max-w-md rounded-[2.5rem] p-0 overflow-hidden">
-              <DialogTitle className="sr-only">Investment Portfolio</DialogTitle>
-              <DialogDescription className="sr-only">Invest and grow your money with Pezeka</DialogDescription>
-              
-              {/* Info Step */}
-              {investStep === 'info' && (
-                <div className="flex flex-col">
-                  <div className="bg-gradient-to-br from-[#1B2B33] to-[#0d4a5e] p-10 text-white text-center space-y-4">
-                    <div className="w-16 h-16 rounded-3xl bg-green-400/20 border border-green-400/30 flex items-center justify-center mx-auto">
-                      <TrendingUp className="h-8 w-8 text-green-400" />
-                    </div>
-                    <h2 className="text-3xl font-black">Wealth Growth</h2>
-                    <p className="text-white/70 text-sm">Grow your money while you sleep</p>
-                  </div>
-                  <div className="p-8 space-y-6 bg-white">
-                    {investorProfile && (
-                      <div className="grid grid-cols-2 gap-3 mb-2">
-                        <div className="bg-green-50 rounded-2xl p-4 text-center border border-green-100">
-                          <p className="text-[10px] font-black uppercase text-green-700 mb-1">My Balance</p>
-                          <p className="text-xl font-black text-green-700">KES {(investorProfile.currentBalance || 0).toLocaleString()}</p>
-                        </div>
-                        <div className="bg-blue-50 rounded-2xl p-4 text-center border border-blue-100">
-                          <p className="text-[10px] font-black uppercase text-blue-700 mb-1">Total Invested</p>
-                          <p className="text-xl font-black text-blue-700">KES {(investorProfile.totalInvestment || 0).toLocaleString()}</p>
-                        </div>
-                      </div>
-                    )}
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-4 bg-[#F8FAFB] rounded-2xl border">
-                        <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center shrink-0">
-                          <TrendingUp className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-black text-sm">30% Annual Return</p>
-                          <p className="text-muted-foreground text-[11px]">Compounding daily on your balance</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-[#F8FAFB] rounded-2xl border">
-                        <div className="w-10 h-10 rounded-xl bg-[#0078D4]/10 flex items-center justify-center shrink-0">
-                          <Coins className="h-5 w-5 text-[#0078D4]" />
-                        </div>
-                        <div>
-                          <p className="font-black text-sm">Minimum: Ksh 500</p>
-                          <p className="text-muted-foreground text-[11px]">Start small, grow big</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-[#F8FAFB] rounded-2xl border">
-                        <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-                          <ShieldCheck className="h-5 w-5 text-purple-500" />
-                        </div>
-                        <div>
-                          <p className="font-black text-sm">Interest starts on approval</p>
-                          <p className="text-muted-foreground text-[11px]">Finance team verifies each deposit</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <Button variant="outline" className="h-14 rounded-2xl font-black" onClick={() => setInvestStep('tc')}>
-                        <Coins className="h-4 w-4 mr-2" /> Invest Now
-                      </Button>
-                      {investorProfile && (investorProfile.currentBalance || 0) > 0 && (
-                        <Button variant="outline" className="h-14 rounded-2xl font-black border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => setInvestStep('withdraw')}>
-                          <ArrowDownCircle className="h-4 w-4 mr-2" /> Withdraw
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {/* T&C Step */}
-              {investStep === 'tc' && (
-                <div className="flex flex-col">
-                  <div className="bg-[#1B2B33] p-8 text-white">
-                    <button onClick={() => setInvestStep('info')} className="flex items-center gap-2 text-white/60 text-xs mb-4 font-black uppercase tracking-wider">
-                      <ChevronLeft className="h-4 w-4" /> Back
-                    </button>
-                    <h2 className="text-2xl font-black">Terms & Conditions</h2>
-                    <p className="text-white/60 text-xs mt-1">Please read before proceeding</p>
-                  </div>
-                  <div className="p-8 bg-white space-y-6">
-                    <ScrollArea className="h-48 border rounded-2xl p-4 bg-[#F8FAFB]">
-                      <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">{INVEST_TC}</pre>
-                    </ScrollArea>
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <Checkbox checked={tcAgreed} onCheckedChange={(v) => setTcAgreed(!!v)} className="mt-0.5" />
-                      <span className="text-sm font-semibold text-[#1B2B33]">I have read and I agree to the Terms and Conditions above.</span>
-                    </label>
-                    <Button
-                      className="w-full h-14 rounded-2xl bg-[#1B2B33] text-white font-black text-base disabled:opacity-40"
-                      disabled={!tcAgreed}
-                      onClick={() => setInvestStep('deposit')}
-                    >
-                      Continue to Invest
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Deposit Step */}
-              {investStep === 'deposit' && (
-                <div className="flex flex-col">
-                  <div className="bg-[#1B2B33] p-8 text-white">
-                    <button onClick={() => setInvestStep('tc')} className="flex items-center gap-2 text-white/60 text-xs mb-4 font-black uppercase tracking-wider">
-                      <ChevronLeft className="h-4 w-4" /> Back
-                    </button>
-                    <h2 className="text-2xl font-black">Invest Funds</h2>
-                    <p className="text-white/60 text-xs mt-1">Pay via M-Pesa then notify us</p>
-                  </div>
-                  <div className="p-8 bg-white space-y-5">
-                    {/* Payment details */}
-                    <div className="bg-[#F8FAFB] rounded-3xl p-6 space-y-4 border">
-                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">M-Pesa Payment Details</p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground text-xs font-bold uppercase">Paybill</span>
-                        <span className="text-2xl font-black">522522</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground text-xs font-bold uppercase">Account No.</span>
-                        <span className="text-2xl font-black">1347823360</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground">Amount to Invest (Ksh)</label>
-                      <Input
-                        type="number"
-                        min={500}
-                        placeholder="Minimum 500"
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                        className="h-14 rounded-2xl text-lg font-black bg-[#F8FAFB]"
-                      />
-                      <p className="text-[10px] text-muted-foreground">Enter the amount you have paid or will pay via M-Pesa.</p>
-                    </div>
-                    <Button
-                      className="w-full h-14 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black text-base shadow-lg shadow-green-600/20"
-                      onClick={handleDepositNotify}
-                      disabled={isSubmittingInvest}
-                    >
-                      {isSubmittingInvest ? <Loader2 className="h-5 w-5 animate-spin" /> : 'I Have Paid — Notify Finance'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Deposit Confirmed Step */}
-              {investStep === 'deposit_confirm' && (
-                <div className="flex flex-col items-center text-center p-10 bg-white space-y-6">
-                  <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-                    <CheckCircle2 className="h-10 w-10 text-green-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-[#1B2B33]">Deposit Notified!</h2>
-                    <p className="text-muted-foreground text-sm mt-2">Finance will verify your M-Pesa payment and approve. Your interest will start compounding from the moment it's approved.</p>
-                  </div>
-                  <div className="bg-[#F8FAFB] rounded-2xl p-4 w-full border text-left space-y-1">
-                    <p className="text-[10px] font-black uppercase text-muted-foreground">Amount Submitted</p>
-                    <p className="text-2xl font-black text-green-600">KES {parseFloat(depositAmount || '0').toLocaleString()}</p>
-                  </div>
-                  <Button className="w-full h-14 rounded-2xl bg-[#1B2B33] font-black text-white" onClick={() => setIsInvestOpen(false)}>
-                    Done
-                  </Button>
-                </div>
-              )}
-
-              {/* Withdraw Step */}
-              {investStep === 'withdraw' && (
-                <div className="flex flex-col">
-                  <div className="bg-[#1B2B33] p-8 text-white">
-                    <button onClick={() => setInvestStep('info')} className="flex items-center gap-2 text-white/60 text-xs mb-4 font-black uppercase tracking-wider">
-                      <ChevronLeft className="h-4 w-4" /> Back
-                    </button>
-                    <h2 className="text-2xl font-black">Request Withdrawal</h2>
-                    <p className="text-white/60 text-xs mt-1">Processed within 5 business days</p>
-                  </div>
-                  <div className="p-8 bg-white space-y-5">
-                    <div className="bg-[#F8FAFB] rounded-3xl p-6 border flex justify-between items-center">
-                      <span className="text-xs font-black uppercase text-muted-foreground">Available Balance</span>
-                      <span className="text-2xl font-black text-green-600">KES {(investorProfile?.currentBalance || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black uppercase text-muted-foreground">Withdrawal Amount (Ksh)</label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={investorProfile?.currentBalance || 0}
-                        placeholder="Enter amount"
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className="h-14 rounded-2xl text-lg font-black bg-[#F8FAFB]"
-                      />
-                    </div>
-                    <Button
-                      className="w-full h-14 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-base shadow-lg shadow-orange-600/20"
-                      onClick={handleWithdrawRequest}
-                      disabled={isSubmittingInvest}
-                    >
-                      {isSubmittingInvest ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Submit Withdrawal Request'}
-                    </Button>
-                    <p className="text-[10px] text-center text-muted-foreground">Once approved, funds will be sent to your registered M-Pesa number.</p>
-                  </div>
-                </div>
-              )}
-
-          </DialogContent>
-      </Dialog>
 
       <Dialog open={isReferOpen} onOpenChange={setIsReferOpen}>
           <DialogContent className="sm:max-w-md rounded-[2.5rem]">

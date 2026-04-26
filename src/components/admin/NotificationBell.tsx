@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useCollection } from '@/firebase';
-import { Bell, HandCoins, UserPlus } from 'lucide-react';
+import { Bell, HandCoins, UserPlus, Briefcase, Landmark } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -28,9 +28,25 @@ interface Customer {
     createdAt: { seconds: number; nanoseconds: number } | any;
 }
 
+interface InvestmentApplication {
+    uid: string;
+    name: string;
+    amount: number;
+    status: string;
+    createdAt: { seconds: number; nanoseconds: number } | any;
+}
+
+interface Investor {
+    uid: string;
+    name: string;
+    deposits: { depositId: string; amount: number; status: string; date: any }[];
+}
+
 export function NotificationBell() {
   const { data: loans, loading: loansLoading } = useCollection<Loan>('loans');
   const { data: customers, loading: customersLoading } = useCollection<Customer>('customers');
+  const { data: invApps, loading: invAppsLoading } = useCollection<InvestmentApplication>('investmentApplications');
+  const { data: investors, loading: investorsLoading } = useCollection<Investor>('investors');
 
   const getTimestamp = (date: any) => {
     if (!date) return 0;
@@ -80,11 +96,44 @@ export function NotificationBell() {
         });
     }
 
+    if (invApps) {
+        invApps.filter(a => a.status === 'pending').forEach(a => {
+            list.push({
+                id: `invapp-${a.uid}`,
+                type: 'investment_app',
+                title: 'New Investment App',
+                description: `${a.name || 'User'} applied to invest Ksh ${(a.amount || 0).toLocaleString()}`,
+                date: a.createdAt,
+                href: '/admin/investors',
+                icon: <Briefcase className="h-3 w-3 text-purple-600" />,
+                bg: 'bg-purple-100'
+            });
+        });
+    }
+
+    if (investors) {
+        investors.forEach(inv => {
+            const pendingDeposits = inv.deposits?.filter(d => d.status === 'pending') || [];
+            pendingDeposits.forEach(d => {
+                list.push({
+                    id: `deposit-${d.depositId}`,
+                    type: 'deposit',
+                    title: 'Investment Deposit',
+                    description: `${inv.name || 'Investor'} notified deposit of Ksh ${(d.amount || 0).toLocaleString()}`,
+                    date: d.date,
+                    href: '/admin/investors',
+                    icon: <Landmark className="h-3 w-3 text-amber-600" />,
+                    bg: 'bg-amber-100'
+                });
+            });
+        });
+    }
+
     return list.sort((a, b) => getTimestamp(b.date) - getTimestamp(a.date));
-  }, [loans, customers]);
+  }, [loans, customers, invApps, investors]);
 
   const count = notifications.length;
-  const loading = loansLoading || customersLoading;
+  const loading = loansLoading || customersLoading || invAppsLoading || investorsLoading;
 
   return (
     <Popover>

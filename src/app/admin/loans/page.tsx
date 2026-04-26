@@ -7,7 +7,9 @@ import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser, useMemoFirebase, useStorage } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, Search, User, Eye, AlertCircle, Pencil, Trash2, FileText, Camera, ShieldCheck, ArrowRight, Lock, Upload, ImagePlus, RefreshCw, CheckCircle2, Sparkles, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, Loader2, PlusCircle, Eye, Pencil, Trash2, CheckCircle2, User, Users, RefreshCw, Landmark, Phone, Calendar, ShieldCheck, Sparkles, AlertCircle, AlertTriangle, CheckCircle, ChevronDown, Check } from 'lucide-react';
+import { canAccessStaffModules, canAccessSensitiveModules } from '@/lib/admin-auth';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getDoc, collection, query, where } from 'firebase/firestore';
 import {
   Dialog,
@@ -19,6 +21,7 @@ import {
   DialogClose,
   DialogDescription,
 } from '@/components/ui/dialog';
+// Command UI components removed as they are missing in this environment
 import {
   Form,
   FormControl,
@@ -182,6 +185,7 @@ export default function LoansPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [memberTabSearch, setMemberTabSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [applicationToManage, setApplicationToManage] = useState<Loan | null>(null);
   const [viewingApplication, setViewingApplication] = useState<Loan | null>(null);
@@ -203,6 +207,7 @@ export default function LoansPage() {
   const [isKYCAddOpen, setIsKYCAddOpen] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -211,13 +216,8 @@ export default function LoansPage() {
   const storage = useStorage();
   const { toast } = useToast();
 
-  const isSuperAdmin = user?.email?.toLowerCase() === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
-  const userRole = user?.role?.toLowerCase();
-  const isFinance = userRole === 'finance';
-  const isStaff = userRole === 'staff' || isFinance;
-  
-  const isAuthorized = isSuperAdmin || isStaff;
-  const canEdit = isSuperAdmin || isFinance; 
+  const isAuthorized = canAccessStaffModules(user);
+  const canEdit = canAccessSensitiveModules(user);
   const canViewKYC = isAuthorized;
 
   const { data: customers, loading: customersLoading } = useCollection<Customer>(isAuthorized ? 'customers' : null);
@@ -282,6 +282,21 @@ export default function LoansPage() {
         return d2 - d1;
     });
   }, [loans]);
+
+  const sortedAllMembers = useMemo(() => {
+    if (!customers) return [];
+    let result = [...customers];
+    if (memberTabSearch) {
+        const s = memberTabSearch.toLowerCase();
+        result = result.filter(c => 
+            c.name?.toLowerCase().includes(s) || 
+            c.phone?.includes(s) || 
+            c.idNumber?.includes(s) || 
+            c.accountNumber?.toLowerCase().includes(s)
+        );
+    }
+    return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [customers, memberTabSearch]);
 
 
   const form = useForm<z.infer<typeof loanSchema>>({
@@ -660,101 +675,285 @@ export default function LoansPage() {
         <h1 className="text-3xl font-bold tracking-tight">Loans</h1>
         {canEdit && (
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Loan</Button></DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
-              <DialogHeader className="p-6 pb-0"><DialogTitle>Add a New Loan</DialogTitle><DialogDescription>Input specific terms to disburse a new credit facility.</DialogDescription></DialogHeader>
+            <DialogTrigger asChild><Button><Search className="mr-2 h-4 w-4" />Add / Search Member</Button></DialogTrigger>
+            <DialogContent className="sm:max-w-[700px] h-[90vh] p-0 flex flex-col overflow-hidden border-none shadow-2xl">
+              <DialogHeader className="p-8 pb-4 bg-gradient-to-r from-primary/10 to-transparent border-b">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/20 rounded-lg text-primary">
+                        <PlusCircle className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <DialogTitle className="text-2xl font-black">Add a New Loan</DialogTitle>
+                        <DialogDescription className="text-sm font-medium">Configure specific credit terms for a new disbursement facility.</DialogDescription>
+                    </div>
+                </div>
+              </DialogHeader>
               <Form {...form}>
-                <ScrollArea className="max-h-[65vh] px-6 py-2">
-                  <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 pb-4">
-                    <FormField control={form.control} name="customerType" render={({ field }) => (
-                        <FormItem className="col-span-2">
-                          <FormLabel>Customer Type</FormLabel>
-                          <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
-                              <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="existing" /></FormControl><FormLabel className="font-normal">Existing</FormLabel></FormItem>
-                              <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="new" /></FormControl><FormLabel className="font-normal">New</FormLabel></FormItem>
-                          </RadioGroup>
-                        </FormItem>
-                    )} />
-                    {customerTypeWatch === 'existing' ? (
-                      <FormField control={form.control} name="customerId" render={({ field }) => (
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <ScrollArea className="flex-1 p-8">
+                    <form id="add-loan-form" onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-2 gap-6 pb-8">
+                      <FormField control={form.control} name="customerType" render={({ field }) => (
                           <FormItem className="col-span-2">
-                            <FormLabel>Customer</FormLabel>
-                            <Select onValueChange={(v) => { field.onChange(v); setCustomerSearch(''); }} defaultValue={field.value} value={field.value}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                <div className="flex items-center border-b px-3 pb-2 mb-1">
-                                  <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
-                                  <input
-                                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                                    placeholder="Search customer..."
-                                    value={customerSearch}
-                                    onChange={(e) => setCustomerSearch(e.target.value)}
-                                    onKeyDown={(e) => e.stopPropagation()}
-                                  />
-                                </div>
-                                {customers
-                                  ?.filter(c =>
-                                    (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-                                    (c.accountNumber || '').toLowerCase().includes(customerSearch.toLowerCase())
-                                  )
-                                  .map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)
-                                }
-                                {customers?.filter(c =>
-                                  (c.name || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-                                  (c.accountNumber || '').toLowerCase().includes(customerSearch.toLowerCase())
-                                ).length === 0 && (
-                                  <div className="py-4 text-center text-sm text-muted-foreground">No customers found.</div>
-                                )}
-                              </SelectContent>
-                            </Select>
+                            <FormLabel className="text-sm font-bold flex items-center gap-2 mb-2">
+                              <Sparkles className="h-4 w-4 text-primary" />
+                              Customer Type
+                            </FormLabel>
+                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                                <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="existing" /></FormControl><FormLabel className="font-normal">Existing Member</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="new" /></FormControl><FormLabel className="font-normal">New Registration</FormLabel></FormItem>
+                            </RadioGroup>
                           </FormItem>
                       )} />
-                    ) : (
-                      <>
-                        <FormField control={form.control} name="newCustomerName" render={({ field }) => (
-                            <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                        )} />
-                        <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (
-                            <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                        )} />
-                      </>
-                    )}
-                    <FormField control={form.control} name="idNumber" render={({ field }) => (
-                        <FormItem className="col-span-2"><FormLabel>ID Number</FormLabel><FormControl><Input placeholder="Customer ID" {...field} /></FormControl><FormMessage/></FormItem>
-                    )} />
-                    <FormField control={form.control} name="assignedStaffId" render={({ field }) => (
-                        <FormItem className="col-span-2"><FormLabel>Assign Staff</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select staff"/></SelectTrigger></FormControl><SelectContent>{staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}</SelectContent></Select></FormItem>
-                    )} />
-                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (
-                        <FormItem><FormLabel>Disbursement Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="firstPaymentDate" render={({ field }) => (
-                        <FormItem><FormLabel className="text-primary font-bold">First Payment Date</FormLabel><FormControl><Input type="date" {...field} className="border-primary/30" /></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="principalAmount" render={({ field }) => (
-                        <FormItem><FormLabel>Principal</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="interestRate" render={({ field }) => (
-                        <FormItem><FormLabel>Interest %</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (
-                        <FormItem><FormLabel>Instalments</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                    )} />
-                    <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
-                      <FormItem><FormLabel>Frequency</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select frequency"/></SelectTrigger></FormControl><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></FormItem>
-                    )} />
-                    {form.watch('paymentFrequency') === 'weekly' && (
-                        <FormField control={form.control} name="preferredPaymentDay" render={({ field }) => (
-                            <FormItem><FormLabel>Preferred Day</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="e.g. Monday" /></SelectTrigger></FormControl><SelectContent>{DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select></FormItem>
-                        )} />
-                    )}
-                    <div className="col-span-2 space-y-2 rounded-md bg-muted p-4">
-                      <div className="flex justify-between"><span className="text-sm">Instalment</span><span className="font-bold">Ksh {calculatedValues.instalmentAmount}</span></div>
-                      <div className="flex justify-between"><span className="text-sm">Total</span><span className="font-bold">Ksh {calculatedValues.totalRepayableAmount}</span></div>
-                    </div>
-                  </form>
-                </ScrollArea>
-                <DialogFooter className="p-6 pt-2"><DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose><Button type="submit" form="add-loan-form" disabled={isSubmitting}>Disburse</Button></DialogFooter>
+
+                      <div className="col-span-2 space-y-6">
+                                {/* Section 1: Member Details */}
+                                <div className="space-y-4">
+                                  <div className="flex items-center gap-2 px-1 border-b pb-2">
+                                    <div className="h-4 w-1 bg-primary rounded-full" />
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">1. Member Details</h3>
+                                  </div>
+
+                                  {form.watch('customerType') === 'existing' ? (
+                                    <FormField control={form.control} name="customerId" render={({ field }) => (
+                                      <FormItem className="col-span-2">
+                                        <Popover open={isCustomerSelectOpen} onOpenChange={setIsCustomerSelectOpen}>
+                                          <PopoverTrigger asChild>
+                                            <FormControl>
+                                              <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                className={cn(
+                                                  "w-full justify-between h-14 text-left font-normal border-primary/20 hover:border-primary transition-all shadow-sm bg-white",
+                                                  !field.value && "text-muted-foreground"
+                                                )}
+                                              >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                        <User className="h-4 w-4 text-primary" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Selected Member</span>
+                                                        <span className="font-semibold text-foreground">
+                                                            {field.value
+                                                                ? customers?.find((c) => c.id === field.value)?.name || "Unknown Member"
+                                                                : "Search by Name, Phone or ID..."}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                  <Search className="h-4 w-4 text-primary opacity-50" />
+                                                  <ChevronDown className="h-4 w-4 opacity-50" />
+                                                </div>
+                                              </Button>
+                                            </FormControl>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[400px] p-0 shadow-2xl border-primary/10" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                                            <div className="flex flex-col max-h-[450px]">
+                                                <div className="p-3 border-b bg-muted/30">
+                                                    <div className="relative">
+                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                                                        <Input 
+                                                            placeholder="Search members..." 
+                                                            className="pl-9 h-11 bg-background border-primary/20 focus-visible:ring-primary"
+                                                            value={customerSearch}
+                                                            onChange={(e) => setCustomerSearch(e.target.value)}
+                                                            onKeyDown={(e) => e.stopPropagation()}
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <ScrollArea className="h-[300px]">
+                                                    <div className="p-2 space-y-1">
+                                                        {customersLoading ? (
+                                                            <div className="flex items-center justify-center py-10">
+                                                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                {(() => {
+                                                                    const searchLower = (customerSearch || "").toLowerCase();
+                                                                    const filtered = customers?.filter(c => {
+                                                                        if (!searchLower) return true;
+                                                                        const nameMatch = c.name?.toLowerCase().includes(searchLower);
+                                                                        const phoneMatch = c.phone?.includes(customerSearch);
+                                                                        const idMatch = c.idNumber?.includes(customerSearch);
+                                                                        const accountMatch = c.accountNumber?.toLowerCase().includes(searchLower);
+                                                                        return nameMatch || phoneMatch || idMatch || accountMatch;
+                                                                    }).slice(0, 100);
+
+                                                                    if (!filtered || filtered.length === 0) {
+                                                                        return (
+                                                                            <div className="text-center py-10 px-4">
+                                                                                <User className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+                                                                                <p className="text-sm text-muted-foreground font-medium">No members found</p>
+                                                                                <p className="text-xs text-muted-foreground mt-1">Try a different search term</p>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    return filtered.map((c) => (
+                                                                        <button
+                                                                            key={c.id}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                form.setValue("customerId", c.id);
+                                                                                form.setValue("idNumber", c.idNumber || '');
+                                                                                setIsCustomerSelectOpen(false);
+                                                                            }}
+                                                                            className={cn(
+                                                                                "w-full text-left px-3 py-3 flex items-center gap-3 rounded-lg transition-all hover:bg-primary/5 group",
+                                                                                field.value === c.id ? "bg-primary/10 border border-primary/20 shadow-sm" : "border border-transparent hover:border-primary/10"
+                                                                            )}
+                                                                        >
+                                                                            <div className={cn(
+                                                                                "h-10 w-10 rounded-full flex items-center justify-center shrink-0 shadow-sm",
+                                                                                field.value === c.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                                                                            )}>
+                                                                                {field.value === c.id ? <CheckCircle2 className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                                                                            </div>
+                                                                            <div className="flex flex-col min-w-0 flex-1">
+                                                                                <span className={cn(
+                                                                                    "font-black text-sm truncate",
+                                                                                    field.value === c.id ? "text-primary" : "text-slate-900"
+                                                                                )}>{c.name || "Unnamed Member"}</span>
+                                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-background font-black border-primary/20 px-1.5 text-primary">
+                                                                                        {c.accountNumber || 'NO-ACC'}
+                                                                                    </Badge>
+                                                                                    <span className="text-[10px] text-slate-500 font-bold">
+                                                                                        {c.phone}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </button>
+                                                                    ));
+                                                                })()}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </ScrollArea>
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )} />
+                                  ) : (
+                                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
+                                      <FormField control={form.control} name="newCustomerName" render={({ field }) => (
+                                          <FormItem><FormLabel className="text-[10px] font-black uppercase">Name</FormLabel><FormControl><Input placeholder="Full Name" {...field} className="h-10 bg-white" /></FormControl></FormItem>
+                                      )} />
+                                      <FormField control={form.control} name="newCustomerPhone" render={({ field }) => (
+                                          <FormItem><FormLabel className="text-[10px] font-black uppercase">Phone</FormLabel><FormControl><Input placeholder="07XX..." {...field} className="h-10 bg-white" /></FormControl></FormItem>
+                                      )} />
+                                    </div>
+                                  )}
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField control={form.control} name="idNumber" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-[10px] font-black uppercase">ID Number</FormLabel>
+                                          <FormControl><Input placeholder="National ID" {...field} className="h-10" /></FormControl>
+                                          <FormMessage/>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={form.control} name="assignedStaffId" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-[10px] font-black uppercase">Credit Officer</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <FormControl><SelectTrigger className="h-10"><SelectValue placeholder="Assign staff"/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                              {staffList?.map(s => <SelectItem key={s.id} value={s.uid || s.id}>{s.name || s.email}</SelectItem>)}
+                                            </SelectContent>
+                                          </Select>
+                                        </FormItem>
+                                    )} />
+                                  </div>
+                                </div>
+
+                                {/* Section 2: Loan Terms */}
+                                <div className="space-y-4">
+                                  <div className="flex items-center gap-2 px-1 border-b pb-2">
+                                    <div className="h-4 w-1 bg-primary rounded-full" />
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">2. Loan Terms</h3>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField control={form.control} name="principalAmount" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-[10px] font-black uppercase text-primary">Principal Amount (Ksh)</FormLabel>
+                                          <FormControl><Input type="number" {...field} className="h-12 text-lg font-black border-primary/30" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={form.control} name="interestRate" render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-[10px] font-black uppercase">Interest %</FormLabel>
+                                          <FormControl><Input type="number" step="0.01" {...field} className="h-12 font-bold" /></FormControl>
+                                        </FormItem>
+                                    )} />
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField control={form.control} name="disbursementDate" render={({ field }) => (
+                                        <FormItem><FormLabel className="text-[10px] font-black uppercase">Disbursement Date</FormLabel><FormControl><Input type="date" {...field} className="h-10" /></FormControl></FormItem>
+                                    )} />
+                                    <FormField control={form.control} name="firstPaymentDate" render={({ field }) => (
+                                        <FormItem><FormLabel className="text-[10px] font-black uppercase text-primary">First Payment Date</FormLabel><FormControl><Input type="date" {...field} className="h-10 border-primary/20" /></FormControl></FormItem>
+                                    )} />
+                                  </div>
+                                </div>
+
+                                {/* Section 3: Repayment Schedule */}
+                                <div className="space-y-4">
+                                  <div className="flex items-center gap-2 px-1 border-b pb-2">
+                                    <div className="h-4 w-1 bg-primary rounded-full" />
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">3. Repayment Schedule</h3>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField control={form.control} name="paymentFrequency" render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-[10px] font-black uppercase">Frequency</FormLabel>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                          <FormControl><SelectTrigger className="h-10"><SelectValue placeholder="Select"/></SelectTrigger></FormControl>
+                                          <SelectContent>
+                                            <SelectItem value="daily">Daily</SelectItem>
+                                            <SelectItem value="weekly">Weekly</SelectItem>
+                                            <SelectItem value="monthly">Monthly</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </FormItem>
+                                    )} />
+                                    <FormField control={form.control} name="numberOfInstalments" render={({ field }) => (
+                                        <FormItem><FormLabel className="text-[10px] font-black uppercase">Total Instalments</FormLabel><FormControl><Input type="number" {...field} className="h-10" /></FormControl></FormItem>
+                                    )} />
+                                  </div>
+
+                                  {form.watch('paymentFrequency') === 'weekly' && (
+                                      <FormField control={form.control} name="preferredPaymentDay" render={({ field }) => (
+                                          <FormItem><FormLabel className="text-[10px] font-black uppercase">Collection Day</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-10"><SelectValue placeholder="e.g. Monday" /></SelectTrigger></FormControl><SelectContent>{DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select></FormItem>
+                                      )} />
+                                  )}
+                                </div>
+                              </div>
+
+                      <div className="col-span-2 space-y-4 rounded-xl bg-primary/5 p-6 border border-primary/10">
+                        <div className="flex justify-between items-center"><span className="text-sm font-medium text-muted-foreground">Periodic Instalment</span><span className="text-xl font-black text-primary">Ksh {calculatedValues.instalmentAmount}</span></div>
+                        <div className="h-[1px] bg-primary/10" />
+                        <div className="flex justify-between items-center"><span className="text-sm font-medium text-muted-foreground">Total Repayable</span><span className="text-lg font-bold">Ksh {calculatedValues.totalRepayableAmount}</span></div>
+                      </div>
+                    </form>
+                  </ScrollArea>
+                  <DialogFooter className="p-8 bg-slate-50 border-t mt-auto">
+                    <DialogClose asChild>
+                      <Button variant="ghost" className="font-bold h-12 px-6">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" form="add-loan-form" disabled={isSubmitting} className="px-10 font-black text-base h-12 shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                      {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : null}
+                      Confirm Disbursement
+                    </Button>
+                  </DialogFooter>
+                </div>
               </Form>
             </DialogContent>
           </Dialog>
@@ -764,6 +963,7 @@ export default function LoansPage() {
         <TabsList className="mb-4">
             <TabsTrigger value="all">Active Debt ({filteredLoans.length})</TabsTrigger>
             <TabsTrigger value="applications">Pending Applications ({applicationLoans.length})</TabsTrigger>
+            <TabsTrigger value="search">Search Members</TabsTrigger>
         </TabsList>
         <TabsContent value="all" className="m-0">
             <Card>
@@ -845,6 +1045,89 @@ export default function LoansPage() {
                             ))}
                         </TableBody>
                     </Table>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <TabsContent value="search" className="m-0 space-y-4">
+            <Card className="border-primary/10 shadow-sm overflow-hidden">
+                <CardHeader className="bg-primary/5 border-b">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <CardTitle className="text-xl flex items-center gap-2">
+                                <Users className="h-5 w-5 text-primary" />
+                                Member Directory
+                            </CardTitle>
+                            <CardDescription>Search and initiate loans for existing members.</CardDescription>
+                        </div>
+                        <div className="relative w-full md:w-[400px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                            <Input 
+                                placeholder="Search by Name, Phone, ID or Account..." 
+                                className="pl-10 h-11 bg-white border-primary/20 focus-visible:ring-primary shadow-sm"
+                                value={memberTabSearch}
+                                onChange={(e) => setMemberTabSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <ScrollArea className="h-[600px]">
+                        <Table>
+                            <TableHeader className="bg-slate-50 sticky top-0 z-10">
+                                <TableRow>
+                                    <TableHead>Member Details</TableHead>
+                                    <TableHead>Contact Info</TableHead>
+                                    <TableHead>Identity</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {customersLoading ? (
+                                    <TableRow><TableCell colSpan={4} className="text-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" /><p className="text-sm text-muted-foreground">Loading members...</p></TableCell></TableRow>
+                                ) : sortedAllMembers.length === 0 ? (
+                                    <TableRow><TableCell colSpan={4} className="text-center py-20 italic text-muted-foreground">No members found matching your search.</TableCell></TableRow>
+                                ) : (
+                                    sortedAllMembers.map((c) => (
+                                        <TableRow key={c.id} className="hover:bg-primary/5 transition-colors group">
+                                            <TableCell>
+                                                <div className="font-black text-sm text-slate-900">{c.name}</div>
+                                                <Badge variant="outline" className="text-[9px] font-mono mt-1 bg-white border-primary/20 text-primary">
+                                                    {c.accountNumber || 'NO-ACCOUNT'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                                                    <Phone className="h-3 w-3 text-primary/60" />
+                                                    {c.phone}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <ShieldCheck className="h-3 w-3" />
+                                                    {c.idNumber || 'N/A'}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button 
+                                                    size="sm" 
+                                                    className="font-bold bg-primary hover:bg-primary/90 shadow-sm"
+                                                    onClick={() => {
+                                                        form.setValue('customerId', c.id);
+                                                        form.setValue('idNumber', c.idNumber || '');
+                                                        setOpen(true);
+                                                    }}
+                                                >
+                                                    <PlusCircle className="mr-2 h-3.5 w-3.5" />
+                                                    Apply Loan
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         </TabsContent>

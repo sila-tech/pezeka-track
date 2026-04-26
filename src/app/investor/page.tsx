@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { useUser, useDoc, useFirestore } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Bell, Download, Wallet, TrendingUp, ArrowDownCircle } from 'lucide-react';
+import { Loader2, Bell, Download, Wallet, TrendingUp, ArrowDownCircle, Landmark, AlertCircle } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, getDaysInMonth, differenceInDays } from 'date-fns';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -302,11 +302,27 @@ export default function InvestorPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            <div className="text-sm p-4 bg-muted rounded-lg border">
-                                <h4 className="font-semibold mb-2">Payment Details</h4>
-                                <p><strong>M-Pesa PayBill:</strong> 522522</p>
-                                <p><strong>Account Number:</strong> 1347823360</p>
-                                <p className="mt-2 text-xs text-muted-foreground">Use your registered name as the payment reference.</p>
+                            <div className="p-5 bg-primary/5 rounded-xl border border-primary/20 shadow-inner space-y-3">
+                                <div className="flex items-center gap-2 text-primary">
+                                    <Landmark className="h-4 w-4" />
+                                    <h4 className="font-black text-xs uppercase tracking-wider">Official Payment Details</h4>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white p-3 rounded-lg border shadow-sm">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">M-Pesa PayBill</p>
+                                        <p className="text-lg font-black text-primary">522522</p>
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border shadow-sm">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Account Number</p>
+                                        <p className="text-lg font-black text-primary">1347823360</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-2 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                                    <AlertCircle className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                                    <p className="text-[10px] text-amber-900 font-medium leading-relaxed">
+                                        <strong>Important:</strong> Use your registered name as the payment reference. Once sent, enter the amount below to notify our finance team.
+                                    </p>
+                                </div>
                             </div>
                             <Form {...depositForm}>
                                 <form onSubmit={depositForm.handleSubmit(onDepositSubmit)} className="space-y-4">

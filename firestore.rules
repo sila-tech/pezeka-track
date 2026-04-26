@@ -93,14 +93,22 @@ service cloud.firestore {
     }
 
     match /investors/{investorId} {
-      allow get: if isSignedIn() && (request.auth.uid == investorId || isFinance());
-      allow list, create, update, delete: if isFinance();
+      allow get: if isSignedIn() && (request.auth.uid == investorId || isStaff());
+      allow list: if isStaff();
+      allow create, update, delete: if isFinance();
     }
 
     match /mail_logs/{logId} {
       allow create: if isSignedIn();
       allow get, list: if isFinance() || isStaff();
       allow update, delete: if false;
+    }
+
+    match /investmentApplications/{applicationId} {
+      allow get: if isSignedIn() && (request.auth.uid == applicationId || isStaff());
+      allow list: if isStaff();
+      allow create: if isSignedIn();
+      allow update, delete: if isFinance();
     }
   }
 }

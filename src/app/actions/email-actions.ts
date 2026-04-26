@@ -41,10 +41,10 @@ export async function sendAutomatedEmail(input: EmailEventInput & { recipientEma
     }
 
     console.log(`[AUTOMATION SUCCESS] ${input.type} email delivered to ${input.recipientEmail}. Message ID: ${data?.id}`);
-    
+
     // Return content so the client can log it to Firestore
-    return { 
-      success: true, 
+    return {
+      success: true,
       data,
       sentContent: {
         recipient: input.recipientEmail,
@@ -64,17 +64,17 @@ export async function sendAutomatedEmail(input: EmailEventInput & { recipientEma
  * Consistently uses the notifications@pezeka.com origin as requested.
  */
 export async function sendManualEmail(input: { recipient: string, subject: string, body: string }) {
-    try {
-        const { data, error } = await resend.emails.send({
-            from: 'Pezeka Credit <notifications@pezeka.com>',
-            to: input.recipient,
-            subject: input.subject,
-            text: input.body,
-        });
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'Pezeka Credit <notifications@pezeka.com>',
+      to: input.recipient,
+      subject: input.subject,
+      text: input.body,
+    });
 
-        if (error) return { success: false, error };
-        return { success: true, data };
-    } catch (error) {
-        return { success: false, error };
-    }
+    if (error) return { success: false, error };
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error };
+  }
 }

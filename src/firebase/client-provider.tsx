@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useMemo, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from './init';
+
+const ClientOverlays = dynamic(() => import('@/components/ClientOverlays'), { ssr: false });
+const PWARegister = dynamic(() => import('@/components/PWARegister').then(mod => mod.PWARegister), { ssr: false });
 
 
 interface FirebaseClientProviderProps {
@@ -10,19 +14,18 @@ interface FirebaseClientProviderProps {
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  const firebaseServices = useMemo(() => {
-    // Initialize Firebase on the client side, once per component mount.
-    return initializeFirebase();
-  }, []); // Empty dependency array ensures this runs only once on mount
+  const services = useMemo(() => initializeFirebase(), []);
 
   return (
     <FirebaseProvider
-      firebaseApp={firebaseServices.firebaseApp}
-      auth={firebaseServices.auth}
-      firestore={firebaseServices.firestore}
-      storage={firebaseServices.storage}
+      firebaseApp={services?.firebaseApp}
+      auth={services?.auth}
+      firestore={services?.firestore}
+      storage={services?.storage}
     >
       {children}
+      <ClientOverlays />
+      <PWARegister />
     </FirebaseProvider>
   );
 }

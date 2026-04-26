@@ -2,11 +2,18 @@
 
 import { useMemo, useState, useRef, useCallback } from 'react';
 import { useCollection, useFirestore, useAppUser, useStorage } from '@/firebase';
+import { canAccessStaffModules } from '@/lib/admin-auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Search, Loader2, FileText, Trash2, Calendar, User, ShieldCheck, Eye, X, Lock, PlusCircle, Camera, Upload, ImagePlus, Sparkles, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  Search, Loader2, PlusCircle, Eye, Trash2, User, Calendar, 
+  ShieldCheck, Sparkles, AlertTriangle, AlertCircle, CheckCircle, 
+  ChevronDown, Check, Camera, Upload, ImagePlus, Lock, FileText, X, CheckCircle2 
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -100,6 +107,8 @@ export default function KYCRepositoryPage() {
     const [docToDelete, setDocToDelete] = useState<KYCDocument | null>(null);
     const [viewingDoc, setViewingDoc] = useState<KYCDocument | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
+    const [customerSearch, setCustomerSearch] = useState('');
     
     // Upload States
     const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -109,21 +118,10 @@ export default function KYCRepositoryPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-    const selectedCustomer = useMemo(() => {
-        if (!selectedCustomerId || !groupedCustomers) return null;
-        return groupedCustomers.find(g => g.customerId === selectedCustomerId) || null;
-    }, [groupedCustomers, selectedCustomerId]);
-
-
-    const isAuthorized = user && (
-        user.role === 'finance' || 
-        user.role === 'staff' || 
-        user.email === 'simon@pezeka.com' || 
-        user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
-    );
+    const isAuthorized = canAccessStaffModules(user);
 
     const { data: documents, loading: docsLoading } = useCollection<KYCDocument>(isAuthorized ? 'kyc_documents' : null);
-    const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
+    const { data: customers, loading: customersLoading } = useCollection<any>(isAuthorized ? 'customers' : null);
     const { data: allLoans } = useCollection<any>(isAuthorized ? 'loans' : null);
 
     const kycForm = useForm<z.infer<typeof kycUploadSchema>>({
@@ -163,6 +161,11 @@ export default function KYCRepositoryPage() {
         
         return Object.values(groups).sort((a, b) => b.latestUpload - a.latestUpload);
     }, [filteredDocs]);
+
+    const selectedCustomer = useMemo(() => {
+        if (!selectedCustomerId || !groupedCustomers) return null;
+        return groupedCustomers.find(g => g.customerId === selectedCustomerId) || null;
+    }, [groupedCustomers, selectedCustomerId]);
 
     const startCamera = async () => {
         try {
@@ -320,34 +323,117 @@ export default function KYCRepositoryPage() {
                                         <FormField control={kycForm.control} name="customerId" render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Member</FormLabel>
-                                                <Select onValueChange={(v) => { field.onChange(v); setMemberSearch(''); }} defaultValue={field.value}>
-                                                    <FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl>
-                                                    <SelectContent>
-                                                        <div className="flex items-center border-b px-3 pb-2 mb-1">
-                                                            <Search className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
-                                                            <input
-                                                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                                                                placeholder="Search member..."
-                                                                value={memberSearch}
-                                                                onChange={(e) => setMemberSearch(e.target.value)}
-                                                                onKeyDown={(e) => e.stopPropagation()}
-                                                            />
-                                                        </div>
-                                                        {customers
-                                                            ?.filter(c =>
-                                                                (c.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
-                                                                (c.accountNumber || '').toLowerCase().includes(memberSearch.toLowerCase())
-                                                            )
-                                                            .map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.accountNumber})</SelectItem>)
-                                                        }
-                                                        {customers?.filter(c =>
-                                                            (c.name || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
-                                                            (c.accountNumber || '').toLowerCase().includes(memberSearch.toLowerCase())
-                                                        ).length === 0 && (
-                                                            <div className="py-4 text-center text-sm text-muted-foreground">No members found.</div>
+                                                <Popover open={isCustomerSelectOpen} onOpenChange={setIsCustomerSelectOpen}>
+                                                  <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                      <Button
+                                                        variant="outline"
+                                                        role="combobox"
+                                                        className={cn(
+                                                          "w-full justify-between h-14 text-left font-normal border-primary/20 hover:border-primary transition-all shadow-sm",
+                                                          !field.value && "text-muted-foreground"
                                                         )}
-                                                    </SelectContent>
-                                                </Select>
+                                                      >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                <User className="h-4 w-4 text-primary" />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Selected Member</span>
+                                                                <span className="font-semibold text-foreground">
+                                                                    {field.value
+                                                                        ? customers?.find((c) => c.id === field.value)?.name || "Unknown Member"
+                                                                        : "Find member by name, phone or ID..."}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50 text-primary" />
+                                                      </Button>
+                                                    </FormControl>
+                                                  </PopoverTrigger>
+                                                  <PopoverContent className="w-[400px] p-0 shadow-2xl border-primary/10" align="start">
+                                                    <div className="flex flex-col h-[400px]">
+                                                        <div className="p-3 border-b bg-muted/30 sticky top-0 z-10">
+                                                            <div className="relative">
+                                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
+                                                                <Input 
+                                                                    placeholder="Type name, phone or account number..." 
+                                                                    className="pl-9 h-11 bg-background border-primary/20 focus-visible:ring-primary"
+                                                                    value={customerSearch}
+                                                                    onChange={(e) => setCustomerSearch(e.target.value)}
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <ScrollArea className="flex-1">
+                                                            <div className="p-2 space-y-1">
+                                                                {customersLoading ? (
+                                                                    <div className="flex items-center justify-center py-10">
+                                                                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                                                    </div>
+                                                                ) : (
+                                                                    <>
+                                                                        {(() => {
+                                                                            const filtered = customers?.filter(c => 
+                                                                                (c.name?.toLowerCase().includes(customerSearch.toLowerCase()) || 
+                                                                                 c.phone?.includes(customerSearch) || 
+                                                                                 c.idNumber?.includes(customerSearch) ||
+                                                                                 c.accountNumber?.toLowerCase().includes(customerSearch.toLowerCase()))
+                                                                            ).slice(0, 50);
+
+                                                                            if (!filtered || filtered.length === 0) {
+                                                                                return (
+                                                                                    <div className="text-center py-10 px-4">
+                                                                                        <User className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+                                                                                        <p className="text-sm text-muted-foreground font-medium">No members found</p>
+                                                                                        <p className="text-xs text-muted-foreground/60 mt-1">Try a different search term</p>
+                                                                                    </div>
+                                                                                );
+                                                                            }
+
+                                                                            return filtered.map((c) => (
+                                                                                <button
+                                                                                    key={c.id}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        kycForm.setValue("customerId", c.id);
+                                                                                        setIsCustomerSelectOpen(false);
+                                                                                    }}
+                                                                                    className={cn(
+                                                                                        "w-full text-left px-3 py-3 flex items-center gap-3 rounded-lg transition-all hover:bg-primary/5 group",
+                                                                                        field.value === c.id ? "bg-primary/10 border border-primary/20 shadow-sm" : "border border-transparent hover:border-primary/10"
+                                                                                    )}
+                                                                                >
+                                                                                    <div className={cn(
+                                                                                        "h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-all shadow-sm",
+                                                                                        field.value === c.id ? "bg-primary text-primary-foreground scale-110" : "bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
+                                                                                    )}>
+                                                                                        {field.value === c.id ? <CheckCircle2 className="h-6 w-6" /> : <User className="h-5 w-5" />}
+                                                                                    </div>
+                                                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                                                        <span className={cn(
+                                                                                            "font-black text-sm truncate",
+                                                                                            field.value === c.id ? "text-primary" : "text-slate-900"
+                                                                                        )}>{c.name || "Unnamed Member"}</span>
+                                                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                                                            <Badge variant="outline" className="text-[10px] py-0 h-4 bg-background font-black border-primary/20 px-1.5 text-primary">
+                                                                                                {c.accountNumber || 'NO-ACC'}
+                                                                                            </Badge>
+                                                                                            <span className="text-[10px] text-slate-500 font-bold truncate">
+                                                                                                ID: {c.idNumber || 'PENDING'} • {c.phone}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </button>
+                                                                            ));
+                                                                        })()}
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </ScrollArea>
+                                                    </div>
+                                                  </PopoverContent>
+                                                </Popover>
                                             </FormItem>
                                         )}/>
                                         <FormField control={kycForm.control} name="type" render={({ field }) => (

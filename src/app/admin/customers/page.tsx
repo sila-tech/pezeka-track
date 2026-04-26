@@ -9,6 +9,7 @@ import { useFirestore, useCollection, useAppUser } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, FileDown, Search, MoreHorizontal, Share2, Phone, ShieldCheck, Mail, Lock } from 'lucide-react';
+import { canAccessStaffModules, canAccessSensitiveModules } from '@/lib/admin-auth';
 import {
   Dialog,
   DialogContent,
@@ -79,8 +80,8 @@ export default function CustomersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const isAuthorized = user?.role === 'staff' || user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
-  const canEdit = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2';
+  const isAuthorized = canAccessStaffModules(user);
+  const canEdit = canAccessSensitiveModules(user);
 
   const { data: customers, loading: customersLoading } = useCollection<any>(isAuthorized ? 'customers' : null);
 

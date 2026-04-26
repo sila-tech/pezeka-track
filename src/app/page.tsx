@@ -1,6 +1,7 @@
 import Header from '@/components/landing/Header';
 import Hero from '@/components/landing/Hero';
 import Products from '@/components/landing/Products';
+import InvestorSection from '@/components/landing/InvestorSection';
 import About from '@/components/landing/About';
 import Blog from '@/components/landing/Blog';
 import Contact from '@/components/landing/Contact';
@@ -14,6 +15,7 @@ export default function LandingPage() {
       <main className="flex-1">
         <Hero />
         <Products />
+        <InvestorSection />
         <LoanCalculator />
         <Blog />
         <About />

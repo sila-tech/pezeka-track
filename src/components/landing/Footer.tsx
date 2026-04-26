@@ -12,6 +12,9 @@ export default function Footer() {
                 </p>
             </div>
             <nav className="flex flex-wrap justify-center gap-4 sm:gap-8">
+                <Link href="#invest" className="text-sm text-white/60 hover:text-[#5BA9D0] transition-colors hover:underline underline-offset-4">
+                    Invest
+                </Link>
                 <Link href="#" className="text-sm text-white/60 hover:text-[#5BA9D0] transition-colors hover:underline underline-offset-4">
                     Terms of Service
                 </Link>

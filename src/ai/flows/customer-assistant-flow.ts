@@ -270,13 +270,12 @@ ${isFirst ? `Greet: "${greeting}, ${input.customerName}! 😊" then invite them 
     }
 
     const response = await ai.generate({
-      model: googleAI.model('gemini-2.5-flash'),
-      system: systemPrompt,
+      model: googleAI.model('gemini-1.5-flash'),
+      prompt: `SYSTEM INSTRUCTIONS:\n${systemPrompt}\n\nUSER MESSAGE: ${input.message}`,
       history: (input.history || []).slice(1).map(h => ({
         role: h.role,
         content: [{ text: h.content }],
       })),
-      prompt: input.message,
     });
 
     let text = response.text?.trim() || "I'm here to help! Could you rephrase that? 😊";

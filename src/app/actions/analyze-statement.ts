@@ -1,7 +1,16 @@
 'use server';
 
 import { PDFDocument } from 'pdf-lib';
-import { runStatementAnalysisFlow, StatementAnalysisOutput } from '@/ai/flows/statement-analysis-flow';
+import { analyzeMedia } from '@/lib/ai';
+
+export interface StatementAnalysisOutput {
+  incomeFlow: number;
+  expenditure: number;
+  redFlags: string[];
+  otherDebts: string[];
+  riskLevel: 'Risky' | 'Moderate Risk' | 'Zero Risk / Qualified';
+  decisionReason: string;
+}
 
 /**
  * Accepts either a base64 data URI or a remote download URL for the statement PDF.
@@ -53,11 +62,46 @@ export async function analyzeStatementAction(
       }
     }
 
-    // Send to Genkit AI
-    const analysisResult = await runStatementAnalysisFlow({
-      requestedLoanAmount: requestedLoanAmount || 0,
-      pdfDataUri: finalDataUri,
-    });
+    // Send to direct Google AI SDK
+    const systemPrompt = `You are an expert AI Credit Analyst for Pezeka Credit Ltd.
+Analyze M-Pesa/Bank statements and evaluate loan applications.
+
+RULES FOR RISK CLASSIFICATION:
+1. If the requested loan > income flow, or there are significant red flags (e.g. betting), classify as "Risky".
+2. If the requested loan is around 1/2 of the income flow, classify as "Moderate Risk".
+3. If the requested loan is <= 1/4 of the income flow, classify as "Zero Risk / Qualified".
+
+RULES FOR RED FLAGS:
+- Flag any transactions related to betting, casinos, or high-risk trading platforms.
+- Mention them explicitly in the redFlags array.
+
+RULES FOR OTHER DEBTS:
+- Look for payments to known lenders (e.g., Tala, Branch, Fuliza, Hustler Fund, M-Kopa, etc.) and list them.
+
+OUTPUT FORMAT:
+Return ONLY a JSON object with:
+{
+  "incomeFlow": number,
+  "expenditure": number,
+  "redFlags": ["..."],
+  "otherDebts": ["..."],
+  "riskLevel": "Risky" | "Moderate Risk" | "Zero Risk / Qualified",
+  "decisionReason": "..."
+}`;
+
+    const taskPrompt = `Requested Loan Amount: KES ${requestedLoanAmount || 0}
+    
+Please extract the total income and expenditure from the attached statement, identify red flags or other debts, and provide a clear reasoning for your risk classification.`;
+
+    const textResponse = await analyzeMedia(taskPrompt, finalDataUri, "application/pdf", systemPrompt);
+    
+    // Parse JSON from response
+    const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('AI failed to return a valid JSON analysis.');
+    }
+    
+    const analysisResult = JSON.parse(jsonMatch[0]);
 
     return { success: true, data: analysisResult };
   } catch (error: any) {

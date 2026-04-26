@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useCollection, useFirestore, useAppUser } from '@/firebase';
+import { canAccessSensitiveModules } from '@/lib/admin-auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -112,7 +113,7 @@ export default function FinancePage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const isAuthorized = user?.role === 'finance' || user?.email === 'simon@pezeka.com' || user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' || user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
+  const isAuthorized = canAccessSensitiveModules(user);
 
   const { data: loans, loading: loansLoading } = useCollection<Loan>(isAuthorized ? 'loans' : null);
   const { data: financeEntries, loading: financeEntriesLoading } = useCollection<any>(isAuthorized ? 'financeEntries' : null);
@@ -433,20 +434,20 @@ export default function FinancePage() {
                                                     <TableCell className="font-mono text-[10px]">{loan.loanNumber}</TableCell>
                                                     <TableCell className="text-[10px]">{isNaN(dDate.getTime()) ? 'N/A' : format(dDate, 'dd/MM/yy')}</TableCell>
                                                     <TableCell className="text-[10px] font-bold text-primary">{fDate && !isNaN(fDate.getTime()) ? format(fDate, 'dd/MM/yy') : 'N/A'}</TableCell>
-                                                    <TableCell className="text-right font-medium text-xs">Ksh {loan.principalAmount.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-[10px]">{regFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-[10px]">{procFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-bold text-blue-600 bg-blue-50/20 text-xs">Ksh {takeHome.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-[10px]">{trackFee.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-[10px]">{chargingFee.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-medium text-xs">Ksh {(Number(loan.principalAmount) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{(regFee || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{(procFee || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold text-blue-600 bg-blue-50/20 text-xs">Ksh {(takeHome || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{(trackFee || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{(chargingFee || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="text-center text-[10px]">{loan.numberOfInstalments} ({loan.paymentFrequency})</TableCell>
-                                                    <TableCell className="text-right text-[10px]">{(loan.instalmentAmount || 0).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-bold text-xs">{loan.totalRepayableAmount.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-green-600 font-medium text-xs">{loan.totalPaid.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-destructive font-black text-xs">Ksh {balance.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right text-orange-600 text-[10px]">{(loan.totalPenalties || 0).toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-medium text-green-700 bg-green-50/20 text-[10px]">Ksh {interest.toLocaleString()}</TableCell>
-                                                    <TableCell className="text-right font-black text-green-800 bg-green-100/20 text-xs">Ksh {totalIncome.toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-[10px]">{(Number(loan.instalmentAmount) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-bold text-xs">{(Number(loan.totalRepayableAmount) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-green-600 font-medium text-xs">{(Number(loan.totalPaid) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-destructive font-black text-xs">Ksh {(Number(balance) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right text-orange-600 text-[10px]">{(Number(loan.totalPenalties) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-medium text-green-700 bg-green-50/20 text-[10px]">Ksh {(Number(interest) || 0).toLocaleString()}</TableCell>
+                                                    <TableCell className="text-right font-black text-green-800 bg-green-100/20 text-xs">Ksh {(Number(totalIncome) || 0).toLocaleString()}</TableCell>
                                                     <TableCell className="sticky right-0 bg-background border-l z-30 text-center">
                                                         <Button variant="ghost" size="icon" onClick={() => handleEditClick(loan)}>
                                                             <ChevronRight className="h-4 w-4" />
@@ -492,7 +493,7 @@ export default function FinancePage() {
                                       <TableRow key={req.id}>
                                           <TableCell className="text-xs">{(req.createdAt as any)?.seconds ? format(new Date((req.createdAt as any).seconds * 1000), 'dd/MM/yyyy HH:mm') : '...'}</TableCell>
                                           <TableCell className="font-bold">{req.staffName}</TableCell>
-                                          <TableCell className="font-black text-primary">Ksh {req.amount.toLocaleString()}</TableCell>
+                                          <TableCell className="font-black text-primary">Ksh {(Number(req.amount) || 0).toLocaleString()}</TableCell>
                                           <TableCell className="max-w-[300px] text-xs italic">"{req.description}"</TableCell>
                                           <TableCell className="text-right">
                                               <div className="flex justify-end gap-2">

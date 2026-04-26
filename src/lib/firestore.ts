@@ -874,7 +874,7 @@ export async function ensureInvestorProfile(db: Firestore, uid: string, name: st
     }
 }
 
-export async function approveDeposit(db: Firestore, investorId: string, depositId: string) {
+export async function approveDeposit(db: Firestore, investorId: string, depositId: string, approver: { id: string, name: string }) {
     const investorRef = doc(db, 'investors', investorId);
     const snap = await getDoc(investorRef);
     if (!snap.exists()) return;
@@ -883,7 +883,26 @@ export async function approveDeposit(db: Firestore, investorId: string, depositI
     if (!d || d.status !== 'pending') return;
 
     const updated = data.deposits.map((x: any) => x.depositId === depositId ? { ...x, status: 'approved' } : x);
-    await updateDoc(investorRef, { deposits: updated, currentBalance: increment(d.amount), totalInvestment: increment(d.amount), updatedAt: serverTimestamp() });
+    
+    // 1. Update investor balance
+    await updateDoc(investorRef, { 
+        deposits: updated, 
+        currentBalance: increment(d.amount), 
+        totalInvestment: increment(d.amount), 
+        updatedAt: serverTimestamp() 
+    });
+
+    // 2. Record in finance ledger
+    await addFinanceEntry(db, {
+        type: 'receipt',
+        receiptCategory: 'investor_deposit',
+        date: new Date(),
+        amount: d.amount,
+        description: `Investment deposit for ${data.name || 'Investor'} (${investorId})`,
+        recordedBy: approver.name,
+        staffId: approver.id,
+        reference: depositId
+    });
 }
 
 export async function rejectDeposit(db: Firestore, investorId: string, depositId: string) {
@@ -912,4 +931,85 @@ export async function setStaffGoal(db: Firestore, staffId: string, month: string
         throw serverError;
     }
 }
+
+// ===== INVESTMENT APPLICATIONS =====
+
+export async function submitInvestmentApplication(db: Firestore, data: { uid: string, name: string, email: string, phone: string, type: 'Individual' | 'Group' | 'Chama', amount: number }) {
+    const appRef = doc(db, 'investmentApplications', data.uid);
+    const appData = {
+        ...data,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+    };
+    try {
+        await setDoc(appRef, appData);
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: appRef.path, operation: 'create', requestResourceData: appData });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
+export async function approveInvestmentApplication(db: Firestore, applicationId: string, approver: { id: string, name: string }) {
+    const appRef = doc(db, 'investmentApplications', applicationId);
+    const appSnap = await getDoc(appRef);
+    if (!appSnap.exists()) throw new Error('Application not found');
+    const appData = appSnap.data();
+
+    // 1. Create/Update investor profile
+    const investorRef = doc(db, 'investors', appData.uid);
+    const investorData = {
+        uid: appData.uid,
+        name: appData.name || 'Unknown Member',
+        email: appData.email || '',
+        phone: appData.phone || '',
+        investmentType: appData.type || 'Individual',
+        totalInvestment: appData.amount || 0,
+        totalWithdrawn: 0,
+        currentBalance: appData.amount || 0,
+        interestRate: 2.5, // 2.5% monthly compounding
+        withdrawals: [],
+        deposits: [],
+        interestEntries: [],
+        status: 'active',
+        approvedAt: serverTimestamp(),
+        approvedBy: approver.name,
+        createdAt: serverTimestamp(),
+    };
+
+    await setDoc(investorRef, investorData);
+
+    // 2. Update application status
+    await updateDoc(appRef, {
+        status: 'approved',
+        updatedAt: serverTimestamp()
+    });
+
+    // 3. Record the initial deposit as a finance entry (receipt)
+    await addFinanceEntry(db, {
+        type: 'receipt',
+        receiptCategory: 'investor_deposit',
+        date: new Date(),
+        amount: appData.amount,
+        description: `Initial investment deposit for ${appData.name} (${appData.type})`,
+        recordedBy: approver.name,
+        staffId: approver.id
+    });
+}
+
+export async function rejectInvestmentApplication(db: Firestore, applicationId: string, reason: string) {
+    const appRef = doc(db, 'investmentApplications', applicationId);
+    try {
+        await updateDoc(appRef, {
+            status: 'rejected',
+            rejectionReason: reason,
+            updatedAt: serverTimestamp()
+        });
+    } catch (serverError) {
+        const permissionError = new FirestorePermissionError({ path: appRef.path, operation: 'update' });
+        errorEmitter.emit('permission-error', permissionError);
+        throw serverError;
+    }
+}
+
     

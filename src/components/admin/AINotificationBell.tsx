@@ -154,80 +154,27 @@ export function AINotificationBell() {
                 {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
           </div>
-          {aiResponse?.greeting && (
-              <div className="mt-4 space-y-1">
-                  <p className="text-sm font-bold text-white/90">{aiResponse.greeting}</p>
-                  <p className="text-xs text-white/60 italic leading-relaxed">{aiResponse.summary}</p>
-              </div>
-          )}
         </div>
-
-        <ScrollArea className="h-[400px] bg-white">
-          {isAnalyzing ? (
-            <div className="flex flex-col items-center justify-center h-full p-12 text-center space-y-4">
-                <Bot className="h-12 w-12 text-[#5BA9D0] animate-bounce" />
-                <div>
-                    <p className="text-sm font-black text-[#1B2B33]">Analyzing Team Activity...</p>
-                    <p className="text-xs text-muted-foreground mt-1">Reviewing follow-ups and customer responses.</p>
+ 
+        <ScrollArea className="h-[300px] bg-white">
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6">
+                <div className="relative">
+                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-[#5BA9D0] to-[#1B2B33] flex items-center justify-center shadow-lg shadow-blue-500/10">
+                        <Bot className="h-8 w-8 text-white animate-pulse" />
+                    </div>
+                    <Badge className="absolute -top-2 -right-2 bg-amber-400 text-[8px] font-black text-white px-1.5 py-0.5 rounded-full uppercase tracking-wider border-2 border-white shadow-md">Soon</Badge>
+                </div>
+                <div className="space-y-2">
+                    <h5 className="text-lg font-black text-[#1B2B33]">Neural Insights</h5>
+                    <p className="text-xs text-muted-foreground font-medium max-w-[200px] mx-auto">
+                        Our AI advisor is currently undergoing advanced training to better support your credit team.
+                    </p>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 w-full">
+                    <p className="text-[9px] font-black text-amber-700 uppercase tracking-widest mb-0.5">Status</p>
+                    <p className="text-[11px] font-bold text-[#1B2B33]">Module optimization in progress... ⚙️</p>
                 </div>
             </div>
-          ) : !aiResponse ? (
-            <div className="flex flex-col items-center justify-center h-full p-12 text-center text-muted-foreground">
-              <Clock className="h-10 w-10 mb-2 opacity-20" />
-              <p className="text-sm font-medium">Click the refresh icon to start daily analysis.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-muted">
-              {user?.role === 'finance' && aiResponse.teamProgress && (
-                  <div className="p-4 bg-blue-50/50">
-                      <h5 className="text-[10px] font-black uppercase text-blue-600 mb-3 flex items-center gap-2">
-                          <Users className="h-3 w-3" /> Team Intelligence
-                      </h5>
-                      <div className="space-y-2">
-                          {aiResponse.teamProgress.map((prog: string, idx: number) => (
-                              <p key={idx} className="text-xs text-[#1B2B33] leading-relaxed border-l-2 border-blue-200 pl-3">
-                                  {prog}
-                              </p>
-                          ))}
-                      </div>
-                  </div>
-              )}
-
-              {aiResponse.alerts?.length > 0 && (
-                  <div className="p-4 bg-amber-50/20">
-                      <h5 className="text-[10px] font-black uppercase text-amber-600 mb-3 flex items-center gap-2">
-                          <AlertCircle className="h-3 w-3" /> Priority Follow-ups
-                      </h5>
-                      <div className="space-y-4">
-                        {aiResponse.alerts.map((alert: any, i: number) => (
-                            <div key={i} className="flex items-start gap-3 group">
-                                <div className={cn(
-                                    "mt-0.5 rounded-full p-1.5 shrink-0",
-                                    alert.urgency === 'high' ? "bg-red-100 text-red-600" : 
-                                    alert.urgency === 'medium' ? "bg-amber-100 text-amber-600" : "bg-blue-100 text-blue-600"
-                                )}>
-                                    <UserCheck className="h-3 w-3" />
-                                </div>
-                                <div className="space-y-1 flex-1">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">Loan {alert.loanNumber}</span>
-                                        <Badge variant="outline" className={cn(
-                                            "text-[8px] uppercase font-black px-1.5 py-0 h-4",
-                                            alert.urgency === 'high' ? "border-red-200 text-red-600" : "border-muted text-muted-foreground"
-                                        )}>
-                                            {alert.urgency}
-                                        </Badge>
-                                    </div>
-                                    <p className="text-sm font-black text-[#1B2B33] leading-tight">{alert.title}</p>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">{alert.message}</p>
-                                </div>
-                            </div>
-                        ))}
-                      </div>
-                  </div>
-              )}
-            </div>
-          )}
         </ScrollArea>
         
         <div className="p-4 bg-muted/30 border-t flex items-center justify-between">
