@@ -10,7 +10,7 @@ import {
     ShieldCheck, Camera, Upload, ImagePlus, ExternalLink, 
     ArrowRight, Clock, Calendar as CalendarIcon, TrendingUp, HandCoins,
     AlertCircle, Banknote, History as HistoryIcon, CheckCircle2, XCircle, Phone,
-    Target, UserPlus, Wallet, Info, AlertTriangle, Users, User
+    Target, Wallet, Info, AlertTriangle, Users, User
 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -183,8 +183,6 @@ export default function Dashboard() {
   const { loans, loansLoading } = useAdminLoans();
   const { data: customers } = useCollection<any>(isAuthorized ? 'customers' : null);
 
-  const currentMonthKey = useMemo(() => format(new Date(), 'yyyy-MM'), []);
-  const { data: myGoal, isLoading: goalLoading } = useDoc<any>(user ? `staffGoals/${user.uid}_${currentMonthKey}` : null);
 
   const myRequestsQuery = useMemoFirebase(() => {
       if (!user || !firestore) return null;
@@ -427,54 +425,7 @@ export default function Dashboard() {
       };
   }, [myPortfolio, date]);
 
-  const myMonthlyProgress = useMemo(() => {
-      if (!user || !loans || !customers) return { onboarding: 0, disbursement: 0, collection: 0 };
-      
-      const start = startOfMonth(new Date());
-      const end = endOfMonth(new Date());
-      const interval = { start, end };
 
-      const myOnboarded = customers.filter(c => {
-          if (c.registeredByStaffId !== user.uid) return false;
-          const cDate = c.createdAt?.seconds ? new Date(c.createdAt.seconds * 1000) : new Date();
-          return isWithinInterval(cDate, interval);
-      }).length;
-
-      let myDisbursed = 0;
-      let myCollected = 0;
-
-      loans.forEach(loan => {
-          if (loan.assignedStaffId === user.uid && loan.status !== 'application' && loan.status !== 'rejected') {
-              const dDate = loan.disbursementDate?.seconds 
-                  ? new Date(loan.disbursementDate.seconds * 1000) 
-                  : (loan.disbursementDate instanceof Date ? loan.disbursementDate : new Date());
-              
-              if (isWithinInterval(dDate, interval)) {
-                  myDisbursed += Number(loan.principalAmount) || 0;
-              }
-          }
-
-          (loan.payments || []).forEach(p => {
-              const isMine = (p as any).staffId === user.uid || (p as any).recordedBy === (user.name || user.email);
-              if (isMine) {
-                  const pDate = (p.date as any)?.seconds ? new Date((p.date as any).seconds * 1000) : new Date(p.date as any);
-                  if (isWithinInterval(pDate, interval)) {
-                      myCollected += Number(p.amount) || 0;
-                  }
-              }
-          });
-      });
-
-      return { onboarding: myOnboarded, disbursement: myDisbursed, collection: myCollected };
-  }, [user, loans, customers]);
-
-  const activeTargets = useMemo(() => {
-      return {
-          onboarding: myGoal?.onboardingTarget || 20,
-          disbursement: myGoal?.disbursementTarget || 1000000,
-          collection: myGoal?.collectionTarget || 800000
-      };
-  }, [myGoal]);
 
   const processedLoansWithTimeline = useMemo(() => {
       if (!loans) return [];
@@ -670,7 +621,7 @@ export default function Dashboard() {
     });
   }, [loans, customers]);
 
-  if (userLoading || loansLoading || goalLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
+  if (userLoading || loansLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -775,7 +726,6 @@ export default function Dashboard() {
                       </Badge>
                   )}
               </TabsTrigger>
-              <TabsTrigger value="goals">My Goals <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary text-[10px] border-none">LIVE</Badge></TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="m-0 space-y-6">
@@ -997,62 +947,6 @@ export default function Dashboard() {
               )}
           </TabsContent>
 
-          <TabsContent value="goals" className="m-0">
-              <div className="grid gap-6 md:grid-cols-3">
-                  <GoalCard 
-                    title="Customer Onboarding" 
-                    icon={<UserPlus className="h-5 w-5 text-blue-600" />} 
-                    current={myMonthlyProgress.onboarding} 
-                    target={activeTargets.onboarding} 
-                    unit="Members" 
-                    description="New customer registrations this month." 
-                  />
-                  <GoalCard 
-                    title="Monthly Disbursement" 
-                    icon={<HandCoins className="h-5 w-5 text-primary" />} 
-                    current={myMonthlyProgress.disbursement} 
-                    target={activeTargets.disbursement} 
-                    unit="Ksh" 
-                    description="Total principal advanced to customers." 
-                  />
-                  <GoalCard 
-                    title="Collection Target" 
-                    icon={<Wallet className="h-5 w-5 text-green-600" />} 
-                    current={myMonthlyProgress.collection} 
-                    target={activeTargets.collection} 
-                    unit="Ksh" 
-                    description="Total repayments collected from the field." 
-                  />
-              </div>
-
-              {!myGoal && (
-                  <Alert className="mt-6 bg-blue-50 border-blue-200">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <AlertTitle className="text-blue-800">Standard Monthly Targets</AlertTitle>
-                      <AlertDescription className="text-blue-700">
-                          Finance has not yet set specific targets for your profile this month. Showing standard company targets.
-                      </AlertDescription>
-                  </Alert>
-              )}
-
-              <Card className="mt-6 border-dashed bg-muted/20">
-                  <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                          <Target className="h-5 w-5 text-primary" />
-                          About Your Goals
-                      </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground space-y-4 max-w-3xl">
-                      <p>Goals are automatically calculated based on your activity during the current calendar month. Progress is tracked from your registered customer profiles, loans assigned to you, and payments you record.</p>
-                      <ul className="list-disc pl-5 space-y-2">
-                          <li><strong>Onboarding</strong>: Count of customers where you are the 'Registered By' staff member.</li>
-                          <li><strong>Disbursement</strong>: Sum of principal amounts for loans assigned to you and disbursed this month.</li>
-                          <li><strong>Collection</strong>: Sum of all loan payments you have recorded in the system this month.</li>
-                      </ul>
-                      <p className="italic font-medium text-primary">Consistently meeting your targets helps improve the Pezeka community and your internal performance rating.</p>
-                  </CardContent>
-              </Card>
-          </TabsContent>
       </Tabs>
 
       <Dialog open={!!selectedLoanForNotes} onOpenChange={(open) => !open && setSelectedLoanForNotes(null)}>
@@ -1071,31 +965,3 @@ export default function Dashboard() {
   );
 }
 
-function GoalCard({ title, icon, current, target, unit, description }: { title: string, icon: React.ReactNode, current: number, target: number, unit: string, description: string }) {
-    const percentage = Math.min(100, Math.round((current / (target || 1)) * 100));
-    
-    return (
-        <Card className="overflow-hidden border-t-4 border-t-primary/20">
-            <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                    <div className="bg-muted/50 p-2 rounded-lg">{icon}</div>
-                    <Badge variant={percentage >= 100 ? 'default' : 'secondary'} className={cn(percentage >= 100 ? "bg-green-600" : "")}>
-                        {percentage}%
-                    </Badge>
-                </div>
-                <CardTitle className="text-base font-black mt-3">{title}</CardTitle>
-                <CardDescription className="text-[10px] leading-tight">{description}</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-2">
-                <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black">{unit === 'Ksh' ? 'Ksh ' : ''}{(Number(current) || 0).toLocaleString()}</span>
-                    <span className="text-[10px] text-muted-foreground font-bold uppercase">/ {(Number(target) || 0).toLocaleString()} {unit === 'Ksh' ? '' : unit}</span>
-                </div>
-                <Progress value={percentage} className="h-2 mt-4" />
-                <p className="text-[9px] text-muted-foreground mt-3 font-medium italic">
-                    {percentage >= 100 ? "Goal achieved! Excellent work." : `Remaining: ${unit === 'Ksh' ? 'Ksh ' : ''}${Math.max(0, (Number(target) || 0) - (Number(current) || 0)).toLocaleString()} ${unit === 'Ksh' ? '' : unit}`}
-                </p>
-            </CardContent>
-        </Card>
-    );
-}

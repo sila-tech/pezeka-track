@@ -13,7 +13,7 @@ import { AINotificationBell } from '@/components/admin/AINotificationBell';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { AdminDataProvider, useAdminLoans } from '@/context/AdminDataContext';
-import { isSuperAdmin as checkSuperAdmin, canAccessSensitiveModules } from '@/lib/admin-auth';
+import { isSuperAdmin as checkSuperAdmin, canAccessSensitiveModules, canAccessStaffModules } from '@/lib/admin-auth';
 
 const NavLinks = ({ user, onLinkClick }: { user: any, onLinkClick?: () => void }) => {
     const pathname = usePathname();
@@ -116,13 +116,7 @@ export default function AdminLayout({
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const isLoginPage = pathname === '/admin/login';
-    const userRole = user?.role?.toLowerCase()?.trim();
-    const isSuperAdmin = user?.email?.toLowerCase()?.trim() === 'simon@pezeka.com' || 
-                        user?.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
-                        user?.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62';
-    const isFinance = userRole === 'finance';
-    const isStaff = userRole === 'staff';
-    const isAuthorized = user && (isSuperAdmin || isFinance || isStaff);
+    const isAuthorized = canAccessStaffModules(user);
 
     useEffect(() => {
         if (!loading && !isAuthorized && !isLoginPage) {
@@ -163,7 +157,7 @@ export default function AdminLayout({
                 <div className="px-2 py-2 mb-2 bg-muted/50 rounded-lg">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground px-1 mb-1">Logged in as</p>
                     <p className="text-xs font-bold truncate px-1 text-primary">{user?.name || user?.email}</p>
-                    <p className="text-[10px] text-muted-foreground px-1 uppercase">{user?.role || (isSuperAdmin ? 'Super Admin' : 'Admin')}</p>
+                    <p className="text-[10px] text-muted-foreground px-1 uppercase">{user?.role || (checkSuperAdmin(user) ? 'Super Admin' : 'Admin')}</p>
                 </div>
                 <Button onClick={handleLogout} variant="ghost" className="w-full justify-start h-9 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
                     <LogOut className="mr-2 h-4 w-4" />

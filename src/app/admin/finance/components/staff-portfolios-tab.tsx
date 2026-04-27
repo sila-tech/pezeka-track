@@ -15,14 +15,7 @@ import { startOfMonth, endOfMonth, isWithinInterval, startOfToday, endOfToday, s
 import { DatePickerWithRange } from './editable-finance-report-tab';
 import { cn } from '@/lib/utils';
 import { useFirestore } from '@/firebase';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { setStaffGoal } from '@/lib/firestore';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 
 interface Payment {
     paymentId: string;
@@ -60,11 +53,6 @@ interface StaffPortfoliosTabProps {
   staffList: Staff[] | null;
 }
 
-const goalSchema = z.object({
-    onboardingTarget: z.coerce.number().min(0),
-    disbursementTarget: z.coerce.number().min(0),
-    collectionTarget: z.coerce.number().min(0),
-});
 
 export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps) {
   const [date, setDate] = useState<DateRange | undefined>({
@@ -73,13 +61,6 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
   });
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [selectedStaffForGoal, setSelectedStaffForGoal] = useState<Staff | null>(null);
-  const [isGoalSubmitting, setIsGoalSubmitting] = useState(false);
-
-  const goalForm = useForm<z.infer<typeof goalSchema>>({
-      resolver: zodResolver(goalSchema),
-      defaultValues: { onboardingTarget: 0, disbursementTarget: 0, collectionTarget: 0 }
-  });
 
   const processedData = useMemo(() => {
     if (!staffList || !loans) return { performance: [], collectionLog: [] };
@@ -173,20 +154,6 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
       }
   }
 
-  const handleSetGoal = async (values: z.infer<typeof goalSchema>) => {
-      if (!selectedStaffForGoal || !firestore) return;
-      setIsGoalSubmitting(true);
-      try {
-          const monthKey = format(new Date(), 'yyyy-MM');
-          await setStaffGoal(firestore, selectedStaffForGoal.uid || selectedStaffForGoal.id, monthKey, values);
-          toast({ title: 'Monthly Goals Updated', description: `Targets set for ${selectedStaffForGoal.name} for ${format(new Date(), 'MMMM')}.` });
-          setSelectedStaffForGoal(null);
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'Goal Update Failed', description: e.message });
-      } finally {
-          setIsGoalSubmitting(false);
-      }
-  }
 
   return (
     <div className="space-y-6">
@@ -223,19 +190,6 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                   <p className="text-[10px] text-muted-foreground mt-1">Total payments received in period</p>
               </CardContent>
           </Card>
-          <Card>
-              <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                      <Wallet className="h-3 w-3" /> Avg. Team Efficiency
-                  </CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <div className="text-2xl font-bold">
-                      {processedData.performance.length > 0 ? (processedData.performance.reduce((acc, s) => acc + s.efficiency, 0) / processedData.performance.length).toFixed(1) : 0}%
-                  </div>
-                  <Progress value={processedData.performance.length > 0 ? (processedData.performance.reduce((acc, s) => acc + s.efficiency, 0) / processedData.performance.length) : 0} className="mt-2" />
-              </CardContent>
-          </Card>
       </div>
 
       <Card>
@@ -254,7 +208,6 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                   <TableHead className="text-center">Active</TableHead>
                   <TableHead className="text-right">Period Disbursed</TableHead>
                   <TableHead className="text-right">Period Collected</TableHead>
-                  <TableHead className="w-[120px]">Efficiency</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -273,22 +226,11 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
                     <TableCell className="text-right text-xs">
                       Ksh {staff.periodDisbursed.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right text-green-600 font-bold text-xs">
+                    <TableCell className="text-right font-bold text-green-600 text-xs">
                       Ksh {staff.periodCollected.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-[9px]">
-                          <span>{staff.efficiency.toFixed(1)}%</span>
-                        </div>
-                        <Progress value={staff.efficiency} className="h-1" />
-                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" title="Set Monthly Goals" onClick={() => { setSelectedStaffForGoal(staff.staffObject); goalForm.reset({ onboardingTarget: 20, disbursementTarget: 1000000, collectionTarget: 800000 }); }}>
-                                <Target className="h-4 w-4 text-primary" />
-                            </Button>
                             <Button variant="ghost" size="icon" asChild>
                                 <Link href={`/admin/finance/staff/${staff.uid}`}>
                                     <BarChart2 className="h-4 w-4" />
@@ -312,31 +254,6 @@ export function StaffPortfoliosTab({ loans, staffList }: StaffPortfoliosTabProps
         </CardContent>
       </Card>
 
-      <Dialog open={!!selectedStaffForGoal} onOpenChange={(o) => !o && setSelectedStaffForGoal(null)}>
-          <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                  <DialogTitle>Set Monthly Goals: {selectedStaffForGoal?.name}</DialogTitle>
-                  <DialogDescription>Assign performance targets for {format(new Date(), 'MMMM yyyy')}. These will appear on the staff's dashboard.</DialogDescription>
-              </DialogHeader>
-              <Form {...goalForm}>
-                  <form onSubmit={goalForm.handleSubmit(handleSetGoal)} className="space-y-4 pt-4">
-                      <FormField control={goalForm.control} name="onboardingTarget" render={({ field }) => (
-                          <FormItem><FormLabel>Onboarding Target (Members)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                      )} />
-                      <FormField control={goalForm.control} name="disbursementTarget" render={({ field }) => (
-                          <FormItem><FormLabel>Disbursement Target (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                      )} />
-                      <FormField control={goalForm.control} name="collectionTarget" render={({ field }) => (
-                          <FormItem><FormLabel>Collection Target (Ksh)</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
-                      )} />
-                      <DialogFooter className="pt-2">
-                          <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
-                          <Button type="submit" disabled={isGoalSubmitting}>{isGoalSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}Set Targets</Button>
-                      </DialogFooter>
-                  </form>
-              </Form>
-          </DialogContent>
-      </Dialog>
 
       <Card>
           <CardHeader className="pb-2">

@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useFirestore, useCollection, useAppUser } from '@/firebase';
+import { isSuperAdmin as checkSuperAdmin, canAccessSensitiveModules, canAccessStaffModules } from '@/lib/admin-auth';
 import { addInvestor, updateInvestor, deleteInvestor, approveDeposit, rejectDeposit, processWithdrawal, rejectWithdrawal, approveInvestmentApplication, rejectInvestmentApplication } from '@/lib/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -108,22 +109,14 @@ export default function InvestorsPage() {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     
     // Investors module is accessible to Staff, Finance and Super Admin roles.
-    const isSuperAdmin = useMemo(() => {
-        if (!currentUser) return false;
-        const email = currentUser.email?.toLowerCase()?.trim();
-        return email === 'simon@pezeka.com' 
-            || currentUser.uid === 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2'
-            || currentUser.uid === 'Z8gkNLZEVUWbsooR8R7OuHxApB62'
-            || currentUser.uid === 'zdf58EsGJKa2xr7D6RmNBS3gbx53';
-    }, [currentUser]);
+    const isSuperAdmin = useMemo(() => checkSuperAdmin(currentUser), [currentUser]);
+    const isFinance = useMemo(() => canAccessSensitiveModules(currentUser), [currentUser]);
+    const isStaff = useMemo(() => canAccessStaffModules(currentUser), [currentUser]);
 
-    const isFinance = useMemo(() => currentUser?.role?.toLowerCase()?.trim() === 'finance', [currentUser]);
-    const isStaff = useMemo(() => currentUser?.role?.toLowerCase()?.trim() === 'staff' || currentUser?.email?.endsWith('@staff.pezeka.com'), [currentUser]);
-
-    const canViewPage = isSuperAdmin || isFinance || isStaff;
+    const canViewPage = isStaff; // Staff includes Finance and Super Admin
 
     // Only Finance and Super Admin can manage portfolios (add/edit/delete)
-    const canEdit = isSuperAdmin || isFinance;
+    const canEdit = isFinance; // Finance includes Super Admin
 
     useEffect(() => {
         if (!userLoading && currentUser && !canViewPage) {

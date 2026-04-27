@@ -11,7 +11,7 @@ service cloud.firestore {
         request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' ||
         request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
         request.auth.uid == 'zdf58EsGJKa2xr7D6RmNBS3gbx53' ||
-        request.auth.token.email.matches('(?i)^simon@pezeka\\.com$')
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'simon@pezeka.com')
       );
     }
 
@@ -23,7 +23,7 @@ service cloud.firestore {
     function isFinance() {
       return isSimon() || (
         isSignedIn() && (
-          (request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')) ||
+          (request.auth.token.email != null && request.auth.token.email.lower().matches('^.*@finance\\.pezeka\\.com$')) ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'finance')
         )
@@ -34,8 +34,8 @@ service cloud.firestore {
       return isSimon() || isFinance() || (
         isSignedIn() && (
           (request.auth.token.email != null && (
-            request.auth.token.email.matches('(?i)^.*@staff\\.pezeka\\.com$') ||
-            request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')
+            request.auth.token.email.lower().matches('^.*@staff\\.pezeka\\.com$') ||
+            request.auth.token.email.lower().matches('^.*@finance\\.pezeka\\.com$')
           )) ||
           (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance'])
@@ -83,8 +83,9 @@ service cloud.firestore {
     }
 
     match /kyc_documents/{docId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff();
+      allow get: if isStaff() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow list: if isStaff() || (isSignedIn() && request.query.limit <= 50 && resource.data.customerId == request.auth.uid);
+      allow create: if isSignedIn() && (request.resource.data.customerId == request.auth.uid || isStaff());
       allow update, delete: if isFinance();
     }
 

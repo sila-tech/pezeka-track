@@ -13,14 +13,14 @@ service firebase.storage {
         request.auth.uid == 'Z8gkNLZEVUWbsooR8R7OuHxApB62' || 
         request.auth.uid == 'gHZ9n7s2b9X8fJ2kP3s5t8YxVOE2' ||
         request.auth.uid == 'zdf58EsGJKa2xr7D6RmNBS3gbx53' ||
-        request.auth.token.email.matches('(?i)^simon@pezeka\\.com$')
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'simon@pezeka.com')
       );
     }
 
     function isFinance() {
       return isSimon() || (
         isSignedIn() && (
-          request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@finance\\.pezeka\\.com$')
+          request.auth.token.email != null && request.auth.token.email.lower().matches('^.*@finance\\.pezeka\\.com$')
         )
       );
     }
@@ -28,7 +28,9 @@ service firebase.storage {
     function isStaff() {
       return isSimon() || isFinance() || (
         isSignedIn() && (
-          request.auth.token.email != null && request.auth.token.email.matches('(?i)^.*@staff\\.pezeka\\.com$')
+          (request.auth.token.email != null && request.auth.token.email.lower().matches('^.*@staff\\.pezeka\\.com$')) ||
+          firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['staff', 'finance']
         )
       );
     }
@@ -36,8 +38,7 @@ service firebase.storage {
     // --- KYC Documents ---
     
     match /kyc/{customerId}/{allPaths=**} {
-      allow read: if isStaff();
-      allow create: if isStaff();
+      allow read, create: if isStaff() || (isSignedIn() && request.auth.uid == customerId);
       allow update, delete: if isFinance();
     }
 
