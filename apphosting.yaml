@@ -9,3 +9,13 @@ runConfig:
 env:
   - variable: FIREBASE_CONFIG
     value: '{"projectId":"pezeka-8ad5e","appId":"1:793868989809:web:96e8346f917540a9277054","storageBucket":"pezeka-8ad5e.firebasestorage.app","locationId":"us-central1"}'
+  - variable: GEMINI_API_KEY
+    value: 'AIzaSyAxIHPPMWkWxJ6KMp_w5XMWhtUyogWDLxY'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: RESEND_API_KEY
+    value: 're_RGjGEBJf_JL8dayzB1Ji86iZbZ3CtrBFA'
+    availability:
+      - BUILD
+      - RUNTIME
